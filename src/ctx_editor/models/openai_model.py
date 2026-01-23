@@ -1,0 +1,110 @@
+"""OpenAI model client implementation."""
+
+import asyncio
+import os
+from typing import Any, Optional
+
+from openai import AsyncOpenAI, AsyncAzureOpenAI
+
+from .base import BaseModelClient, format_messages
+from ..core.types import ModelResponse
+
+
+class OpenAIModelClient(BaseModelClient):
+    """Async OpenAI/Azure model client."""
+
+    def __init__(self):
+        """Initialize the OpenAI client."""
+        if "AZURE_OPENAI_API_KEY" in os.environ and "AZURE_OPENAI_ENDPOINT" in os.environ:
+            self.client = AsyncAzureOpenAI(
+                api_key=os.environ["AZURE_OPENAI_API_KEY"],
+                azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
+                api_version="2024-10-01-preview",
+            )
+        else:
+            api_key = os.environ.get("OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError("OPENAI_API_KEY environment variable not set")
+            self.client = AsyncOpenAI(api_key=api_key)
+
+    async def generate(
+        self,
+        messages: list[dict],
+        model: str = "gpt-4o-mini",
+        temperature: float = 1.0,
+        max_tokens: Optional[int] = None,
+        timeout: int = 30,
+        max_retries: int = 3,
+        variables: Optional[dict[str, str]] = None,
+        is_json: bool = False,
+    ) -> ModelResponse:
+        """Generate a response from OpenAI.
+
+        Args:
+            messages: List of message dictionaries.
+            model: Model identifier.
+            temperature: Sampling temperature.
+            max_tokens: Maximum tokens to generate.
+            timeout: Request timeout in seconds.
+            max_retries: Maximum number of retries on failure.
+            variables: Optional variables to substitute in the prompt.
+            is_json: Whether to request JSON output.
+
+        Returns:
+            ModelResponse with generated content and metadata.
+        """
+        messages = format_messages(list(messages), variables or {})
+
+        # Handle o1 models that don't support system messages
+        if model.startswith("o1") and len(messages) > 1:
+            if messages[0]["role"] == "system" and messages[1]["role"] == "user":
+                system_content = messages[0]["content"]
+                messages[1]["content"] = f"System Message: {system_content}\n{messages[1]['content']}"
+                messages = messages[1:]
+
+        kwargs: dict[str, Any] = {}
+        if is_json:
+            kwargs["response_format"] = {"type": "json_object"}
+
+        last_error = None
+        for attempt in range(max_retries):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=model,
+                    messages=messages,
+                    timeout=timeout,
+                    max_completion_tokens=max_tokens,
+                    temperature=temperature,
+                    **kwargs,
+                )
+                break
+            except Exception as e:
+                last_error = e
+                if attempt < max_retries - 1:
+                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+        else:
+            raise RuntimeError(f"Failed after {max_retries} attempts: {last_error}")
+
+        response_dict = response.model_dump()
+        usage = response_dict["usage"]
+
+        prompt_tokens_cached = 0
+        if "prompt_tokens_details" in usage and usage["prompt_tokens_details"]:
+            prompt_tokens_cached = usage["prompt_tokens_details"].get("cached_tokens", 0)
+
+        total_usd = self._calculate_cost(
+            model=model,
+            prompt_tokens=usage["prompt_tokens"],
+            completion_tokens=usage["completion_tokens"],
+            prompt_tokens_cached=prompt_tokens_cached,
+        )
+
+        return ModelResponse(
+            content=response_dict["choices"][0]["message"]["content"],
+            total_tokens=usage["total_tokens"],
+            prompt_tokens=usage["prompt_tokens"],
+            completion_tokens=usage["completion_tokens"],
+            prompt_tokens_cached=prompt_tokens_cached,
+            total_usd=total_usd,
+            raw_response=response_dict,
+        )

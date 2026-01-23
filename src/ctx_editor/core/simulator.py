@@ -1,0 +1,227 @@
+"""Main conversation simulator."""
+
+from typing import TYPE_CHECKING, Any, Optional
+
+from .trace import ConversationTrace
+from .types import EvaluationResult, Message, SimulationResult, SimulatorConfig
+
+if TYPE_CHECKING:
+    from ..agents.user_agent import UserAgent
+    from ..agents.system_agent import SystemAgent
+    from ..cheatsheet.cheatsheet import Cheatsheet
+    from ..models.base import ModelClient
+    from ..strategies.base import ContextStrategy
+
+
+class ConversationSimulator:
+    """Orchestrates multi-turn conversations for evaluation.
+
+    Uses dependency injection for flexibility in mixing strategies,
+    agents, and models.
+    """
+
+    def __init__(
+        self,
+        sample: dict[str, Any],
+        task: Any,
+        user_agent: "UserAgent",
+        system_agent: "SystemAgent",
+        model_client: "ModelClient",
+        strategy: "ContextStrategy",
+        cheatsheet: Optional["Cheatsheet"] = None,
+        config: Optional[SimulatorConfig] = None,
+    ):
+        """Initialize the simulator.
+
+        Args:
+            sample: The sample data containing shards and metadata.
+            task: The task instance for evaluation.
+            user_agent: Agent for simulating user responses.
+            system_agent: Agent for verification and answer extraction.
+            model_client: Client for model API calls.
+            strategy: Strategy for context preparation.
+            cheatsheet: Optional cheatsheet for context augmentation.
+            config: Simulator configuration.
+        """
+        self.sample = sample
+        self.task = task
+        self.user_agent = user_agent
+        self.system_agent = system_agent
+        self.model_client = model_client
+        self.strategy = strategy
+        self.cheatsheet = cheatsheet
+        self.config = config or SimulatorConfig()
+
+        self.trace = ConversationTrace()
+        self.total_cost_usd = 0.0
+        self.is_completed = False
+        self.final_result: Optional[SimulationResult] = None
+
+        # Initialize with system message
+        system_prompt = task.generate_system_prompt(sample)
+        self.trace.add_system_message(system_prompt)
+
+    async def run(self, verbose: bool = False) -> SimulationResult:
+        """Run the full conversation simulation.
+
+        Args:
+            verbose: Whether to print conversation progress.
+
+        Returns:
+            SimulationResult with evaluation outcome and trace.
+        """
+        verbose = verbose or self.config.verbose
+
+        while not self.is_completed and self.trace.num_user_turns < self.config.max_turns:
+            await self._run_turn(verbose)
+
+        # Ensure we have a result
+        if self.final_result is None:
+            self.final_result = SimulationResult(
+                sample_id=self.sample.get("task_id", "unknown"),
+                task_name=self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown",
+                is_correct=False,
+                score=0.0,
+                num_turns=self.trace.num_user_turns,
+                total_cost_usd=self.total_cost_usd,
+                trace=self.trace.to_full_trace(),
+                metadata={"reason": "max_turns_reached"},
+            )
+
+        return self.final_result
+
+    async def _run_turn(self, verbose: bool = False) -> None:
+        """Execute a single conversation turn.
+
+        A turn consists of:
+        1. Generate user response
+        2. Apply context strategy
+        3. Generate assistant response
+        4. Verify and potentially evaluate
+
+        Args:
+            verbose: Whether to print progress.
+        """
+        # 1. Generate user response
+        user_response = await self.user_agent.generate_response(
+            trace=self.trace,
+            sample=self.sample,
+            model_client=self.model_client,
+            temperature=self.config.temperature,
+        )
+
+        self.trace.add_user_message(
+            content=user_response.content,
+            metadata={"cost_usd": user_response.cost_usd},
+        )
+        self.total_cost_usd += user_response.cost_usd
+
+        # Log shard revelation if applicable
+        if user_response.shard_id:
+            self.trace.add_log("shard_revealed", {"shard_id": user_response.shard_id})
+
+        if verbose:
+            print(f"\033[94m[user] {user_response.content}\033[0m")
+
+        # 2. Apply context strategy to prepare context
+        context_messages = await self.strategy.prepare_context(
+            trace=self.trace,
+            cheatsheet=self.cheatsheet,
+            model_client=self.model_client,
+        )
+
+        # Convert to dict format for API call
+        messages_for_api = [
+            msg.to_dict() if isinstance(msg, Message) else msg
+            for msg in context_messages
+        ]
+
+        # 3. Generate assistant response
+        is_reasoning_model = any(
+            m in self.config.assistant_model
+            for m in ["o1", "o3", "deepseek-r1"]
+        )
+        max_tokens = 16000 if is_reasoning_model else 2000
+
+        assistant_response = await self.model_client.generate(
+            messages=messages_for_api,
+            model=self.config.assistant_model,
+            temperature=self.config.temperature,
+            max_tokens=max_tokens,
+        )
+
+        self.trace.add_assistant_message(
+            content=assistant_response.content,
+            metadata={"cost_usd": assistant_response.total_usd},
+        )
+        self.total_cost_usd += assistant_response.total_usd
+
+        if verbose:
+            print(f"\033[91m[assistant] {assistant_response.content}\033[0m")
+
+        # 4. Verify the response
+        verification = await self.system_agent.verify_response(
+            trace=self.trace,
+            model_client=self.model_client,
+        )
+        self.total_cost_usd += verification.cost_usd
+
+        self.trace.add_log("verification", {
+            "response_type": verification.response_type,
+            "is_answer_attempt": verification.is_answer_attempt,
+        })
+
+        # 5. If this is an answer attempt, extract and evaluate
+        if verification.is_answer_attempt:
+            extraction = await self.system_agent.extract_answer(
+                trace=self.trace,
+                model_client=self.model_client,
+            )
+            self.total_cost_usd += extraction.cost_usd
+
+            # Evaluate the answer
+            evaluation_return = self.task.evaluator_function(
+                extraction.answer,
+                self.sample,
+            )
+
+            # Handle different evaluation return formats
+            if isinstance(evaluation_return, dict):
+                score = evaluation_return.get("score", 0.0)
+                is_correct = evaluation_return.get("is_correct", score == 1.0)
+            elif isinstance(evaluation_return, tuple):
+                is_correct, feedback = evaluation_return
+                score = 1.0 if is_correct else 0.0
+            else:
+                is_correct = bool(evaluation_return)
+                score = 1.0 if is_correct else 0.0
+
+            eval_result = EvaluationResult(
+                is_correct=is_correct,
+                score=score,
+                extracted_answer=extraction.answer,
+                raw_evaluation=evaluation_return if isinstance(evaluation_return, dict) else None,
+            )
+
+            self.trace.add_log("answer_evaluation", {
+                "extracted_answer": extraction.answer,
+                "is_correct": is_correct,
+                "score": score,
+            })
+
+            if verbose:
+                icon = "\033[92m✔\033[0m" if is_correct else "\033[91m✘\033[0m"
+                print(f"{icon} Score: {score}")
+
+            self.is_completed = True
+            self.final_result = SimulationResult(
+                sample_id=self.sample.get("task_id", "unknown"),
+                task_name=self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown",
+                is_correct=is_correct,
+                score=score,
+                num_turns=self.trace.num_user_turns,
+                total_cost_usd=self.total_cost_usd,
+                trace=self.trace.to_full_trace(),
+                extracted_answer=extraction.answer,
+                evaluation_result=eval_result,
+            )
