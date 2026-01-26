@@ -9,7 +9,7 @@ from ..core.types import ModelResponse
 
 
 def format_messages(messages: list[dict], variables: dict[str, str]) -> list[dict]:
-    """Format messages by replacing [[KEY]] placeholders with values.
+    """Format messages by replacing {key} placeholders with values.
 
     Args:
         messages: List of message dictionaries with 'role' and 'content'.
@@ -24,10 +24,18 @@ def format_messages(messages: list[dict], variables: dict[str, str]) -> list[dic
     # Find the last user message and apply substitutions
     for msg in reversed(messages):
         if msg["role"] == "user":
-            for key, value in variables.items():
-                key_string = f"[[{key}]]"
-                if key_string in msg["content"]:
-                    msg["content"] = msg["content"].replace(key_string, value)
+            # Use format_map to allow partial substitution (missing keys stay as-is)
+            try:
+                msg["content"] = msg["content"].format(**variables)
+            except KeyError:
+                # Fall back to format_map for partial substitution
+                from string import Formatter
+
+                class SafeDict(dict):
+                    def __missing__(self, key):
+                        return f"{{{key}}}"
+
+                msg["content"] = msg["content"].format_map(SafeDict(variables))
             break
 
     return messages

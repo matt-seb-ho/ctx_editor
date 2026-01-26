@@ -14,10 +14,11 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DECISION_PROMPT = """Analyze the current conversation and decide whether context compression would be beneficial.
+DECISION_PROMPT = """\
+Analyze the current conversation and decide whether context compression would be beneficial.
 
 <conversation>
-[[CONVERSATION]]
+{conversation}
 </conversation>
 
 Consider:
@@ -27,10 +28,10 @@ Consider:
 4. Would compression risk losing critical details?
 
 Respond with a JSON object:
-{
+{{
     "should_edit": true/false,
     "reasoning": "Brief explanation of your decision"
-}"""
+}}"""
 
 
 @dataclass
@@ -104,7 +105,7 @@ class AgenticEditStrategy(BaseStrategy):
 
         # Ask the model
         conversation_str = trace.get_conversation_string(skip_system=True)
-        prompt = self.decision_prompt.replace("[[CONVERSATION]]", conversation_str)
+        prompt = self.decision_prompt.format(conversation=conversation_str)
 
         response = await model_client.generate_json(
             messages=[{"role": "user", "content": prompt}],

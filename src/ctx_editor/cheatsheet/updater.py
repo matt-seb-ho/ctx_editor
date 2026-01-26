@@ -10,20 +10,21 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DEFAULT_REFLECTION_PROMPT = """You are updating a cheatsheet based on a completed conversation trajectory.
+DEFAULT_REFLECTION_PROMPT = """\
+You are updating a cheatsheet based on a completed conversation trajectory.
 
 <current_cheatsheet>
-[[CURRENT_CHEATSHEET]]
+{current_cheatsheet}
 </current_cheatsheet>
 
 <trajectory>
-Task: [[TASK_NAME]]
-Sample ID: [[SAMPLE_ID]]
-Outcome: [[OUTCOME]] (score: [[SCORE]])
-Number of turns: [[NUM_TURNS]]
+Task: {task_name}
+Sample ID: {sample_id}
+Outcome: {outcome} (score: {score})
+Number of turns: {num_turns}
 
 Conversation:
-[[CONVERSATION]]
+{conversation}
 </trajectory>
 
 Based on this trajectory, update the cheatsheet to capture any useful lessons learned. Consider:
@@ -116,21 +117,14 @@ class CheatsheetUpdater:
         conversation = self._extract_conversation(trajectory.trace)
         outcome = "Success" if trajectory.is_correct else "Failure"
 
-        prompt = self.reflection_prompt.replace(
-            "[[CURRENT_CHEATSHEET]]",
-            cheatsheet.content if cheatsheet.content else "(empty)",
-        ).replace(
-            "[[TASK_NAME]]", trajectory.task_name
-        ).replace(
-            "[[SAMPLE_ID]]", trajectory.sample_id
-        ).replace(
-            "[[OUTCOME]]", outcome
-        ).replace(
-            "[[SCORE]]", str(trajectory.score)
-        ).replace(
-            "[[NUM_TURNS]]", str(trajectory.num_turns)
-        ).replace(
-            "[[CONVERSATION]]", conversation
+        prompt = self.reflection_prompt.format(
+            current_cheatsheet=cheatsheet.content if cheatsheet.content else "(empty)",
+            task_name=trajectory.task_name,
+            sample_id=trajectory.sample_id,
+            outcome=outcome,
+            score=str(trajectory.score),
+            num_turns=str(trajectory.num_turns),
+            conversation=conversation,
         )
 
         # Generate updated cheatsheet

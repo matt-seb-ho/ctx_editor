@@ -3,7 +3,7 @@
 from typing import TYPE_CHECKING, Any, Optional
 
 from .trace import ConversationTrace
-from .types import EvaluationResult, Message, SimulationResult, SimulatorConfig
+from .types import EvaluationResult, Message, SimulationResult, SimulatorConfig, UsageStats
 
 if TYPE_CHECKING:
     from ..agents.user_agent import UserAgent
@@ -53,7 +53,7 @@ class ConversationSimulator:
         self.config = config or SimulatorConfig()
 
         self.trace = ConversationTrace()
-        self.total_cost_usd = 0.0
+        self.usage_stats = UsageStats()
         self.is_completed = False
         self.final_result: Optional[SimulationResult] = None
 
@@ -83,8 +83,9 @@ class ConversationSimulator:
                 is_correct=False,
                 score=0.0,
                 num_turns=self.trace.num_user_turns,
-                total_cost_usd=self.total_cost_usd,
-                trace=self.trace.to_full_trace(),
+                total_cost_usd=self.usage_stats.total_cost_usd(),
+                trace=self.trace.to_full_trace(include_history=self.config.include_trace_history),
+                usage_stats=self.usage_stats,
                 metadata={"reason": "max_turns_reached"},
             )
 
@@ -103,18 +104,21 @@ class ConversationSimulator:
             verbose: Whether to print progress.
         """
         # 1. Generate user response
+        user_cfg = self.config.model_config.user
         user_response = await self.user_agent.generate_response(
             trace=self.trace,
             sample=self.sample,
             model_client=self.model_client,
-            temperature=self.config.temperature,
+            temperature=user_cfg.temperature,
         )
 
         self.trace.add_user_message(
             content=user_response.content,
             metadata={"cost_usd": user_response.cost_usd},
         )
-        self.total_cost_usd += user_response.cost_usd
+        # Track usage for user role
+        if user_response.model_response:
+            self.usage_stats.record("user", user_response.model_response)
 
         # Log shard revelation if applicable
         if user_response.shard_id:
@@ -136,17 +140,14 @@ class ConversationSimulator:
             for msg in context_messages
         ]
 
-        # 3. Generate assistant response
-        is_reasoning_model = any(
-            m in self.config.assistant_model
-            for m in ["o1", "o3", "deepseek-r1"]
-        )
-        max_tokens = 16000 if is_reasoning_model else 2000
+        # 3. Generate assistant response using role config
+        assistant_cfg = self.config.model_config.assistant
+        max_tokens = assistant_cfg.get_effective_max_tokens()
 
         assistant_response = await self.model_client.generate(
             messages=messages_for_api,
-            model=self.config.assistant_model,
-            temperature=self.config.temperature,
+            model=assistant_cfg.model,
+            temperature=assistant_cfg.temperature,
             max_tokens=max_tokens,
         )
 
@@ -154,7 +155,7 @@ class ConversationSimulator:
             content=assistant_response.content,
             metadata={"cost_usd": assistant_response.total_usd},
         )
-        self.total_cost_usd += assistant_response.total_usd
+        self.usage_stats.record("assistant", assistant_response)
 
         if verbose:
             print(f"\033[91m[assistant] {assistant_response.content}\033[0m")
@@ -164,7 +165,9 @@ class ConversationSimulator:
             trace=self.trace,
             model_client=self.model_client,
         )
-        self.total_cost_usd += verification.cost_usd
+        # Track usage for system role
+        if verification.model_response:
+            self.usage_stats.record("system", verification.model_response)
 
         self.trace.add_log("verification", {
             "response_type": verification.response_type,
@@ -177,7 +180,9 @@ class ConversationSimulator:
                 trace=self.trace,
                 model_client=self.model_client,
             )
-            self.total_cost_usd += extraction.cost_usd
+            # Track usage for system role (extraction may have multiple attempts)
+            for model_response in extraction.model_responses:
+                self.usage_stats.record("system", model_response)
 
             # Evaluate the answer
             evaluation_return = self.task.evaluator_function(
@@ -220,8 +225,9 @@ class ConversationSimulator:
                 is_correct=is_correct,
                 score=score,
                 num_turns=self.trace.num_user_turns,
-                total_cost_usd=self.total_cost_usd,
-                trace=self.trace.to_full_trace(),
+                total_cost_usd=self.usage_stats.total_cost_usd(),
+                trace=self.trace.to_full_trace(include_history=self.config.include_trace_history),
                 extracted_answer=extraction.answer,
                 evaluation_result=eval_result,
+                usage_stats=self.usage_stats,
             )

@@ -12,13 +12,14 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DEFAULT_REFLECTION_PROMPT = """Analyze the conversation so far and provide a brief reflection that will help the assistant respond more effectively.
+DEFAULT_REFLECTION_PROMPT = """\
+Analyze the conversation so far and provide a brief reflection that will help the assistant respond more effectively.
 
 <conversation>
-[[CONVERSATION]]
+{conversation}
 </conversation>
 
-[[CHEATSHEET_SECTION]]
+{cheatsheet_section}
 
 Consider:
 1. What is the user's core goal or question?
@@ -96,8 +97,10 @@ Reference this cheatsheet when reflecting:
 </cheatsheet>
 """
 
-        prompt = self.reflection_prompt.replace("[[CONVERSATION]]", conversation_str)
-        prompt = prompt.replace("[[CHEATSHEET_SECTION]]", cheatsheet_section)
+        prompt = self.reflection_prompt.format(
+            conversation=conversation_str,
+            cheatsheet_section=cheatsheet_section,
+        )
 
         response = await model_client.generate(
             messages=[{"role": "user", "content": prompt}],

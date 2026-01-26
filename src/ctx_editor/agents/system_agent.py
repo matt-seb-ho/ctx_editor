@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
-from ..core.types import VerificationResult
+from ..core.types import ModelResponse, VerificationResult
 from ..utils.helpers import load_prompt
 
 if TYPE_CHECKING:
@@ -12,21 +12,22 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DEFAULT_VERIFICATION_PROMPT = """Analyze the assistant's last response and categorize it.
+DEFAULT_VERIFICATION_PROMPT = """\
+Analyze the assistant's last response and categorize it.
 
 <initial_query>
-[[INITIAL_SHARD]]
+{initial_shard}
 </initial_query>
 
 <additional_requirements>
-[[SHARDS]]
+{shards}
 </additional_requirements>
 
 <last_turn>
-[[CONVERSATION_SO_FAR]]
+{conversation_so_far}
 </last_turn>
 
-The answer should be: [[ANSWER_DESCRIPTION]]
+The answer should be: {answer_description}
 
 Categorize the assistant's response as one of:
 - "answer_attempt": The assistant is providing what they believe to be the final answer
@@ -35,38 +36,34 @@ Categorize the assistant's response as one of:
 - "other": None of the above
 
 Respond with a JSON object:
-{
-    "response_type": "answer_attempt" | "clarification" | "partial_answer" | "other",
-    "reasoning": "Brief explanation"
-}"""
+{{"response_type": "answer_attempt" | "clarification" | "partial_answer" | "other", "reasoning": "Brief explanation"}}"""
 
 
-DEFAULT_EXTRACTION_PROMPT_GEN = """Extract the final answer from the assistant's response.
+DEFAULT_EXTRACTION_PROMPT_GEN = """\
+Extract the final answer from the assistant's response.
 
 <assistant_response>
-[[ASSISTANT_RESPONSE]]
+{assistant_response}
 </assistant_response>
 
-The answer should be: [[ANSWER_DESCRIPTION]]
+The answer should be: {answer_description}
 
 Respond with a JSON object:
-{
-    "answer": "The extracted answer"
-}"""
+{{"answer": "The extracted answer"}}"""
 
 
-DEFAULT_EXTRACTION_PROMPT_PREFIX_SUFFIX = """Extract the final answer from the assistant's response by identifying the prefix and suffix that bound it.
+DEFAULT_EXTRACTION_PROMPT_PREFIX_SUFFIX = """\
+Extract the final answer from the assistant's response by identifying the prefix \
+and suffix that bound it.
 
 <assistant_response>
-[[ASSISTANT_RESPONSE]]
+{assistant_response}
 </assistant_response>
 
-The answer should be: [[ANSWER_DESCRIPTION]]
+The answer should be: {answer_description}
 
 Respond with a JSON object:
-{
-    "answer": "prefix of the answer [...] suffix of the answer"
-}
+{{"answer": "prefix of the answer [...] suffix of the answer"}}
 
 Use [...] to indicate content in between that should be included."""
 
@@ -76,6 +73,11 @@ class ExtractionResult:
     """Result of answer extraction."""
     answer: str
     cost_usd: float = 0.0
+    model_responses: list[ModelResponse] = None  # For detailed usage tracking (may have multiple attempts)
+
+    def __post_init__(self):
+        if self.model_responses is None:
+            self.model_responses = []
 
 
 class SystemAgent:
@@ -157,14 +159,11 @@ class SystemAgent:
         shards = self.sample["shards"][1:]
         last_turn_text = trace.get_conversation_string(only_last_turn=True)
 
-        prompt = self.verification_prompt.replace(
-            "[[CONVERSATION_SO_FAR]]", last_turn_text
-        ).replace(
-            "[[INITIAL_SHARD]]", initial_query
-        ).replace(
-            "[[SHARDS]]", json.dumps(shards)
-        ).replace(
-            "[[ANSWER_DESCRIPTION]]", self.answer_description
+        prompt = self.verification_prompt.format(
+            conversation_so_far=last_turn_text,
+            initial_shard=initial_query,
+            shards=json.dumps(shards),
+            answer_description=self.answer_description,
         )
 
         response = await model_client.generate_json(
@@ -178,6 +177,7 @@ class SystemAgent:
             response_type=result.get("response_type", "other"),
             cost_usd=response.total_usd,
             raw_response=result,
+            model_response=response,
         )
 
     async def extract_answer(
@@ -216,12 +216,12 @@ class SystemAgent:
 
         extracted_answer = None
         total_cost = 0.0
+        model_responses = []
 
         for _ in range(self.max_extraction_attempts):
-            prompt = self.extraction_prompt.replace(
-                "[[ASSISTANT_RESPONSE]]", last_turn_text
-            ).replace(
-                "[[ANSWER_DESCRIPTION]]", self.answer_description
+            prompt = self.extraction_prompt.format(
+                assistant_response=last_turn_text,
+                answer_description=self.answer_description,
             )
 
             response = await model_client.generate_json(
@@ -230,6 +230,7 @@ class SystemAgent:
                 temperature=0.0,
             )
             total_cost += response.total_usd
+            model_responses.append(response)
 
             result = response.content
 
@@ -256,4 +257,4 @@ class SystemAgent:
         if extracted_answer is None:
             extracted_answer = ""
 
-        return ExtractionResult(answer=extracted_answer, cost_usd=total_cost)
+        return ExtractionResult(answer=extracted_answer, cost_usd=total_cost, model_responses=model_responses)

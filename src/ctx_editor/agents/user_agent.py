@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
+from ..core.types import ModelResponse
 from ..utils.helpers import load_prompt
 
 if TYPE_CHECKING:
@@ -11,27 +12,30 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DEFAULT_USER_PROMPT = """You are simulating a user who is gradually revealing information to an assistant. Based on the conversation so far and the information you still need to reveal, generate the next user response.
+DEFAULT_USER_PROMPT = """\
+You are simulating a user who is gradually revealing information to an assistant. \
+Based on the conversation so far and the information you still need to reveal, \
+generate the next user response.
 
 <conversation_so_far>
-[[CONVERSATION_SO_FAR]]
+{conversation_so_far}
 </conversation_so_far>
 
 <information_already_revealed>
-[[SHARDS_REVEALED]]
+{shards_revealed}
 </information_already_revealed>
 
 <information_not_yet_revealed>
-[[SHARDS_NOT_REVEALED]]
+{shards_not_revealed}
 </information_not_yet_revealed>
 
-Based on the assistant's response, choose the most appropriate piece of information to reveal next (if any) and craft a natural user response. The user should reveal information gradually in response to the assistant's questions or when it's contextually appropriate.
+Based on the assistant's response, choose the most appropriate piece of information \
+to reveal next (if any) and craft a natural user response. The user should reveal \
+information gradually in response to the assistant's questions or when it's \
+contextually appropriate.
 
 Respond with a JSON object:
-{
-    "response": "The user's next message",
-    "shard_id": "The ID of the shard being revealed (or null if no new information)"
-}"""
+{{"response": "The user's next message", "shard_id": "The ID of the shard being revealed (or null if no new information)"}}"""
 
 
 @dataclass
@@ -40,6 +44,7 @@ class UserResponse:
     content: str
     shard_id: Optional[str] = None
     cost_usd: float = 0.0
+    model_response: Optional[ModelResponse] = None  # For detailed usage tracking
 
 
 class UserAgent:
@@ -123,12 +128,10 @@ class UserAgent:
 
         # Build the prompt
         conversation_str = trace.get_conversation_string(skip_system=True)
-        prompt = self.prompt_response.replace(
-            "[[CONVERSATION_SO_FAR]]", conversation_str
-        ).replace(
-            "[[SHARDS_REVEALED]]", json.dumps(shards_revealed)
-        ).replace(
-            "[[SHARDS_NOT_REVEALED]]", json.dumps(shards_not_revealed)
+        prompt = self.prompt_response.format(
+            conversation_so_far=conversation_str,
+            shards_revealed=json.dumps(shards_revealed),
+            shards_not_revealed=json.dumps(shards_not_revealed),
         )
 
         # Generate response
@@ -143,4 +146,5 @@ class UserAgent:
             content=result.get("response", ""),
             shard_id=result.get("shard_id"),
             cost_usd=response.total_usd,
+            model_response=response,
         )

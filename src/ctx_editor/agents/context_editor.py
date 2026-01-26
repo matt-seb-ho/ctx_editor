@@ -11,13 +11,14 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DEFAULT_EDITOR_PROMPT = """You are a context editor. Analyze the conversation and create a condensed summary.
+DEFAULT_EDITOR_PROMPT = """\
+You are a context editor. Analyze the conversation and create a condensed summary.
 
 <conversation>
-[[CONVERSATION]]
+{conversation}
 </conversation>
 
-[[CHEATSHEET_SECTION]]
+{cheatsheet_section}
 
 Create a condensed context preserving:
 1. The user's core request and requirements
@@ -102,8 +103,10 @@ Use this guidance to identify what information is most important:
 """
 
         # Build prompt
-        prompt = self.prompt.replace("[[CONVERSATION]]", conversation_str)
-        prompt = prompt.replace("[[CHEATSHEET_SECTION]]", cheatsheet_section)
+        prompt = self.prompt.format(
+            conversation=conversation_str,
+            cheatsheet_section=cheatsheet_section,
+        )
 
         # Generate edited context
         response = await model_client.generate(

@@ -12,7 +12,8 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DEFAULT_EDITOR_PROMPT = """You are a context editor. Your task is to condense the conversation history into a concise summary that preserves all essential information needed for the assistant to continue the conversation effectively.
+DEFAULT_EDITOR_PROMPT = """\
+You are a context editor. Your task is to condense the conversation history into a concise summary that preserves all essential information needed for the assistant to continue the conversation effectively.
 
 Given the conversation so far, create a condensed version that:
 1. Preserves the user's original request and key requirements
@@ -21,10 +22,10 @@ Given the conversation so far, create a condensed version that:
 4. Removes redundant back-and-forth while keeping critical context
 
 <conversation>
-[[CONVERSATION]]
+{conversation}
 </conversation>
 
-[[CHEATSHEET_SECTION]]
+{cheatsheet_section}
 
 Provide a condensed context that the assistant can use to continue helping the user. Focus on information density - what does the assistant absolutely need to know to respond effectively?
 
@@ -96,8 +97,10 @@ Use this cheatsheet to help identify what information is most important to prese
 """
 
         # Format the editor prompt
-        prompt = self.editor_prompt.replace("[[CONVERSATION]]", conversation_str)
-        prompt = prompt.replace("[[CHEATSHEET_SECTION]]", cheatsheet_section)
+        prompt = self.editor_prompt.format(
+            conversation=conversation_str,
+            cheatsheet_section=cheatsheet_section,
+        )
 
         return prompt
 
