@@ -27,7 +27,7 @@ class BatchedRunner(ExperimentRunner):
         model_client: Optional[ModelClient] = None,
         updater: Optional[CheatsheetUpdater] = None,
         save_cheatsheet_path: Optional[str] = None,
-        progress_callback: Optional[Callable[[int, int, int], None]] = None,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
     ):
         """Initialize the batched runner.
 
@@ -37,7 +37,7 @@ class BatchedRunner(ExperimentRunner):
             model_client: Model client for cheatsheet updates.
             updater: CheatsheetUpdater instance.
             save_cheatsheet_path: Path to save cheatsheet after each batch.
-            progress_callback: Optional callback(batch_num, total_batches, completed_problems).
+            progress_callback: Optional callback(completed, total) for progress updates.
         """
         self.batch_size = batch_size
         self.max_concurrent = max_concurrent
@@ -125,7 +125,7 @@ class BatchedRunner(ExperimentRunner):
 
             # Progress callback
             if self.progress_callback:
-                self.progress_callback(batch_num, total_batches, len(all_results))
+                self.progress_callback(len(all_results), len(problems))
 
             # Log batch summary
             batch_scores = [r.score for r in batch_results]
@@ -176,6 +176,10 @@ class BatchedRunner(ExperimentRunner):
                 result = await simulator.run()
                 results.append(result)
 
+                # Progress callback
+                if self.progress_callback:
+                    self.progress_callback(len(results), len(problems))
+
                 # Update cheatsheet after each problem
                 if self.model_client:
                     cheatsheet = await self.updater.update_from_trajectory(
@@ -196,5 +200,8 @@ class BatchedRunner(ExperimentRunner):
                     trace=[],
                     metadata={"error": str(e)},
                 ))
+                # Progress callback even on error
+                if self.progress_callback:
+                    self.progress_callback(len(results), len(problems))
 
         return results

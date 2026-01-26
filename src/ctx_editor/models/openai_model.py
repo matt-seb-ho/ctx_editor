@@ -7,7 +7,7 @@ from typing import Any, Optional
 from openai import AsyncOpenAI, AsyncAzureOpenAI
 
 from .base import BaseModelClient, format_messages
-from ..core.types import ModelResponse
+from ..core.types import ModelResponse, ReasoningEffort
 
 
 class OpenAIModelClient(BaseModelClient):
@@ -37,6 +37,7 @@ class OpenAIModelClient(BaseModelClient):
         max_retries: int = 3,
         variables: Optional[dict[str, str]] = None,
         is_json: bool = False,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> ModelResponse:
         """Generate a response from OpenAI.
 
@@ -49,11 +50,20 @@ class OpenAIModelClient(BaseModelClient):
             max_retries: Maximum number of retries on failure.
             variables: Optional variables to substitute in the prompt.
             is_json: Whether to request JSON output.
+            reasoning_effort: Reasoning effort level for reasoning models.
 
         Returns:
             ModelResponse with generated content and metadata.
         """
         messages = format_messages(list(messages), variables or {})
+
+        # Enforce temperature=1.0 for gpt-5 models (API requirement)
+        if model.startswith("gpt-5") and temperature != 1.0:
+            import logging
+            logging.getLogger("ctx_editor").warning(
+                f"gpt-5 models require temperature=1.0, overriding {temperature} -> 1.0"
+            )
+            temperature = 1.0
 
         # Handle o1 models that don't support system messages
         if model.startswith("o1") and len(messages) > 1:
@@ -65,6 +75,8 @@ class OpenAIModelClient(BaseModelClient):
         kwargs: dict[str, Any] = {}
         if is_json:
             kwargs["response_format"] = {"type": "json_object"}
+        if reasoning_effort:
+            kwargs["reasoning_effort"] = reasoning_effort
 
         last_error = None
         for attempt in range(max_retries):

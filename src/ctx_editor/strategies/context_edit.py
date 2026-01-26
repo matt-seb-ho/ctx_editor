@@ -13,13 +13,19 @@ if TYPE_CHECKING:
 
 
 DEFAULT_EDITOR_PROMPT = """\
-You are a context editor. Your task is to condense the conversation history into a concise summary that preserves all essential information needed for the assistant to continue the conversation effectively.
+You are a context editor. Your task is to condense the conversation history into a concise summary that preserves essential information while removing content that could mislead the assistant.
 
 Given the conversation so far, create a condensed version that:
 1. Preserves the user's original request and key requirements
 2. Keeps track of all revealed information and constraints
-3. Maintains any partial progress or intermediate results
+3. Maintains ONLY still-valid progress and intermediate results
 4. Removes redundant back-and-forth while keeping critical context
+
+IMPORTANT - Remove or correct these common sources of confusion:
+- Premature answer attempts that were later shown to be wrong
+- Invalid assumptions that were corrected by subsequent information
+- Outdated intermediate work that was invalidated by new constraints
+- Incorrect reasoning paths that led nowhere
 
 <conversation>
 {conversation}
@@ -27,7 +33,7 @@ Given the conversation so far, create a condensed version that:
 
 {cheatsheet_section}
 
-Provide a condensed context that the assistant can use to continue helping the user. Focus on information density - what does the assistant absolutely need to know to respond effectively?
+Provide a condensed context that the assistant can use to continue helping the user. Focus on information density and accuracy - include only what the assistant needs to know, and ensure nothing misleading remains.
 
 Condensed context:"""
 

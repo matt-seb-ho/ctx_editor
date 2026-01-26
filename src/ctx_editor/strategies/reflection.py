@@ -28,7 +28,13 @@ Consider:
 4. What progress has been made toward the goal?
 5. What information might still be missing?
 
-Provide a concise reflection (2-4 sentences) summarizing the state of the conversation and what the assistant should focus on:"""
+IMPORTANT - Flag any issues that could mislead the assistant:
+- Were there premature answer attempts that turned out to be wrong?
+- Are there assumptions in the conversation that were later invalidated?
+- Is there intermediate work that is now outdated due to new information?
+If any of these exist, explicitly note them so the assistant knows to disregard them.
+
+Provide a concise reflection (2-4 sentences) summarizing the state of the conversation, what the assistant should focus on, and any prior mistakes to avoid repeating:"""
 
 
 class ReflectionStrategy(BaseStrategy):

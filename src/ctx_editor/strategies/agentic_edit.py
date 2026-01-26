@@ -21,11 +21,14 @@ Analyze the current conversation and decide whether context compression would be
 {conversation}
 </conversation>
 
-Consider:
-1. Is the conversation getting long with redundant information?
-2. Are there repeated clarifications that can be summarized?
-3. Is there important information scattered across many turns?
-4. Would compression risk losing critical details?
+Consider these common failure modes that compression can help address:
+1. Premature answer attempts - did the assistant make guesses that were later invalidated?
+2. Invalid assumptions - are there assumptions in the context that turned out to be wrong?
+3. Outdated intermediate work - is there prior reasoning/work that was invalidated by new information?
+4. Redundant clarifications - are there repeated exchanges that can be summarized?
+5. Information scatter - is critical information spread across many turns?
+
+Compression is beneficial when the context contains invalidated work or wrong assumptions that might mislead the assistant. Compression is risky if it might lose still-valid critical details.
 
 Respond with a JSON object:
 {{

@@ -3,22 +3,24 @@
 
 import asyncio
 import json
-import sys
+from collections import defaultdict
 from pathlib import Path
 from typing import Any, Optional
 
 import hydra
+from dotenv import load_dotenv
 from omegaconf import DictConfig, OmegaConf
+from tqdm import tqdm
 
-# Add lic to path for task imports
-sys.path.insert(0, str(Path(__file__).parent.parent / "lic"))
-
-from ctx_editor.core import ConversationSimulator, SimulatorConfig
 from ctx_editor.agents import UserAgent, SystemAgent
-from ctx_editor.models import OpenAIModelClient, AnthropicModelClient
 from ctx_editor.cheatsheet import Cheatsheet, CheatsheetUpdater
-from ctx_editor.execution import ParallelRunner, BatchedRunner
-from ctx_editor.utils.logging import setup_logging, save_results, save_metrics, get_logger
+from ctx_editor.core import ConversationSimulator, SimulatorConfig
+from ctx_editor.execution import BatchedRunner, ParallelRunner
+from ctx_editor.models import AnthropicModelClient, OpenAIModelClient
+from ctx_editor.utils.logging import get_logger, save_metrics, save_results, setup_logging
+
+# Load environment variables from .env file at repo root
+load_dotenv(Path(__file__).parent.parent.parent / ".env")
 
 
 def get_task(task_name: str, version: str = None):
@@ -184,6 +186,13 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     # Run experiment
     execution_mode = cfg.execution.mode
 
+    # Create progress bar
+    pbar = tqdm(total=len(samples), desc="Running samples", unit="sample")
+
+    def update_progress(completed: int, total: int) -> None:
+        pbar.n = completed
+        pbar.refresh()
+
     if execution_mode == "batched" and cfg.cheatsheet.enabled and cfg.cheatsheet.source == "continual":
         # Batched execution with continual learning
         runner = BatchedRunner(
@@ -192,6 +201,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             model_client=model_client,
             updater=CheatsheetUpdater(),
             save_cheatsheet_path=cfg.cheatsheet.get("save_path"),
+            progress_callback=update_progress,
         )
         results = await runner.run(samples, make_simulator, cheatsheet)
     elif execution_mode == "sequential":
@@ -201,19 +211,47 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             max_concurrent=1,
             model_client=model_client,
             updater=CheatsheetUpdater(),
+            progress_callback=update_progress,
         )
         results = await runner.run_sequential(samples, make_simulator, cheatsheet)
     else:
         # Parallel execution (default)
-        runner = ParallelRunner(max_concurrent=cfg.execution.max_concurrent)
+        runner = ParallelRunner(
+            max_concurrent=cfg.execution.max_concurrent,
+            progress_callback=update_progress,
+        )
         results = await runner.run(samples, make_simulator, cheatsheet)
 
-    # Compute metrics
+    pbar.close()
+
+    # Compute overall metrics
     total = len(results)
     correct = sum(1 for r in results if r.is_correct)
     avg_score = sum(r.score for r in results) / total if total > 0 else 0
     total_cost = sum(r.total_cost_usd for r in results)
     avg_turns = sum(r.num_turns for r in results) / total if total > 0 else 0
+
+    # Compute per-task metrics
+    results_by_task = defaultdict(list)
+    for r in results:
+        results_by_task[r.task_name].append(r)
+
+    per_task_metrics = {}
+    for task_name, task_results in sorted(results_by_task.items()):
+        task_total = len(task_results)
+        task_correct = sum(1 for r in task_results if r.is_correct)
+        task_avg_score = sum(r.score for r in task_results) / task_total if task_total > 0 else 0
+        task_cost = sum(r.total_cost_usd for r in task_results)
+        task_avg_turns = sum(r.num_turns for r in task_results) / task_total if task_total > 0 else 0
+
+        per_task_metrics[task_name] = {
+            "total_samples": task_total,
+            "correct": task_correct,
+            "accuracy": task_correct / task_total if task_total > 0 else 0,
+            "average_score": task_avg_score,
+            "total_cost_usd": task_cost,
+            "average_turns": task_avg_turns,
+        }
 
     metrics = {
         "experiment_name": cfg.experiment_name,
@@ -224,11 +262,22 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         "total_cost_usd": total_cost,
         "average_turns": avg_turns,
         "execution_mode": execution_mode,
+        "per_task": per_task_metrics,
     }
 
+    # Log overall metrics
     logger.info(f"Results: {correct}/{total} correct ({metrics['accuracy']:.2%})")
     logger.info(f"Average score: {avg_score:.3f}")
     logger.info(f"Total cost: ${total_cost:.4f}")
+
+    # Log per-task metrics
+    if len(per_task_metrics) > 1:
+        logger.info("Per-task breakdown:")
+        for task_name, task_metrics in sorted(per_task_metrics.items()):
+            logger.info(
+                f"  {task_name}: {task_metrics['correct']}/{task_metrics['total_samples']} "
+                f"({task_metrics['accuracy']:.2%}), avg_score={task_metrics['average_score']:.3f}"
+            )
 
     # Save results
     output_dir = cfg.logging.output_dir
@@ -280,7 +329,24 @@ def main(cfg: DictConfig) -> None:
     print(f"Average Score: {metrics['average_score']:.3f}")
     print(f"Total Cost: ${metrics['total_cost_usd']:.4f}")
     print(f"Average Turns: {metrics['average_turns']:.1f}")
-    print(f"Results saved to: {cfg.logging.output_dir}")
+
+    # Print per-task breakdown if multiple tasks
+    per_task = metrics.get("per_task", {})
+    if len(per_task) > 1:
+        print("\n" + "-" * 50)
+        print("PER-TASK BREAKDOWN")
+        print("-" * 50)
+        print(f"{'Task':<15} {'Accuracy':<12} {'Avg Score':<12} {'Cost':<10}")
+        print("-" * 50)
+        for task_name, task_metrics in sorted(per_task.items()):
+            acc_str = f"{task_metrics['accuracy']:.1%} ({task_metrics['correct']}/{task_metrics['total_samples']})"
+            print(
+                f"{task_name:<15} {acc_str:<12} "
+                f"{task_metrics['average_score']:<12.3f} ${task_metrics['total_cost_usd']:<9.4f}"
+            )
+        print("-" * 50)
+
+    print(f"\nResults saved to: {cfg.logging.output_dir}")
 
 
 if __name__ == "__main__":
