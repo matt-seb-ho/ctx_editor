@@ -218,16 +218,20 @@ class ConversationSimulator:
                 icon = "\033[92m✔\033[0m" if is_correct else "\033[91m✘\033[0m"
                 print(f"{icon} Score: {score}")
 
-            self.is_completed = True
-            self.final_result = SimulationResult(
-                sample_id=self.sample.get("task_id", "unknown"),
-                task_name=self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown",
-                is_correct=is_correct,
-                score=score,
-                num_turns=self.trace.num_user_turns,
-                total_cost_usd=self.usage_stats.total_cost_usd(),
-                trace=self.trace.to_full_trace(include_history=self.config.include_trace_history),
-                extracted_answer=extraction.answer,
-                evaluation_result=eval_result,
-                usage_stats=self.usage_stats,
-            )
+            # Only mark as completed if the answer is correct
+            # This matches the original LiC behavior - incorrect answers allow
+            # the conversation to continue so more shards can be revealed
+            if is_correct:
+                self.is_completed = True
+                self.final_result = SimulationResult(
+                    sample_id=self.sample.get("task_id", "unknown"),
+                    task_name=self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown",
+                    is_correct=is_correct,
+                    score=score,
+                    num_turns=self.trace.num_user_turns,
+                    total_cost_usd=self.usage_stats.total_cost_usd(),
+                    trace=self.trace.to_full_trace(include_history=self.config.include_trace_history),
+                    extracted_answer=extraction.answer,
+                    evaluation_result=eval_result,
+                    usage_stats=self.usage_stats,
+                )

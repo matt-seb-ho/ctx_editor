@@ -12,6 +12,7 @@ def setup_logging(
     output_dir: Optional[str] = None,
     level: int = logging.INFO,
     log_file: str = "experiment.log",
+    verbose_log_file: str = "verbose.log",
 ) -> logging.Logger:
     """Set up logging with file and console handlers.
 
@@ -19,6 +20,7 @@ def setup_logging(
         output_dir: Directory for log files. If None, only console logging.
         level: Logging level.
         log_file: Name of the log file.
+        verbose_log_file: Name of the verbose log file for noisy loggers.
 
     Returns:
         Configured logger instance.
@@ -29,7 +31,7 @@ def setup_logging(
     # Clear existing handlers
     logger.handlers.clear()
 
-    # Console handler
+    # Console handler - only for ctx_editor logger
     console_handler = logging.StreamHandler()
     console_handler.setLevel(level)
     console_format = logging.Formatter(
@@ -39,7 +41,7 @@ def setup_logging(
     console_handler.setFormatter(console_format)
     logger.addHandler(console_handler)
 
-    # File handler
+    # File handler for ctx_editor
     if output_dir:
         output_path = Path(output_dir)
         output_path.mkdir(parents=True, exist_ok=True)
@@ -47,6 +49,21 @@ def setup_logging(
         file_handler.setLevel(level)
         file_handler.setFormatter(console_format)
         logger.addHandler(file_handler)
+
+        # Verbose file handler for noisy loggers (httpx, openai, etc.)
+        # These go to file only, not console
+        verbose_handler = logging.FileHandler(output_path / verbose_log_file)
+        verbose_handler.setLevel(logging.DEBUG)
+        verbose_handler.setFormatter(console_format)
+
+        # Configure noisy third-party loggers to only log to file
+        noisy_loggers = ["httpx", "httpcore", "openai", "anthropic"]
+        for logger_name in noisy_loggers:
+            noisy_logger = logging.getLogger(logger_name)
+            noisy_logger.handlers.clear()
+            noisy_logger.addHandler(verbose_handler)
+            noisy_logger.setLevel(logging.DEBUG)
+            noisy_logger.propagate = False  # Don't propagate to root logger
 
     return logger
 

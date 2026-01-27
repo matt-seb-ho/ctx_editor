@@ -8,12 +8,12 @@ are available without path manipulation.
 try:
     from lic.tasks import get_task
     from lic.tasks.tasks import (
+        TaskActions,
+        TaskCode,
+        TaskData2Text,
         TaskDatabase,
         TaskMath,
-        TaskCode,
         TaskSummary,
-        TaskData2Text,
-        TaskActions,
         TaskTranslation,
     )
 except ImportError:

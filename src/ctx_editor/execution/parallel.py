@@ -1,6 +1,7 @@
 """Parallel execution runner."""
 
 import asyncio
+import traceback
 from typing import Any, Callable, Optional
 
 from .runner import ExperimentRunner
@@ -78,7 +79,7 @@ class ParallelRunner(ExperimentRunner):
 
                 except Exception as e:
                     self.logger.error(
-                        f"Error on problem {problem.get('task_id', 'unknown')}: {e}"
+                        f"Error on problem {problem.get('task_id', 'unknown')}:\n{traceback.format_exc()}"
                     )
                     # Return a failed result
                     completed += 1

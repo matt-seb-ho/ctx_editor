@@ -1,8 +1,8 @@
 """Core components for the context editor system."""
 
-from .types import Message, SimulationResult, VerificationResult, SimulatorConfig
-from .trace import ConversationTrace
 from .simulator import ConversationSimulator
+from .trace import ConversationTrace
+from .types import Message, ModelConfig, SimulationResult, SimulatorConfig, VerificationResult
 
 __all__ = [
     "Message",
@@ -11,4 +11,5 @@ __all__ = [
     "SimulatorConfig",
     "ConversationTrace",
     "ConversationSimulator",
+    "ModelConfig",
 ]

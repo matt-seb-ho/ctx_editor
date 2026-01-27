@@ -236,6 +236,8 @@ class SystemAgent:
 
             if self.answer_extraction_strategy == "gen":
                 extracted_answer = result.get("answer", "")
+                if extracted_answer is not None:
+                    extracted_answer = str(extracted_answer)
             else:  # prefix_suffix
                 extractor_response = result.get("answer", "")
                 if "[...]" in extractor_response and extractor_response.count("[...]") == 1:

@@ -12,15 +12,16 @@ from dotenv import load_dotenv
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-from ctx_editor.agents import UserAgent, SystemAgent
+from ctx_editor.agents import SystemAgent, UserAgent
 from ctx_editor.cheatsheet import Cheatsheet, CheatsheetUpdater
-from ctx_editor.core import ConversationSimulator, SimulatorConfig
+from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
 from ctx_editor.execution import BatchedRunner, ParallelRunner
 from ctx_editor.models import AnthropicModelClient, OpenAIModelClient
 from ctx_editor.utils.logging import get_logger, save_metrics, save_results, setup_logging
+from lic.paths import PROJECT_ROOT
 
 # Load environment variables from .env file at repo root
-load_dotenv(Path(__file__).parent.parent.parent / ".env")
+load_dotenv(PROJECT_ROOT / ".env")
 
 
 def get_task(task_name: str, version: str = None):
@@ -29,21 +30,26 @@ def get_task(task_name: str, version: str = None):
     Bridges to the existing LIC tasks module.
     """
     try:
-        from tasks import get_task as lic_get_task
+        from lic.tasks import get_task as lic_get_task
+
         return lic_get_task(task_name, version)
     except ImportError:
         # Fallback: try to import directly
         if task_name == "math":
-            from tasks.math import TaskMath
+            from ctx_editor.tasks import TaskMath
+
             return TaskMath(version=version) if version else TaskMath()
         elif task_name == "code":
-            from tasks.code import TaskCode
+            from ctx_editor.tasks import TaskCode
+
             return TaskCode(version=version) if version else TaskCode()
         elif task_name.startswith("database"):
-            from tasks.database import TaskDatabase
+            from ctx_editor.tasks import TaskDatabase
+
             return TaskDatabase(version=version) if version else TaskDatabase()
         elif task_name.startswith("actions"):
-            from tasks.actions import TaskActions
+            from ctx_editor.tasks import TaskActions
+
             return TaskActions(version=version) if version else TaskActions()
         else:
             raise ValueError(f"Task {task_name} not found")
@@ -53,11 +59,9 @@ def load_samples(cfg: DictConfig) -> list[dict[str, Any]]:
     """Load samples based on configuration."""
     data_file = cfg.task.get("data_file", "data/sharded_instructions_600.json")
 
-    # Handle relative paths
+    # Handle relative paths - resolve to project root, not working directory
     if not Path(data_file).is_absolute():
-        # Try relative to project root
-        project_root = Path(__file__).parent.parent.parent
-        data_file = project_root / data_file
+        data_file = PROJECT_ROOT / data_file
 
     with open(data_file, "r") as f:
         samples = json.load(f)
@@ -79,7 +83,7 @@ def load_samples(cfg: DictConfig) -> list[dict[str, Any]]:
 
 def get_model_client(cfg: DictConfig):
     """Create appropriate model client based on config."""
-    model_name = cfg.model.get("assistant", cfg.model.name)
+    model_name = cfg.model.get("assistant", None).model or cfg.model.name
 
     if "claude" in model_name.lower():
         return AnthropicModelClient()
@@ -97,9 +101,9 @@ def get_strategy(cfg: DictConfig):
 
     # Fallback to manual instantiation
     from ctx_editor.strategies import (
+        AgenticEditStrategy,
         BaselineStrategy,
         ContextEditStrategy,
-        AgenticEditStrategy,
         ReflectionStrategy,
     )
 
@@ -151,22 +155,22 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     logger.info(f"Config:\n{OmegaConf.to_yaml(cfg)}")
 
     # Load components
-    task = get_task(cfg.task.name)
     samples = load_samples(cfg)
     model_client = get_model_client(cfg)
     strategy = get_strategy(cfg)
     cheatsheet = setup_cheatsheet(cfg)
 
-    logger.info(f"Loaded {len(samples)} samples for task {cfg.task.name}")
+    logger.info(f"Loaded {len(samples)} samples for task config '{cfg.task.name}'")
 
     # Create simulator factory
     def make_simulator(sample: dict, cheatsheet: Optional[Cheatsheet] = None):
+        # Build ModelConfig from hydra config
+        model_cfg_dict = OmegaConf.to_container(cfg.model, resolve=True)
+        model_config = ModelConfig.from_dict(model_cfg_dict)
+
         sim_config = SimulatorConfig(
             max_turns=cfg.task.get("max_turns", 20),
-            assistant_model=cfg.model.get("assistant", cfg.model.name),
-            user_model=cfg.model.get("user", "gpt-4o-mini"),
-            system_model=cfg.model.get("system", "gpt-4o-mini"),
-            temperature=cfg.model.get("temperature", 1.0),
+            model_config=model_config,
             verbose=cfg.logging.get("verbose", False),
         )
 
@@ -193,7 +197,11 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         pbar.n = completed
         pbar.refresh()
 
-    if execution_mode == "batched" and cfg.cheatsheet.enabled and cfg.cheatsheet.source == "continual":
+    if (
+        execution_mode == "batched"
+        and cfg.cheatsheet.enabled
+        and cfg.cheatsheet.source == "continual"
+    ):
         # Batched execution with continual learning
         runner = BatchedRunner(
             batch_size=cfg.execution.batch_size,
@@ -242,7 +250,9 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         task_correct = sum(1 for r in task_results if r.is_correct)
         task_avg_score = sum(r.score for r in task_results) / task_total if task_total > 0 else 0
         task_cost = sum(r.total_cost_usd for r in task_results)
-        task_avg_turns = sum(r.num_turns for r in task_results) / task_total if task_total > 0 else 0
+        task_avg_turns = (
+            sum(r.num_turns for r in task_results) / task_total if task_total > 0 else 0
+        )
 
         per_task_metrics[task_name] = {
             "total_samples": task_total,
@@ -287,6 +297,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     # Save individual traces if configured
     if cfg.logging.save_traces:
         from ctx_editor.utils.logging import log_conversation
+
         for r in results:
             log_conversation(
                 experiment_type=cfg.experiment.name,
@@ -296,7 +307,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
                 is_correct=r.is_correct,
                 score=r.score,
                 output_dir=output_dir,
-                assistant_model=cfg.model.get("assistant", cfg.model.name),
+                assistant_model=cfg.model.assistant.model,
             )
 
     # Save final cheatsheet
@@ -311,6 +322,9 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
 @hydra.main(config_path="config", config_name="config", version_base=None)
 def main(cfg: DictConfig) -> None:
     """Main entry point."""
+    # Print output directory at start
+    print(f"\nOutput directory: {cfg.logging.output_dir}\n")
+
     # Setup logging
     setup_logging(
         output_dir=cfg.logging.output_dir,

@@ -1,6 +1,7 @@
 """Batched execution runner for continual learning."""
 
 import asyncio
+import traceback
 from typing import Any, Callable, Iterator, Optional
 
 from .runner import ExperimentRunner
@@ -189,7 +190,7 @@ class BatchedRunner(ExperimentRunner):
                     )
 
             except Exception as e:
-                self.logger.error(f"Error on problem {problem.get('task_id')}: {e}")
+                self.logger.error(f"Error on problem {problem.get('task_id')}:\n{traceback.format_exc()}")
                 results.append(SimulationResult(
                     sample_id=problem.get("task_id", "unknown"),
                     task_name=problem.get("task", "unknown"),

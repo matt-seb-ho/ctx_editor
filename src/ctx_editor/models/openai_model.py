@@ -13,6 +13,8 @@ from ..core.types import ModelResponse, ReasoningEffort
 class OpenAIModelClient(BaseModelClient):
     """Async OpenAI/Azure model client."""
 
+    _gpt5_temp_warned: bool = False  # Class-level flag to warn only once
+
     def __init__(self):
         """Initialize the OpenAI client."""
         if "AZURE_OPENAI_API_KEY" in os.environ and "AZURE_OPENAI_ENDPOINT" in os.environ:
@@ -59,10 +61,12 @@ class OpenAIModelClient(BaseModelClient):
 
         # Enforce temperature=1.0 for gpt-5 models (API requirement)
         if model.startswith("gpt-5") and temperature != 1.0:
-            import logging
-            logging.getLogger("ctx_editor").warning(
-                f"gpt-5 models require temperature=1.0, overriding {temperature} -> 1.0"
-            )
+            if not OpenAIModelClient._gpt5_temp_warned:
+                import logging
+                logging.getLogger("ctx_editor").warning(
+                    f"gpt-5 models require temperature=1.0, overriding {temperature} -> 1.0"
+                )
+                OpenAIModelClient._gpt5_temp_warned = True
             temperature = 1.0
 
         # Handle o1 models that don't support system messages
