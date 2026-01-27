@@ -70,11 +70,6 @@ class ParallelRunner(ExperimentRunner):
                     if self.progress_callback:
                         self.progress_callback(completed, total)
 
-                    self.logger.info(
-                        f"Completed {completed}/{total}: {problem.get('task_id', 'unknown')} "
-                        f"(score: {result.score})"
-                    )
-
                     return index, result
 
                 except Exception as e:
