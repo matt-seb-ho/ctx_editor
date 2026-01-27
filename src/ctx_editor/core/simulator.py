@@ -72,7 +72,18 @@ class ConversationSimulator:
         """
         verbose = verbose or self.config.verbose
 
+        shards = self.sample.get("shards", [])
+        termination_reason = "max_turns_reached"
+
         while not self.is_completed and self.trace.num_user_turns < self.config.max_turns:
+            # Check if all shards have been revealed - no point continuing
+            revealed_shard_ids = set(self.trace.get_revealed_shard_ids())
+            if len(revealed_shard_ids) == len(shards) and len(shards) > 0:
+                if verbose:
+                    print(f"\033[94m[log] all shards revealed ({len(revealed_shard_ids)}/{len(shards)})\033[0m")
+                termination_reason = "all_shards_revealed"
+                break
+
             await self._run_turn(verbose)
 
         # Ensure we have a result
@@ -86,7 +97,7 @@ class ConversationSimulator:
                 total_cost_usd=self.usage_stats.total_cost_usd(),
                 trace=self.trace.to_full_trace(include_history=self.config.include_trace_history),
                 usage_stats=self.usage_stats,
-                metadata={"reason": "max_turns_reached"},
+                metadata={"reason": termination_reason},
             )
 
         return self.final_result
@@ -149,6 +160,7 @@ class ConversationSimulator:
             model=assistant_cfg.model,
             temperature=assistant_cfg.temperature,
             max_tokens=max_tokens,
+            timeout=assistant_cfg.timeout,
         )
 
         self.trace.add_assistant_message(

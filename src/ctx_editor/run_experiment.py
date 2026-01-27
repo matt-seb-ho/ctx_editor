@@ -152,7 +152,6 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
 
     # Setup
     logger.info(f"Starting experiment: {cfg.experiment_name}")
-    logger.info(f"Config:\n{OmegaConf.to_yaml(cfg)}")
 
     # Save resolved config to output directory
     output_dir = Path(cfg.logging.output_dir)

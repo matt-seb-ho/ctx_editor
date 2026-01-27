@@ -27,6 +27,7 @@ class RoleConfig:
     model: str = "gpt-4o-mini"
     max_tokens: int = 2000
     temperature: float = 1.0
+    timeout: int = 30
     reasoning_effort: Optional[ReasoningEffort] = None
 
     def is_reasoning_model(self) -> bool:
