@@ -154,6 +154,14 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     logger.info(f"Starting experiment: {cfg.experiment_name}")
     logger.info(f"Config:\n{OmegaConf.to_yaml(cfg)}")
 
+    # Save resolved config to output directory
+    output_dir = Path(cfg.logging.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    config_path = output_dir / "config.yaml"
+    with open(config_path, "w") as f:
+        f.write(OmegaConf.to_yaml(cfg, resolve=True))
+    logger.info(f"Saved config to {config_path}")
+
     # Load components
     samples = load_samples(cfg)
     model_client = get_model_client(cfg)
