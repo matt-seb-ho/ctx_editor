@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from ..core.types import ModelResponse, VerificationResult
@@ -12,60 +13,11 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DEFAULT_VERIFICATION_PROMPT = """\
-Analyze the assistant's last response and categorize it.
-
-<initial_query>
-{initial_shard}
-</initial_query>
-
-<additional_requirements>
-{shards}
-</additional_requirements>
-
-<last_turn>
-{conversation_so_far}
-</last_turn>
-
-The answer should be: {answer_description}
-
-Categorize the assistant's response as one of:
-- "answer_attempt": The assistant is providing what they believe to be the final answer
-- "clarification": The assistant is asking for clarification or more information
-- "partial_answer": The assistant is providing partial progress toward the answer
-- "other": None of the above
-
-Respond with a JSON object:
-{{"response_type": "answer_attempt" | "clarification" | "partial_answer" | "other", "reasoning": "Brief explanation"}}"""
-
-
-DEFAULT_EXTRACTION_PROMPT_GEN = """\
-Extract the final answer from the assistant's response.
-
-<assistant_response>
-{assistant_response}
-</assistant_response>
-
-The answer should be: {answer_description}
-
-Respond with a JSON object:
-{{"answer": "The extracted answer"}}"""
-
-
-DEFAULT_EXTRACTION_PROMPT_PREFIX_SUFFIX = """\
-Extract the final answer from the assistant's response by identifying the prefix \
-and suffix that bound it.
-
-<assistant_response>
-{assistant_response}
-</assistant_response>
-
-The answer should be: {answer_description}
-
-Respond with a JSON object:
-{{"answer": "prefix of the answer [...] suffix of the answer"}}
-
-Use [...] to indicate content in between that should be included."""
+# Load prompts from files (matches LiC exactly)
+_PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
+DEFAULT_VERIFICATION_PROMPT = (_PROMPTS_DIR / "system_turn_categorization.txt").read_text()
+DEFAULT_EXTRACTION_PROMPT_GEN = (_PROMPTS_DIR / "system_answer_extraction_gen.txt").read_text()
+DEFAULT_EXTRACTION_PROMPT_PREFIX_SUFFIX = (_PROMPTS_DIR / "system_answer_extraction_prefix_suffix.txt").read_text()
 
 
 @dataclass
@@ -147,8 +99,8 @@ class SystemAgent:
         Returns:
             VerificationResult with the response type.
         """
-        # Some tasks always treat responses as answer attempts
-        if self.task_name in ["summary", "totto", "translation", "data2text"]:
+        # Some tasks always treat responses as answer attempts (matches LiC)
+        if self.task_name in ["summary", "totto", "translation"]:
             return VerificationResult(response_type="answer_attempt")
 
         if not self.sample:

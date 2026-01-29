@@ -2,6 +2,7 @@
 
 import json
 from dataclasses import dataclass
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from ..core.types import ModelResponse
@@ -12,30 +13,9 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-DEFAULT_USER_PROMPT = """\
-You are simulating a user who is gradually revealing information to an assistant. \
-Based on the conversation so far and the information you still need to reveal, \
-generate the next user response.
-
-<conversation_so_far>
-{conversation_so_far}
-</conversation_so_far>
-
-<information_already_revealed>
-{shards_revealed}
-</information_already_revealed>
-
-<information_not_yet_revealed>
-{shards_not_revealed}
-</information_not_yet_revealed>
-
-Based on the assistant's response, choose the most appropriate piece of information \
-to reveal next (if any) and craft a natural user response. The user should reveal \
-information gradually in response to the assistant's questions or when it's \
-contextually appropriate.
-
-Respond with a JSON object:
-{{"response": "The user's next message", "shard_id": "The ID of the shard being revealed (or null if no new information)"}}"""
+# Load the default prompt from the prompts directory (matches LiC exactly)
+_PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
+DEFAULT_USER_PROMPT = (_PROMPTS_DIR / "user_agent.txt").read_text()
 
 
 @dataclass
