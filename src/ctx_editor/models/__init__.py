@@ -1,6 +1,6 @@
 """Model implementations for API calls."""
 
-from .base import ModelClient, BaseModelClient
+from .base import BaseModelClient, ModelClient
 
 # Lazy imports to handle missing dependencies gracefully
 _openai_client = None
@@ -12,6 +12,7 @@ def OpenAIModelClient():
     global _openai_client
     if _openai_client is None:
         from .openai_model import OpenAIModelClient as _OpenAI
+
         _openai_client = _OpenAI
     return _openai_client()
 
@@ -21,6 +22,7 @@ def AnthropicModelClient():
     global _anthropic_client
     if _anthropic_client is None:
         from .anthropic_model import AnthropicModelClient as _Anthropic
+
         _anthropic_client = _Anthropic
     return _anthropic_client()
 

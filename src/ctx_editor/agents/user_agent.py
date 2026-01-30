@@ -20,6 +20,7 @@ DEFAULT_USER_PROMPT = (PROMPTS_DIR / "user_agent.txt").read_text()
 @dataclass
 class UserResponse:
     """Response from the user agent."""
+
     content: str
     shard_id: Optional[str] = None
     cost_usd: float = 0.0

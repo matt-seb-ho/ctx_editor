@@ -392,22 +392,26 @@ def display_conversation(sample: dict, exp_type: str = "") -> None:
     # Add messages to timeline
     for i, msg in enumerate(messages):
         msg_ts = msg.get("timestamp", "")
-        timeline.append({
-            "type": "message",
-            "timestamp": msg_ts,
-            "data": msg,
-            "index": i,
-        })
+        timeline.append(
+            {
+                "type": "message",
+                "timestamp": msg_ts,
+                "data": msg,
+                "index": i,
+            }
+        )
 
     # Add logs to timeline
     for i, log in enumerate(logs):
         log_ts = log.get("timestamp", "")
-        timeline.append({
-            "type": "log",
-            "timestamp": log_ts,
-            "data": log,
-            "index": i,
-        })
+        timeline.append(
+            {
+                "type": "log",
+                "timestamp": log_ts,
+                "data": log,
+                "index": i,
+            }
+        )
 
     # Sort by timestamp
     def parse_ts(item):
@@ -438,7 +442,7 @@ def display_conversation(sample: dict, exp_type: str = "") -> None:
 
             if role == "assistant":
                 assistant_turn_count += 1
-            last_was_user = (role == "user")
+            last_was_user = role == "user"
 
         elif item["type"] == "log":
             log = item["data"]
@@ -534,7 +538,7 @@ def get_run_path_from_args() -> Optional[str]:
     # Find args after -- in sys.argv
     try:
         separator_idx = sys.argv.index("--")
-        args = parser.parse_args(sys.argv[separator_idx + 1:])
+        args = parser.parse_args(sys.argv[separator_idx + 1 :])
         return args.run
     except (ValueError, SystemExit):
         return None
@@ -713,7 +717,9 @@ def main():
         effective_exp_type = selected_exp
 
     if "context_edit" in effective_exp_type and "agentic" not in effective_exp_type:
-        st.info("**Strategy:** Context Edit - Conversation is compressed before each assistant turn")
+        st.info(
+            "**Strategy:** Context Edit - Conversation is compressed before each assistant turn"
+        )
     elif "agentic_edit" in effective_exp_type:
         st.info("**Strategy:** Agentic Edit - Model decides when to compress context")
     elif "reflection" in effective_exp_type:

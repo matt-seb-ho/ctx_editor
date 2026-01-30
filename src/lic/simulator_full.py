@@ -1,10 +1,11 @@
 import random
 
-from lic.utils_log import log_conversation
 from system_agent import SystemAgent
+
 from lic.model_openai import generate
 from lic.tasks import get_task
 from lic.utils import date_str
+from lic.utils_log import log_conversation
 
 
 class ConversationSimulatorFull:
@@ -136,7 +137,8 @@ class ConversationSimulatorFull:
 
 
 if __name__ == "__main__":
-    import json, argparse
+    import argparse
+    import json
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--assistant_model", type=str, default="gpt-4o-mini")

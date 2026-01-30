@@ -2,8 +2,8 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from .cheatsheet import Cheatsheet
 from ..utils.helpers import load_prompt
+from .cheatsheet import Cheatsheet
 
 if TYPE_CHECKING:
     from ..core.types import SimulationResult

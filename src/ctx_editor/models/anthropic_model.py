@@ -4,8 +4,8 @@ import asyncio
 import os
 from typing import Any, Optional
 
-from .base import BaseModelClient, format_messages
 from ..core.types import ModelResponse
+from .base import BaseModelClient, format_messages
 
 
 class AnthropicModelClient(BaseModelClient):
@@ -87,7 +87,7 @@ class AnthropicModelClient(BaseModelClient):
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)
+                    await asyncio.sleep(2**attempt)
         else:
             raise RuntimeError(f"Failed after {max_retries} attempts: {last_error}")
 

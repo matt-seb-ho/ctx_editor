@@ -1,16 +1,15 @@
-from typing import List, Dict, Any, Tuple
+import ast
+import base64
 import json
+import pickle
 import random
 import re
-import pickle
 import zlib
-import base64
-import ast
+from typing import Any, Dict, List, Tuple
 
-
+from lic.paths import get_prompt_path
 from lic.task_base import Task
 from lic.tasks.code.eval_code import check_correctness
-from lic.paths import get_prompt_path
 
 
 class TaskCode(Task):

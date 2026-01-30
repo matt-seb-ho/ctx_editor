@@ -6,8 +6,8 @@ from typing import TYPE_CHECKING, Any, Optional
 from ..utils.helpers import load_prompt
 
 if TYPE_CHECKING:
-    from ..core.trace import ConversationTrace
     from ..cheatsheet.cheatsheet import Cheatsheet
+    from ..core.trace import ConversationTrace
     from ..models.base import ModelClient
 
 
@@ -32,6 +32,7 @@ Condensed context:"""
 @dataclass
 class EditResult:
     """Result of a context editing operation."""
+
     edited_context: str
     original_length: int
     edited_length: int
@@ -150,10 +151,16 @@ Use this guidance to identify what information is most important:
 
         conversation_str = trace.get_conversation_string()
         if len(conversation_str) < threshold_chars:
-            return False, f"Context short enough ({len(conversation_str)} < {threshold_chars} chars)"
+            return (
+                False,
+                f"Context short enough ({len(conversation_str)} < {threshold_chars} chars)",
+            )
 
         # Could add model-based decision here
-        return True, f"Context is long ({len(conversation_str)} chars) with {trace.num_user_turns} turns"
+        return (
+            True,
+            f"Context is long ({len(conversation_str)} chars) with {trace.num_user_turns} turns",
+        )
 
     async def iterative_edit(
         self,
@@ -196,10 +203,12 @@ Use this guidance to identify what information is most important:
             new_trace = ConversationTrace()
             if trace.system_message:
                 new_trace.add_system_message(trace.system_message.content)
-            new_trace.messages.append(Message(
-                role="assistant",
-                content=result.edited_context,
-            ))
+            new_trace.messages.append(
+                Message(
+                    role="assistant",
+                    content=result.edited_context,
+                )
+            )
             current_trace = new_trace
 
         # Return last result if target not reached

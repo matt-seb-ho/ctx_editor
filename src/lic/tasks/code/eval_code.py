@@ -2,30 +2,27 @@
 #
 
 import ast
-import json
-import sys
 import faulthandler
+import json
+import multiprocessing
 import platform
-
-# used for debugging to time steps
-from datetime import datetime
 
 # to run the solution files we're using a timing based approach
 import signal
+import sys
+import time
 
+# used for debugging to time steps
+from datetime import datetime
+from decimal import Decimal
+from enum import Enum
 from io import StringIO
-
-# used for testing the code that reads from input
-from unittest.mock import patch, mock_open
 
 # from pyext import RuntimeModule
 from types import ModuleType
 
-from enum import Enum
-from decimal import Decimal
-import time
-
-import multiprocessing
+# used for testing the code that reads from input
+from unittest.mock import mock_open, patch
 
 import_string = "from string import *\nfrom re import *\nfrom datetime import *\nfrom collections import *\nfrom heapq import *\nfrom bisect import *\nfrom copy import *\nfrom math import *\nfrom random import *\nfrom statistics import *\nfrom itertools import *\nfrom functools import *\nfrom operator import *\nfrom io import *\nfrom sys import *\nfrom json import *\nfrom builtins import *\nfrom typing import *\nimport string\nimport re\nimport datetime\nimport collections\nimport heapq\nimport bisect\nimport copy\nimport math\nimport random\nimport statistics\nimport itertools\nimport functools\nimport operator\nimport io\nimport sys\nimport json\nsys.setrecursionlimit(50000)\n"
 
@@ -102,9 +99,7 @@ def make_function(code: str) -> str:
 
         function_ast = ast.FunctionDef(
             name="wrapped_function",
-            args=ast.arguments(
-                posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]
-            ),
+            args=ast.arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]),
             body=all_other_stmts,
             decorator_list=[],
             lineno=-1,
@@ -122,7 +117,6 @@ def make_function(code: str) -> str:
 
 
 def call_method(method, inputs):
-
     if isinstance(inputs, list):
         inputs = "\n".join(inputs)
 
@@ -198,9 +192,7 @@ def get_stripped_lines(val: str):
     return [val_line.strip() for val_line in val.split("\n")]
 
 
-def grade_call_based(
-    code: str, all_inputs: list, all_outputs: list, fn_name: str, timeout: int
-):
+def grade_call_based(code: str, all_inputs: list, all_outputs: list, fn_name: str, timeout: int):
     # call-based clean up logic
     # need to wrap in try-catch logic after to catch the correct errors, but for now this is fine.
     code = import_string + "\n\n" + code
@@ -214,9 +206,7 @@ def grade_call_based(
     if method is None:
         return
 
-    all_inputs = [
-        [json.loads(line) for line in inputs.split("\n")] for inputs in all_inputs
-    ]
+    all_inputs = [[json.loads(line) for line in inputs.split("\n")] for inputs in all_inputs]
 
     all_outputs = [json.loads(output) for output in all_outputs]
 
@@ -376,9 +366,7 @@ def grade_stdio(
             ## otherwise gotcha: np.isclose(50000000000000000, 50000000000000001) = True
             ## note that we should always be able to convert to decimals
 
-            success, decimal_prediction_line = convert_line_to_decimals(
-                stripped_prediction_line
-            )
+            success, decimal_prediction_line = convert_line_to_decimals(stripped_prediction_line)
             if not success:
                 all_results.append(-2)
                 return all_results, WA_send_args
@@ -493,16 +481,10 @@ def reliability_guard(maximum_memory_bytes=None):
     if maximum_memory_bytes is not None:
         import resource
 
-        resource.setrlimit(
-            resource.RLIMIT_AS, (maximum_memory_bytes, maximum_memory_bytes)
-        )
-        resource.setrlimit(
-            resource.RLIMIT_DATA, (maximum_memory_bytes, maximum_memory_bytes)
-        )
+        resource.setrlimit(resource.RLIMIT_AS, (maximum_memory_bytes, maximum_memory_bytes))
+        resource.setrlimit(resource.RLIMIT_DATA, (maximum_memory_bytes, maximum_memory_bytes))
         if not platform.uname().system == "Darwin":
-            resource.setrlimit(
-                resource.RLIMIT_STACK, (maximum_memory_bytes, maximum_memory_bytes)
-            )
+            resource.setrlimit(resource.RLIMIT_STACK, (maximum_memory_bytes, maximum_memory_bytes))
 
     faulthandler.disable()
 
@@ -583,9 +565,7 @@ def check_correctness(sample, generation, tests, timeout, debug=False):
         args=(sample, generation, tests, debug, result, metadata_list, timeout),
     )
     p.start()
-    p.join(
-        timeout=(timeout + 1) * len(json.loads(tests)["inputs"]) + 5
-    )
+    p.join(timeout=(timeout + 1) * len(json.loads(tests)["inputs"]) + 5)
     if p.is_alive():
         p.kill()
     if not result:
@@ -595,5 +575,3 @@ def check_correctness(sample, generation, tests, timeout, debug=False):
         if debug:
             print("global timeout")
     return result[0], metadata_list[0]
-
-

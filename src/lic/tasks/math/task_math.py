@@ -1,7 +1,10 @@
-from typing import List, Dict, Any
-from lic.task_base import Task
+import json
+import random
+import re
+from typing import Any, Dict, List
+
 from lic.paths import get_prompt_path
-import json, random, re
+from lic.task_base import Task
 
 
 class TaskMath(Task):

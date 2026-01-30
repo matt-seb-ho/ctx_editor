@@ -1,11 +1,18 @@
-import os, re, asyncio, sqlite3, threading, tqdm, random, json
-from typing import Tuple, Any, List, Set
-from itertools import product
+import asyncio
+import json
+import os
+import random
+import re
+import sqlite3
+import threading
 from collections import defaultdict
-from lic.tasks.database.eval_spider_parse import get_all_preds_for_execution, remove_distinct
-from itertools import chain
-from lic.utils import print_colored
+from itertools import chain, product
+from typing import Any, List, Set, Tuple
 
+import tqdm
+
+from lic.tasks.database.eval_spider_parse import get_all_preds_for_execution, remove_distinct
+from lic.utils import print_colored
 
 threadLock = threading.Lock()
 TIMEOUT = 60

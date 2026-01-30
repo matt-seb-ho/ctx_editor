@@ -1,8 +1,9 @@
 import json
-from lic.utils import extract_conversation
+
 from lic.model_openai import generate_json
-from lic.tasks import get_task
 from lic.paths import get_prompt_path
+from lic.tasks import get_task
+from lic.utils import extract_conversation
 
 
 class SystemAgent:
@@ -22,11 +23,19 @@ class SystemAgent:
             "task_specific",
         ], f"Answer extraction strategy {self.answer_extraction_strategy} not supported"
 
-        with open(get_prompt_path("prompts/system_turn_categorization.txt"), "r", encoding="utf-8") as f:
+        with open(
+            get_prompt_path("prompts/system_turn_categorization.txt"), "r", encoding="utf-8"
+        ) as f:
             self.system_verification_prompt = f.read()
-        with open(get_prompt_path("prompts/system_answer_extraction_gen.txt"), "r", encoding="utf-8") as f:
+        with open(
+            get_prompt_path("prompts/system_answer_extraction_gen.txt"), "r", encoding="utf-8"
+        ) as f:
             self.answer_extraction_prompt_gen = f.read()
-        with open(get_prompt_path("prompts/system_answer_extraction_prefix_suffix.txt"), "r", encoding="utf-8") as f:
+        with open(
+            get_prompt_path("prompts/system_answer_extraction_prefix_suffix.txt"),
+            "r",
+            encoding="utf-8",
+        ) as f:
             self.answer_extraction_prompt_prefix_suffix = f.read()
 
     def verify_system_response(self, conversation_so_far):

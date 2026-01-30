@@ -1,9 +1,11 @@
+import json
 import os
-from lic.tasks.database.eval_spider_exec import eval_exec_match
-from typing import Dict, Any, List
-from lic.task_base import Task
+import re
+from typing import Any, Dict, List
+
 from lic.paths import get_data_path, get_prompt_path
-import json, re
+from lic.task_base import Task
+from lic.tasks.database.eval_spider_exec import eval_exec_match
 
 
 class TaskDatabase(Task):

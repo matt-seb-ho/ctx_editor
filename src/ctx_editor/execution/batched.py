@@ -4,13 +4,13 @@ import asyncio
 import traceback
 from typing import Any, Callable, Iterator, Optional
 
-from .runner import ExperimentRunner
-from .parallel import ParallelRunner
-from ..core.types import SimulationResult
 from ..cheatsheet.cheatsheet import Cheatsheet
 from ..cheatsheet.updater import CheatsheetUpdater
+from ..core.types import SimulationResult
 from ..models.base import ModelClient
 from ..utils.logging import get_logger
+from .parallel import ParallelRunner
+from .runner import ExperimentRunner
 
 
 class BatchedRunner(ExperimentRunner):
@@ -65,7 +65,7 @@ class BatchedRunner(ExperimentRunner):
             Batches of items.
         """
         for i in range(0, len(items), batch_size):
-            yield items[i:i + batch_size]
+            yield items[i : i + batch_size]
 
     async def run(
         self,
@@ -97,8 +97,7 @@ class BatchedRunner(ExperimentRunner):
 
         for batch_num, batch in enumerate(batches, 1):
             self.logger.info(
-                f"Starting batch {batch_num}/{total_batches} "
-                f"(cheatsheet v{cheatsheet.version})"
+                f"Starting batch {batch_num}/{total_batches} " f"(cheatsheet v{cheatsheet.version})"
             )
 
             # Run batch with current cheatsheet (frozen for this batch)
@@ -190,17 +189,21 @@ class BatchedRunner(ExperimentRunner):
                     )
 
             except Exception as e:
-                self.logger.error(f"Error on problem {problem.get('task_id')}:\n{traceback.format_exc()}")
-                results.append(SimulationResult(
-                    sample_id=problem.get("task_id", "unknown"),
-                    task_name=problem.get("task", "unknown"),
-                    is_correct=False,
-                    score=0.0,
-                    num_turns=0,
-                    total_cost_usd=0.0,
-                    trace=[],
-                    metadata={"error": str(e)},
-                ))
+                self.logger.error(
+                    f"Error on problem {problem.get('task_id')}:\n{traceback.format_exc()}"
+                )
+                results.append(
+                    SimulationResult(
+                        sample_id=problem.get("task_id", "unknown"),
+                        task_name=problem.get("task", "unknown"),
+                        is_correct=False,
+                        score=0.0,
+                        num_turns=0,
+                        total_cost_usd=0.0,
+                        trace=[],
+                        metadata={"error": str(e)},
+                    )
+                )
                 # Progress callback even on error
                 if self.progress_callback:
                     self.progress_callback(len(results), len(problems))

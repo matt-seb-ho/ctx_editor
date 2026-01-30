@@ -2,12 +2,13 @@
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Any, Literal, Optional
 from enum import Enum
+from typing import Any, Literal, Optional
 
 
 class MessageRole(str, Enum):
     """Enum for message roles in a conversation."""
+
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
@@ -24,6 +25,7 @@ ReasoningEffort = Literal["minimal", "low", "medium", "high"]
 @dataclass
 class RoleConfig:
     """Configuration for a specific agent role's model settings."""
+
     model: str = "gpt-4o-mini"
     max_tokens: int = 2000
     temperature: float = 1.0
@@ -49,10 +51,19 @@ class ModelConfig:
     for different agent roles (user simulator, assistant, system operations,
     context editor).
     """
-    user: RoleConfig = field(default_factory=lambda: RoleConfig(model="gpt-4o-mini", max_tokens=1000))
-    assistant: RoleConfig = field(default_factory=lambda: RoleConfig(model="gpt-4o", max_tokens=2000))
-    system: RoleConfig = field(default_factory=lambda: RoleConfig(model="gpt-4o-mini", max_tokens=1000, temperature=0.0))
-    ctx_editor: RoleConfig = field(default_factory=lambda: RoleConfig(model="gpt-4o-mini", max_tokens=4000))
+
+    user: RoleConfig = field(
+        default_factory=lambda: RoleConfig(model="gpt-4o-mini", max_tokens=1000)
+    )
+    assistant: RoleConfig = field(
+        default_factory=lambda: RoleConfig(model="gpt-4o", max_tokens=2000)
+    )
+    system: RoleConfig = field(
+        default_factory=lambda: RoleConfig(model="gpt-4o-mini", max_tokens=1000, temperature=0.0)
+    )
+    ctx_editor: RoleConfig = field(
+        default_factory=lambda: RoleConfig(model="gpt-4o-mini", max_tokens=4000)
+    )
 
     def get_role_config(self, role: AgentRole) -> RoleConfig:
         """Get configuration for a specific role."""
@@ -76,6 +87,7 @@ class ModelConfig:
 @dataclass
 class Message:
     """A single message in a conversation."""
+
     role: str
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
@@ -103,6 +115,7 @@ class Message:
 @dataclass
 class RoleUsageStats:
     """Usage statistics for a single role."""
+
     num_requests: int = 0
     input_tokens: int = 0
     output_tokens: int = 0
@@ -139,6 +152,7 @@ class RoleUsageStats:
 @dataclass
 class UsageStats:
     """Aggregated usage statistics across all roles."""
+
     user: RoleUsageStats = field(default_factory=RoleUsageStats)
     assistant: RoleUsageStats = field(default_factory=RoleUsageStats)
     system: RoleUsageStats = field(default_factory=RoleUsageStats)
@@ -150,7 +164,12 @@ class UsageStats:
 
     def total_cost_usd(self) -> float:
         """Get total cost across all roles."""
-        return self.user.cost_usd + self.assistant.cost_usd + self.system.cost_usd + self.ctx_editor.cost_usd
+        return (
+            self.user.cost_usd
+            + self.assistant.cost_usd
+            + self.system.cost_usd
+            + self.ctx_editor.cost_usd
+        )
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to dictionary for serialization."""
@@ -166,6 +185,7 @@ class UsageStats:
 @dataclass
 class VerificationResult:
     """Result of verifying an assistant response."""
+
     response_type: str  # "answer_attempt", "clarification", "partial_answer", etc.
     is_answer_attempt: bool = False
     cost_usd: float = 0.0
@@ -179,6 +199,7 @@ class VerificationResult:
 @dataclass
 class EvaluationResult:
     """Result of evaluating an extracted answer."""
+
     is_correct: bool
     score: float
     extracted_answer: str
@@ -189,10 +210,13 @@ class EvaluationResult:
 @dataclass
 class SimulatorConfig:
     """Configuration for the conversation simulator."""
+
     max_turns: int = 20
     model_config: ModelConfig = field(default_factory=ModelConfig)
     verbose: bool = False
-    include_trace_history: bool = False  # Include full history in trace output (for context editing)
+    include_trace_history: bool = (
+        False  # Include full history in trace output (for context editing)
+    )
 
     # Backward compatibility properties
     @property
@@ -215,6 +239,7 @@ class SimulatorConfig:
 @dataclass
 class SimulationResult:
     """Result of a complete conversation simulation."""
+
     sample_id: str
     task_name: str
     is_correct: bool
@@ -250,6 +275,7 @@ class SimulationResult:
 @dataclass
 class ModelResponse:
     """Response from a model API call."""
+
     content: str
     total_tokens: int = 0
     prompt_tokens: int = 0

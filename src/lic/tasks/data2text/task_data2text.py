@@ -1,7 +1,10 @@
-from typing import Dict, Any, List
-from lic.task_base import Task
+import json
+from typing import Any, Dict, List
+
+import sacrebleu
+
 from lic.paths import get_prompt_path
-import json, sacrebleu
+from lic.task_base import Task
 
 
 class TaskData2Text(Task):

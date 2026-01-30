@@ -1,8 +1,9 @@
 import json
 import os
-import streamlit as st
 from collections import defaultdict
 from datetime import datetime
+
+import streamlit as st
 
 from lic.tasks import get_task
 

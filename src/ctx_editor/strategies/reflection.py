@@ -2,13 +2,13 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from .base import BaseStrategy
 from ..core.types import Message
 from ..utils.helpers import load_prompt
+from .base import BaseStrategy
 
 if TYPE_CHECKING:
-    from ..core.trace import ConversationTrace
     from ..cheatsheet.cheatsheet import Cheatsheet
+    from ..core.trace import ConversationTrace
     from ..models.base import ModelClient
 
 
@@ -149,7 +149,9 @@ Reference this cheatsheet when reflecting:
             # Append to system message
             for msg in messages:
                 if msg.role == "system":
-                    msg.content += f"\n\n<reflection>\nConversation state: {reflection}\n</reflection>"
+                    msg.content += (
+                        f"\n\n<reflection>\nConversation state: {reflection}\n</reflection>"
+                    )
                     break
         else:
             # Insert before last user message

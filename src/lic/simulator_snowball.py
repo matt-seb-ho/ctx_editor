@@ -1,15 +1,15 @@
 import random
-import tqdm
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 
-from lic.utils import print_colored, extract_conversation, date_str
-from lic.utils_log import log_conversation
+import tqdm
 from system_agent import SystemAgent
 from user_agent import UserAgent
-from lic.tasks import get_task
+
 from lic.model_openai import generate
-from concurrent.futures import ThreadPoolExecutor
-from lic.utils_log import get_run_counts
-from collections import Counter
+from lic.tasks import get_task
+from lic.utils import date_str, extract_conversation, print_colored
+from lic.utils_log import get_run_counts, log_conversation
 
 snowball_message = """Just to reiterate,
 {HINTS_SO_FAR}
@@ -166,11 +166,10 @@ class ConversationSimulatorSnowball:
                 else:
                     evaluation_return = self.task.evaluator_function(extracted_answer, self.sample)
 
-                    assert type(evaluation_return) is dict and (
-                        "score" in evaluation_return or "is_correct" in evaluation_return
-                    ), (
-                        "Evaluator function should return a dictionary with 'score' or 'is_correct' key"
-                    )
+                    assert (
+                        type(evaluation_return) is dict
+                        and ("score" in evaluation_return or "is_correct" in evaluation_return)
+                    ), "Evaluator function should return a dictionary with 'score' or 'is_correct' key"
                     is_correct = evaluation_return.get("is_correct", None)
                     score = evaluation_return.get("score", None)
 

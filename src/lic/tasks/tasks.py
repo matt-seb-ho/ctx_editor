@@ -29,6 +29,7 @@ def get_task(task_name, version=None):
     else:
         raise ValueError(f"Task {task_name} not supported")
 
+
 if __name__ == "__main__":
     task = get_task("data2text")
     print(len(task.get_samples()))

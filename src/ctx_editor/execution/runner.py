@@ -3,8 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Any, Callable, Optional
 
-from ..core.types import SimulationResult
 from ..cheatsheet.cheatsheet import Cheatsheet
+from ..core.types import SimulationResult
 
 
 class ExperimentRunner(ABC):

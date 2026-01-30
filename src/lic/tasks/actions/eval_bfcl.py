@@ -71,17 +71,19 @@ NESTED_CONVERSION_TYPE_LIST = ["Array", "ArrayList", "array"]
 
 def ast_parse(input_str, language="Python"):
     input_str = input_str.strip()
-    bad_starts = sorted(["```tool_code", "```python", "```json", "```", "`"], key=len, reverse=True) # gemini insists on having tool_code, force longer ones first
+    bad_starts = sorted(
+        ["```tool_code", "```python", "```json", "```", "`"], key=len, reverse=True
+    )  # gemini insists on having tool_code, force longer ones first
     bad_ends = sorted(["```", "`"], key=len, reverse=True)
     for bad_start in bad_starts:
         if input_str.startswith(bad_start):
-            input_str = input_str[len(bad_start):]
+            input_str = input_str[len(bad_start) :]
     for bad_end in bad_ends:
         if input_str.endswith(bad_end):
-            input_str = input_str[:-len(bad_end)]
+            input_str = input_str[: -len(bad_end)]
 
     input_str = input_str.strip().replace("\n", " ")
-    
+
     if language == "Python":
         cleaned_input = input_str.strip("[]'")
         parsed = ast.parse(cleaned_input, mode="eval")
@@ -132,16 +134,11 @@ def resolve_ast_by_type(value):
         output = [resolve_ast_by_type(v) for v in value.elts]
     elif isinstance(value, ast.Dict):
         output = {
-            resolve_ast_by_type(k): resolve_ast_by_type(v)
-            for k, v in zip(value.keys, value.values)
+            resolve_ast_by_type(k): resolve_ast_by_type(v) for k, v in zip(value.keys, value.values)
         }
-    elif isinstance(
-        value, ast.NameConstant
-    ):  # Added this condition to handle boolean values
+    elif isinstance(value, ast.NameConstant):  # Added this condition to handle boolean values
         output = value.value
-    elif isinstance(
-        value, ast.BinOp
-    ):  # Added this condition to handle function calls as arguments
+    elif isinstance(value, ast.BinOp):  # Added this condition to handle function calls as arguments
         output = eval(ast.unparse(value))
     elif isinstance(value, ast.Name):
         output = value.id
@@ -188,7 +185,6 @@ def is_function_calling_format_output(decoded_output):
     return True
 
 
-
 # https://github.com/ShishirPatil/gorilla/blob/c5ffaf09fd3556e88aed947a3aefde173ca31611/berkeley-function-call-leaderboard/bfcl/eval_checker/ast_eval/ast_checker.py
 #### Main function ####
 def ast_checker(
@@ -198,12 +194,12 @@ def ast_checker(
         return parallel_function_checker_no_order(
             func_description, model_output, possible_answer, language, model_name
         )
-        
+
     elif "multiple" in test_category:
         return multiple_function_checker(
             func_description, model_output, possible_answer, language, model_name
         )
-        
+
     else:
         if len(model_output) != 1:
             return {
@@ -371,9 +367,7 @@ def list_checker(param: str, model_output: list, possible_answer: list):
         standardize_possible_answer.append([])
         for j in range(len(possible_answer[i])):
             if type(possible_answer[i][j]) == str:
-                standardize_possible_answer[i].append(
-                    standardize_string(possible_answer[i][j])
-                )
+                standardize_possible_answer[i].append(standardize_string(possible_answer[i][j]))
             else:
                 standardize_possible_answer[i].append(possible_answer[i][j])
 
@@ -395,7 +389,6 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
 
     result = {"valid": False, "error": [], "error_type": "dict_checker:unclear"}
     for i in range(len(possible_answers)):
-
         if possible_answers[i] == "":
             continue
 
@@ -405,7 +398,7 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
 
         possible_answer = possible_answers[i]
         # possible_anwer is a single dictionary
-        
+
         for key, value in model_output.items():
             if key not in possible_answer:
                 result["valid"] = False
@@ -418,14 +411,12 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
             # If the value is a string, we need to standardize it
             if type(value) == str:
                 standardize_value = standardize_string(value)
-                
+
             # We also need to standardize the possible answers if they are string
             standardize_possible_answer = []
             for i in range(len(possible_answer[key])):
                 if type(possible_answer[key][i]) == str:
-                    standardize_possible_answer.append(
-                        standardize_string(possible_answer[key][i])
-                    )
+                    standardize_possible_answer.append(standardize_string(possible_answer[key][i]))
                 else:
                     standardize_possible_answer.append(possible_answer[key][i])
 
@@ -437,7 +428,7 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
                 result["error_type"] = "value_error:dict_value"
                 flag = False
                 break
-        
+
         for key, value in possible_answer.items():
             if key not in model_output and "" not in value:
                 result["valid"] = False
@@ -445,7 +436,7 @@ def dict_checker(param: str, model_output: dict, possible_answers: list):
                 result["error_type"] = "value_error:dict_key"
                 flag = False
                 break
-            
+
         if flag:
             return {"valid": True, "error": []}
 
@@ -509,9 +500,7 @@ def simple_function_checker(
     # Check if function name matches
     if func_name not in model_output:
         result["valid"] = False
-        result["error"].append(
-            f"Function name {repr(func_name)} not found in model output."
-        )
+        result["error"].append(f"Function name {repr(func_name)} not found in model output.")
         result["error_type"] = "simple_function_checker:wrong_func_name"
         return result
 
@@ -594,11 +583,7 @@ def simple_function_checker(
             value = list(value)
 
         # Allow python auto conversion from int to float
-        if (
-            language == "Python"
-            and expected_type_description == "float"
-            and type(value) == int
-        ):
+        if language == "Python" and expected_type_description == "float" and type(value) == int:
             value = float(value)
 
         # Type checking
@@ -691,7 +676,7 @@ def parallel_function_checker_enforce_order(
 
     for i in range(len(possible_answers_list)):
         func_description = find_description(func_descriptions, func_name_list[i])
-        
+
         result = simple_function_checker(
             func_description,
             model_output[i],
@@ -728,7 +713,6 @@ def parallel_function_checker_no_order(
         func_name_expected = list(possible_answers[i].keys())[0]
         func_description = find_description(func_descriptions, func_name_expected)
 
-
         all_errors = []
 
         for index in range(len(model_output)):
@@ -759,9 +743,7 @@ def parallel_function_checker_no_order(
                 )
 
         if not result["valid"]:
-            considered_indices = [
-                i for i in range(len(model_output)) if i not in matched_indices
-            ]
+            considered_indices = [i for i in range(len(model_output)) if i not in matched_indices]
             all_errors.insert(
                 0,
                 f"Could not find a matching function among index {considered_indices} of model output for index {i} of possible answers.",

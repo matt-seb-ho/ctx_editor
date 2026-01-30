@@ -1,13 +1,15 @@
-import os
-import json
 import argparse
-import tqdm
+import json
+import os
 from concurrent.futures import ThreadPoolExecutor
-from lic.utils import extract_conversation, date_str
-from lic.utils_log import log_conversation
+
+import tqdm
 from system_agent import SystemAgent
+
 from lic.model_openai import generate
 from lic.tasks import get_task
+from lic.utils import date_str, extract_conversation
+from lic.utils_log import log_conversation
 
 recap_message = """Just to recapitulate, the entire task is:
 

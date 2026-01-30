@@ -1,4 +1,9 @@
-import json, numpy as np, re, os
+import json
+import os
+import re
+
+import numpy as np
+
 from lic.model_openai import generate_json
 from lic.paths import get_prompt_path
 
@@ -37,9 +42,7 @@ def summary2bullets(summary, max_summary_length=300):
     return {"bullets": trimmed_bullets, "trim_ratio": excess_percentage}
 
 
-def evaluate_insights(
-    insights, summary, evaluator_model_card, eval_prompt_fn=None
-):
+def evaluate_insights(insights, summary, evaluator_model_card, eval_prompt_fn=None):
     if eval_prompt_fn is None:
         eval_prompt_fn = get_prompt_path("prompts/summary/summhay_evaluation.txt")
     with open(eval_prompt_fn, "r") as f:

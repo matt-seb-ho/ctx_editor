@@ -1,8 +1,10 @@
-from lic.tasks.actions.eval_bfcl import ast_checker, ast_parse
-from typing import Dict, List, Any
-from lic.task_base import Task
+import json
+import random
+from typing import Any, Dict, List
+
 from lic.paths import get_prompt_path
-import json, random
+from lic.task_base import Task
+from lic.tasks.actions.eval_bfcl import ast_checker, ast_parse
 
 
 class TaskActions(Task):

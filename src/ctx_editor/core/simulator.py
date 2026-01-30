@@ -6,8 +6,8 @@ from .trace import ConversationTrace
 from .types import EvaluationResult, Message, SimulationResult, SimulatorConfig, UsageStats
 
 if TYPE_CHECKING:
-    from ..agents.user_agent import UserAgent
     from ..agents.system_agent import SystemAgent
+    from ..agents.user_agent import UserAgent
     from ..cheatsheet.cheatsheet import Cheatsheet
     from ..models.base import ModelClient
     from ..strategies.base import ContextStrategy
@@ -103,7 +103,9 @@ class ConversationSimulator:
             revealed_shard_ids = set(self.trace.get_revealed_shard_ids())
             if len(revealed_shard_ids) == len(shards) and len(shards) > 0:
                 if verbose:
-                    print(f"\033[94m[log] all shards revealed ({len(revealed_shard_ids)}/{len(shards)})\033[0m")
+                    print(
+                        f"\033[94m[log] all shards revealed ({len(revealed_shard_ids)}/{len(shards)})\033[0m"
+                    )
                 termination_reason = "all_shards_revealed"
                 break
 
@@ -113,7 +115,9 @@ class ConversationSimulator:
         if self.final_result is None:
             self.final_result = SimulationResult(
                 sample_id=self.sample.get("task_id", "unknown"),
-                task_name=self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown",
+                task_name=self.task.get_task_name()
+                if hasattr(self.task, "get_task_name")
+                else "unknown",
                 is_correct=False,
                 score=0.0,
                 num_turns=self.trace.num_user_turns,
@@ -170,8 +174,7 @@ class ConversationSimulator:
 
         # Convert to dict format for API call
         messages_for_api = [
-            msg.to_dict() if isinstance(msg, Message) else msg
-            for msg in context_messages
+            msg.to_dict() if isinstance(msg, Message) else msg for msg in context_messages
         ]
 
         # 3. Generate assistant response using role config
@@ -204,10 +207,13 @@ class ConversationSimulator:
         if verification.model_response:
             self.usage_stats.record("system", verification.model_response)
 
-        self.trace.add_log("verification", {
-            "response_type": verification.response_type,
-            "is_answer_attempt": verification.is_answer_attempt,
-        })
+        self.trace.add_log(
+            "verification",
+            {
+                "response_type": verification.response_type,
+                "is_answer_attempt": verification.is_answer_attempt,
+            },
+        )
 
         # 5. If this is an answer attempt, extract and evaluate
         if verification.is_answer_attempt:
@@ -243,11 +249,14 @@ class ConversationSimulator:
                 raw_evaluation=evaluation_return if isinstance(evaluation_return, dict) else None,
             )
 
-            self.trace.add_log("answer_evaluation", {
-                "extracted_answer": extraction.answer,
-                "is_correct": is_correct,
-                "score": score,
-            })
+            self.trace.add_log(
+                "answer_evaluation",
+                {
+                    "extracted_answer": extraction.answer,
+                    "is_correct": is_correct,
+                    "score": score,
+                },
+            )
 
             if verbose:
                 icon = "\033[92m✔\033[0m" if is_correct else "\033[91m✘\033[0m"
@@ -260,12 +269,16 @@ class ConversationSimulator:
                 self.is_completed = True
                 self.final_result = SimulationResult(
                     sample_id=self.sample.get("task_id", "unknown"),
-                    task_name=self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown",
+                    task_name=self.task.get_task_name()
+                    if hasattr(self.task, "get_task_name")
+                    else "unknown",
                     is_correct=is_correct,
                     score=score,
                     num_turns=self.trace.num_user_turns,
                     total_cost_usd=self.usage_stats.total_cost_usd(),
-                    trace=self.trace.to_full_trace(include_history=self.config.include_trace_history),
+                    trace=self.trace.to_full_trace(
+                        include_history=self.config.include_trace_history
+                    ),
                     extracted_answer=extraction.answer,
                     evaluation_result=eval_result,
                     usage_stats=self.usage_stats,

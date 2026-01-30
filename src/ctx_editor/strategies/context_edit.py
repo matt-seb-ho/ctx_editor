@@ -2,13 +2,13 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from .base import BaseStrategy
 from ..core.types import Message
 from ..utils.helpers import load_prompt
+from .base import BaseStrategy
 
 if TYPE_CHECKING:
-    from ..core.trace import ConversationTrace
     from ..cheatsheet.cheatsheet import Cheatsheet
+    from ..core.trace import ConversationTrace
     from ..models.base import ModelClient
 
 
@@ -151,11 +151,14 @@ Use this cheatsheet to help identify what information is most important to prese
         edited_context = response.content
 
         # Log the context edit operation for auditing
-        trace.add_log("context_edit_output", {
-            "edited_context": edited_context,
-            "editor_model": self.editor_model,
-            "original_turn_count": trace.num_user_turns,
-        })
+        trace.add_log(
+            "context_edit_output",
+            {
+                "edited_context": edited_context,
+                "editor_model": self.editor_model,
+                "original_turn_count": trace.num_user_turns,
+            },
+        )
 
         # Build the new context:
         # 1. Original system message
@@ -172,14 +175,18 @@ Use this cheatsheet to help identify what information is most important to prese
             messages.append(Message(role="system", content=system_content))
 
         # Add a user message explaining this is condensed context, then the edited context
-        messages.append(Message(
-            role="user",
-            content="[Prior conversation context, condensed]",
-        ))
-        messages.append(Message(
-            role="assistant",
-            content=edited_context,
-        ))
+        messages.append(
+            Message(
+                role="user",
+                content="[Prior conversation context, condensed]",
+            )
+        )
+        messages.append(
+            Message(
+                role="assistant",
+                content=edited_context,
+            )
+        )
 
         # Add last user message
         last_user = trace.last_user_message

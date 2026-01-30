@@ -16,15 +16,20 @@ if TYPE_CHECKING:
 # Load prompts from files (matches LiC exactly)
 DEFAULT_VERIFICATION_PROMPT = (PROMPTS_DIR / "system_turn_categorization.txt").read_text()
 DEFAULT_EXTRACTION_PROMPT_GEN = (PROMPTS_DIR / "system_answer_extraction_gen.txt").read_text()
-DEFAULT_EXTRACTION_PROMPT_PREFIX_SUFFIX = (PROMPTS_DIR / "system_answer_extraction_prefix_suffix.txt").read_text()
+DEFAULT_EXTRACTION_PROMPT_PREFIX_SUFFIX = (
+    PROMPTS_DIR / "system_answer_extraction_prefix_suffix.txt"
+).read_text()
 
 
 @dataclass
 class ExtractionResult:
     """Result of answer extraction."""
+
     answer: str
     cost_usd: float = 0.0
-    model_responses: list[ModelResponse] = None  # For detailed usage tracking (may have multiple attempts)
+    model_responses: list[ModelResponse] = (
+        None  # For detailed usage tracking (may have multiple attempts)
+    )
 
     def __post_init__(self):
         if self.model_responses is None:
@@ -65,9 +70,7 @@ class SystemAgent:
             if hasattr(task, "get_answer_description")
             else "the final answer"
         )
-        self.answer_extraction_strategy = getattr(
-            task, "answer_extraction_strategy", "gen"
-        )
+        self.answer_extraction_strategy = getattr(task, "answer_extraction_strategy", "gen")
 
         self.max_extraction_attempts = 3
 
@@ -198,7 +201,7 @@ class SystemAgent:
                     start_idx = assistant_response.find(prefix)
                     end_idx = assistant_response.rfind(suffix)
                     if start_idx >= 0 and end_idx >= 0:
-                        extracted_answer = assistant_response[start_idx:(end_idx + len(suffix))]
+                        extracted_answer = assistant_response[start_idx : (end_idx + len(suffix))]
                 else:
                     extracted_answer = extractor_response
 
@@ -210,4 +213,6 @@ class SystemAgent:
         if extracted_answer is None:
             extracted_answer = ""
 
-        return ExtractionResult(answer=extracted_answer, cost_usd=total_cost, model_responses=model_responses)
+        return ExtractionResult(
+            answer=extracted_answer, cost_usd=total_cost, model_responses=model_responses
+        )

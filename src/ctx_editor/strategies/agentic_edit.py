@@ -3,14 +3,14 @@
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
+from ..core.types import Message
 from .base import BaseStrategy
 from .baseline import BaselineStrategy
 from .context_edit import ContextEditStrategy
-from ..core.types import Message
 
 if TYPE_CHECKING:
-    from ..core.trace import ConversationTrace
     from ..cheatsheet.cheatsheet import Cheatsheet
+    from ..core.trace import ConversationTrace
     from ..models.base import ModelClient
 
 
@@ -40,6 +40,7 @@ Respond with a JSON object:
 @dataclass
 class EditDecision:
     """Decision about whether to edit the context."""
+
     should_edit: bool
     reasoning: str
 
@@ -141,10 +142,13 @@ class AgenticEditStrategy(BaseStrategy):
         decision = await self._should_edit(trace, model_client)
 
         # Log the decision
-        trace.add_log("edit_decision", {
-            "should_edit": decision.should_edit,
-            "reasoning": decision.reasoning,
-        })
+        trace.add_log(
+            "edit_decision",
+            {
+                "should_edit": decision.should_edit,
+                "reasoning": decision.reasoning,
+            },
+        )
 
         if decision.should_edit:
             return await self.edit_strategy.prepare_context(trace, cheatsheet, model_client)

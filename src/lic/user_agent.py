@@ -1,8 +1,8 @@
 import json
 
 from lic.model_openai import generate_json
-from lic.utils import extract_conversation
 from lic.paths import get_prompt_path
+from lic.utils import extract_conversation
 
 
 class UserAgent:

@@ -1,12 +1,16 @@
+import json
+import math
+import os
+import random
+from collections import Counter
+
+from lic.paths import get_prompt_path
+from lic.task_base import Task
 from lic.tasks.summary.eval_summhay import (
     build_ref_insight2docids,
     compute_single_sample_results,
     evaluate_insights,
 )
-from collections import Counter
-import os, json, random, math
-from lic.task_base import Task
-from lic.paths import get_prompt_path
 
 random.seed(42)
 

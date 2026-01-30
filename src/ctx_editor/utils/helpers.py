@@ -98,10 +98,12 @@ def extract_conversation(
         user_turn_idxs = [i for i, msg in enumerate(real_conversation) if msg["role"] == "user"]
         if user_turn_idxs:
             last_user_turn_idx = user_turn_idxs[-1]
-            real_conversation = real_conversation[last_user_turn_idx + 1:]
+            real_conversation = real_conversation[last_user_turn_idx + 1 :]
 
     # Keep only role and content
-    real_conversation = [{"role": msg["role"], "content": msg["content"]} for msg in real_conversation]
+    real_conversation = [
+        {"role": msg["role"], "content": msg["content"]} for msg in real_conversation
+    ]
 
     if to_str:
         return "\n\n".join([f"[{msg['role']}] {msg['content']}" for msg in real_conversation])

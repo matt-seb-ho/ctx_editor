@@ -5,8 +5,8 @@ from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 from ..core.types import Message
 
 if TYPE_CHECKING:
-    from ..core.trace import ConversationTrace
     from ..cheatsheet.cheatsheet import Cheatsheet
+    from ..core.trace import ConversationTrace
     from ..models.base import ModelClient
 
 

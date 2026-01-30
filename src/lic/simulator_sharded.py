@@ -1,12 +1,13 @@
 import json
 import random
 
-from lic.utils import print_colored, extract_conversation, date_str
-from lic.utils_log import log_conversation
 from system_agent import SystemAgent
-from lic.model_openai import generate
 from user_agent import UserAgent
+
+from lic.model_openai import generate
 from lic.tasks import get_task
+from lic.utils import date_str, extract_conversation, print_colored
+from lic.utils_log import log_conversation
 
 
 class ConversationSimulatorSharded:
@@ -149,11 +150,10 @@ class ConversationSimulatorSharded:
                 else:
                     evaluation_return = self.task.evaluator_function(extracted_answer, self.sample)
 
-                    assert type(evaluation_return) is dict and (
-                        "score" in evaluation_return or "is_correct" in evaluation_return
-                    ), (
-                        "Evaluator function should return a dictionary with 'score' or 'is_correct' key"
-                    )
+                    assert (
+                        type(evaluation_return) is dict
+                        and ("score" in evaluation_return or "is_correct" in evaluation_return)
+                    ), "Evaluator function should return a dictionary with 'score' or 'is_correct' key"
                     is_correct = evaluation_return.get("is_correct", None)
                     score = evaluation_return.get("score", None)
 
@@ -217,7 +217,8 @@ class ConversationSimulatorSharded:
 
 
 if __name__ == "__main__":
-    import argparse, json
+    import argparse
+    import json
 
     parser = argparse.ArgumentParser()
     parser.add_argument("--task", type=str, default="math")

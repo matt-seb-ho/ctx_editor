@@ -1,8 +1,9 @@
 from datasets import load_dataset
-from task_spider_process_sql import Schema, get_schema_from_json_obj, get_sql
 from task_spider_eval_old import SpiderEvaluator
+from task_spider_process_sql import Schema, get_schema_from_json_obj, get_sql
 
 spider_evaluator = SpiderEvaluator()
+
 
 def load_spider_seeds(difficulties=["hard", "extra"]):
     dataset = load_dataset("spider")

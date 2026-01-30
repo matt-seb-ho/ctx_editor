@@ -64,27 +64,33 @@ class ConversationTrace:
 
     def add_user_message(self, content: str, metadata: Optional[dict] = None) -> None:
         """Add a user message to the trace."""
-        self.messages.append(Message(
-            role="user",
-            content=content,
-            metadata=metadata or {},
-        ))
+        self.messages.append(
+            Message(
+                role="user",
+                content=content,
+                metadata=metadata or {},
+            )
+        )
 
     def add_assistant_message(self, content: str, metadata: Optional[dict] = None) -> None:
         """Add an assistant message to the trace."""
-        self.messages.append(Message(
-            role="assistant",
-            content=content,
-            metadata=metadata or {},
-        ))
+        self.messages.append(
+            Message(
+                role="assistant",
+                content=content,
+                metadata=metadata or {},
+            )
+        )
 
     def add_log(self, log_type: str, data: dict[str, Any]) -> None:
         """Add a log entry to the trace."""
-        self.logs.append({
-            "type": log_type,
-            "data": data,
-            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        })
+        self.logs.append(
+            {
+                "type": log_type,
+                "data": data,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            }
+        )
 
     def take_snapshot(self, label: Optional[str] = None) -> None:
         """Take a snapshot of the current messages for history tracking.
@@ -116,10 +122,13 @@ class ConversationTrace:
         if snapshot_label:
             self.take_snapshot(snapshot_label)
         self.messages = new_messages
-        self.add_log("context_replaced", {
-            "new_message_count": len(new_messages),
-            "history_snapshot_count": len(self.history),
-        })
+        self.add_log(
+            "context_replaced",
+            {
+                "new_message_count": len(new_messages),
+                "history_snapshot_count": len(self.history),
+            },
+        )
 
     def to_messages(self, include_system: bool = True) -> list[Message]:
         """Get all messages for API calls."""
@@ -185,17 +194,13 @@ class ConversationTrace:
             user_indices = [i for i, msg in enumerate(messages) if msg.role == "user"]
             if user_indices:
                 last_user_idx = user_indices[-1]
-                messages = messages[last_user_idx + 1:]
+                messages = messages[last_user_idx + 1 :]
 
         return "\n\n".join([f"[{msg.role}] {msg.content}" for msg in messages])
 
     def get_revealed_shard_ids(self) -> list[str]:
         """Get IDs of shards that have been revealed."""
-        return [
-            log["data"]["shard_id"]
-            for log in self.logs
-            if log["type"] == "shard_revealed"
-        ]
+        return [log["data"]["shard_id"] for log in self.logs if log["type"] == "shard_revealed"]
 
     def clone(self) -> "ConversationTrace":
         """Create a deep copy of the trace."""
@@ -212,15 +217,18 @@ class ConversationTrace:
         new_trace.logs = [dict(log) for log in self.logs]
         # Deep copy history
         new_trace.history = [
-            (label, [
-                Message(
-                    role=m.role,
-                    content=m.content,
-                    metadata=dict(m.metadata),
-                    timestamp=m.timestamp,
-                )
-                for m in snapshot_messages
-            ])
+            (
+                label,
+                [
+                    Message(
+                        role=m.role,
+                        content=m.content,
+                        metadata=dict(m.metadata),
+                        timestamp=m.timestamp,
+                    )
+                    for m in snapshot_messages
+                ],
+            )
             for label, snapshot_messages in self.history
         ]
         return new_trace

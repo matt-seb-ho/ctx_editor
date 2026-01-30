@@ -4,10 +4,10 @@ import asyncio
 import traceback
 from typing import Any, Callable, Optional
 
-from .runner import ExperimentRunner
-from ..core.types import SimulationResult
 from ..cheatsheet.cheatsheet import Cheatsheet
+from ..core.types import SimulationResult
 from ..utils.logging import get_logger
+from .runner import ExperimentRunner
 
 
 class ParallelRunner(ExperimentRunner):
