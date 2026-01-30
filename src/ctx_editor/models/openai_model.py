@@ -4,10 +4,10 @@ import asyncio
 import os
 from typing import Any, Optional
 
-from openai import AsyncOpenAI, AsyncAzureOpenAI
+from openai import AsyncAzureOpenAI, AsyncOpenAI
 
-from .base import BaseModelClient, format_messages
 from ..core.types import ModelResponse, ReasoningEffort
+from .base import BaseModelClient, format_messages
 
 
 class OpenAIModelClient(BaseModelClient):
@@ -63,6 +63,7 @@ class OpenAIModelClient(BaseModelClient):
         if model.startswith("gpt-5") and temperature != 1.0:
             if not OpenAIModelClient._gpt5_temp_warned:
                 import logging
+
                 logging.getLogger("ctx_editor").warning(
                     f"gpt-5 models require temperature=1.0, overriding {temperature} -> 1.0"
                 )
@@ -73,7 +74,9 @@ class OpenAIModelClient(BaseModelClient):
         if model.startswith("o1") and len(messages) > 1:
             if messages[0]["role"] == "system" and messages[1]["role"] == "user":
                 system_content = messages[0]["content"]
-                messages[1]["content"] = f"System Message: {system_content}\n{messages[1]['content']}"
+                messages[1]["content"] = (
+                    f"System Message: {system_content}\n{messages[1]['content']}"
+                )
                 messages = messages[1:]
 
         kwargs: dict[str, Any] = {}
@@ -97,7 +100,7 @@ class OpenAIModelClient(BaseModelClient):
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2 ** attempt)  # Exponential backoff
+                    await asyncio.sleep(2**attempt)  # Exponential backoff
         else:
             raise RuntimeError(f"Failed after {max_retries} attempts: {last_error}")
 

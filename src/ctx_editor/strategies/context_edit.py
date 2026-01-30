@@ -150,6 +150,13 @@ Use this cheatsheet to help identify what information is most important to prese
         )
         edited_context = response.content
 
+        # Log the context edit operation for auditing
+        trace.add_log("context_edit_output", {
+            "edited_context": edited_context,
+            "editor_model": self.editor_model,
+            "original_turn_count": trace.num_user_turns,
+        })
+
         # Build the new context:
         # 1. Original system message
         # 2. Edited context as a "prior context" assistant message

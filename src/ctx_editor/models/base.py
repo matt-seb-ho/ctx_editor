@@ -3,9 +3,17 @@
 import json
 import re
 from abc import ABC, abstractmethod
+from functools import cache
 from typing import Any, Optional, Protocol, runtime_checkable
 
 from ..core.types import ModelResponse
+from .openai_pricing import OPENAI_PRICING
+
+
+@cache
+def get_model_pricing() -> dict[str, dict[str, float]]:
+    # TODO: mix other providers' pricing here
+    return OPENAI_PRICING
 
 
 def format_messages(messages: list[dict], variables: dict[str, str]) -> list[dict]:
@@ -167,36 +175,31 @@ class BaseModelClient(ABC):
         if model.startswith("ft:"):
             base_model = model.split(":")[1]
 
-        # Cost per 1000 tokens (input, output)
-        pricing = {
-            "gpt-4o-mini": (0.00015, 0.0006),
-            "gpt-4o": (0.0025, 0.01),
-            "gpt-4.5-preview": (0.075, 0.150),
-            "gpt-3.5-turbo": (0.0005, 0.0015),
-            "o1-mini": (0.003, 0.012),
-            "o1-preview": (0.015, 0.06),
-            "o1": (0.015, 0.06),
-            "claude-3-5-sonnet": (0.003, 0.015),
-            "claude-3-opus": (0.015, 0.075),
-            "claude-3-haiku": (0.00025, 0.00125),
-        }
+        # pricing now expressed in USD/1M tokens
+        pricing = get_model_pricing()
 
         # Find matching pricing
-        inp_cost, out_cost = 0.0, 0.0
+        inp_cost = 0.0
+        out_cost = 0.0
+        cached_inp_cost = 0.0
+        matched_name = None
         for name, costs in pricing.items():
             if base_model.startswith(name):
-                inp_cost, out_cost = costs
-                break
+                # go with longest matching prefix
+                if matched_name is not None and len(name) < len(matched_name):
+                    continue
+                matched_name = name
+                inp_cost = costs["input"]
+                out_cost = costs["output"]
+                cached_inp_cost = costs.get("cached_input", None) or inp_cost
 
         # Apply cache discount (50%)
-        cache_discount = 0.5
         prompt_tokens_non_cached = prompt_tokens - prompt_tokens_cached
         total = (
-            (prompt_tokens_non_cached + prompt_tokens_cached * cache_discount)
-            / 1000
-            * inp_cost
-            + completion_tokens / 1000 * out_cost
-        )
+            prompt_tokens_cached * cached_inp_cost
+            + prompt_tokens_non_cached * inp_cost
+            + completion_tokens * out_cost
+        ) / 1_000_000
 
         # Apply batch discount (50%)
         if is_batch:
