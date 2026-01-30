@@ -61,6 +61,29 @@ class ConversationSimulator:
         system_prompt = task.generate_system_prompt(sample)
         self.trace.add_system_message(system_prompt)
 
+    def _build_result_metadata(self, extra: dict[str, Any] | None = None) -> dict[str, Any]:
+        """Build metadata dict for SimulationResult, including grounding info.
+
+        Args:
+            extra: Additional metadata to include.
+
+        Returns:
+            Combined metadata dict with full_spec_q and ground_truth_a if available.
+        """
+        metadata = {}
+
+        # Include grounding information from sample if available
+        if "full_spec_q" in self.sample:
+            metadata["full_spec_q"] = self.sample["full_spec_q"]
+        if "ground_truth_a" in self.sample:
+            metadata["ground_truth_a"] = self.sample["ground_truth_a"]
+
+        # Merge with any extra metadata
+        if extra:
+            metadata.update(extra)
+
+        return metadata
+
     async def run(self, verbose: bool = False) -> SimulationResult:
         """Run the full conversation simulation.
 
@@ -97,7 +120,7 @@ class ConversationSimulator:
                 total_cost_usd=self.usage_stats.total_cost_usd(),
                 trace=self.trace.to_full_trace(include_history=self.config.include_trace_history),
                 usage_stats=self.usage_stats,
-                metadata={"reason": termination_reason},
+                metadata=self._build_result_metadata({"reason": termination_reason}),
             )
 
         return self.final_result
@@ -246,4 +269,5 @@ class ConversationSimulator:
                     extracted_answer=extraction.answer,
                     evaluation_result=eval_result,
                     usage_stats=self.usage_stats,
+                    metadata=self._build_result_metadata(),
                 )

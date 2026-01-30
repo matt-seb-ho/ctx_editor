@@ -204,6 +204,12 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         pbar.n = completed
         pbar.refresh()
 
+    # Create cheatsheet updater with grounding config
+    cheatsheet_updater = CheatsheetUpdater(
+        include_full_spec_q=cfg.cheatsheet.get("include_full_spec_q", False),
+        include_ground_truth_a=cfg.cheatsheet.get("include_ground_truth_a", False),
+    )
+
     if (
         execution_mode == "batched"
         and cfg.cheatsheet.enabled
@@ -214,7 +220,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             batch_size=cfg.execution.batch_size,
             max_concurrent=cfg.execution.max_concurrent,
             model_client=model_client,
-            updater=CheatsheetUpdater(),
+            updater=cheatsheet_updater,
             save_cheatsheet_path=cfg.cheatsheet.get("save_path"),
             progress_callback=update_progress,
         )
@@ -225,7 +231,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             batch_size=1,
             max_concurrent=1,
             model_client=model_client,
-            updater=CheatsheetUpdater(),
+            updater=cheatsheet_updater,
             progress_callback=update_progress,
         )
         results = await runner.run_sequential(samples, make_simulator, cheatsheet)

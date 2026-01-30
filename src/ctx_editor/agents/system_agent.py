@@ -2,10 +2,10 @@
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from ..core.types import ModelResponse, VerificationResult
+from ..paths import PROMPTS_DIR
 from ..utils.helpers import load_prompt
 
 if TYPE_CHECKING:
@@ -14,10 +14,9 @@ if TYPE_CHECKING:
 
 
 # Load prompts from files (matches LiC exactly)
-_PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
-DEFAULT_VERIFICATION_PROMPT = (_PROMPTS_DIR / "system_turn_categorization.txt").read_text()
-DEFAULT_EXTRACTION_PROMPT_GEN = (_PROMPTS_DIR / "system_answer_extraction_gen.txt").read_text()
-DEFAULT_EXTRACTION_PROMPT_PREFIX_SUFFIX = (_PROMPTS_DIR / "system_answer_extraction_prefix_suffix.txt").read_text()
+DEFAULT_VERIFICATION_PROMPT = (PROMPTS_DIR / "system_turn_categorization.txt").read_text()
+DEFAULT_EXTRACTION_PROMPT_GEN = (PROMPTS_DIR / "system_answer_extraction_gen.txt").read_text()
+DEFAULT_EXTRACTION_PROMPT_PREFIX_SUFFIX = (PROMPTS_DIR / "system_answer_extraction_prefix_suffix.txt").read_text()
 
 
 @dataclass

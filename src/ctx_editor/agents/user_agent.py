@@ -2,10 +2,10 @@
 
 import json
 from dataclasses import dataclass
-from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional
 
 from ..core.types import ModelResponse
+from ..paths import PROMPTS_DIR
 from ..utils.helpers import load_prompt
 
 if TYPE_CHECKING:
@@ -14,8 +14,7 @@ if TYPE_CHECKING:
 
 
 # Load the default prompt from the prompts directory (matches LiC exactly)
-_PROMPTS_DIR = Path(__file__).parent.parent / "prompts"
-DEFAULT_USER_PROMPT = (_PROMPTS_DIR / "user_agent.txt").read_text()
+DEFAULT_USER_PROMPT = (PROMPTS_DIR / "user_agent.txt").read_text()
 
 
 @dataclass

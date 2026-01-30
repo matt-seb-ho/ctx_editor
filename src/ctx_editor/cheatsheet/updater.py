@@ -26,7 +26,7 @@ Number of turns: {num_turns}
 Conversation:
 {conversation}
 </trajectory>
-
+{grounding_info}
 Based on this trajectory, update the cheatsheet to capture any useful lessons learned. Consider:
 1. What patterns or strategies led to success or failure?
 2. What information was critical to preserve in context?
@@ -53,6 +53,8 @@ class CheatsheetUpdater:
         model: str = "gpt-4o-mini",
         update_on_success: bool = True,
         update_on_failure: bool = True,
+        include_full_spec_q: bool = False,
+        include_ground_truth_a: bool = False,
     ):
         """Initialize the updater.
 
@@ -62,6 +64,10 @@ class CheatsheetUpdater:
             model: Model to use for reflection.
             update_on_success: Whether to update on successful outcomes.
             update_on_failure: Whether to update on failed outcomes.
+            include_full_spec_q: Whether to include the fully-specified question
+                in cheatsheet update prompts for grounding.
+            include_ground_truth_a: Whether to include the ground truth answer
+                in cheatsheet update prompts for grounding.
         """
         if reflection_prompt_file:
             self.reflection_prompt = load_prompt(reflection_prompt_file)
@@ -73,6 +79,8 @@ class CheatsheetUpdater:
         self.model = model
         self.update_on_success = update_on_success
         self.update_on_failure = update_on_failure
+        self.include_full_spec_q = include_full_spec_q
+        self.include_ground_truth_a = include_ground_truth_a
 
     def _extract_conversation(self, trace: list[dict]) -> str:
         """Extract conversation from trace for reflection.
@@ -90,6 +98,39 @@ class CheatsheetUpdater:
                 content = entry.get("content", "")
                 conversation_parts.append(f"[{role}] {content}")
         return "\n\n".join(conversation_parts)
+
+    def _build_grounding_info(self, trajectory: "SimulationResult") -> str:
+        """Build grounding information section for the prompt.
+
+        This includes the fully-specified question and/or ground truth answer
+        to help the model reflect on what the correct behavior should have been.
+
+        Args:
+            trajectory: The simulation result containing metadata.
+
+        Returns:
+            Formatted grounding info string, or empty string if nothing to include.
+        """
+        parts = []
+        metadata = trajectory.metadata or {}
+
+        if self.include_full_spec_q and "full_spec_q" in metadata:
+            parts.append(f"""
+<full_specification>
+The fully-specified single-turn version of this problem:
+{metadata["full_spec_q"]}
+</full_specification>""")
+
+        if self.include_ground_truth_a and "ground_truth_a" in metadata:
+            parts.append(f"""
+<ground_truth>
+The ground truth answer:
+{metadata["ground_truth_a"]}
+</ground_truth>""")
+
+        if parts:
+            return "\n" + "\n".join(parts)
+        return ""
 
     async def update_from_trajectory(
         self,
@@ -116,6 +157,7 @@ class CheatsheetUpdater:
         # Build reflection prompt
         conversation = self._extract_conversation(trajectory.trace)
         outcome = "Success" if trajectory.is_correct else "Failure"
+        grounding_info = self._build_grounding_info(trajectory)
 
         prompt = self.reflection_prompt.format(
             current_cheatsheet=cheatsheet.content if cheatsheet.content else "(empty)",
@@ -125,6 +167,7 @@ class CheatsheetUpdater:
             score=str(trajectory.score),
             num_turns=str(trajectory.num_turns),
             conversation=conversation,
+            grounding_info=grounding_info,
         )
 
         # Generate updated cheatsheet
@@ -184,6 +227,7 @@ class CheatsheetUpdater:
         for i, t in enumerate(filtered, 1):
             conversation = self._extract_conversation(t.trace)
             outcome = "Success" if t.is_correct else "Failure"
+            grounding_info = self._build_grounding_info(t)
             trajectories_text.append(f"""
 --- Trajectory {i} ---
 Task: {t.task_name}
@@ -192,7 +236,7 @@ Outcome: {outcome} (score: {t.score})
 Turns: {t.num_turns}
 
 {conversation}
-""")
+{grounding_info}""")
 
         batch_prompt = f"""You are updating a cheatsheet based on multiple completed conversation trajectories.
 
