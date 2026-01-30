@@ -8,9 +8,9 @@ Usage:
     streamlit run src/ctx_editor/app_conv_viewer.py
 
     # Load a specific run directory
-    streamlit run src/ctx_editor/app_conv_viewer.py -- --run outputs/context_edit_gpt-5-mini_all/2026-01-29_09-00-12
+    streamlit run src/ctx_editor/app_conv_viewer.py -- --run outputs/2026-01-29/09-00-12
 
-    # Or via query params: http://localhost:8501?run=outputs/context_edit_gpt-5-mini_all/2026-01-29_09-00-12
+    # Or via query params: http://localhost:8501?run=outputs/2026-01-29/09-00-12
 """
 
 import argparse
@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 import streamlit as st
+import yaml
 
 
 def load_results_file(file_path: str) -> list[dict]:
@@ -40,32 +41,182 @@ def load_trace_file(file_path: str) -> dict:
         return json.load(f)
 
 
-def find_output_dirs(base_path: str = "outputs") -> dict[str, list[str]]:
-    """Find all output directories organized by experiment type.
+def load_config_file(run_dir: str) -> Optional[dict]:
+    """Load the config.yaml from a run directory.
+
+    Tries multiple locations:
+    1. {run_dir}/config.yaml (copied config)
+    2. {run_dir}/.hydra/config.yaml (hydra output)
+    """
+    # Try direct config.yaml first
+    config_path = os.path.join(run_dir, "config.yaml")
+    if os.path.exists(config_path):
+        with open(config_path, "r") as f:
+            return yaml.safe_load(f)
+
+    # Try .hydra subdirectory
+    hydra_config_path = os.path.join(run_dir, ".hydra", "config.yaml")
+    if os.path.exists(hydra_config_path):
+        with open(hydra_config_path, "r") as f:
+            return yaml.safe_load(f)
+
+    return None
+
+
+@st.cache_data
+def load_data_file_indexed(data_file_path: str) -> dict[str, dict]:
+    """Load a data file and index it by task_id.
 
     Returns:
-        Dict mapping experiment type to list of timestamped run directories.
+        Dict mapping task_id to the full sample data (with full_spec_q, ground_truth_a, etc.)
     """
-    experiments = defaultdict(list)
+    if not os.path.exists(data_file_path):
+        return {}
+
+    with open(data_file_path, "r") as f:
+        data = json.load(f)
+
+    if not isinstance(data, list):
+        data = [data]
+
+    # Index by task_id
+    indexed = {}
+    for item in data:
+        task_id = item.get("task_id")
+        if task_id:
+            indexed[task_id] = item
+
+    return indexed
+
+
+def get_original_problem_spec(
+    run_dir: str, task_id: str
+) -> tuple[Optional[str], Optional[str]]:
+    """Get the original problem specification for a given task_id.
+
+    Args:
+        run_dir: Path to the run directory containing config.yaml
+        task_id: The task_id to look up
+
+    Returns:
+        Tuple of (full_spec_q, ground_truth_a), either can be None if not found
+    """
+    # Load config to get data_file path
+    config = load_config_file(run_dir)
+    if not config:
+        return None, None
+
+    # Get data file path from config
+    data_file = config.get("task", {}).get("data_file")
+    if not data_file:
+        return None, None
+
+    # Resolve data file path relative to project root
+    # The data_file in config is relative to project root (e.g., "data/lic_eval_subset.json")
+    # We need to find the project root from run_dir
+    # run_dir is like: outputs/baseline_gpt-5-mini_all/2026-01-29_08-03-51
+    # Project root is 3 levels up from the new-style paths, but could vary
+
+    # Try to resolve from current working directory first
+    if os.path.exists(data_file):
+        data_file_path = data_file
+    else:
+        # Try relative to the script location
+        script_dir = Path(__file__).parent.parent.parent
+        data_file_path = str(script_dir / data_file)
+
+        if not os.path.exists(data_file_path):
+            # Try relative to run_dir by going up directories
+            run_path = Path(run_dir)
+            for i in range(1, 5):  # Try up to 4 levels up
+                candidate = run_path.parents[i] / data_file if i < len(run_path.parents) else None
+                if candidate and candidate.exists():
+                    data_file_path = str(candidate)
+                    break
+
+    # Load and index the data file
+    indexed_data = load_data_file_indexed(data_file_path)
+
+    # Look up the task
+    task_data = indexed_data.get(task_id, {})
+
+    return task_data.get("full_spec_q"), task_data.get("ground_truth_a")
+
+
+def load_ledger(base_path: str = "outputs") -> list[dict]:
+    """Load the runs ledger if it exists.
+
+    Returns:
+        List of run entries from the ledger, or empty list if not found.
+    """
+    ledger_path = Path(base_path) / "runs.yaml"
+    if not ledger_path.exists():
+        return []
+
+    with open(ledger_path) as f:
+        data = yaml.safe_load(f)
+        return data.get("runs", []) if data else []
+
+
+def find_output_dirs(base_path: str = "outputs") -> list[dict]:
+    """Find all output directories using ledger or directory scan.
+
+    Returns:
+        List of run info dicts with keys: path, strategy, model, task, accuracy, etc.
+    """
     base = Path(base_path)
 
     if not base.exists():
-        return experiments
+        return []
 
-    for exp_dir in base.iterdir():
-        if not exp_dir.is_dir():
+    # Try loading from ledger first
+    runs = load_ledger(base_path)
+    if runs:
+        # Add full_path to each run and filter to those that exist
+        valid_runs = []
+        for run in runs:
+            full_path = base / run["path"]
+            if full_path.exists() and (full_path / "results.json").exists():
+                run["full_path"] = str(full_path)
+                valid_runs.append(run)
+        return valid_runs
+
+    # Fallback: scan directory structure (new format: {date}/{time})
+    runs = []
+    for date_dir in base.iterdir():
+        if not date_dir.is_dir() or date_dir.name.startswith("."):
             continue
 
-        exp_name = exp_dir.name
+        # Check if it's a date directory (YYYY-MM-DD)
+        import re
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_dir.name):
+            continue
 
-        # Find timestamped subdirectories with results.json
-        for run_dir in exp_dir.iterdir():
-            if run_dir.is_dir():
-                results_file = run_dir / "results.json"
+        for time_dir in date_dir.iterdir():
+            if time_dir.is_dir():
+                results_file = time_dir / "results.json"
+                config_file = time_dir / "config.yaml"
+
                 if results_file.exists():
-                    experiments[exp_name].append(str(run_dir))
+                    run_info = {
+                        "path": f"{date_dir.name}/{time_dir.name}",
+                        "full_path": str(time_dir),
+                        "strategy": "unknown",
+                        "model": "unknown",
+                        "task": "unknown",
+                    }
 
-    return experiments
+                    # Try to extract info from config
+                    if config_file.exists():
+                        config = load_config_file(str(time_dir))
+                        if config:
+                            run_info["strategy"] = config.get("experiment", {}).get("name", "unknown")
+                            run_info["model"] = config.get("model", {}).get("name", "unknown")
+                            run_info["task"] = config.get("task", {}).get("name", "unknown")
+
+                    runs.append(run_info)
+
+    return runs
 
 
 def get_experiment_type(sample: dict) -> str:
@@ -280,6 +431,60 @@ def display_context_edit_marker(turn_num: int) -> None:
     )
 
 
+def display_original_problem(full_spec_q: Optional[str], ground_truth_a: Optional[str]) -> None:
+    """Display the original single-turn problem specification.
+
+    This shows what the complete problem looks like before being sharded
+    into a multi-turn conversation.
+    """
+    if not full_spec_q and not ground_truth_a:
+        return
+
+    st.markdown(
+        """<div style="background-color: #1a2a3a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 2px solid #3a5a7a;">
+        <h4 style="color: #7ab3e0; margin-top: 0; margin-bottom: 10px;">Original Single-Turn Problem</h4>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    if full_spec_q:
+        st.markdown(
+            f"""<div style="background-color: #0d1a26; padding: 12px; border-radius: 5px; margin-bottom: 10px;">
+            <strong style="color: #5a9fd4;">Question:</strong><br>
+            <span style="color: #e0e0e0;">{full_spec_q}</span>
+            </div>""",
+            unsafe_allow_html=True,
+        )
+
+    if ground_truth_a:
+        # Truncate long answers for display
+        display_answer = ground_truth_a
+        if len(display_answer) > 500:
+            with st.expander("Ground Truth Answer (click to expand)", expanded=False):
+                st.markdown(
+                    f"""<div style="background-color: #0d2618; padding: 12px; border-radius: 5px;">
+                    <span style="color: #a8e6cf;">{ground_truth_a}</span>
+                    </div>""",
+                    unsafe_allow_html=True,
+                )
+        else:
+            st.markdown(
+                f"""<div style="background-color: #0d2618; padding: 12px; border-radius: 5px;">
+                <strong style="color: #5ad4a8;">Ground Truth Answer:</strong><br>
+                <span style="color: #a8e6cf;">{display_answer}</span>
+                </div>""",
+                unsafe_allow_html=True,
+            )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown(
+        """<p style="font-size: 0.85em; color: #888; text-align: center; margin-top: 5px;">
+        The problem above was sharded into multiple turns in the conversation below
+        </p>""",
+        unsafe_allow_html=True,
+    )
+
+
 def display_log_entry(log: dict, show_verification: bool = True) -> None:
     """Display a log entry based on its type."""
     log_type = log.get("type", "unknown")
@@ -355,8 +560,20 @@ def display_history_snapshot(snapshot: dict, index: int) -> None:
                 st.markdown(f"**[system]** {content}")
 
 
-def display_conversation(sample: dict, exp_type: str = "") -> None:
-    """Display a full conversation with all logs and context edits."""
+def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") -> None:
+    """Display a full conversation with all logs and context edits.
+
+    Args:
+        sample: The sample data containing trace, metadata, etc.
+        exp_type: The experiment type (e.g., "context_edit", "baseline")
+        run_dir: Path to the run directory (for loading original problem spec)
+    """
+    # Display original problem specification from data file
+    task_id = sample.get("sample_id")
+    if run_dir and task_id:
+        full_spec_q, ground_truth_a = get_original_problem_spec(run_dir, task_id)
+        display_original_problem(full_spec_q, ground_truth_a)
+
     trace = sample.get("trace", {})
 
     # Handle empty trace
@@ -570,7 +787,7 @@ def main():
     custom_path = st.sidebar.text_input(
         "Custom run path",
         value=run_from_args or run_from_query or "",
-        placeholder="e.g., outputs/baseline_gpt-5-mini_all/2026-01-29_08-03-51",
+        placeholder="e.g., outputs/2026-01-29/09-00-12",
         help="Enter a path to a specific run directory, or leave empty to browse",
     )
 
@@ -583,7 +800,9 @@ def main():
         custom_path = custom_path.strip()
         if os.path.exists(custom_path):
             selected_run = custom_path
-            selected_exp = os.path.basename(os.path.dirname(custom_path))
+            # Try to get experiment type from config
+            config = load_config_file(custom_path)
+            selected_exp = config.get("experiment", {}).get("name", "unknown") if config else "unknown"
             st.sidebar.success(f"Loaded: {os.path.basename(custom_path)}")
         else:
             st.sidebar.error(f"Path not found: {custom_path}")
@@ -593,31 +812,57 @@ def main():
         st.sidebar.divider()
         st.sidebar.header("Browse Experiments")
 
-        experiments = find_output_dirs(base_path)
+        all_runs = find_output_dirs(base_path)
 
-        if not experiments:
+        if not all_runs:
             st.error(f"No experiment outputs found in {base_path}")
             st.info("Run some experiments first with: `ctx-editor`")
             st.info("Or enter a custom path in the sidebar.")
             return
 
-        # Select experiment type
-        exp_names = sorted(experiments.keys())
-        selected_exp = st.sidebar.selectbox("Experiment", exp_names)
+        # Get unique values for filters
+        strategies = sorted(set(r.get("strategy", "unknown") for r in all_runs))
+        models = sorted(set(r.get("model", "unknown") for r in all_runs))
+        tasks = sorted(set(r.get("task", "unknown") for r in all_runs))
 
-        if not selected_exp:
-            st.warning("Select an experiment to view conversations.")
+        # Filter controls
+        selected_strategy = st.sidebar.selectbox("Strategy", ["All"] + strategies)
+        selected_model = st.sidebar.selectbox("Model", ["All"] + models)
+        selected_task_filter = st.sidebar.selectbox("Task", ["All"] + tasks)
+
+        # Apply filters
+        filtered_runs = all_runs
+        if selected_strategy != "All":
+            filtered_runs = [r for r in filtered_runs if r.get("strategy") == selected_strategy]
+        if selected_model != "All":
+            filtered_runs = [r for r in filtered_runs if r.get("model") == selected_model]
+        if selected_task_filter != "All":
+            filtered_runs = [r for r in filtered_runs if r.get("task") == selected_task_filter]
+
+        if not filtered_runs:
+            st.warning("No runs match the selected filters.")
             return
 
-        # Select run
-        runs = sorted(experiments[selected_exp], reverse=True)  # Most recent first
-        run_labels = [os.path.basename(r) for r in runs]
+        # Sort by path (which includes date/time) descending for most recent first
+        filtered_runs = sorted(filtered_runs, key=lambda r: r.get("path", ""), reverse=True)
+
+        # Create run labels with key info
+        def make_run_label(r: dict) -> str:
+            path = r.get("path", "unknown")
+            strategy = r.get("strategy", "?")
+            acc = r.get("accuracy")
+            acc_str = f" ({acc:.0%})" if acc is not None else ""
+            return f"{path} [{strategy}]{acc_str}"
+
         selected_run_idx = st.sidebar.selectbox(
             "Run",
-            range(len(runs)),
-            format_func=lambda i: run_labels[i],
+            range(len(filtered_runs)),
+            format_func=lambda i: make_run_label(filtered_runs[i]),
         )
-        selected_run = runs[selected_run_idx]
+
+        selected_run_info = filtered_runs[selected_run_idx]
+        selected_run = selected_run_info.get("full_path", "")
+        selected_exp = selected_run_info.get("strategy", "unknown")
 
     # Load results
     results_path = os.path.join(selected_run, "results.json")
@@ -728,7 +973,7 @@ def main():
         st.info("**Strategy:** Baseline - No context modifications")
 
     # Display the conversation
-    display_conversation(selected_sample, exp_type=effective_exp_type)
+    display_conversation(selected_sample, exp_type=effective_exp_type, run_dir=selected_run)
 
 
 if __name__ == "__main__":

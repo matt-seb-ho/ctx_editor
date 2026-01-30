@@ -17,6 +17,7 @@ from ctx_editor.cheatsheet import Cheatsheet, CheatsheetUpdater
 from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
 from ctx_editor.execution import BatchedRunner, ParallelRunner
 from ctx_editor.models import AnthropicModelClient, OpenAIModelClient
+from ctx_editor.utils.ledger import add_run
 from ctx_editor.utils.logging import get_logger, save_metrics, save_results, setup_logging
 from lic.paths import PROJECT_ROOT
 
@@ -306,6 +307,23 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     output_dir = cfg.logging.output_dir
     save_results([r.to_dict() for r in results], output_dir)
     save_metrics(metrics, output_dir)
+
+    # Update ledger with run info
+    output_path = Path(output_dir)
+    outputs_root = output_path.parent.parent  # outputs/{date}/{time} -> outputs/
+    run_path = f"{output_path.parent.name}/{output_path.name}"  # "{date}/{time}"
+    add_run(
+        outputs_dir=outputs_root,
+        run_path=run_path,
+        strategy=cfg.experiment.name,
+        model=cfg.model.name,
+        task=cfg.task.name,
+        status="completed",
+        samples=total,
+        accuracy=metrics["accuracy"],
+        total_cost_usd=total_cost,
+        average_turns=avg_turns,
+    )
 
     # Save individual traces if configured
     if cfg.logging.save_traces:

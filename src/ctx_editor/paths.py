@@ -7,3 +7,5 @@ PACKAGE_DIR = Path(__file__).parent
 
 # Prompts directory
 PROMPTS_DIR = PACKAGE_DIR / "prompts"
+
+PROJECT_ROOT = PACKAGE_DIR.parent.parent  # ctx_editor repo root
