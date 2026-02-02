@@ -8,6 +8,7 @@ from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from ..core.types import ModelResponse, ReasoningEffort
 from .base import BaseModelClient, format_messages
+from .setup_azure_oai_client import setup_azure_oai_client
 
 
 class OpenAIModelClient(BaseModelClient):
@@ -17,12 +18,9 @@ class OpenAIModelClient(BaseModelClient):
 
     def __init__(self):
         """Initialize the OpenAI client."""
-        if "AZURE_OPENAI_API_KEY" in os.environ and "AZURE_OPENAI_ENDPOINT" in os.environ:
-            self.client = AsyncAzureOpenAI(
-                api_key=os.environ["AZURE_OPENAI_API_KEY"],
-                azure_endpoint=os.environ["AZURE_OPENAI_ENDPOINT"],
-                api_version="2024-10-01-preview",
-            )
+        if os.getenv("USE_AZURE_OAI", "false").lower() == "true":
+            print("Using Azure OpenAI")
+            self.client = setup_azure_oai_client()
         else:
             api_key = os.environ.get("OPENAI_API_KEY")
             if not api_key:
