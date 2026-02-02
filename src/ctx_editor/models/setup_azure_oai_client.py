@@ -2,9 +2,10 @@ from azure.identity import (
     AzureCliCredential,
     get_bearer_token_provider,
 )
-from openai import AsyncOpenAI
+from openai import AsyncAzureOpenAI
 
-AZURE_ENDPOINT = "https://fxdata-eastus2.openai.azure.com/openai/v1"
+AZURE_ENDPOINT = "https://fxdata-eastus2.openai.azure.com"
+API_VERSION = "2024-10-21"
 
 
 def setup_azure_oai_client():
@@ -12,8 +13,9 @@ def setup_azure_oai_client():
         AzureCliCredential(),
         "https://cognitiveservices.azure.com/.default",
     )
-    client = AsyncOpenAI(
-        base_url=AZURE_ENDPOINT,
-        api_key=token_provider,
+    client = AsyncAzureOpenAI(
+        azure_endpoint=AZURE_ENDPOINT,
+        azure_ad_token_provider=token_provider,
+        api_version=API_VERSION,
     )
     return client
