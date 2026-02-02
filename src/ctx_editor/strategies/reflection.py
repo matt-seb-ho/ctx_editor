@@ -36,12 +36,31 @@ If any of these exist, explicitly note them so the assistant knows to disregard 
 
 Provide a concise reflection (2-4 sentences) summarizing the state of the conversation, what the assistant should focus on, and any prior mistakes to avoid repeating:"""
 
+# Explanation added to system message when reflection is used
+REFLECTION_SYSTEM_ADDENDUM = """
+
+Note: User messages may contain a <conversation_state_reflection> section at the end. This is NOT part of the user's message - it is automatically injected context from an external system that analyzes conversation state. Use it as helpful context for your response, but do not reference or respond to it directly."""
+
+CHEATSHEET_SECTION_TEMPLATE = """\
+<cheatsheet>
+Reference this cheatsheet when reflecting:
+{cheatsheet_content}
+</cheatsheet>
+"""
+
+REFLECTION_BLOCK_TEMPLATE = "\n\n<conversation_state_reflection>\n{reflection}\n</conversation_state_reflection>"
+
 
 class ReflectionStrategy(BaseStrategy):
     """Append a reflection to the context without removing history.
 
-    This strategy generates a reflection/summary of the conversation
-    and appends it as additional context, preserving all original messages.
+    This strategy generates a reflection/summary of the conversation and appends
+    it to the last user message inside <conversation_state_reflection> tags.
+    This preserves strict message alternation (system → user → assistant → ...)
+    while providing the assistant with helpful context about conversation state.
+
+    The reflection is persisted in the trace, so future turns will see previous
+    user messages with their reflections included.
     """
 
     def __init__(
@@ -50,7 +69,6 @@ class ReflectionStrategy(BaseStrategy):
         reflection_prompt_file: Optional[str] = None,
         reflection_model: str = "gpt-4o-mini",
         use_cheatsheet: bool = False,
-        inject_as: str = "system",  # 'system' or 'user'
         min_turns_for_reflection: int = 2,
     ):
         """Initialize the reflection strategy.
@@ -60,7 +78,6 @@ class ReflectionStrategy(BaseStrategy):
             reflection_prompt_file: Path to prompt file.
             reflection_model: Model to use for reflection generation.
             use_cheatsheet: Whether to include cheatsheet in reflection prompt.
-            inject_as: How to inject the reflection ('system' or 'user').
             min_turns_for_reflection: Minimum user turns before adding reflection.
         """
         if reflection_prompt_file:
@@ -72,8 +89,11 @@ class ReflectionStrategy(BaseStrategy):
 
         self.reflection_model = reflection_model
         self.use_cheatsheet = use_cheatsheet
-        self.inject_as = inject_as
         self.min_turns_for_reflection = min_turns_for_reflection
+
+    def _is_reflection_addendum_added(self, trace: "ConversationTrace") -> bool:
+        """Check if the reflection system addendum has already been added."""
+        return any(log["type"] == "reflection_addendum_added" for log in trace.logs)
 
     async def _generate_reflection(
         self,
@@ -91,17 +111,14 @@ class ReflectionStrategy(BaseStrategy):
         Returns:
             The generated reflection text.
         """
-        conversation_str = trace.get_conversation_string(skip_system=True)
+        conversation_str = trace.get_conversation_string(skip_system=False)
 
         # Build cheatsheet section
         cheatsheet_section = ""
         if self.use_cheatsheet and cheatsheet and cheatsheet.content:
-            cheatsheet_section = f"""
-<cheatsheet>
-Reference this cheatsheet when reflecting:
-{cheatsheet.content}
-</cheatsheet>
-"""
+            cheatsheet_section = CHEATSHEET_SECTION_TEMPLATE.format(
+                cheatsheet_content=cheatsheet.content
+            )
 
         prompt = self.reflection_prompt.format(
             conversation=conversation_str,
@@ -122,21 +139,30 @@ Reference this cheatsheet when reflecting:
         cheatsheet: Optional["Cheatsheet"],
         model_client: "ModelClient",
     ) -> list[Message]:
-        """Prepare context with appended reflection.
+        """Prepare context with appended reflection (mutates trace).
+
+        Mutates the trace by:
+        1. Adding explanation to system message about <conversation_state_reflection> tags (once)
+        2. Appending reflection inside those tags to the last user message
+
+        The reflection persists in the trace, so future turns see accumulated reflections.
 
         Args:
-            trace: The current conversation trace.
+            trace: The current conversation trace (will be mutated).
             cheatsheet: Optional cheatsheet.
             model_client: Model client for reflection generation.
 
         Returns:
-            Full context with reflection appended.
+            Active messages from the trace.
         """
-        messages = self._messages_to_list(trace)
-
         # Don't add reflection if conversation is too short
         if trace.num_user_turns < self.min_turns_for_reflection:
-            return messages
+            return trace.get_active_messages()
+
+        # Add system addendum explaining reflection tags (only once)
+        if not self._is_reflection_addendum_added(trace):
+            trace.append_to_system_message(REFLECTION_SYSTEM_ADDENDUM)
+            trace.add_log("reflection_addendum_added", {})
 
         # Generate reflection
         reflection = await self._generate_reflection(trace, cheatsheet, model_client)
@@ -144,28 +170,8 @@ Reference this cheatsheet when reflecting:
         # Log the reflection
         trace.add_log("reflection_generated", {"reflection": reflection})
 
-        # Inject reflection
-        if self.inject_as == "system":
-            # Append to system message
-            for msg in messages:
-                if msg.role == "system":
-                    msg.content += (
-                        f"\n\n<reflection>\nConversation state: {reflection}\n</reflection>"
-                    )
-                    break
-        else:
-            # Insert before last user message
-            last_user_idx = None
-            for i in range(len(messages) - 1, -1, -1):
-                if messages[i].role == "user":
-                    last_user_idx = i
-                    break
+        # Append reflection to last user message in the trace
+        reflection_block = REFLECTION_BLOCK_TEMPLATE.format(reflection=reflection)
+        trace.append_to_last_user_message(reflection_block)
 
-            if last_user_idx is not None:
-                reflection_msg = Message(
-                    role="user",
-                    content=f"[System reflection on conversation so far: {reflection}]",
-                )
-                messages.insert(last_user_idx, reflection_msg)
-
-        return messages
+        return trace.get_active_messages()

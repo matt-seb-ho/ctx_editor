@@ -15,7 +15,8 @@ class BaselineStrategy(BaseStrategy):
     """No modification strategy - returns the full conversation as-is.
 
     This is the baseline approach where all conversation history is preserved
-    and passed directly to the assistant.
+    and passed directly to the assistant. The only mutation is optional
+    one-time cheatsheet injection.
     """
 
     def __init__(self, use_cheatsheet: bool = False, cheatsheet_target: str = "system"):
@@ -34,23 +35,18 @@ class BaselineStrategy(BaseStrategy):
         cheatsheet: Optional["Cheatsheet"],
         model_client: "ModelClient",
     ) -> list[Message]:
-        """Return the full conversation trace.
+        """Return the full conversation trace (mutates trace for cheatsheet only).
 
         Args:
-            trace: The current conversation trace.
+            trace: The current conversation trace (mutated if cheatsheet injected).
             cheatsheet: Optional cheatsheet (only used if use_cheatsheet=True).
             model_client: Not used in baseline strategy.
 
         Returns:
-            All messages from the trace, optionally with cheatsheet.
+            Active messages from the trace.
         """
-        messages = self._messages_to_list(trace)
-
+        # Inject cheatsheet once if configured
         if self.use_cheatsheet and cheatsheet:
-            messages = self._inject_cheatsheet(
-                messages,
-                cheatsheet,
-                target=self.cheatsheet_target,
-            )
+            self._inject_cheatsheet_to_trace(trace, cheatsheet, target=self.cheatsheet_target)
 
-        return messages
+        return trace.get_active_messages()

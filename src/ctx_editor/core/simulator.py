@@ -120,9 +120,9 @@ class ConversationSimulator:
                 else "unknown",
                 is_correct=False,
                 score=0.0,
-                num_turns=self.trace.num_user_turns,
+                num_turns=self.trace.total_user_turns,  # Use total across all resets
                 total_cost_usd=self.usage_stats.total_cost_usd(),
-                trace=self.trace.to_full_trace(include_history=self.config.include_trace_history),
+                trace=self.trace.to_full_trace(),
                 usage_stats=self.usage_stats,
                 metadata=self._build_result_metadata({"reason": termination_reason}),
             )
@@ -274,11 +274,9 @@ class ConversationSimulator:
                     else "unknown",
                     is_correct=is_correct,
                     score=score,
-                    num_turns=self.trace.num_user_turns,
+                    num_turns=self.trace.total_user_turns,  # Use total across all resets
                     total_cost_usd=self.usage_stats.total_cost_usd(),
-                    trace=self.trace.to_full_trace(
-                        include_history=self.config.include_trace_history
-                    ),
+                    trace=self.trace.to_full_trace(),
                     extracted_answer=extraction.answer,
                     evaluation_result=eval_result,
                     usage_stats=self.usage_stats,

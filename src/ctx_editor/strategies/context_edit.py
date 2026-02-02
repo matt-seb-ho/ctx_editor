@@ -37,6 +37,13 @@ Provide a condensed context that the assistant can use to continue helping the u
 
 Condensed context:"""
 
+CHEATSHEET_SECTION_TEMPLATE = """\
+<cheatsheet>
+Use this cheatsheet to help identify what information is most important to preserve:
+{cheatsheet_content}
+</cheatsheet>
+"""
+
 
 class ContextEditStrategy(BaseStrategy):
     """Fixed context editing before every assistant turn.
@@ -88,19 +95,16 @@ class ContextEditStrategy(BaseStrategy):
         Returns:
             Formatted editor prompt.
         """
-        # Get conversation as string (skip system message - we'll preserve it separately)
-        conversation_str = trace.get_conversation_string(skip_system=True)
+        # Get conversation as string (include system message so editor understands the task)
+        conversation_str = trace.get_conversation_string(skip_system=False)
 
         # Build cheatsheet section if applicable
         cheatsheet_section = ""
         if self.use_cheatsheet and cheatsheet and cheatsheet.content:
             if self.cheatsheet_target == "context_editor":
-                cheatsheet_section = f"""
-<cheatsheet>
-Use this cheatsheet to help identify what information is most important to preserve:
-{cheatsheet.content}
-</cheatsheet>
-"""
+                cheatsheet_section = CHEATSHEET_SECTION_TEMPLATE.format(
+                    cheatsheet_content=cheatsheet.content
+                )
 
         # Format the editor prompt
         prompt = self.editor_prompt.format(
@@ -116,27 +120,30 @@ Use this cheatsheet to help identify what information is most important to prese
         cheatsheet: Optional["Cheatsheet"],
         model_client: "ModelClient",
     ) -> list[Message]:
-        """Generate edited context for the assistant.
+        """Generate edited context for the assistant (mutates trace).
 
-        The context is structured as:
+        Resets the trace's active conversation to:
         [system_message, edited_context_as_assistant_msg, last_user_message]
 
+        This ensures future turns build on the edited context rather than full history.
+
         Args:
-            trace: The current conversation trace.
+            trace: The current conversation trace (will be mutated).
             cheatsheet: Optional cheatsheet for guidance.
             model_client: Model client for generating the edit.
 
         Returns:
-            Condensed context messages.
+            Active messages from the trace after reset.
         """
+        # Inject cheatsheet to assistant (via system message) if configured
+        if self.use_cheatsheet and cheatsheet and self.cheatsheet_target == "assistant":
+            self._inject_cheatsheet_to_trace(trace, cheatsheet, target="system")
+
         # If this is the first turn (only system + user), no editing needed
         if trace.num_assistant_turns == 0:
-            messages = self._messages_to_list(trace)
-            if self.use_cheatsheet and cheatsheet and self.cheatsheet_target == "assistant":
-                messages = self._inject_cheatsheet(messages, cheatsheet, target="system")
-            return messages
+            return trace.get_active_messages()
 
-        # Build editor input
+        # Build editor input (uses active conversation only)
         editor_input = self._build_editor_input(
             trace,
             cheatsheet if self.use_cheatsheet else None,
@@ -150,38 +157,36 @@ Use this cheatsheet to help identify what information is most important to prese
         )
         edited_context = response.content
 
-        # Log the context edit operation for auditing
+        # Log the context edit operation for auditing (before reset)
         trace.add_log(
             "context_edit_output",
             {
                 "edited_context": edited_context,
                 "editor_model": self.editor_model,
-                "original_turn_count": trace.num_user_turns,
+                "original_turn_count": trace.total_user_turns,
+                "active_turn_count": trace.num_user_turns,
             },
         )
 
         # Build the new context:
-        # 1. Original system message
+        # 1. Original system message (with cheatsheet if already injected)
         # 2. Edited context as a "prior context" assistant message
         # 3. Last user message
-        messages = []
+        new_messages = []
 
         # Add system message
         system_msg = trace.system_message
         if system_msg:
-            system_content = system_msg.content
-            if self.use_cheatsheet and cheatsheet and self.cheatsheet_target == "assistant":
-                system_content += f"\n\n<cheatsheet>\n{cheatsheet.content}\n</cheatsheet>"
-            messages.append(Message(role="system", content=system_content))
+            new_messages.append(Message(role="system", content=system_msg.content))
 
         # Add a user message explaining this is condensed context, then the edited context
-        messages.append(
+        new_messages.append(
             Message(
                 role="user",
                 content="[Prior conversation context, condensed]",
             )
         )
-        messages.append(
+        new_messages.append(
             Message(
                 role="assistant",
                 content=edited_context,
@@ -191,6 +196,9 @@ Use this cheatsheet to help identify what information is most important to prese
         # Add last user message
         last_user = trace.last_user_message
         if last_user:
-            messages.append(Message(role="user", content=last_user.content))
+            new_messages.append(Message(role="user", content=last_user.content))
 
-        return messages
+        # Reset the trace's active conversation to the edited context
+        trace.reset_conversation(new_messages, label="context_edit")
+
+        return trace.get_active_messages()

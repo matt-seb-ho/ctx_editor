@@ -20,6 +20,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from dotenv import load_dotenv
+from tqdm import tqdm
 
 from .models import get_model_client
 from .paths import PROJECT_ROOT
@@ -179,7 +180,7 @@ async def analyze_conversation(
         correct_answer_present=result_data.get("correct_answer_present", False),
         extracted_answer=extracted_answer,
         assistant_final_answer=result_data.get("assistant_final_answer", ""),
-        ground_truth=extract_ground_truth_final(ground_truth_a),
+        ground_truth=ground_truth_a,  # Keep full ground truth for debugging
         explanation=result_data.get("explanation", ""),
         raw_response=result_data,
     )
@@ -191,6 +192,7 @@ async def run_analysis(
     max_samples: Optional[int] = None,
     task_filter: Optional[str] = None,
     verbose: bool = False,
+    debug: bool = False,
 ) -> list[AnalysisResult]:
     """Run error analysis on all incorrect baseline samples in a run directory."""
 
@@ -217,14 +219,31 @@ async def run_analysis(
     if not incorrect_samples:
         return []
 
+    # Debug: sanity check first sample's data
+    if debug:
+        first_sample = incorrect_samples[0]
+        metadata = first_sample.get("metadata", {})
+        print("\n" + "=" * 60)
+        print("DEBUG: Sanity check for first sample")
+        print("=" * 60)
+        print(f"Sample ID: {first_sample.get('sample_id')}")
+        print(f"full_spec_q present: {bool(metadata.get('full_spec_q'))}")
+        print(f"ground_truth_a present: {bool(metadata.get('ground_truth_a'))}")
+        print(f"\nfull_spec_q:\n{metadata.get('full_spec_q', '<MISSING>')[:500]}")
+        print(f"\nground_truth_a:\n{metadata.get('ground_truth_a', '<MISSING>')[:500]}")
+        print("=" * 60 + "\n")
+
     # Create model client
     model_client = get_model_client(model)
 
     results = []
-    for i, sample in enumerate(incorrect_samples):
+    pbar = tqdm(incorrect_samples, desc="Analyzing", disable=verbose)
+    for sample in pbar:
         sample_id = sample.get("sample_id", "unknown")
+        pbar.set_postfix_str(sample_id[:30])
+
         if verbose:
-            print(f"[{i + 1}/{len(incorrect_samples)}] Analyzing {sample_id}...")
+            print(f"Analyzing {sample_id}...")
 
         try:
             result = await analyze_conversation(sample, model_client, model)
@@ -235,7 +254,8 @@ async def run_analysis(
                 if result.explanation:
                     print(f"  -> Explanation: {result.explanation[:100]}...")
         except Exception as e:
-            print(f"  -> Error analyzing {sample_id}: {e}")
+            if verbose:
+                print(f"  -> Error analyzing {sample_id}: {e}")
             results.append(
                 AnalysisResult(
                     sample_id=sample_id,
@@ -365,6 +385,11 @@ def main():
         action="store_true",
         help="Print progress for each sample",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Print debug info (sanity check prompt inputs for first sample)",
+    )
 
     args = parser.parse_args()
 
@@ -376,6 +401,7 @@ def main():
             max_samples=args.max_samples,
             task_filter=args.task,
             verbose=args.verbose,
+            debug=args.debug,
         )
     )
 

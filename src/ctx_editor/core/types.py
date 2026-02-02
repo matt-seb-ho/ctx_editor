@@ -86,12 +86,18 @@ class ModelConfig:
 
 @dataclass
 class Message:
-    """A single message in a conversation."""
+    """A single message in a conversation.
+
+    The `visible` flag controls whether this message is part of the "active" conversation.
+    When context editing resets the conversation, old messages are marked as visible=False
+    to preserve history while ensuring future turns only see the edited context.
+    """
 
     role: str
     content: str
     metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: Optional[str] = None
+    visible: bool = True  # Whether this message is part of the active conversation
 
     def __post_init__(self):
         if self.timestamp is None:
@@ -101,6 +107,18 @@ class Message:
         """Convert to dictionary format for API calls."""
         return {"role": self.role, "content": self.content}
 
+    def to_full_dict(self) -> dict[str, Any]:
+        """Convert to dictionary with all fields for serialization."""
+        result = {
+            "role": self.role,
+            "content": self.content,
+            "timestamp": self.timestamp,
+            "visible": self.visible,
+        }
+        if self.metadata:
+            result["metadata"] = self.metadata
+        return result
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "Message":
         """Create a Message from a dictionary."""
@@ -109,6 +127,7 @@ class Message:
             content=data["content"],
             metadata=data.get("metadata", {}),
             timestamp=data.get("timestamp"),
+            visible=data.get("visible", True),
         )
 
 
@@ -214,9 +233,6 @@ class SimulatorConfig:
     max_turns: int = 20
     model_config: ModelConfig = field(default_factory=ModelConfig)
     verbose: bool = False
-    include_trace_history: bool = (
-        False  # Include full history in trace output (for context editing)
-    )
 
     # Backward compatibility properties
     @property
@@ -246,15 +262,23 @@ class SimulationResult:
     score: float
     num_turns: int
     total_cost_usd: float
-    trace: dict[str, Any]  # Contains 'messages', 'logs', and optionally 'history'
+    trace: dict[str, Any]  # Contains 'messages', 'logs', and 'num_resets'
     extracted_answer: Optional[str] = None
     evaluation_result: Optional[EvaluationResult] = None
     usage_stats: Optional[UsageStats] = None
     metadata: dict[str, Any] = field(default_factory=dict)
     timestamp: str = field(default_factory=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
-    def to_dict(self) -> dict[str, Any]:
-        """Convert to dictionary for serialization."""
+    def to_dict(self, include_trace: bool = True) -> dict[str, Any]:
+        """Convert to dictionary for serialization.
+
+        Args:
+            include_trace: Whether to include the full trace. Set to False when
+                          traces are saved separately to avoid redundancy.
+
+        Returns:
+            Dictionary representation of the result.
+        """
         result = {
             "sample_id": self.sample_id,
             "task_name": self.task_name,
@@ -263,10 +287,11 @@ class SimulationResult:
             "num_turns": self.num_turns,
             "total_cost_usd": self.total_cost_usd,
             "extracted_answer": self.extracted_answer,
-            "trace": self.trace,
             "metadata": self.metadata,
             "timestamp": self.timestamp,
         }
+        if include_trace:
+            result["trace"] = self.trace
         if self.usage_stats:
             result["usage_stats"] = self.usage_stats.to_dict()
         return result

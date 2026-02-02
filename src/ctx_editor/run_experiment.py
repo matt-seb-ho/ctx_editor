@@ -303,9 +303,12 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
                 f"({task_metrics['accuracy']:.2%}), avg_score={task_metrics['average_score']:.3f}"
             )
 
-    # Save results
+    # Save results (traces saved separately in individual files)
     output_dir = cfg.logging.output_dir
-    save_results([r.to_dict() for r in results], output_dir)
+    save_results(
+        [r.to_dict(include_trace=False) for r in results],
+        output_dir,
+    )
     save_metrics(metrics, output_dir)
 
     # Update ledger with run info
@@ -325,21 +328,20 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         average_turns=avg_turns,
     )
 
-    # Save individual traces if configured
-    if cfg.logging.save_traces:
-        from ctx_editor.utils.logging import log_conversation
+    # Save individual trace files
+    from ctx_editor.utils.logging import log_conversation
 
-        for r in results:
-            log_conversation(
-                experiment_type=cfg.experiment.name,
-                task_name=r.task_name,
-                sample_id=r.sample_id,
-                trace=r.trace,
-                is_correct=r.is_correct,
-                score=r.score,
-                output_dir=output_dir,
-                assistant_model=cfg.model.assistant.model,
-            )
+    for r in results:
+        log_conversation(
+            experiment_type=cfg.experiment.name,
+            task_name=r.task_name,
+            sample_id=r.sample_id,
+            trace=r.trace,
+            is_correct=r.is_correct,
+            score=r.score,
+            output_dir=output_dir,
+            assistant_model=cfg.model.assistant.model,
+        )
 
     # Save final cheatsheet
     if cheatsheet and cfg.cheatsheet.get("save_path"):

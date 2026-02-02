@@ -108,7 +108,7 @@ class AgenticEditStrategy(BaseStrategy):
             )
 
         # Ask the model
-        conversation_str = trace.get_conversation_string(skip_system=True)
+        conversation_str = trace.get_conversation_string(skip_system=False)
         prompt = self.decision_prompt.format(conversation=conversation_str)
 
         response = await model_client.generate_json(
@@ -129,15 +129,18 @@ class AgenticEditStrategy(BaseStrategy):
         cheatsheet: Optional["Cheatsheet"],
         model_client: "ModelClient",
     ) -> list[Message]:
-        """Prepare context, deciding whether to edit first.
+        """Prepare context, deciding whether to edit first (mutates trace).
+
+        Delegates to either ContextEditStrategy or BaselineStrategy based on
+        the model's decision. Both strategies mutate the trace.
 
         Args:
-            trace: The current conversation trace.
+            trace: The current conversation trace (will be mutated).
             cheatsheet: Optional cheatsheet.
             model_client: Model client for decisions and editing.
 
         Returns:
-            Either the full context or edited context based on decision.
+            Active messages from the trace after strategy execution.
         """
         decision = await self._should_edit(trace, model_client)
 
