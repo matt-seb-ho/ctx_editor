@@ -187,6 +187,7 @@ class ConversationSimulator:
             temperature=assistant_cfg.temperature,
             max_tokens=max_tokens,
             timeout=assistant_cfg.timeout,
+            reasoning_effort=assistant_cfg.reasoning_effort,
         )
 
         self.trace.add_assistant_message(

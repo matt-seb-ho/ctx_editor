@@ -6,7 +6,7 @@ from abc import ABC, abstractmethod
 from functools import cache
 from typing import Any, Optional, Protocol, runtime_checkable
 
-from ..core.types import ModelResponse
+from ..core.types import ModelResponse, ReasoningEffort
 from .openai_pricing import OPENAI_PRICING
 
 
@@ -61,6 +61,7 @@ class ModelClient(Protocol):
         max_tokens: Optional[int] = None,
         timeout: int = 30,
         variables: Optional[dict[str, str]] = None,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> ModelResponse:
         """Generate a response from the model.
 
@@ -71,6 +72,7 @@ class ModelClient(Protocol):
             max_tokens: Maximum tokens to generate.
             timeout: Request timeout in seconds.
             variables: Optional variables to substitute in the prompt.
+            reasoning_effort: Reasoning effort level for reasoning models (OpenAI only).
 
         Returns:
             ModelResponse with the generated content and metadata.
@@ -114,6 +116,7 @@ class BaseModelClient(ABC):
         max_tokens: Optional[int] = None,
         timeout: int = 30,
         variables: Optional[dict[str, str]] = None,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> ModelResponse:
         """Generate a response from the model."""
         pass

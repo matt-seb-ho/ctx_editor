@@ -41,6 +41,66 @@ def load_trace_file(file_path: str) -> dict:
         return json.load(f)
 
 
+def find_trace_file(run_dir: str, sample: dict, experiment_type: str) -> str | None:
+    """Find the trace file for a sample.
+
+    Trace files are stored at: {run_dir}/traces/{task_name}/{experiment_type}/{sample_id}.json
+
+    Args:
+        run_dir: Path to the run directory
+        sample: Sample dict with sample_id and task_name
+        experiment_type: The experiment type (e.g., "baseline", "context_edit")
+
+    Returns:
+        Path to trace file if found, None otherwise.
+    """
+    task_name = sample.get("task_name", "unknown")
+    sample_id = sample.get("sample_id", "unknown")
+
+    # Sanitize sample_id for filename (same logic as logging.py)
+    safe_id = sample_id.replace("/", "_").replace("\\", "_")
+
+    trace_path = Path(run_dir) / "traces" / task_name / experiment_type / f"{safe_id}.json"
+
+    if trace_path.exists():
+        return str(trace_path)
+
+    return None
+
+
+def load_sample_with_trace(run_dir: str, sample: dict, experiment_type: str) -> dict:
+    """Load a sample and merge in its trace data from the individual trace file.
+
+    Args:
+        run_dir: Path to the run directory
+        sample: Sample dict from results.json (may not have trace)
+        experiment_type: The experiment type
+
+    Returns:
+        Sample dict with trace data merged in.
+    """
+    # If sample already has trace data, return as-is
+    if sample.get("trace"):
+        return sample
+
+    # Find and load the trace file
+    trace_path = find_trace_file(run_dir, sample, experiment_type)
+    if not trace_path:
+        return sample
+
+    try:
+        trace_data = load_trace_file(trace_path)
+        # Merge trace into sample
+        merged = dict(sample)
+        merged["trace"] = trace_data.get("trace", {})
+        # Also merge models info if present in trace file
+        if "models" in trace_data and "models" not in merged:
+            merged["models"] = trace_data["models"]
+        return merged
+    except Exception:
+        return sample
+
+
 def load_config_file(run_dir: str) -> Optional[dict]:
     """Load the config.yaml from a run directory.
 
@@ -372,12 +432,11 @@ def display_context_replaced(log: dict) -> None:
     """Display a context replaced log entry."""
     data = log.get("data", {})
     new_count = data.get("new_message_count", "?")
-    history_count = data.get("history_snapshot_count", 0)
 
     st.markdown(
         f"""<div style="background-color: #4a2d4a; padding: 10px; border-radius: 5px; margin: 10px 0; border: 2px dashed #9c27b0;">
         <strong>CONTEXT REPLACED</strong><br>
-        New message count: {new_count} | History snapshots: {history_count}<br>
+        New message count: {new_count}<br>
         <em>The assistant now sees a condensed version of the conversation.</em>
         </div>""",
         unsafe_allow_html=True,
@@ -946,13 +1005,6 @@ def main():
 
     selected_sample = task_samples[selected_sample_idx]
 
-    # Display sample info in sidebar
-    display_sidebar_info(selected_sample)
-
-    # Main content: Display conversation
-    sample_id = selected_sample.get("sample_id", "unknown")
-    st.header(f"Conversation: {sample_id}")
-
     # Show experiment type badge
     exp_type = get_experiment_type(selected_sample)
 
@@ -960,6 +1012,18 @@ def main():
     effective_exp_type = exp_type
     if effective_exp_type == "unknown" and selected_exp:
         effective_exp_type = selected_exp
+
+    # Load full trace data (traces are stored in separate files)
+    selected_sample_with_trace = load_sample_with_trace(
+        selected_run, selected_sample, effective_exp_type
+    )
+
+    # Display sample info in sidebar
+    display_sidebar_info(selected_sample_with_trace)
+
+    # Main content: Display conversation
+    sample_id = selected_sample_with_trace.get("sample_id", "unknown")
+    st.header(f"Conversation: {sample_id}")
 
     if "context_edit" in effective_exp_type and "agentic" not in effective_exp_type:
         st.info(
@@ -973,7 +1037,7 @@ def main():
         st.info("**Strategy:** Baseline - No context modifications")
 
     # Display the conversation
-    display_conversation(selected_sample, exp_type=effective_exp_type, run_dir=selected_run)
+    display_conversation(selected_sample_with_trace, exp_type=effective_exp_type, run_dir=selected_run)
 
 
 if __name__ == "__main__":

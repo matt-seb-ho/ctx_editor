@@ -16,7 +16,7 @@ from ctx_editor.agents import SystemAgent, UserAgent
 from ctx_editor.cheatsheet import Cheatsheet, CheatsheetUpdater
 from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
 from ctx_editor.execution import BatchedRunner, ParallelRunner
-from ctx_editor.models import AnthropicModelClient, OpenAIModelClient
+from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient
 from ctx_editor.utils.ledger import add_run
 from ctx_editor.utils.logging import get_logger, save_metrics, save_results, setup_logging
 from lic.paths import PROJECT_ROOT
@@ -89,7 +89,13 @@ def get_model_client(cfg: DictConfig):
     if "claude" in model_name.lower():
         return AnthropicModelClient()
     else:
-        return OpenAIModelClient()
+        # Check for load balancer configuration
+        load_balancer_config = None
+        if hasattr(cfg, "load_balancer") and cfg.load_balancer:
+            lb_dict = OmegaConf.to_container(cfg.load_balancer, resolve=True)
+            load_balancer_config = LoadBalancerConfig.from_dict(lb_dict)
+
+        return OpenAIModelClient(load_balancer_config=load_balancer_config)
 
 
 def get_strategy(cfg: DictConfig):

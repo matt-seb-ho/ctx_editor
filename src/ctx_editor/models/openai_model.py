@@ -2,30 +2,46 @@
 
 import asyncio
 import os
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI
 
 from ..core.types import ModelResponse, ReasoningEffort
 from .base import BaseModelClient, format_messages
+from .endpoint_config import LoadBalancerConfig
+from .load_balancer import EndpointLoadBalancer
 from .setup_azure_oai_client import setup_azure_oai_client
 
 
 class OpenAIModelClient(BaseModelClient):
-    """Async OpenAI/Azure model client."""
+    """Async OpenAI/Azure model client with optional load balancing."""
 
     _gpt5_temp_warned: bool = False  # Class-level flag to warn only once
 
-    def __init__(self):
-        """Initialize the OpenAI client."""
-        if os.getenv("USE_AZURE_OAI", "false").lower() == "true":
-            print("Using Azure OpenAI")
-            self.client = setup_azure_oai_client()
+    def __init__(self, load_balancer_config: Optional[LoadBalancerConfig] = None):
+        """Initialize the OpenAI client.
+
+        Args:
+            load_balancer_config: Optional load balancer configuration.
+                If provided with endpoints, enables multi-endpoint load balancing.
+                If None, uses single-endpoint mode (backward compatible).
+        """
+        self.load_balancer: Optional[EndpointLoadBalancer] = None
+        self.client: Optional[Union[AsyncOpenAI, AsyncAzureOpenAI]] = None
+
+        if load_balancer_config and load_balancer_config.endpoints:
+            # Multi-endpoint mode
+            self.load_balancer = EndpointLoadBalancer(load_balancer_config)
         else:
-            api_key = os.environ.get("OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError("OPENAI_API_KEY environment variable not set")
-            self.client = AsyncOpenAI(api_key=api_key)
+            # Single-endpoint mode (backward compatible)
+            if os.getenv("USE_AZURE_OAI", "false").lower() == "true":
+                print("Using Azure OpenAI")
+                self.client = setup_azure_oai_client()
+            else:
+                api_key = os.environ.get("OPENAI_API_KEY")
+                if not api_key:
+                    raise ValueError("OPENAI_API_KEY environment variable not set")
+                self.client = AsyncOpenAI(api_key=api_key)
 
     async def generate(
         self,
@@ -77,31 +93,65 @@ class OpenAIModelClient(BaseModelClient):
                 )
                 messages = messages[1:]
 
-        kwargs: dict[str, Any] = {}
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "messages": messages,
+            "timeout": timeout,
+            "max_completion_tokens": max_tokens,
+            "temperature": temperature,
+        }
         if is_json:
             kwargs["response_format"] = {"type": "json_object"}
         if reasoning_effort:
             kwargs["reasoning_effort"] = reasoning_effort
 
+        # Execute with load balancer or single client
+        if self.load_balancer:
+            response = await self._generate_with_load_balancer(model, max_retries, **kwargs)
+        else:
+            response = await self._generate_single_client(max_retries, **kwargs)
+
+        return self._parse_response(response, model)
+
+    async def _generate_with_load_balancer(
+        self,
+        model: str,
+        max_retries: int,
+        **kwargs: Any,
+    ) -> Any:
+        """Generate using load-balanced endpoints."""
+
+        async def call_api(client: Union[AsyncOpenAI, AsyncAzureOpenAI], **kw: Any) -> Any:
+            last_error = None
+            for attempt in range(max_retries):
+                try:
+                    return await client.chat.completions.create(**kw)
+                except Exception as e:
+                    last_error = e
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(2**attempt)
+            raise last_error
+
+        return await self.load_balancer.execute_with_endpoint(
+            model=model,
+            operation=call_api,
+            **kwargs,
+        )
+
+    async def _generate_single_client(self, max_retries: int, **kwargs: Any) -> Any:
+        """Generate using single client (backward compatible)."""
         last_error = None
         for attempt in range(max_retries):
             try:
-                response = await self.client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    timeout=timeout,
-                    max_completion_tokens=max_tokens,
-                    temperature=temperature,
-                    **kwargs,
-                )
-                break
+                return await self.client.chat.completions.create(**kwargs)
             except Exception as e:
                 last_error = e
                 if attempt < max_retries - 1:
-                    await asyncio.sleep(2**attempt)  # Exponential backoff
-        else:
-            raise RuntimeError(f"Failed after {max_retries} attempts: {last_error}")
+                    await asyncio.sleep(2**attempt)
+        raise RuntimeError(f"Failed after {max_retries} attempts: {last_error}")
 
+    def _parse_response(self, response: Any, model: str) -> ModelResponse:
+        """Parse API response into ModelResponse."""
         response_dict = response.model_dump()
         usage = response_dict["usage"]
 
@@ -125,3 +175,9 @@ class OpenAIModelClient(BaseModelClient):
             total_usd=total_usd,
             raw_response=response_dict,
         )
+
+    def get_load_balancer_stats(self) -> Optional[dict[str, Any]]:
+        """Get load balancer statistics if available."""
+        if self.load_balancer:
+            return self.load_balancer.get_stats()
+        return None

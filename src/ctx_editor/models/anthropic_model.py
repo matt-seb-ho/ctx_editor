@@ -4,7 +4,7 @@ import asyncio
 import os
 from typing import Any, Optional
 
-from ..core.types import ModelResponse
+from ..core.types import ModelResponse, ReasoningEffort
 from .base import BaseModelClient, format_messages
 
 
@@ -33,6 +33,7 @@ class AnthropicModelClient(BaseModelClient):
         max_retries: int = 3,
         variables: Optional[dict[str, str]] = None,
         is_json: bool = False,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> ModelResponse:
         """Generate a response from Anthropic.
 
@@ -45,6 +46,7 @@ class AnthropicModelClient(BaseModelClient):
             max_retries: Maximum number of retries on failure.
             variables: Optional variables to substitute in the prompt.
             is_json: Whether to request JSON output.
+            reasoning_effort: Ignored (OpenAI-specific parameter).
 
         Returns:
             ModelResponse with generated content and metadata.
