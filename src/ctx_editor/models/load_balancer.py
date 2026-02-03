@@ -160,16 +160,14 @@ class EndpointLoadBalancer:
 
     async def execute_with_endpoint(
         self,
-        model: str,
         operation: Callable[..., Any],
         **kwargs: Any,
     ) -> Any:
         """Execute an operation with automatic endpoint selection and fallback.
 
         Args:
-            model: Model name for endpoint selection.
             operation: Async function that takes (client, **kwargs) and returns result.
-            **kwargs: Arguments to pass to operation.
+            **kwargs: Arguments to pass to operation. Must include 'model' key.
 
         Returns:
             Result from the operation.
@@ -178,6 +176,10 @@ class EndpointLoadBalancer:
             ValueError: If no endpoints support the model.
             RuntimeError: If all endpoints fail.
         """
+        model = kwargs.get("model")
+        if not model:
+            raise ValueError("'model' must be provided in kwargs")
+
         endpoints = self.get_endpoints_for_model(model)
         if not endpoints:
             available_models = list(self._model_to_endpoints.keys())

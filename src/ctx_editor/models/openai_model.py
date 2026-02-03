@@ -107,18 +107,13 @@ class OpenAIModelClient(BaseModelClient):
 
         # Execute with load balancer or single client
         if self.load_balancer:
-            response = await self._generate_with_load_balancer(model, max_retries, **kwargs)
+            response = await self._generate_with_load_balancer(max_retries, **kwargs)
         else:
             response = await self._generate_single_client(max_retries, **kwargs)
 
         return self._parse_response(response, model)
 
-    async def _generate_with_load_balancer(
-        self,
-        model: str,
-        max_retries: int,
-        **kwargs: Any,
-    ) -> Any:
+    async def _generate_with_load_balancer(self, max_retries: int, **kwargs: Any) -> Any:
         """Generate using load-balanced endpoints."""
 
         async def call_api(client: Union[AsyncOpenAI, AsyncAzureOpenAI], **kw: Any) -> Any:
@@ -133,7 +128,6 @@ class OpenAIModelClient(BaseModelClient):
             raise last_error
 
         return await self.load_balancer.execute_with_endpoint(
-            model=model,
             operation=call_api,
             **kwargs,
         )
