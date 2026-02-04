@@ -159,7 +159,8 @@ class ConversationSimulator:
             self.usage_stats.record("user", user_response.model_response)
 
         # Log shard revelation if applicable
-        if user_response.shard_id:
+        # Note: shard_id of -1 means "no shard revealed" (per user agent prompt)
+        if user_response.shard_id is not None and user_response.shard_id != -1:
             self.trace.add_log("shard_revealed", {"shard_id": user_response.shard_id})
 
         if verbose:
