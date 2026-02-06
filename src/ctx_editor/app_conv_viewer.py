@@ -591,9 +591,15 @@ def display_message(msg: dict, logs: list[dict], show_logs: bool = True) -> None
                 st.caption(f"_{format_timestamp(timestamp)}_")
 
     elif role == "system":
+        # st.markdown(
+        #     f"""<div style="background-color: #1e1e2e; padding: 10px; border-radius: 5px; margin: 5px 0; border-left: 4px solid #6c757d;">
+        #     <strong>System:</strong> {content[:500]}{"..." if len(content) > 500 else ""}
+        #     </div>""",
+        #     unsafe_allow_html=True,
+        # )
         st.markdown(
             f"""<div style="background-color: #1e1e2e; padding: 10px; border-radius: 5px; margin: 5px 0; border-left: 4px solid #6c757d;">
-            <strong>System:</strong> {content[:500]}{"..." if len(content) > 500 else ""}
+            <strong>System:</strong> {content}
             </div>""",
             unsafe_allow_html=True,
         )
