@@ -54,7 +54,9 @@ def extract_run_time(record: Dict[str, Any]) -> float:
     """
     trace = record.get("trace", None)
     if isinstance(trace, list) and trace:
-        ts = [msg.get("timestamp") for msg in trace if isinstance(msg, dict) and msg.get("timestamp")]
+        ts = [
+            msg.get("timestamp") for msg in trace if isinstance(msg, dict) and msg.get("timestamp")
+        ]
         if ts:
             parsed = pd.to_datetime(ts, errors="coerce", utc=True)
             parsed = parsed.dropna()
@@ -86,7 +88,15 @@ def to_dataframe(records: List[Dict[str, Any]], dataset_fn: Optional[str] = None
     df = pd.DataFrame(records)
 
     # Ensure expected columns exist
-    for col in ["task", "task_id", "assistant_model", "conv_type", "dataset_fn", "score", "is_correct"]:
+    for col in [
+        "task",
+        "task_id",
+        "assistant_model",
+        "conv_type",
+        "dataset_fn",
+        "score",
+        "is_correct",
+    ]:
         if col not in df.columns:
             df[col] = None
 
@@ -154,7 +164,9 @@ def aggregate(df: pd.DataFrame, group_by: List[str]) -> pd.DataFrame:
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--run_dir", type=str, required=True, help="Root folder containing logs")
-    parser.add_argument("--dataset_fn", type=str, default=None, help="Optional dataset filter (basename match)")
+    parser.add_argument(
+        "--dataset_fn", type=str, default=None, help="Optional dataset filter (basename match)"
+    )
 
     parser.add_argument(
         "--group_by",
@@ -204,4 +216,16 @@ def main():
 
     summary = aggregate(df, group_by=group_by)
 
-    with pd.option_context("display.max_rows", 200, "display.max_columns", 200, "display
+    with pd.option_context(
+        "display.max_rows", 200, "display.max_columns", 200, "display.width", 200
+    ):
+        print(summary.to_string(index=False))
+
+    if args.out_csv:
+        Path(args.out_csv).parent.mkdir(parents=True, exist_ok=True)
+        summary.to_csv(args.out_csv, index=False)
+        print(f"\nWrote: {args.out_csv}")
+
+
+if __name__ == "__main__":
+    main()
