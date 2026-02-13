@@ -10,7 +10,6 @@ from ..core.types import ModelResponse, ReasoningEffort
 from .base import BaseModelClient, format_messages
 from .endpoint_config import LoadBalancerConfig
 from .load_balancer import EndpointLoadBalancer
-from .setup_azure_oai_client import setup_azure_oai_client
 
 
 class OpenAIModelClient(BaseModelClient):
@@ -36,6 +35,8 @@ class OpenAIModelClient(BaseModelClient):
             # Single-endpoint mode (backward compatible)
             if os.getenv("USE_AZURE_OAI", "false").lower() == "true":
                 print("Using Azure OpenAI")
+                from .setup_azure_oai_client import setup_azure_oai_client
+
                 self.client = setup_azure_oai_client()
             else:
                 api_key = os.environ.get("OPENAI_API_KEY")

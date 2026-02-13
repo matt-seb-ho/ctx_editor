@@ -44,6 +44,10 @@ def get_task(task_name: str, version: str = None):
             from ctx_editor.tasks import TaskCode
 
             return TaskCode(version=version) if version else TaskCode()
+        elif task_name == "aime":
+            from ctx_editor.tasks import TaskAIME
+
+            return TaskAIME(version=version) if version else TaskAIME()
         elif task_name.startswith("database"):
             from ctx_editor.tasks import TaskDatabase
 

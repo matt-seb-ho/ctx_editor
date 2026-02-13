@@ -9,6 +9,7 @@ try:
     from lic.tasks import get_task
     from lic.tasks.tasks import (
         TaskActions,
+        TaskAIME,
         TaskCode,
         TaskData2Text,
         TaskDatabase,
@@ -27,6 +28,7 @@ except ImportError:
 
     TaskDatabase = None
     TaskMath = None
+    TaskAIME = None
     TaskCode = None
     TaskSummary = None
     TaskData2Text = None
@@ -37,6 +39,7 @@ __all__ = [
     "get_task",
     "TaskDatabase",
     "TaskMath",
+    "TaskAIME",
     "TaskCode",
     "TaskSummary",
     "TaskData2Text",
