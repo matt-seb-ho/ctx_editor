@@ -63,6 +63,7 @@ class ConversationSimulatorFull:
             "o1" in self.assistant_model
             or "o3" in self.assistant_model
             or "deepseek-r1" in self.assistant_model
+            or "gpt-5" in self.assistant_model
         )
 
         max_tokens = 16000 if is_reasoning_model else 1000

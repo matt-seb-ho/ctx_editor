@@ -111,6 +111,11 @@ class ConversationSimulator:
 
             await self._run_turn(verbose)
 
+            # Check if user budget was exhausted (natural mode)
+            if any(log["type"] == "user_budget_exhausted" for log in self.trace.logs):
+                termination_reason = "user_budget_exhausted"
+                break
+
         # Ensure we have a result
         if self.final_result is None:
             self.final_result = SimulationResult(
@@ -162,6 +167,11 @@ class ConversationSimulator:
         # Note: shard_id of -1 means "no shard revealed" (per user agent prompt)
         if user_response.shard_id is not None and user_response.shard_id != -1:
             self.trace.add_log("shard_revealed", {"shard_id": user_response.shard_id})
+
+        # Budget exhausted (natural mode) — log and return without generating assistant turn
+        if user_response.budget_exhausted:
+            self.trace.add_log("user_budget_exhausted", {})
+            return
 
         if verbose:
             print(f"\033[94m[user] {user_response.content}\033[0m")

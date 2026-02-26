@@ -49,6 +49,7 @@ class ConversationSimulatorSharded:
             "o1" in self.assistant_model
             or "o3" in self.assistant_model
             or "deepseek-r1" in self.assistant_model
+            or "gpt-5" in self.assistant_model
         )
         max_assistant_tokens = 10000 if is_reasoning_model else 1000
         is_completed, is_correct, score = False, False, None
@@ -150,10 +151,11 @@ class ConversationSimulatorSharded:
                 else:
                     evaluation_return = self.task.evaluator_function(extracted_answer, self.sample)
 
-                    assert (
-                        type(evaluation_return) is dict
-                        and ("score" in evaluation_return or "is_correct" in evaluation_return)
-                    ), "Evaluator function should return a dictionary with 'score' or 'is_correct' key"
+                    assert type(evaluation_return) is dict and (
+                        "score" in evaluation_return or "is_correct" in evaluation_return
+                    ), (
+                        "Evaluator function should return a dictionary with 'score' or 'is_correct' key"
+                    )
                     is_correct = evaluation_return.get("is_correct", None)
                     score = evaluation_return.get("score", None)
 

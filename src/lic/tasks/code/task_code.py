@@ -29,7 +29,8 @@ class TaskCode(Task):
         self.answer_extraction_strategy = "task_specific"
 
     def get_dataset_file(self) -> str:
-        return "data/sharded_instructions_600.json"
+        # return "data/sharded_instructions_600.json"
+        return "data/hard_task_exp_data.json"
 
     def get_samples(self) -> List[Dict[str, Any]]:
         with open(self.get_dataset_file(), "r") as f:
@@ -97,9 +98,11 @@ class TaskCode(Task):
             if imports:
                 pred_python_code = "\n".join(imports) + "\n\n" + pred_python_code
 
-        # Force update the function name with the true function name
-        old_func_name = pred_python_code.split("def ")[1].split("(")[0].strip()
-        pred_python_code = pred_python_code.replace(old_func_name, sample["metadata"]["func_name"])
+        # Force update the function name with the true function name (call-based only)
+        func_name = sample.get("metadata", {}).get("func_name")
+        if func_name:
+            old_func_name = pred_python_code.split("def ")[1].split("(")[0].strip()
+            pred_python_code = pred_python_code.replace(old_func_name, func_name)
 
         # load tests
         testcases = self.load_test_cases(sample)
@@ -125,7 +128,7 @@ class TaskCode(Task):
         )
 
     def populate_fully_specific_prompt(self, sample: Dict[str, Any]) -> str:
-        if sample.get("source") in ["lcb_easy", "lcb_medium"]:
+        if sample.get("source") in ["lcb_easy", "lcb_medium", "lcb_hard"]:
             return self._populate_fully_specific_prompt_lcb(sample)
         elif sample.get("source") == "humaneval":
             return self._populate_fully_specific_prompt_humaneval(sample)
@@ -151,7 +154,7 @@ class TaskCode(Task):
         )
 
     def populate_concat_prompt(self, sample: Dict[str, Any]) -> str:
-        if sample.get("source") in ["lcb_easy", "lcb_medium"]:
+        if sample.get("source") in ["lcb_easy", "lcb_medium", "lcb_hard"]:
             return self._populate_concat_prompt_lcb(sample)
         elif sample.get("source") == "humaneval":
             return self._populate_concat_prompt_humaneval(sample)
@@ -180,7 +183,7 @@ class TaskCode(Task):
 
     def process_original_sample(self, sample: Dict[str, Any]) -> Dict[str, Any]:
         """Process python sample for annotation UI display"""
-        if sample.get("source") in ["lcb_easy", "lcb_medium"]:
+        if sample.get("source") in ["lcb_easy", "lcb_medium", "lcb_hard"]:
             return {
                 "task_id": sample["task_id"],
                 "prompt": sample["question_content"] + "\n\n" + sample["starter_code"],

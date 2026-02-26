@@ -12,13 +12,19 @@ from dotenv import load_dotenv
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-from ctx_editor.agents import SystemAgent, UserAgent
+from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, SystemAgent, UserAgent
 from ctx_editor.cheatsheet import Cheatsheet, CheatsheetUpdater
 from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
 from ctx_editor.execution import BatchedRunner, ParallelRunner
 from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient
 from ctx_editor.utils.ledger import add_run
-from ctx_editor.utils.logging import get_logger, save_metrics, save_results, setup_logging
+from ctx_editor.utils.logging import (
+    get_logger,
+    log_conversation,
+    save_metrics,
+    save_results,
+    setup_logging,
+)
 from lic.paths import PROJECT_ROOT
 
 # Load environment variables from .env file at repo root
@@ -192,12 +198,36 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             verbose=cfg.logging.get("verbose", False),
         )
 
-        sample_task = get_task(sample.get("task", cfg.task.name))
+        raw_task_name = sample.get("task", cfg.task.name)
+        version_map = cfg.task.get("task_version_map", {}) or {}
+        resolved_task_name = version_map.get(raw_task_name, raw_task_name)
+        sample_task = get_task(resolved_task_name)
+
+        # Select user agent based on user_mode config
+        user_mode = cfg.user_mode.name
+        if user_mode == "natural":
+            user_agent = NaturalUserAgent(
+                task=sample_task,
+                model=sim_config.user_model,
+                include_shards=cfg.user_mode.get("include_shards", False),
+                max_turns=cfg.user_mode.get("max_turns", 20),
+            )
+        elif user_mode == "length_constrained":
+            user_agent = LengthConstrainedUserAgent(
+                task=sample_task,
+                model=sim_config.user_model,
+                total_token_budget=cfg.user_mode.get("total_token_budget", 500),
+                per_turn_token_budget=cfg.user_mode.get("per_turn_token_budget", 150),
+                hard_cap_multiplier=cfg.user_mode.get("hard_cap_multiplier", 1.2),
+                include_shards=cfg.user_mode.get("include_shards", False),
+            )
+        else:
+            user_agent = UserAgent(sample_task, model=sim_config.user_model)
 
         return ConversationSimulator(
             sample=sample,
             task=sample_task,
-            user_agent=UserAgent(sample_task, model=sim_config.user_model),
+            user_agent=user_agent,
             system_agent=SystemAgent(sample_task, sim_config.system_model, sample),
             model_client=model_client,
             strategy=strategy,
@@ -214,6 +244,28 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     def update_progress(completed: int, total: int) -> None:
         pbar.n = completed
         pbar.refresh()
+
+    # Incremental result saving - save each result as it completes so
+    # progress is not lost if the experiment hangs or is interrupted.
+    partial_results_path = output_dir / "results_partial.jsonl"
+
+    def save_result_incrementally(result: "SimulationResult") -> None:
+        """Save a single result to disk immediately upon completion."""
+        # Append to JSONL file (atomic per-line, safe for concurrent writes)
+        with open(partial_results_path, "a") as f:
+            f.write(json.dumps(result.to_dict(include_trace=False)) + "\n")
+
+        # Save individual trace file
+        log_conversation(
+            experiment_type=cfg.experiment.name,
+            task_name=result.task_name,
+            sample_id=result.sample_id,
+            trace=result.trace,
+            is_correct=result.is_correct,
+            score=result.score,
+            output_dir=str(output_dir),
+            assistant_model=cfg.model.assistant.model,
+        )
 
     # Create cheatsheet updater with grounding config
     cheatsheet_updater = CheatsheetUpdater(
@@ -234,6 +286,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             updater=cheatsheet_updater,
             save_cheatsheet_path=cfg.cheatsheet.get("save_path"),
             progress_callback=update_progress,
+            on_result=save_result_incrementally,
         )
         results = await runner.run(samples, make_simulator, cheatsheet)
     elif execution_mode == "sequential":
@@ -244,6 +297,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             model_client=model_client,
             updater=cheatsheet_updater,
             progress_callback=update_progress,
+            on_result=save_result_incrementally,
         )
         results = await runner.run_sequential(samples, make_simulator, cheatsheet)
     else:
@@ -251,80 +305,126 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         runner = ParallelRunner(
             max_concurrent=cfg.execution.max_concurrent,
             progress_callback=update_progress,
+            on_result=save_result_incrementally,
         )
         results = await runner.run(samples, make_simulator, cheatsheet)
 
     pbar.close()
 
-    # Compute overall metrics
-    total = len(results)
-    correct = sum(1 for r in results if r.is_correct)
-    avg_score = sum(r.score for r in results) / total if total > 0 else 0
-    total_cost = sum(r.total_cost_usd for r in results)
-    avg_turns = sum(r.num_turns for r in results) / total if total > 0 else 0
+    # Separate valid results from error results (exceptions during conversation)
+    valid_results = [r for r in results if "error" not in r.metadata]
+    error_results = [r for r in results if "error" in r.metadata]
 
-    # Compute per-task metrics
-    results_by_task = defaultdict(list)
-    for r in results:
-        results_by_task[r.task_name].append(r)
+    def _user_output_tokens(r) -> int:
+        """Extract user agent output tokens from a result."""
+        if r.usage_stats:
+            return r.usage_stats.user.output_tokens
+        return 0
+
+    # Compute overall metrics (excluding errored conversations)
+    total_attempted = len(results)
+    total = len(valid_results)
+    num_errors = len(error_results)
+    correct = sum(1 for r in valid_results if r.is_correct)
+    avg_score = sum(r.score for r in valid_results) / total if total > 0 else 0
+    total_cost = sum(r.total_cost_usd for r in results)  # cost includes errors
+    avg_turns = sum(r.num_turns for r in valid_results) / total if total > 0 else 0
+    avg_user_tokens = (
+        sum(_user_output_tokens(r) for r in valid_results) / total if total > 0 else 0
+    )
+
+    # Compute per-task metrics (excluding errored conversations)
+    valid_by_task = defaultdict(list)
+    errors_by_task = defaultdict(list)
+    for r in valid_results:
+        valid_by_task[r.task_name].append(r)
+    for r in error_results:
+        errors_by_task[r.task_name].append(r)
+
+    all_task_names = sorted(set(list(valid_by_task.keys()) + list(errors_by_task.keys())))
 
     per_task_metrics = {}
-    for task_name, task_results in sorted(results_by_task.items()):
+    for task_name in all_task_names:
+        task_results = valid_by_task.get(task_name, [])
+        task_errors = errors_by_task.get(task_name, [])
         task_total = len(task_results)
         task_correct = sum(1 for r in task_results if r.is_correct)
         task_avg_score = sum(r.score for r in task_results) / task_total if task_total > 0 else 0
-        task_cost = sum(r.total_cost_usd for r in task_results)
+        task_cost = sum(r.total_cost_usd for r in task_results) + sum(
+            r.total_cost_usd for r in task_errors
+        )
         task_avg_turns = (
             sum(r.num_turns for r in task_results) / task_total if task_total > 0 else 0
+        )
+        task_avg_user_tokens = (
+            sum(_user_output_tokens(r) for r in task_results) / task_total
+            if task_total > 0
+            else 0
         )
 
         per_task_metrics[task_name] = {
             "total_samples": task_total,
+            "total_attempted": task_total + len(task_errors),
+            "errors": len(task_errors),
             "correct": task_correct,
             "accuracy": task_correct / task_total if task_total > 0 else 0,
             "average_score": task_avg_score,
             "total_cost_usd": task_cost,
             "average_turns": task_avg_turns,
+            "average_user_tokens": task_avg_user_tokens,
         }
 
     metrics = {
         "experiment_name": cfg.experiment_name,
         "total_samples": total,
+        "total_attempted": total_attempted,
+        "errors": num_errors,
         "correct": correct,
         "accuracy": correct / total if total > 0 else 0,
         "average_score": avg_score,
         "total_cost_usd": total_cost,
         "average_turns": avg_turns,
+        "average_user_tokens": avg_user_tokens,
         "execution_mode": execution_mode,
         "per_task": per_task_metrics,
     }
 
     # Log overall metrics
-    logger.info(f"Results: {correct}/{total} correct ({metrics['accuracy']:.2%})")
+    error_suffix = f" ({num_errors} errors excluded)" if num_errors > 0 else ""
+    logger.info(f"Results: {correct}/{total} correct ({metrics['accuracy']:.2%}){error_suffix}")
     logger.info(f"Average score: {avg_score:.3f}")
     logger.info(f"Total cost: ${total_cost:.4f}")
 
     # Log per-task metrics
     if len(per_task_metrics) > 1:
         logger.info("Per-task breakdown:")
-        for task_name, task_metrics in sorted(per_task_metrics.items()):
+        for task_name, task_m in sorted(per_task_metrics.items()):
+            err_str = f" [{task_m['errors']} errors]" if task_m["errors"] > 0 else ""
             logger.info(
-                f"  {task_name}: {task_metrics['correct']}/{task_metrics['total_samples']} "
-                f"({task_metrics['accuracy']:.2%}), avg_score={task_metrics['average_score']:.3f}"
+                f"  {task_name}: {task_m['correct']}/{task_m['total_samples']} "
+                f"({task_m['accuracy']:.2%}), avg_score={task_m['average_score']:.3f}{err_str}"
             )
 
-    # Save results (traces saved separately in individual files)
-    output_dir = cfg.logging.output_dir
+    # Log error details
+    if error_results:
+        logger.warning(f"{num_errors} conversations failed with errors (excluded from scoring):")
+        for r in error_results:
+            logger.warning(f"  {r.sample_id} ({r.task_name}): {r.metadata.get('error', 'unknown')}")
+
+    # Save final results (traces already saved incrementally)
     save_results(
         [r.to_dict(include_trace=False) for r in results],
-        output_dir,
+        str(output_dir),
     )
-    save_metrics(metrics, output_dir)
+    save_metrics(metrics, str(output_dir))
+
+    # Clean up partial results file now that final results are saved
+    if partial_results_path.exists():
+        partial_results_path.unlink()
 
     # Update ledger with run info
-    output_path = Path(output_dir)
-    outputs_root = output_path.parent.parent  # outputs/{date}/{time} -> outputs/
-    run_path = f"{output_path.parent.name}/{output_path.name}"  # "{date}/{time}"
+    outputs_root = output_dir.parent.parent  # outputs/{date}/{time} -> outputs/
+    run_path = f"{output_dir.parent.name}/{output_dir.name}"  # "{date}/{time}"
     add_run(
         outputs_dir=outputs_root,
         run_path=run_path,
@@ -336,22 +436,12 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         accuracy=metrics["accuracy"],
         total_cost_usd=total_cost,
         average_turns=avg_turns,
+        notes=cfg.get("notes", ""),
+        extra={
+            "user_mode": cfg.user_mode.name,
+            "data_file": cfg.task.get("data_file", ""),
+        },
     )
-
-    # Save individual trace files
-    from ctx_editor.utils.logging import log_conversation
-
-    for r in results:
-        log_conversation(
-            experiment_type=cfg.experiment.name,
-            task_name=r.task_name,
-            sample_id=r.sample_id,
-            trace=r.trace,
-            is_correct=r.is_correct,
-            score=r.score,
-            output_dir=output_dir,
-            assistant_model=cfg.model.assistant.model,
-        )
 
     # Save final cheatsheet
     if cheatsheet and cfg.cheatsheet.get("save_path"):
@@ -377,33 +467,58 @@ def main(cfg: DictConfig) -> None:
     # Run the experiment
     metrics = asyncio.run(run_experiment(cfg))
 
-    # Print summary
-    print("\n" + "=" * 50)
-    print("EXPERIMENT COMPLETE")
-    print("=" * 50)
-    print(f"Experiment: {cfg.experiment_name}")
-    print(f"Accuracy: {metrics['accuracy']:.2%} ({metrics['correct']}/{metrics['total_samples']})")
-    print(f"Average Score: {metrics['average_score']:.3f}")
-    print(f"Total Cost: ${metrics['total_cost_usd']:.4f}")
-    print(f"Average Turns: {metrics['average_turns']:.1f}")
+    # Build summary text (used for both stdout and file)
+    summary_lines = []
+    summary_lines.append("=" * 60)
+    summary_lines.append("EXPERIMENT COMPLETE")
+    summary_lines.append("=" * 60)
+    summary_lines.append(f"Experiment: {cfg.experiment_name}")
 
-    # Print per-task breakdown if multiple tasks
+    num_errors = metrics.get("errors", 0)
+    error_note = f"  ({num_errors} errors excluded)" if num_errors > 0 else ""
+    summary_lines.append(
+        f"Accuracy: {metrics['accuracy']:.2%} "
+        f"({metrics['correct']}/{metrics['total_samples']}){error_note}"
+    )
+    summary_lines.append(f"Average Score: {metrics['average_score']:.3f}")
+    summary_lines.append(f"Total Cost: ${metrics['total_cost_usd']:.4f}")
+    summary_lines.append(f"Average Turns: {metrics['average_turns']:.1f}")
+    summary_lines.append(f"Average User Tokens: {metrics['average_user_tokens']:.0f}")
+
+    # Per-task breakdown if multiple tasks
     per_task = metrics.get("per_task", {})
     if len(per_task) > 1:
-        print("\n" + "-" * 50)
-        print("PER-TASK BREAKDOWN")
-        print("-" * 50)
-        print(f"{'Task':<15} {'Accuracy':<12} {'Avg Score':<12} {'Cost':<10}")
-        print("-" * 50)
-        for task_name, task_metrics in sorted(per_task.items()):
-            acc_str = f"{task_metrics['accuracy']:.1%} ({task_metrics['correct']}/{task_metrics['total_samples']})"
-            print(
-                f"{task_name:<15} {acc_str:<12} "
-                f"{task_metrics['average_score']:<12.3f} ${task_metrics['total_cost_usd']:<9.4f}"
+        summary_lines.append("")
+        summary_lines.append("-" * 80)
+        summary_lines.append("PER-TASK BREAKDOWN")
+        summary_lines.append("-" * 80)
+        summary_lines.append(
+            f"{'Task':<15} {'Accuracy':<20} {'Avg Score':<10} "
+            f"{'Turns':<8} {'User Tok':<10} {'Cost':<10}"
+        )
+        summary_lines.append("-" * 80)
+        for task_name, task_m in sorted(per_task.items()):
+            acc_str = f"{task_m['accuracy']:.1%} ({task_m['correct']}/{task_m['total_samples']})"
+            summary_lines.append(
+                f"{task_name:<15} {acc_str:<20} "
+                f"{task_m['average_score']:<10.3f} "
+                f"{task_m['average_turns']:<8.1f} "
+                f"{task_m.get('average_user_tokens', 0):<10.0f} "
+                f"${task_m['total_cost_usd']:<9.4f}"
             )
-        print("-" * 50)
+        summary_lines.append("-" * 80)
 
-    print(f"\nResults saved to: {cfg.logging.output_dir}")
+    summary_lines.append(f"\nResults saved to: {cfg.logging.output_dir}")
+
+    summary_text = "\n".join(summary_lines)
+
+    # Print to stdout
+    print("\n" + summary_text)
+
+    # Write summary file
+    summary_path = Path(cfg.logging.output_dir) / "summary.txt"
+    with open(summary_path, "w") as f:
+        f.write(summary_text + "\n")
 
 
 if __name__ == "__main__":

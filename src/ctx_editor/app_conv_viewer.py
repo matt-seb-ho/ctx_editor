@@ -23,7 +23,17 @@ from pathlib import Path
 from typing import Any, Optional
 
 import streamlit as st
+import tiktoken
 import yaml
+
+
+@st.cache_resource
+def _get_tokenizer():
+    return tiktoken.encoding_for_model("gpt-4o")
+
+
+def count_tokens(text: str) -> int:
+    return len(_get_tokenizer().encode(text))
 
 
 def load_results_file(file_path: str) -> list[dict]:
@@ -370,18 +380,18 @@ def display_edit_decision(log: dict) -> None:
 
     if should_edit:
         st.markdown(
-            f"""<div style="background-color: #2d4a3e; padding: 10px; border-radius: 5px; margin: 5px 0; border-left: 4px solid #28a745;">
-            <strong>Context Edit Decision:</strong> EDIT<br>
-            <em>{reasoning}</em>
-            </div>""",
+            f'<div style="background-color: #2d4a3e; padding: 10px; border-radius: 5px; margin: 5px 0; border-left: 4px solid #28a745;">'
+            f"<strong>Context Edit Decision:</strong> EDIT<br>"
+            f"<em>{reasoning}</em>"
+            f"</div>",
             unsafe_allow_html=True,
         )
     else:
         st.markdown(
-            f"""<div style="background-color: #3d3d3d; padding: 10px; border-radius: 5px; margin: 5px 0; border-left: 4px solid #6c757d;">
-            <strong>Context Edit Decision:</strong> NO EDIT<br>
-            <em>{reasoning}</em>
-            </div>""",
+            f'<div style="background-color: #3d3d3d; padding: 10px; border-radius: 5px; margin: 5px 0; border-left: 4px solid #6c757d;">'
+            f"<strong>Context Edit Decision:</strong> NO EDIT<br>"
+            f"<em>{reasoning}</em>"
+            f"</div>",
             unsafe_allow_html=True,
         )
 
@@ -391,9 +401,9 @@ def display_shard_revealed(log: dict) -> None:
     data = log.get("data", {})
     shard_id = data.get("shard_id", "?")
     st.markdown(
-        f"""<div style="background-color: #1a3a4a; padding: 5px 10px; border-radius: 5px; margin: 2px 0; font-size: 0.9em;">
-        Shard revealed: <strong>#{shard_id}</strong>
-        </div>""",
+        f'<div style="background-color: #1a3a4a; padding: 5px 10px; border-radius: 5px; margin: 2px 0; font-size: 0.9em;">'
+        f"Shard revealed: <strong>#{shard_id}</strong>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -408,24 +418,35 @@ def display_verification(log: dict) -> None:
     icon = "" if is_answer else ""
 
     st.markdown(
-        f"""<div style="background-color: {color}; padding: 5px 10px; border-radius: 5px; margin: 2px 0; font-size: 0.9em;">
-        {icon} Response classified as: <strong>{response_type}</strong>
-        </div>""",
+        f'<div style="background-color: {color}; padding: 5px 10px; border-radius: 5px; margin: 2px 0; font-size: 0.9em;">'
+        f"{icon} Response classified as: <strong>{response_type}</strong>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
 
-def display_answer_evaluation(log: dict) -> None:
+def display_answer_evaluation(log: dict, task_name: str = "") -> None:
     """Display an answer evaluation log entry."""
     data = log.get("data", {})
     is_correct = data.get("is_correct", False)
     score = data.get("score", 0.0)
     extracted = data.get("extracted_answer", "")
 
-    if is_correct:
-        st.success(f"Answer: `{extracted}` - Correct (score: {score})")
+    # For code/database tasks, use expander for long extracted answers
+    if task_name in ("code", "database") and extracted and len(extracted) > 80:
+        label = "Correct" if is_correct else "Incorrect"
+        if is_correct:
+            st.success(f"Answer: {label} (score: {score})")
+        else:
+            st.error(f"Answer: {label} (score: {score})")
+        lang = "python" if task_name == "code" else "sql"
+        with st.expander("View extracted answer", expanded=False):
+            st.code(extracted, language=lang)
     else:
-        st.error(f"Answer: `{extracted}` - Incorrect (score: {score})")
+        if is_correct:
+            st.success(f"Answer: `{extracted}` - Correct (score: {score})")
+        else:
+            st.error(f"Answer: `{extracted}` - Incorrect (score: {score})")
 
 
 def display_context_replaced(log: dict) -> None:
@@ -434,11 +455,11 @@ def display_context_replaced(log: dict) -> None:
     new_count = data.get("new_message_count", "?")
 
     st.markdown(
-        f"""<div style="background-color: #4a2d4a; padding: 10px; border-radius: 5px; margin: 10px 0; border: 2px dashed #9c27b0;">
-        <strong>CONTEXT REPLACED</strong><br>
-        New message count: {new_count}<br>
-        <em>The assistant now sees a condensed version of the conversation.</em>
-        </div>""",
+        f'<div style="background-color: #4a2d4a; padding: 10px; border-radius: 5px; margin: 10px 0; border: 2px dashed #9c27b0;">'
+        f"<strong>CONTEXT REPLACED</strong><br>"
+        f"New message count: {new_count}<br>"
+        f"<em>The assistant now sees a condensed version of the conversation.</em>"
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -449,10 +470,10 @@ def display_reflection_generated(log: dict) -> None:
     reflection = data.get("reflection", "")
 
     st.markdown(
-        f"""<div style="background-color: #2d3a4a; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #17a2b8;">
-        <strong>Reflection Added to Context</strong><br>
-        <em style="color: #a8d4e6;">{reflection}</em>
-        </div>""",
+        f'<div style="background-color: #2d3a4a; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #17a2b8;">'
+        f"<strong>Reflection Added to Context</strong><br>"
+        f'<em style="color: #a8d4e6;">{reflection}</em>'
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -469,9 +490,9 @@ def display_context_edit_output(log: dict) -> None:
     is_long = len(edited_context) > preview_length
 
     st.markdown(
-        f"""<div style="background-color: #2d4a2d; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #28a745;">
-        <strong>Context Editor Output</strong> <span style="font-size: 0.85em; color: #888;">(model: {editor_model}, original turns: {original_turns})</span>
-        </div>""",
+        f'<div style="background-color: #2d4a2d; padding: 10px; border-radius: 5px; margin: 10px 0; border-left: 4px solid #28a745;">'
+        f'<strong>Context Editor Output</strong> <span style="font-size: 0.85em; color: #888;">(model: {editor_model}, original turns: {original_turns})</span>'
+        f"</div>",
         unsafe_allow_html=True,
     )
 
@@ -482,15 +503,17 @@ def display_context_edit_output(log: dict) -> None:
 def display_context_edit_marker(turn_num: int) -> None:
     """Display a marker indicating context was edited (for context_edit strategy)."""
     st.markdown(
-        f"""<div style="background-color: #3d2d4a; padding: 8px; border-radius: 5px; margin: 10px 0; border: 1px solid #9c27b0; text-align: center;">
-        <strong style="color: #d4a8e6;">--- Context Edited (Turn {turn_num}) ---</strong><br>
-        <span style="font-size: 0.85em; color: #b8a8c8;">The assistant sees a condensed summary instead of full history above</span>
-        </div>""",
+        f'<div style="background-color: #3d2d4a; padding: 8px; border-radius: 5px; margin: 10px 0; border: 1px solid #9c27b0; text-align: center;">'
+        f'<strong style="color: #d4a8e6;">--- Context Edited (Turn {turn_num}) ---</strong><br>'
+        f'<span style="font-size: 0.85em; color: #b8a8c8;">The assistant sees a condensed summary instead of full history above</span>'
+        f"</div>",
         unsafe_allow_html=True,
     )
 
 
-def display_original_problem(full_spec_q: Optional[str], ground_truth_a: Optional[str]) -> None:
+def display_original_problem(
+    full_spec_q: Optional[str], ground_truth_a: Optional[str], task_name: str = ""
+) -> None:
     """Display the original single-turn problem specification.
 
     This shows what the complete problem looks like before being sharded
@@ -508,43 +531,48 @@ def display_original_problem(full_spec_q: Optional[str], ground_truth_a: Optiona
 
     if full_spec_q:
         st.markdown(
-            f"""<div style="background-color: #0d1a26; padding: 12px; border-radius: 5px; margin-bottom: 10px;">
-            <strong style="color: #5a9fd4;">Question:</strong><br>
-            <span style="color: #e0e0e0;">{full_spec_q}</span>
-            </div>""",
+            f'<div style="background-color: #0d1a26; padding: 12px; border-radius: 5px; margin-bottom: 10px;">'
+            f'<strong style="color: #5a9fd4;">Question:</strong><br>'
+            f'<span style="color: #e0e0e0;">{full_spec_q}</span>'
+            f"</div>",
             unsafe_allow_html=True,
         )
 
     if ground_truth_a:
-        # Truncate long answers for display
-        display_answer = ground_truth_a
-        if len(display_answer) > 500:
+        # For code/database tasks, always use expander with syntax-highlighted code
+        if task_name in ("code", "database"):
+            lang = "python" if task_name == "code" else "sql"
+            with st.expander("Ground Truth Answer", expanded=False):
+                st.code(ground_truth_a, language=lang)
+        elif len(ground_truth_a) > 500:
             with st.expander("Ground Truth Answer (click to expand)", expanded=False):
                 st.markdown(
-                    f"""<div style="background-color: #0d2618; padding: 12px; border-radius: 5px;">
-                    <span style="color: #a8e6cf;">{ground_truth_a}</span>
-                    </div>""",
+                    f'<div style="background-color: #0d2618; padding: 12px; border-radius: 5px;">'
+                    f'<span style="color: #a8e6cf;">{ground_truth_a}</span>'
+                    f"</div>",
                     unsafe_allow_html=True,
                 )
         else:
             st.markdown(
-                f"""<div style="background-color: #0d2618; padding: 12px; border-radius: 5px;">
-                <strong style="color: #5ad4a8;">Ground Truth Answer:</strong><br>
-                <span style="color: #a8e6cf;">{display_answer}</span>
-                </div>""",
+                f'<div style="background-color: #0d2618; padding: 12px; border-radius: 5px;">'
+                f'<strong style="color: #5ad4a8;">Ground Truth Answer:</strong><br>'
+                f'<span style="color: #a8e6cf;">{ground_truth_a}</span>'
+                f"</div>",
                 unsafe_allow_html=True,
             )
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.markdown(
-        """<p style="font-size: 0.85em; color: #888; text-align: center; margin-top: 5px;">
-        The problem above was sharded into multiple turns in the conversation below
-        </p>""",
+        '<p style="font-size: 0.85em; color: #888; text-align: center; margin-top: 5px;">'
+        "The problem above was sharded into multiple turns in the conversation below"
+        "</p>",
         unsafe_allow_html=True,
     )
 
 
-def display_log_entry(log: dict, show_verification: bool = True) -> None:
+def display_log_entry(
+    log: dict, show_verification: bool = True, task_name: str = ""
+) -> None:
     """Display a log entry based on its type."""
     log_type = log.get("type", "unknown")
 
@@ -556,7 +584,7 @@ def display_log_entry(log: dict, show_verification: bool = True) -> None:
         if show_verification:
             display_verification(log)
     elif log_type == "answer_evaluation":
-        display_answer_evaluation(log)
+        display_answer_evaluation(log, task_name=task_name)
     elif log_type == "context_replaced":
         display_context_replaced(log)
     elif log_type == "reflection_generated":
@@ -565,7 +593,13 @@ def display_log_entry(log: dict, show_verification: bool = True) -> None:
         display_context_edit_output(log)
 
 
-def display_message(msg: dict, logs: list[dict], show_logs: bool = True) -> None:
+def display_message(
+    msg: dict,
+    logs: list[dict],
+    show_logs: bool = True,
+    show_token_counts: bool = False,
+    user_turn_number: int | None = None,
+) -> None:
     """Display a single message with associated logs."""
     role = msg.get("role", "")
     content = msg.get("content", "")
@@ -581,8 +615,15 @@ def display_message(msg: dict, logs: list[dict], show_logs: bool = True) -> None
     if role == "user":
         with st.chat_message("user"):
             st.markdown(content)
+            caption_parts = []
             if timestamp:
-                st.caption(f"_{format_timestamp(timestamp)}_")
+                caption_parts.append(format_timestamp(timestamp))
+            if show_token_counts:
+                tok_count = count_tokens(content)
+                turn_label = f"Turn {user_turn_number}" if user_turn_number else "User"
+                caption_parts.append(f"{turn_label}: {tok_count} tokens")
+            if caption_parts:
+                st.caption("_" + " | ".join(caption_parts) + "_")
 
     elif role == "assistant":
         with st.chat_message("assistant"):
@@ -598,9 +639,9 @@ def display_message(msg: dict, logs: list[dict], show_logs: bool = True) -> None
         #     unsafe_allow_html=True,
         # )
         st.markdown(
-            f"""<div style="background-color: #1e1e2e; padding: 10px; border-radius: 5px; margin: 5px 0; border-left: 4px solid #6c757d;">
-            <strong>System:</strong> {content}
-            </div>""",
+            f'<div style="background-color: #1e1e2e; padding: 10px; border-radius: 5px; margin: 5px 0; border-left: 4px solid #6c757d;">'
+            f"<strong>System:</strong> {content}"
+            f"</div>",
             unsafe_allow_html=True,
         )
 
@@ -635,9 +676,10 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
     """
     # Display original problem specification from data file
     task_id = sample.get("sample_id")
+    task_name = sample.get("task_name", "")
     if run_dir and task_id:
         full_spec_q, ground_truth_a = get_original_problem_spec(run_dir, task_id)
-        display_original_problem(full_spec_q, ground_truth_a)
+        display_original_problem(full_spec_q, ground_truth_a, task_name=task_name)
 
     trace = sample.get("trace", {})
 
@@ -667,6 +709,7 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
 
     # Show toggle for detailed logs
     show_verification = st.checkbox("Show verification logs", value=False)
+    show_token_counts = st.checkbox("Show user token counts", value=True)
 
     # Build a combined timeline of messages and logs
     timeline = []
@@ -709,6 +752,7 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
 
     # Track assistant turn count for context_edit markers
     assistant_turn_count = 0
+    user_turn_count = 0
     last_was_user = False
 
     for item in timeline:
@@ -720,7 +764,16 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
             if is_context_edit and role == "assistant" and assistant_turn_count > 0:
                 display_context_edit_marker(assistant_turn_count + 1)
 
-            display_message(msg, [], show_logs=False)
+            if role == "user":
+                user_turn_count += 1
+
+            display_message(
+                msg,
+                [],
+                show_logs=False,
+                show_token_counts=show_token_counts and role == "user",
+                user_turn_number=user_turn_count if role == "user" else None,
+            )
 
             if role == "assistant":
                 assistant_turn_count += 1
@@ -728,7 +781,23 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
 
         elif item["type"] == "log":
             log = item["data"]
-            display_log_entry(log, show_verification=show_verification)
+            display_log_entry(
+                log,
+                show_verification=show_verification,
+                task_name=sample.get("task_name", ""),
+            )
+
+    # Show total user tokens at the end of the conversation
+    if show_token_counts:
+        user_messages = [m for m in messages if m.get("role") == "user"]
+        total_user_tokens = sum(count_tokens(m.get("content", "")) for m in user_messages)
+        st.markdown(
+            f"""<div style="background-color: #1a2a1a; padding: 10px; border-radius: 5px; """
+            f"""margin: 15px 0; border: 1px solid #3a5a3a; text-align: center;">"""
+            f"""<strong>Total user tokens: {total_user_tokens}</strong> """
+            f"""across {len(user_messages)} turn(s)</div>""",
+            unsafe_allow_html=True,
+        )
 
     # Show reference answer and ground truth if available
     metadata = sample.get("metadata", {})
@@ -745,9 +814,19 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
                 st.markdown(full_spec)
 
         if ground_truth:
-            st.success(f"**Ground Truth Answer:** {ground_truth}")
+            if task_name in ("code", "database"):
+                lang = "python" if task_name == "code" else "sql"
+                st.markdown("**Ground Truth Answer:**")
+                st.code(ground_truth, language=lang)
+            else:
+                st.success(f"**Ground Truth Answer:** {ground_truth}")
         elif ref_answer:
-            st.info(f"**Reference Answer:** {ref_answer}")
+            if task_name in ("code", "database"):
+                lang = "python" if task_name == "code" else "sql"
+                st.markdown("**Reference Answer:**")
+                st.code(ref_answer, language=lang)
+            else:
+                st.info(f"**Reference Answer:** {ref_answer}")
 
 
 def display_sidebar_info(sample: dict) -> None:
@@ -767,6 +846,16 @@ def display_sidebar_info(sample: dict) -> None:
 
     st.sidebar.write(f"**Turns:** {sample.get('num_turns', 0)}")
     st.sidebar.write(f"**Cost:** ${sample.get('total_cost_usd', 0):.6f}")
+
+    # User token stats from trace
+    trace = sample.get("trace", {})
+    if trace:
+        user_msgs = [m for m in trace.get("messages", []) if m.get("role") == "user"]
+        if user_msgs:
+            per_turn = [count_tokens(m.get("content", "")) for m in user_msgs]
+            total = sum(per_turn)
+            st.sidebar.write(f"**User tokens:** {total} ({len(user_msgs)} turns)")
+            st.sidebar.caption(f"Per turn: {per_turn}")
 
     # Model info
     models = sample.get("models", {})
@@ -789,8 +878,14 @@ def display_sidebar_info(sample: dict) -> None:
     # Extracted answer
     extracted = sample.get("extracted_answer")
     if extracted:
+        task_name = sample.get("task_name", "")
         st.sidebar.subheader("Extracted Answer")
-        st.sidebar.code(extracted)
+        if task_name in ("code", "database"):
+            lang = "python" if task_name == "code" else "sql"
+            with st.sidebar.expander("View extracted answer", expanded=False):
+                st.code(extracted, language=lang)
+        else:
+            st.sidebar.code(extracted)
 
 
 def get_statistics(samples: list[dict]) -> dict:
@@ -859,15 +954,17 @@ def main():
     # Determine selected run
     selected_run = None
     selected_exp = None
+    selected_user_mode = None
 
     if custom_path and custom_path.strip():
         # Use custom path directly
         custom_path = custom_path.strip()
         if os.path.exists(custom_path):
             selected_run = custom_path
-            # Try to get experiment type from config
+            # Try to get experiment type and user mode from config
             config = load_config_file(custom_path)
             selected_exp = config.get("experiment", {}).get("name", "unknown") if config else "unknown"
+            selected_user_mode = config.get("user_mode", {}).get("name") if config else None
             st.sidebar.success(f"Loaded: {os.path.basename(custom_path)}")
         else:
             st.sidebar.error(f"Path not found: {custom_path}")
@@ -915,9 +1012,11 @@ def main():
         def make_run_label(r: dict) -> str:
             path = r.get("path", "unknown")
             strategy = r.get("strategy", "?")
+            user_mode = r.get("user_mode", "")
             acc = r.get("accuracy")
             acc_str = f" ({acc:.0%})" if acc is not None else ""
-            return f"{path} [{strategy}]{acc_str}"
+            mode_str = f" <{user_mode}>" if user_mode else ""
+            return f"{path} [{strategy}]{mode_str}{acc_str}"
 
         selected_run_idx = st.sidebar.selectbox(
             "Run",
@@ -928,6 +1027,7 @@ def main():
         selected_run_info = filtered_runs[selected_run_idx]
         selected_run = selected_run_info.get("full_path", "")
         selected_exp = selected_run_info.get("strategy", "unknown")
+        selected_user_mode = selected_run_info.get("user_mode")
 
     # Load results
     results_path = os.path.join(selected_run, "results.json")
@@ -1031,16 +1131,29 @@ def main():
     sample_id = selected_sample_with_trace.get("sample_id", "unknown")
     st.header(f"Conversation: {sample_id}")
 
+    # Build strategy description
     if "context_edit" in effective_exp_type and "agentic" not in effective_exp_type:
-        st.info(
-            "**Strategy:** Context Edit - Conversation is compressed before each assistant turn"
-        )
+        strategy_desc = "**Strategy:** Context Edit - Conversation is compressed before each assistant turn"
     elif "agentic_edit" in effective_exp_type:
-        st.info("**Strategy:** Agentic Edit - Model decides when to compress context")
+        strategy_desc = "**Strategy:** Agentic Edit - Model decides when to compress context"
     elif "reflection" in effective_exp_type:
-        st.info("**Strategy:** Reflection - Reflection prompts added to context")
+        strategy_desc = "**Strategy:** Reflection - Reflection prompts added to context"
     elif "baseline" in effective_exp_type:
-        st.info("**Strategy:** Baseline - No context modifications")
+        strategy_desc = "**Strategy:** Baseline - No context modifications"
+    else:
+        strategy_desc = f"**Strategy:** {effective_exp_type}"
+
+    # Append user mode if available
+    if selected_user_mode:
+        mode_labels = {
+            "sharded": "Sharded (pre-defined shard reveals)",
+            "natural": "Natural (full problem, no constraints)",
+            "length_constrained": "Length-Constrained (token-budgeted turns)",
+        }
+        mode_label = mode_labels.get(selected_user_mode, selected_user_mode)
+        strategy_desc += f"  |  **User Mode:** {mode_label}"
+
+    st.info(strategy_desc)
 
     # Display the conversation
     display_conversation(selected_sample_with_trace, exp_type=effective_exp_type, run_dir=selected_run)

@@ -68,6 +68,10 @@ class OpenAI_Model:
             inp_token_cost, out_token_cost = 0.075, 0.150
         elif base_model.startswith("o1-preview") or base_model == "o1":
             inp_token_cost, out_token_cost = 0.015, 0.06
+        elif base_model.startswith("gpt-5-mini"):
+            # input: $0.25 / 1M tokens, output: $2.00 / 1M tokens
+            # need to convert to per 1k tokens
+            inp_token_cost, out_token_cost = 0.25 / 1000, 2.00 / 1000
         else:
             raise Exception(f"Model {model} pricing unknown, please add")
 
@@ -110,6 +114,10 @@ class OpenAI_Model:
             system_message = messages[0]["content"]
             messages[1]["content"] = f"System Message: {system_message}\n{messages[1]['content']}"
             messages = messages[1:]
+        
+        if "gpt-5" in model:
+            temperature = 1.0 # gpt-5 models require temperature=1.0
+            timeout = 300 # gpt-5 models can take a long time to respond, so increase timeout to 5 minutes
 
         while True:
             try:

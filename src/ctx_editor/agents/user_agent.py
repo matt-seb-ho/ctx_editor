@@ -25,6 +25,7 @@ class UserResponse:
     shard_id: Optional[str] = None
     cost_usd: float = 0.0
     model_response: Optional[ModelResponse] = None  # For detailed usage tracking
+    budget_exhausted: bool = False  # Set when user agent has no more info to share
 
 
 class UserAgent:

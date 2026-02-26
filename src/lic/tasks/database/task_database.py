@@ -40,6 +40,10 @@ class TaskDatabase(Task):
 
         pred_sql = extracted_answer.replace("```sql", "").replace("```", "")
         pred_sql = re.sub(r"\s+", " ", pred_sql).strip()
+
+        if not pred_sql:
+            return {"score": 0.0}
+
         ref_sql = sample["reference_sql"]
         # if there's no data/spider/databases/ folder, then throw an error
         spider_db_dir = get_data_path("data/spider/databases")

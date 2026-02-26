@@ -32,9 +32,79 @@ from ctx_editor.models import get_model_client
 client = None
 
 PROMPTS_DIR = PROJECT_ROOT / "prompts"
-SEGMENT_PROMPT = (PROMPTS_DIR / "sharding_segment.txt").read_text()
-CONVERSATIONAL_PROMPT = (PROMPTS_DIR / "sharding_conversational.txt").read_text()
-VERIFICATION_PROMPT = (PROMPTS_DIR / "sharding_verification.txt").read_text()
+
+# Default (generic) prompts
+PROMPTS = {
+    "default": {
+        "segment": (PROMPTS_DIR / "sharding_segment.txt").read_text(),
+        "conversational": (PROMPTS_DIR / "sharding_conversational.txt").read_text(),
+        "verification": (PROMPTS_DIR / "sharding_verification.txt").read_text(),
+    },
+    "code": {
+        "segment": (PROMPTS_DIR / "sharding_segment_code.txt").read_text(),
+        "conversational": (PROMPTS_DIR / "sharding_conversational_code.txt").read_text(),
+        "verification": (PROMPTS_DIR / "sharding_verification.txt").read_text(),  # reuse generic
+    },
+}
+
+# Active prompts (set based on --task flag and shard count args)
+SEGMENT_PROMPT = None
+CONVERSATIONAL_PROMPT = None
+VERIFICATION_PROMPT = None
+
+
+def set_active_prompts(task: str, target_shards: int = 0, max_shards: int = 0):
+    global SEGMENT_PROMPT, CONVERSATIONAL_PROMPT, VERIFICATION_PROMPT
+    prompt_set = PROMPTS.get(task, PROMPTS["default"])
+
+    # Build guidance strings based on shard count config
+    segment_text = prompt_set["segment"]
+    conversational_text = prompt_set["conversational"]
+
+    if target_shards > 0:
+        # Replace the Minimalistic rule with a coarse-grouping rule
+        for old_rule in [
+            "- [Minimalistic] You should split the information in the segments to as small as possible. "
+            "If you have a compound expression (X and Y), you should split it into two segments. "
+            "Each segment should represent a unit of information.",
+            "- [Minimalistic] You should split the information in the segments as small as possible. "
+            "If you have a compound expression (X and Y), you should split it into two segments. "
+            "Each segment should represent a unit of information.",
+        ]:
+            segment_text = segment_text.replace(
+                old_rule,
+                f"- [Coarse grouping] You MUST produce approximately {target_shards} segments "
+                f"(no more than {max_shards or target_shards + 3}). "
+                "Group related information together into meaningful chunks rather than splitting "
+                "into fine-grained atomic units. For example: combine all constraints into one segment, "
+                "combine all examples into one segment, merge a step description with its details. "
+                "Each segment should represent a coherent topic, not a single atomic fact.",
+            )
+        segment_guidance = ""
+    else:
+        segment_guidance = ""
+
+    if max_shards > 0:
+        conversational_guidance = (
+            f"- [Shard limit] CRITICAL: The total number of shards (initial shard + follow-up shards) "
+            f"MUST be between {target_shards or max_shards - 3} and {max_shards}. "
+            "Aggressively merge segments to stay within this limit. Combine all constraints into one shard, "
+            "all examples into one shard, and group related algorithmic steps together. "
+            "If you have more segments than the limit, you MUST merge until you are within the limit."
+        )
+    elif target_shards > 0:
+        conversational_guidance = (
+            f"- [Target count] Aim for approximately {target_shards} shards total "
+            "(including the initial shard). Merge related segments to reach this target."
+        )
+    else:
+        conversational_guidance = ""
+
+    SEGMENT_PROMPT = segment_text.replace("{segment_guidance}", segment_guidance)
+    CONVERSATIONAL_PROMPT = conversational_text.replace(
+        "{conversational_guidance}", conversational_guidance
+    )
+    VERIFICATION_PROMPT = prompt_set["verification"]
 
 
 async def segment_instruction(question: str, model: str, timeout: int = 30) -> dict | None:
@@ -153,6 +223,24 @@ async def process_item(
     if "task" in item:
         output["task"] = item["task"]
 
+    # Pass through any extra fields (e.g., LCB metadata, test cases, starter_code)
+    passthrough_keys = {
+        "question_title",
+        "question_content",
+        "platform",
+        "contest_id",
+        "contest_date",
+        "starter_code",
+        "difficulty",
+        "public_test_cases",
+        "private_test_cases",
+        "metadata",
+        "source",
+    }
+    for key in passthrough_keys:
+        if key in item:
+            output[key] = item[key]
+
     return output
 
 
@@ -172,9 +260,14 @@ async def main_async(args):
 
     concurrency = args.concurrency
     timeout = args.timeout
+    shard_info = ""
+    if args.target_shards > 0:
+        shard_info += f", target_shards={args.target_shards}"
+    if args.max_shards > 0:
+        shard_info += f", max_shards={args.max_shards}"
     print(
         f"Processing {len(items)} items with model={args.model}, "
-        f"concurrency={concurrency}, timeout={timeout}s"
+        f"concurrency={concurrency}, timeout={timeout}s{shard_info}"
     )
 
     semaphore = asyncio.Semaphore(concurrency)
@@ -234,8 +327,27 @@ def main():
     parser.add_argument(
         "--timeout", type=int, default=300, help="Timeout per LLM call in seconds (default: 120)"
     )
+    parser.add_argument(
+        "--task",
+        default="default",
+        choices=list(PROMPTS.keys()),
+        help="Task type for prompt routing (default: default)",
+    )
+    parser.add_argument(
+        "--target-shards",
+        type=int,
+        default=0,
+        help="Target number of shards per item (0 = off, original behavior)",
+    )
+    parser.add_argument(
+        "--max-shards",
+        type=int,
+        default=0,
+        help="Hard max number of shards per item (0 = off, no limit)",
+    )
     args = parser.parse_args()
 
+    set_active_prompts(args.task, target_shards=args.target_shards, max_shards=args.max_shards)
     asyncio.run(main_async(args))
 
 

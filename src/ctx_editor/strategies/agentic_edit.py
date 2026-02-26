@@ -1,12 +1,13 @@
 """Agent-decided context editing strategy."""
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 from ..core.types import Message
 from .base import BaseStrategy
 from .baseline import BaselineStrategy
-from .context_edit import ContextEditStrategy
+from .context_edit import ContextEditStrategy, DEFAULT_EDITOR_PROMPT, CHEATSHEET_SECTION_TEMPLATE
 
 if TYPE_CHECKING:
     from ..cheatsheet.cheatsheet import Cheatsheet
@@ -30,11 +31,24 @@ Consider these common failure modes that compression can help address:
 
 Compression is beneficial when the context contains invalidated work or wrong assumptions that might mislead the assistant. Compression is risky if it might lose still-valid critical details.
 
-Respond with a JSON object:
-{{
-    "should_edit": true/false,
-    "reasoning": "Brief explanation of your decision"
-}}"""
+Respond with your decision and analysis using the following format. Always provide thorough notes \
+regardless of your decision — these notes are used for downstream editing and error analysis.
+
+<notes>
+Your detailed analysis of the conversation state. Include:
+- What failure modes (if any) are present in the conversation
+- What information is critical to preserve
+- What content is misleading, outdated, or redundant
+- How an edit might help or hurt at this point
+</notes>
+
+<edit_decision>yes or no</edit_decision>"""
+
+
+def _parse_xml_tag(text: str, tag: str) -> str:
+    """Extract content from an XML tag in text."""
+    match = re.search(rf"<{tag}>(.*?)</{tag}>", text, re.DOTALL)
+    return match.group(1).strip() if match else ""
 
 
 @dataclass
@@ -43,6 +57,7 @@ class EditDecision:
 
     should_edit: bool
     reasoning: str
+    notes: str
 
 
 class AgenticEditStrategy(BaseStrategy):
@@ -98,30 +113,164 @@ class AgenticEditStrategy(BaseStrategy):
             model_client: Model client for the decision.
 
         Returns:
-            EditDecision with the decision and reasoning.
+            EditDecision with the decision, reasoning, and analysis notes.
         """
         # Don't edit if conversation is short
         if trace.num_user_turns < self.edit_threshold_turns:
             return EditDecision(
                 should_edit=False,
                 reasoning=f"Conversation has fewer than {self.edit_threshold_turns} turns",
+                notes="",
             )
 
         # Ask the model
         conversation_str = trace.get_conversation_string(skip_system=False)
         prompt = self.decision_prompt.format(conversation=conversation_str)
 
-        response = await model_client.generate_json(
+        response = await model_client.generate(
             messages=[{"role": "user", "content": prompt}],
             model=self.decision_model,
             temperature=0.0,
         )
 
-        result = response.content
+        text = response.content
+        decision_str = _parse_xml_tag(text, "edit_decision").lower()
+        notes = _parse_xml_tag(text, "notes")
+        should_edit = decision_str.startswith("yes")
+
         return EditDecision(
-            should_edit=result.get("should_edit", False),
-            reasoning=result.get("reasoning", ""),
+            should_edit=should_edit,
+            reasoning=decision_str,
+            notes=notes,
         )
+
+    def _build_editor_input_with_analysis(
+        self,
+        trace: "ConversationTrace",
+        cheatsheet: Optional["Cheatsheet"],
+        decision_notes: str,
+    ) -> str:
+        """Build the editor prompt with injected decision analysis.
+
+        Uses the same base editor prompt as ContextEditStrategy, then appends
+        the decision analysis so the editor can act on it directly.
+
+        Args:
+            trace: The current conversation trace.
+            cheatsheet: Optional cheatsheet to include.
+            decision_notes: Analysis notes from the decision step.
+
+        Returns:
+            Formatted editor prompt with decision analysis injected.
+        """
+        conversation_str = trace.get_conversation_string(skip_system=False)
+
+        cheatsheet_section = ""
+        if self.edit_strategy.use_cheatsheet and cheatsheet and cheatsheet.content:
+            if self.edit_strategy.cheatsheet_target == "context_editor":
+                cheatsheet_section = CHEATSHEET_SECTION_TEMPLATE.format(
+                    cheatsheet_content=cheatsheet.content
+                )
+
+        base_prompt = self.edit_strategy.editor_prompt.format(
+            conversation=conversation_str,
+            cheatsheet_section=cheatsheet_section,
+        )
+
+        # Inject decision analysis before the final instruction
+        analysis_section = f"""
+<decision_analysis>
+The following analysis was produced during the decision to compress this context.
+Use it to guide your editing — it identifies key issues to address:
+
+{decision_notes}
+</decision_analysis>
+
+Condensed context:"""
+
+        # Replace the trailing "Condensed context:" with the augmented version
+        if base_prompt.rstrip().endswith("Condensed context:"):
+            base_prompt = base_prompt.rstrip()[: -len("Condensed context:")].rstrip()
+            return base_prompt + "\n" + analysis_section
+        else:
+            return base_prompt + "\n" + analysis_section
+
+    async def _perform_edit_with_analysis(
+        self,
+        trace: "ConversationTrace",
+        cheatsheet: Optional["Cheatsheet"],
+        model_client: "ModelClient",
+        decision_notes: str,
+    ) -> list[Message]:
+        """Perform context editing with injected decision analysis (mutates trace).
+
+        Follows the same flow as ContextEditStrategy.prepare_context() but uses
+        an augmented prompt that includes the decision analysis notes.
+
+        Args:
+            trace: The current conversation trace (will be mutated).
+            cheatsheet: Optional cheatsheet for guidance.
+            model_client: Model client for generating the edit.
+            decision_notes: Analysis notes from the decision step.
+
+        Returns:
+            Active messages from the trace after reset.
+        """
+        # Inject cheatsheet to assistant (via system message) if configured
+        if self.edit_strategy.use_cheatsheet and cheatsheet:
+            if self.edit_strategy.cheatsheet_target == "assistant":
+                self._inject_cheatsheet_to_trace(trace, cheatsheet, target="system")
+
+        # If this is the first turn, no editing needed
+        if trace.num_assistant_turns == 0:
+            return trace.get_active_messages()
+
+        # Build editor input with decision analysis injected
+        editor_input = self._build_editor_input_with_analysis(
+            trace, cheatsheet, decision_notes
+        )
+
+        # Generate edited context
+        response = await model_client.generate(
+            messages=[{"role": "user", "content": editor_input}],
+            model=self.edit_strategy.editor_model,
+            temperature=0.0,
+        )
+        edited_context = response.content
+
+        # Log the context edit operation
+        trace.add_log(
+            "context_edit_output",
+            {
+                "edited_context": edited_context,
+                "editor_model": self.edit_strategy.editor_model,
+                "original_turn_count": trace.total_user_turns,
+                "active_turn_count": trace.num_user_turns,
+                "used_decision_analysis": True,
+            },
+        )
+
+        # Build new context: system + condensed prior context + last user message
+        new_messages = []
+
+        system_msg = trace.system_message
+        if system_msg:
+            new_messages.append(Message(role="system", content=system_msg.content))
+
+        new_messages.append(
+            Message(role="user", content="[Prior conversation context, condensed]")
+        )
+        new_messages.append(
+            Message(role="assistant", content=edited_context)
+        )
+
+        last_user = trace.last_user_message
+        if last_user:
+            new_messages.append(Message(role="user", content=last_user.content))
+
+        trace.reset_conversation(new_messages, label="context_edit")
+
+        return trace.get_active_messages()
 
     async def prepare_context(
         self,
@@ -131,8 +280,9 @@ class AgenticEditStrategy(BaseStrategy):
     ) -> list[Message]:
         """Prepare context, deciding whether to edit first (mutates trace).
 
-        Delegates to either ContextEditStrategy or BaselineStrategy based on
-        the model's decision. Both strategies mutate the trace.
+        When editing is chosen, the decision analysis notes are injected into
+        the editor prompt so the editor can act on them directly instead of
+        re-analyzing the conversation from scratch.
 
         Args:
             trace: The current conversation trace (will be mutated).
@@ -144,16 +294,19 @@ class AgenticEditStrategy(BaseStrategy):
         """
         decision = await self._should_edit(trace, model_client)
 
-        # Log the decision
+        # Always log the full decision including notes (for error analysis)
         trace.add_log(
             "edit_decision",
             {
                 "should_edit": decision.should_edit,
                 "reasoning": decision.reasoning,
+                "notes": decision.notes,
             },
         )
 
         if decision.should_edit:
-            return await self.edit_strategy.prepare_context(trace, cheatsheet, model_client)
+            return await self._perform_edit_with_analysis(
+                trace, cheatsheet, model_client, decision.notes
+            )
         else:
             return await self.baseline_strategy.prepare_context(trace, cheatsheet, model_client)

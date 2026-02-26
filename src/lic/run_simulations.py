@@ -4,6 +4,10 @@ import multiprocessing
 import random
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
+
+load_dotenv(".env")
+
 
 import tqdm
 from simulator_full import ConversationSimulatorFull

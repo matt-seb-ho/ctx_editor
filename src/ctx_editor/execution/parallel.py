@@ -21,15 +21,18 @@ class ParallelRunner(ExperimentRunner):
         self,
         max_concurrent: int = 10,
         progress_callback: Optional[Callable[[int, int], None]] = None,
+        on_result: Optional[Callable[[SimulationResult], None]] = None,
     ):
         """Initialize the parallel runner.
 
         Args:
             max_concurrent: Maximum number of concurrent simulations.
             progress_callback: Optional callback(completed, total) for progress updates.
+            on_result: Optional callback(result) called after each result completes.
         """
         self.max_concurrent = max_concurrent
         self.progress_callback = progress_callback
+        self.on_result = on_result
         self.logger = get_logger("parallel_runner")
 
     async def run(
@@ -67,6 +70,8 @@ class ParallelRunner(ExperimentRunner):
                     result = await simulator.run()
 
                     completed += 1
+                    if self.on_result:
+                        self.on_result(result)
                     if self.progress_callback:
                         self.progress_callback(completed, total)
 
@@ -77,11 +82,7 @@ class ParallelRunner(ExperimentRunner):
                         f"Error on problem {problem.get('task_id', 'unknown')}:\n{traceback.format_exc()}"
                     )
                     # Return a failed result
-                    completed += 1
-                    if self.progress_callback:
-                        self.progress_callback(completed, total)
-
-                    return index, SimulationResult(
+                    error_result = SimulationResult(
                         sample_id=problem.get("task_id", "unknown"),
                         task_name=problem.get("task", "unknown"),
                         is_correct=False,
@@ -89,8 +90,18 @@ class ParallelRunner(ExperimentRunner):
                         num_turns=0,
                         total_cost_usd=0.0,
                         trace=[],
-                        metadata={"error": str(e)},
+                        metadata={
+                            "error": str(e),
+                            "traceback": traceback.format_exc(),
+                        },
                     )
+                    completed += 1
+                    if self.on_result:
+                        self.on_result(error_result)
+                    if self.progress_callback:
+                        self.progress_callback(completed, total)
+
+                    return index, error_result
 
         # Run all problems concurrently
         tasks = [run_one(problem, i) for i, problem in enumerate(problems)]

@@ -29,6 +29,7 @@ class BatchedRunner(ExperimentRunner):
         updater: Optional[CheatsheetUpdater] = None,
         save_cheatsheet_path: Optional[str] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
+        on_result: Optional[Callable[[SimulationResult], None]] = None,
     ):
         """Initialize the batched runner.
 
@@ -39,6 +40,7 @@ class BatchedRunner(ExperimentRunner):
             updater: CheatsheetUpdater instance.
             save_cheatsheet_path: Path to save cheatsheet after each batch.
             progress_callback: Optional callback(completed, total) for progress updates.
+            on_result: Optional callback(result) called after each result completes.
         """
         self.batch_size = batch_size
         self.max_concurrent = max_concurrent
@@ -46,9 +48,12 @@ class BatchedRunner(ExperimentRunner):
         self.updater = updater or CheatsheetUpdater()
         self.save_cheatsheet_path = save_cheatsheet_path
         self.progress_callback = progress_callback
+        self.on_result = on_result
         self.logger = get_logger("batched_runner")
 
-        self.parallel_runner = ParallelRunner(max_concurrent=max_concurrent)
+        self.parallel_runner = ParallelRunner(
+            max_concurrent=max_concurrent, on_result=on_result
+        )
 
     def _batches(
         self,
@@ -176,6 +181,8 @@ class BatchedRunner(ExperimentRunner):
                 result = await simulator.run()
                 results.append(result)
 
+                if self.on_result:
+                    self.on_result(result)
                 # Progress callback
                 if self.progress_callback:
                     self.progress_callback(len(results), len(problems))
@@ -192,18 +199,22 @@ class BatchedRunner(ExperimentRunner):
                 self.logger.error(
                     f"Error on problem {problem.get('task_id')}:\n{traceback.format_exc()}"
                 )
-                results.append(
-                    SimulationResult(
-                        sample_id=problem.get("task_id", "unknown"),
-                        task_name=problem.get("task", "unknown"),
-                        is_correct=False,
-                        score=0.0,
-                        num_turns=0,
-                        total_cost_usd=0.0,
-                        trace=[],
-                        metadata={"error": str(e)},
-                    )
+                error_result = SimulationResult(
+                    sample_id=problem.get("task_id", "unknown"),
+                    task_name=problem.get("task", "unknown"),
+                    is_correct=False,
+                    score=0.0,
+                    num_turns=0,
+                    total_cost_usd=0.0,
+                    trace=[],
+                    metadata={
+                        "error": str(e),
+                        "traceback": traceback.format_exc(),
+                    },
                 )
+                results.append(error_result)
+                if self.on_result:
+                    self.on_result(error_result)
                 # Progress callback even on error
                 if self.progress_callback:
                     self.progress_callback(len(results), len(problems))

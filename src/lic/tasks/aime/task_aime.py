@@ -130,7 +130,8 @@ class TaskAIME(Task):
         self.answer_extraction_strategy = "task_specific"
 
     def get_dataset_file(self) -> str:
-        return "data/sharded_aime24_5mini.json"
+        # return "data/sharded_aime24_5mini.json"
+        return "data/hard_task_exp_data.json"
 
     def get_samples(self, filter="full"):
         with open(self.get_dataset_file(), "r") as f:
