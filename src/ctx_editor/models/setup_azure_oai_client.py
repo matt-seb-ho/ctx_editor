@@ -4,7 +4,8 @@ from azure.identity import (
 )
 from openai import AsyncAzureOpenAI
 
-AZURE_ENDPOINT = "https://fxdata-eastus2.openai.azure.com"
+# AZURE_ENDPOINT = "https://fxdata-eastus2.openai.azure.com"
+AZURE_ENDPOINT = "https://dl-openai-3.openai.azure.com"
 API_VERSION = "2024-10-21"
 
 
