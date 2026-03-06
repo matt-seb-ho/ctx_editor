@@ -17,11 +17,18 @@ class TaskCodeV2(TaskCode):
 
     def __init__(self):
         super().__init__()
-        with open(get_prompt_path("prompts/lcb/lcb_system_prompt_v2.txt"), "r") as f:
+        with open(get_prompt_path("prompts/lcb/lcb_system_prompt_v2.txt")) as f:
             self.system_prompt_lcb = f.read()
+        with open(get_prompt_path("prompts/humaneval/humaneval_system_prompt_v2.txt")) as f:
+            self.system_prompt_humaneval = f.read()
         if not TaskCodeV2._initialized_once:
-            print("[TaskCodeV2] active — code-fence prompt + fixed extract_answer")
+            print("[TaskCodeV2] active — separate per-dataset prompts, args-not-stdin, code-fence, fixed extract_answer")
             TaskCodeV2._initialized_once = True
+
+    def generate_system_prompt(self, sample) -> str:
+        if sample.get("source") == "humaneval":
+            return self.system_prompt_humaneval
+        return self.system_prompt_lcb
 
     def extract_answer(self, text: str) -> str:
         """Extract the last Python function definition from text.
