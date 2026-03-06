@@ -16,7 +16,7 @@ from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, Syst
 from ctx_editor.cheatsheet import Cheatsheet, CheatsheetUpdater
 from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
 from ctx_editor.execution import BatchedRunner, ParallelRunner
-from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient
+from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient, set_content_filter_log_path
 from ctx_editor.utils.ledger import add_run
 from ctx_editor.utils.logging import (
     get_logger,
@@ -177,6 +177,10 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     with open(config_path, "w") as f:
         f.write(OmegaConf.to_yaml(cfg, resolve=True))
     logger.info(f"Saved config to {config_path}")
+
+    # Configure content filter error log (captures Azure content filter rejections
+    # with the full request messages so they can be investigated)
+    set_content_filter_log_path(output_dir / "content_filter_errors.jsonl")
 
     # Load components
     samples = load_samples(cfg)

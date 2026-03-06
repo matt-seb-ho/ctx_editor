@@ -2,6 +2,7 @@
 
 from .base import BaseModelClient, ModelClient
 from .endpoint_config import EndpointConfig, LoadBalancerConfig
+from .openai_model import set_content_filter_log_path
 
 # Lazy imports to handle missing dependencies gracefully
 _openai_client_cls = None
@@ -60,4 +61,5 @@ __all__ = [
     "get_model_client",
     "EndpointConfig",
     "LoadBalancerConfig",
+    "set_content_filter_log_path",
 ]

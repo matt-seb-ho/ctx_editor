@@ -1,7 +1,11 @@
 """OpenAI model client implementation."""
 
 import asyncio
+import json
+import logging
 import os
+from datetime import datetime
+from pathlib import Path
 from typing import Any, Optional, Union
 
 from openai import AsyncAzureOpenAI, AsyncOpenAI
@@ -10,6 +14,67 @@ from ..core.types import ModelResponse, ReasoningEffort
 from .base import BaseModelClient, format_messages
 from .endpoint_config import LoadBalancerConfig
 from .load_balancer import EndpointLoadBalancer
+
+# Module-level path for logging content filter errors. Set via
+# set_content_filter_log_path() before running an experiment.
+_content_filter_log_path: Optional[Path] = None
+_cf_logger = logging.getLogger("ctx_editor.content_filter")
+
+
+def set_content_filter_log_path(path: Union[str, Path]) -> None:
+    """Configure where content filter errors are written (JSONL)."""
+    global _content_filter_log_path
+    _content_filter_log_path = Path(path)
+    _content_filter_log_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+def _log_content_filter_error(messages: list[dict], error: Exception, model: str) -> None:
+    """Append a content filter incident to the JSONL log file and emit a warning."""
+    entry = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "model": model,
+        "error_type": type(error).__name__,
+        "error_message": str(error),
+        "request_messages": messages,
+    }
+    # Try to extract Azure's content_filter_result detail if present
+    if hasattr(error, "body") and isinstance(error.body, dict):
+        entry["error_body"] = error.body
+
+    _cf_logger.warning(
+        f"Azure content filter triggered on model={model}. "
+        f"Messages count={len(messages)}. See content_filter_errors.jsonl for full request."
+    )
+
+    if _content_filter_log_path is not None:
+        with open(_content_filter_log_path, "a") as f:
+            f.write(json.dumps(entry) + "\n")
+    else:
+        # Fallback: log at WARNING with truncated messages so it's not lost
+        _cf_logger.warning(f"Content filter request (no log file configured): {entry}")
+
+
+def _is_content_filter_error(e: Exception) -> bool:
+    """Return True if the exception is an Azure content filter rejection."""
+    try:
+        from openai import BadRequestError
+
+        if isinstance(e, BadRequestError):
+            # SDK exposes error.code as a direct property (most reliable)
+            if getattr(e, "code", None) == "content_filter":
+                return True
+            # Fallback: body is {"error": {"code": ..., "innererror": ...}}
+            body = getattr(e, "body", None) or {}
+            error = body.get("error", {}) or {}
+            code = error.get("code", "") or ""
+            if "content_filter" in code.lower():
+                return True
+            inner = error.get("innererror", {}) or {}
+            if "content_filter" in str(inner).lower():
+                return True
+    except ImportError:
+        pass
+    return False
 
 
 class OpenAIModelClient(BaseModelClient):
@@ -123,6 +188,9 @@ class OpenAIModelClient(BaseModelClient):
                 try:
                     return await client.chat.completions.create(**kw)
                 except Exception as e:
+                    if _is_content_filter_error(e):
+                        _log_content_filter_error(kw.get("messages", []), e, kw.get("model", "unknown"))
+                        raise
                     last_error = e
                     if attempt < max_retries - 1:
                         await asyncio.sleep(2**attempt)
@@ -140,6 +208,9 @@ class OpenAIModelClient(BaseModelClient):
             try:
                 return await self.client.chat.completions.create(**kwargs)
             except Exception as e:
+                if _is_content_filter_error(e):
+                    _log_content_filter_error(kwargs.get("messages", []), e, kwargs.get("model", "unknown"))
+                    raise
                 last_error = e
                 if attempt < max_retries - 1:
                     await asyncio.sleep(2**attempt)
