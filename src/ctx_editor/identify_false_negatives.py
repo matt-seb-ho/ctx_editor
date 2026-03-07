@@ -423,7 +423,7 @@ async def _analyze_with_semaphore(
 
 async def run_analysis(
     run_dir: str,
-    model: str = "gpt-4o-mini",
+    model: str = "gpt-5.2",
     concurrency: int = 5,
     max_samples: Optional[int] = None,
     task_filter: Optional[str] = None,
@@ -631,8 +631,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="gpt-4o-mini",
-        help="Model to use for LLM checks (default: gpt-4o-mini)",
+        default="gpt-5.2",
+        help="Model to use for LLM checks (default: gpt-5.2)",
     )
     parser.add_argument(
         "--concurrency", "-c",
