@@ -153,6 +153,7 @@ class ConversationSimulator:
             sample=self.sample,
             model_client=self.model_client,
             temperature=user_cfg.temperature,
+            reasoning_effort=user_cfg.reasoning_effort,
         )
 
         self.trace.add_user_message(
@@ -211,9 +212,11 @@ class ConversationSimulator:
             print(f"\033[91m[assistant] {assistant_response.content}\033[0m")
 
         # 4. Verify the response
+        system_cfg = self.config.model_config.system
         verification = await self.system_agent.verify_response(
             trace=self.trace,
             model_client=self.model_client,
+            reasoning_effort=system_cfg.reasoning_effort,
         )
         # Track usage for system role
         if verification.model_response:
@@ -232,6 +235,7 @@ class ConversationSimulator:
             extraction = await self.system_agent.extract_answer(
                 trace=self.trace,
                 model_client=self.model_client,
+                reasoning_effort=system_cfg.reasoning_effort,
             )
             # Track usage for system role (extraction may have multiple attempts)
             for model_response in extraction.model_responses:

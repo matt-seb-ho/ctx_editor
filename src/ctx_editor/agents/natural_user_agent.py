@@ -5,8 +5,9 @@ naturally. Multi-turn behavior arises from the instruction to break up the probl
 across messages, not from artificial length limits.
 """
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
+from ..core.types import ReasoningEffort
 from ..paths import PROMPTS_DIR
 from .user_agent import UserResponse
 
@@ -63,6 +64,7 @@ class NaturalUserAgent:
         sample: dict[str, Any],
         model_client: "ModelClient",
         temperature: float = 1.0,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> UserResponse:
         """Generate the next user response."""
         self.turns_used += 1
@@ -101,6 +103,7 @@ class NaturalUserAgent:
             messages=[{"role": "user", "content": prompt}],
             model=self.model,
             temperature=temperature,
+            reasoning_effort=reasoning_effort,
         )
 
         return UserResponse(

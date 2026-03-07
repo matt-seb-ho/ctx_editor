@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
-from ..core.types import ModelResponse
+from ..core.types import ModelResponse, ReasoningEffort
 from ..paths import PROMPTS_DIR
 from ..utils.helpers import load_prompt
 
@@ -62,6 +62,7 @@ class UserAgent:
         sample: dict[str, Any],
         model_client: "ModelClient",
         temperature: float = 1.0,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> UserResponse:
         """Generate the next user response.
 
@@ -120,6 +121,7 @@ class UserAgent:
             messages=[{"role": "user", "content": prompt}],
             model=self.model,
             temperature=temperature,
+            reasoning_effort=reasoning_effort,
         )
 
         result = response.content

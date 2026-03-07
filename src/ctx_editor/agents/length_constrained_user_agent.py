@@ -1,7 +1,8 @@
 """Length-constrained natural user agent with per-turn and total token budgets."""
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
+from ..core.types import ReasoningEffort
 from ..paths import PROMPTS_DIR
 from .user_agent import UserResponse
 
@@ -62,6 +63,7 @@ class LengthConstrainedUserAgent:
         sample: dict[str, Any],
         model_client: "ModelClient",
         temperature: float = 1.0,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> UserResponse:
         """Generate the next user response."""
         tokens_remaining = self.total_token_budget - self.tokens_used
@@ -112,6 +114,7 @@ class LengthConstrainedUserAgent:
             model=self.model,
             temperature=temperature,
             max_tokens=max_tokens,
+            reasoning_effort=reasoning_effort,
         )
 
         # Track actual usage against total budget

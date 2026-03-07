@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Optional
 
-from ..core.types import ModelResponse, VerificationResult
+from ..core.types import ModelResponse, ReasoningEffort, VerificationResult
 from ..paths import PROMPTS_DIR
 from ..utils.helpers import load_prompt
 
@@ -91,6 +91,7 @@ class SystemAgent:
         self,
         trace: "ConversationTrace",
         model_client: "ModelClient",
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> VerificationResult:
         """Verify the assistant's last response and categorize it.
 
@@ -124,6 +125,7 @@ class SystemAgent:
             messages=[{"role": "user", "content": prompt}],
             model=self.system_model,
             temperature=0.0,
+            reasoning_effort=reasoning_effort,
         )
 
         result = response.content
@@ -138,6 +140,7 @@ class SystemAgent:
         self,
         trace: "ConversationTrace",
         model_client: "ModelClient",
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> ExtractionResult:
         """Extract the final answer from the assistant's response.
 
@@ -182,6 +185,7 @@ class SystemAgent:
                 messages=[{"role": "user", "content": prompt}],
                 model=self.system_model,
                 temperature=0.0,
+                reasoning_effort=reasoning_effort,
             )
             total_cost += response.total_usd
             model_responses.append(response)

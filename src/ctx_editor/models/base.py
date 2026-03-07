@@ -87,6 +87,7 @@ class ModelClient(Protocol):
         max_tokens: Optional[int] = None,
         timeout: int = 30,
         variables: Optional[dict[str, str]] = None,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> ModelResponse:
         """Generate a JSON response from the model.
 
@@ -97,6 +98,7 @@ class ModelClient(Protocol):
             max_tokens: Maximum tokens to generate.
             timeout: Request timeout in seconds.
             variables: Optional variables to substitute in the prompt.
+            reasoning_effort: Reasoning effort level for reasoning models (OpenAI only).
 
         Returns:
             ModelResponse with parsed JSON content.
@@ -129,6 +131,7 @@ class BaseModelClient(ABC):
         max_tokens: Optional[int] = None,
         timeout: int = 30,
         variables: Optional[dict[str, str]] = None,
+        reasoning_effort: Optional[ReasoningEffort] = None,
     ) -> ModelResponse:
         """Generate a JSON response from the model."""
         response = await self.generate(
@@ -139,6 +142,7 @@ class BaseModelClient(ABC):
             timeout=timeout,
             variables=variables,
             is_json=True,
+            reasoning_effort=reasoning_effort,
         )
         # Parse JSON from content
         try:
