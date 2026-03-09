@@ -7,14 +7,25 @@ the Dynamic Cheatsheet approach (Suzgun et al 2025).
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 from ..utils.helpers import load_prompt
 from .base import MemoryModule, MemoryUpdater
+from .renderers import RENDERERS
 
 if TYPE_CHECKING:
     from ..core.types import SimulationResult
     from ..models.base import ModelClient
+
+# Directory containing built-in prompt templates
+_PROMPTS_DIR = Path(__file__).parent / "prompts"
+
+# Map target → prompt file
+_DEFAULT_PROMPT_FILES: dict[str, Path] = {
+    "assistant": _PROMPTS_DIR / "assistant_reflection.txt",
+    "context_editor": _PROMPTS_DIR / "context_editor_reflection.txt",
+    "edit_decision": _PROMPTS_DIR / "edit_decision_reflection.txt",
+}
 
 
 @dataclass
@@ -125,33 +136,7 @@ class CheatsheetMemory(MemoryModule):
         return f"CheatsheetMemory(v{self._version}, {len(self._content)} chars): {preview}"
 
 
-DEFAULT_REFLECTION_PROMPT = """\
-You are updating a cheatsheet based on a completed conversation trajectory.
-
-<current_cheatsheet>
-{current_cheatsheet}
-</current_cheatsheet>
-
-<trajectory>
-Task: {task_name}
-Sample ID: {sample_id}
-Outcome: {outcome} (score: {score})
-Number of turns: {num_turns}
-
-Conversation:
-{conversation}
-</trajectory>
-{grounding_info}
-Based on this trajectory, update the cheatsheet to capture any useful lessons learned. Consider:
-1. What patterns or strategies led to success or failure?
-2. What information was critical to preserve in context?
-3. What types of questions or clarifications were most helpful?
-4. Are there task-specific insights to remember?
-
-Provide an updated cheatsheet that would help in future similar problems. Keep it concise and actionable.
-Focus on generalizable insights rather than problem-specific details.
-
-Updated cheatsheet:"""
+VALID_TARGETS = frozenset({"assistant", "context_editor", "edit_decision"})
 
 
 class CheatsheetUpdater(MemoryUpdater):
@@ -163,6 +148,7 @@ class CheatsheetUpdater(MemoryUpdater):
 
     def __init__(
         self,
+        target: str = "assistant",
         reflection_prompt: Optional[str] = None,
         reflection_prompt_file: Optional[str] = None,
         model: str = "gpt-4o-mini",
@@ -174,8 +160,11 @@ class CheatsheetUpdater(MemoryUpdater):
         """Initialize the updater.
 
         Args:
-            reflection_prompt: Custom prompt for reflection.
-            reflection_prompt_file: Path to prompt file.
+            target: What component to improve — "assistant", "context_editor",
+                or "edit_decision". Controls the reflection prompt and trajectory
+                rendering used during updates.
+            reflection_prompt: Custom prompt override (overrides target default).
+            reflection_prompt_file: Path to a prompt file (overrides target default).
             model: Model to use for reflection.
             update_on_success: Whether to update on successful outcomes.
             update_on_failure: Whether to update on failed outcomes.
@@ -184,12 +173,17 @@ class CheatsheetUpdater(MemoryUpdater):
             include_ground_truth_a: Whether to include the ground truth answer
                 in cheatsheet update prompts for grounding.
         """
+        if target not in VALID_TARGETS:
+            raise ValueError(f"Invalid target {target!r}. Must be one of {sorted(VALID_TARGETS)}")
+        self.target = target
+        self.renderer: Callable[["SimulationResult"], str] = RENDERERS[target]
+
         if reflection_prompt_file:
             self.reflection_prompt = load_prompt(reflection_prompt_file)
         elif reflection_prompt:
             self.reflection_prompt = reflection_prompt
         else:
-            self.reflection_prompt = DEFAULT_REFLECTION_PROMPT
+            self.reflection_prompt = _DEFAULT_PROMPT_FILES[target].read_text()
 
         self.model = model
         self.update_on_success = update_on_success
@@ -197,15 +191,9 @@ class CheatsheetUpdater(MemoryUpdater):
         self.include_full_spec_q = include_full_spec_q
         self.include_ground_truth_a = include_ground_truth_a
 
-    def _extract_conversation(self, trace: list[dict]) -> str:
-        """Extract conversation from trace for reflection."""
-        conversation_parts = []
-        for entry in trace:
-            role = entry.get("role", "")
-            if role in ["system", "user", "assistant"]:
-                content = entry.get("content", "")
-                conversation_parts.append(f"[{role}] {content}")
-        return "\n\n".join(conversation_parts)
+    def _render_trajectory(self, trajectory: "SimulationResult") -> str:
+        """Render trajectory conversation using the target-specific renderer."""
+        return self.renderer(trajectory)
 
     def _build_grounding_info(self, trajectory: "SimulationResult") -> str:
         """Build grounding information section for the prompt."""
@@ -217,7 +205,7 @@ class CheatsheetUpdater(MemoryUpdater):
 <full_specification>
 The fully-specified single-turn version of this problem:
 {metadata["full_spec_q"]}
-</full_specification>"")
+</full_specification>""")
 
         if self.include_ground_truth_a and "ground_truth_a" in metadata:
             parts.append(f"""
@@ -244,7 +232,7 @@ The ground truth answer:
             return memory
 
         # Build reflection prompt
-        conversation = self._extract_conversation(trajectory.trace)
+        conversation = self._render_trajectory(trajectory)
         outcome = "Success" if trajectory.is_correct else "Failure"
         grounding_info = self._build_grounding_info(trajectory)
 
@@ -301,7 +289,7 @@ The ground truth answer:
         # Build a combined reflection prompt
         trajectories_text = []
         for i, t in enumerate(filtered, 1):
-            conversation = self._extract_conversation(t.trace)
+            conversation = self._render_trajectory(t)
             outcome = "Success" if t.is_correct else "Failure"
             grounding_info = self._build_grounding_info(t)
             trajectories_text.append(f"""
@@ -314,22 +302,18 @@ Turns: {t.num_turns}
 {conversation}
 {grounding_info}""")
 
-        batch_prompt = f"""You are updating a cheatsheet based on multiple completed conversation trajectories.
-
-<current_cheatsheet>
-{memory.content if memory.content else "(empty)"}
-</current_cheatsheet>
-
-<trajectories>
-{"".join(trajectories_text)}
-</trajectories>
-
-Synthesize insights from all trajectories to update the cheatsheet. Look for:
-1. Common patterns across successful/failed attempts
-2. Critical information that needed to be preserved
-3. Effective strategies and pitfalls to avoid
-
-Provide an updated, concise cheatsheet:"""
+        current = memory.content if memory.content else "(empty)"
+        all_trajectories = "".join(trajectories_text)
+        batch_prompt = (
+            f"You are updating a cheatsheet based on multiple completed conversation trajectories.\n\n"
+            f"<current_cheatsheet>\n{current}\n</current_cheatsheet>\n\n"
+            f"<trajectories>\n{all_trajectories}\n</trajectories>\n\n"
+            "Synthesize insights from all trajectories to update the cheatsheet. Look for:\n"
+            "1. Common patterns across successful/failed attempts\n"
+            "2. Critical information that needed to be preserved\n"
+            "3. Effective strategies and pitfalls to avoid\n\n"
+            "Provide an updated, concise cheatsheet:"
+        )
 
         response = await model_client.generate(
             messages=[{"role": "user", "content": batch_prompt}],

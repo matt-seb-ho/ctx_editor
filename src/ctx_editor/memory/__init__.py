@@ -7,11 +7,13 @@ alternative memory implementations (e.g., retrieval-augmented, structured).
 """
 
 from .base import MemoryModule, MemoryUpdater
-from .cheatsheet import CheatsheetMemory, CheatsheetUpdater
+from .cheatsheet import CheatsheetUpdater, CheatsheetMemory
+from .renderers import RENDERERS
 
 __all__ = [
     "MemoryModule",
     "MemoryUpdater",
     "CheatsheetMemory",
     "CheatsheetUpdater",
+    "RENDERERS",
 ]

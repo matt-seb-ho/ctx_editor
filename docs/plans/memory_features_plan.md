@@ -22,7 +22,7 @@ The memory system has been refactored from `cheatsheet/` to `memory/` with clean
 
 ---
 
-## Change 1: Target-Aware Memory Updates
+## Change 1: Target-Aware Memory Updates ✅ COMPLETE
 
 ### 1.1 Multiple update targets with different source trajectories
 
@@ -253,6 +253,19 @@ ctx-learn-memory \
   --target context_editor \
   --output memories/editor_v1.json
 ```
+
+---
+
+## Progress Notes
+
+### Change 1 — completed
+- `memory/prompts/assistant_reflection.txt` — target-specific prompt
+- `memory/prompts/context_editor_reflection.txt` — target-specific prompt
+- `memory/prompts/edit_decision_reflection.txt` — target-specific prompt
+- `memory/renderers.py` — `render_for_assistant`, `render_for_context_editor`, `render_for_edit_decision`, `RENDERERS` registry
+- `memory/cheatsheet.py` — `CheatsheetUpdater` now accepts `target` param (default `"assistant"`); loads prompt from `memory/prompts/` by default; uses target-specific renderer in `_render_trajectory`; fixed pre-existing f-string syntax bug in `batch_update`
+- `memory/.__init__.py` — exports `RENDERERS`
+- Section 1.4 (CombinedMemoryUpdater) deferred to Phase 4 per plan
 
 ---
 
