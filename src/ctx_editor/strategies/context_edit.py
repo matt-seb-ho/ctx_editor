@@ -7,8 +7,8 @@ from ..utils.helpers import load_prompt
 from .base import BaseStrategy
 
 if TYPE_CHECKING:
-    from ..cheatsheet.cheatsheet import Cheatsheet
     from ..core.trace import ConversationTrace
+    from ..memory.base import MemoryModule
     from ..models.base import ModelClient
 
 
@@ -31,16 +31,16 @@ IMPORTANT - Remove or correct these common sources of confusion:
 {conversation}
 </conversation>
 
-{cheatsheet_section}
+{memory_section}
 
 Provide a condensed context that the assistant can use to continue helping the user. Focus on information density and accuracy - include only what the assistant needs to know, and ensure nothing misleading remains.
 
 Condensed context:"""
 
-CHEATSHEET_SECTION_TEMPLATE = """\
+MEMORY_SECTION_TEMPLATE = """\
 <cheatsheet>
 Use this cheatsheet to help identify what information is most important to preserve:
-{cheatsheet_content}
+{memory_content}
 </cheatsheet>
 """
 
@@ -58,8 +58,8 @@ class ContextEditStrategy(BaseStrategy):
         editor_prompt: Optional[str] = None,
         editor_prompt_file: Optional[str] = None,
         editor_model: str = "gpt-4o-mini",
-        use_cheatsheet: bool = False,
-        cheatsheet_target: str = "context_editor",
+        use_memory: bool = False,
+        memory_target: str = "context_editor",
     ):
         """Initialize the context edit strategy.
 
@@ -67,8 +67,8 @@ class ContextEditStrategy(BaseStrategy):
             editor_prompt: Custom prompt for the context editor.
             editor_prompt_file: Path to prompt file (alternative to editor_prompt).
             editor_model: Model to use for context editing.
-            use_cheatsheet: Whether to include cheatsheet in editor input.
-            cheatsheet_target: Where cheatsheet is used ('context_editor' or 'assistant').
+            use_memory: Whether to include memory in editor input.
+            memory_target: Where memory is used ('context_editor' or 'assistant').
         """
         if editor_prompt_file:
             self.editor_prompt = load_prompt(editor_prompt_file)
@@ -78,19 +78,19 @@ class ContextEditStrategy(BaseStrategy):
             self.editor_prompt = DEFAULT_EDITOR_PROMPT
 
         self.editor_model = editor_model
-        self.use_cheatsheet = use_cheatsheet
-        self.cheatsheet_target = cheatsheet_target
+        self.use_memory = use_memory
+        self.memory_target = memory_target
 
     def _build_editor_input(
         self,
         trace: "ConversationTrace",
-        cheatsheet: Optional["Cheatsheet"],
+        memory: Optional["MemoryModule"],
     ) -> str:
         """Build the input for the context editor.
 
         Args:
             trace: The current conversation trace.
-            cheatsheet: Optional cheatsheet to include.
+            memory: Optional memory module to include.
 
         Returns:
             Formatted editor prompt.
@@ -98,18 +98,18 @@ class ContextEditStrategy(BaseStrategy):
         # Get conversation as string (include system message so editor understands the task)
         conversation_str = trace.get_conversation_string(skip_system=False)
 
-        # Build cheatsheet section if applicable
-        cheatsheet_section = ""
-        if self.use_cheatsheet and cheatsheet and cheatsheet.content:
-            if self.cheatsheet_target == "context_editor":
-                cheatsheet_section = CHEATSHEET_SECTION_TEMPLATE.format(
-                    cheatsheet_content=cheatsheet.content
+        # Build memory section if applicable
+        memory_section = ""
+        if self.use_memory and memory and memory.content:
+            if self.memory_target == "context_editor":
+                memory_section = MEMORY_SECTION_TEMPLATE.format(
+                    memory_content=memory.content
                 )
 
         # Format the editor prompt
         prompt = self.editor_prompt.format(
             conversation=conversation_str,
-            cheatsheet_section=cheatsheet_section,
+            memory_section=memory_section,
         )
 
         return prompt
@@ -117,7 +117,7 @@ class ContextEditStrategy(BaseStrategy):
     async def prepare_context(
         self,
         trace: "ConversationTrace",
-        cheatsheet: Optional["Cheatsheet"],
+        memory: Optional["MemoryModule"],
         model_client: "ModelClient",
     ) -> list[Message]:
         """Generate edited context for the assistant (mutates trace).
@@ -129,15 +129,15 @@ class ContextEditStrategy(BaseStrategy):
 
         Args:
             trace: The current conversation trace (will be mutated).
-            cheatsheet: Optional cheatsheet for guidance.
+            memory: Optional memory module for guidance.
             model_client: Model client for generating the edit.
 
         Returns:
             Active messages from the trace after reset.
         """
-        # Inject cheatsheet to assistant (via system message) if configured
-        if self.use_cheatsheet and cheatsheet and self.cheatsheet_target == "assistant":
-            self._inject_cheatsheet_to_trace(trace, cheatsheet, target="system")
+        # Inject memory to assistant (via system message) if configured
+        if self.use_memory and memory and self.memory_target == "assistant":
+            self._inject_memory_to_trace(trace, memory, target="system")
 
         # If this is the first turn (only system + user), no editing needed
         if trace.num_assistant_turns == 0:
@@ -146,7 +146,7 @@ class ContextEditStrategy(BaseStrategy):
         # Build editor input (uses active conversation only)
         editor_input = self._build_editor_input(
             trace,
-            cheatsheet if self.use_cheatsheet else None,
+            memory if self.use_memory else None,
         )
 
         # Generate edited context
@@ -169,7 +169,7 @@ class ContextEditStrategy(BaseStrategy):
         )
 
         # Build the new context:
-        # 1. Original system message (with cheatsheet if already injected)
+        # 1. Original system message (with memory if already injected)
         # 2. Edited context as a "prior context" assistant message
         # 3. Last user message
         new_messages = []

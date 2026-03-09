@@ -4,9 +4,9 @@ import asyncio
 import traceback
 from typing import Any, Callable, Iterator, Optional
 
-from ..cheatsheet.cheatsheet import Cheatsheet
-from ..cheatsheet.updater import CheatsheetUpdater
 from ..core.types import SimulationResult
+from ..memory.base import MemoryModule, MemoryUpdater
+from ..memory.cheatsheet import CheatsheetMemory, CheatsheetUpdater
 from ..models.base import ModelClient
 from ..utils.logging import get_logger
 from .parallel import ParallelRunner
@@ -16,9 +16,9 @@ from .runner import ExperimentRunner
 class BatchedRunner(ExperimentRunner):
     """Run problems in batches for continual learning.
 
-    This runner processes problems in batches, updating the cheatsheet
+    This runner processes problems in batches, updating the memory module
     after each batch. Within a batch, problems run in parallel with
-    a frozen cheatsheet.
+    a frozen memory snapshot.
     """
 
     def __init__(
@@ -26,8 +26,8 @@ class BatchedRunner(ExperimentRunner):
         batch_size: int = 5,
         max_concurrent: int = 10,
         model_client: Optional[ModelClient] = None,
-        updater: Optional[CheatsheetUpdater] = None,
-        save_cheatsheet_path: Optional[str] = None,
+        updater: Optional[MemoryUpdater] = None,
+        save_memory_path: Optional[str] = None,
         progress_callback: Optional[Callable[[int, int], None]] = None,
         on_result: Optional[Callable[[SimulationResult], None]] = None,
     ):
@@ -36,9 +36,9 @@ class BatchedRunner(ExperimentRunner):
         Args:
             batch_size: Number of problems per batch.
             max_concurrent: Max concurrent problems within a batch.
-            model_client: Model client for cheatsheet updates.
-            updater: CheatsheetUpdater instance.
-            save_cheatsheet_path: Path to save cheatsheet after each batch.
+            model_client: Model client for memory updates.
+            updater: MemoryUpdater instance.
+            save_memory_path: Path to save memory after each batch.
             progress_callback: Optional callback(completed, total) for progress updates.
             on_result: Optional callback(result) called after each result completes.
         """
@@ -46,7 +46,7 @@ class BatchedRunner(ExperimentRunner):
         self.max_concurrent = max_concurrent
         self.model_client = model_client
         self.updater = updater or CheatsheetUpdater()
-        self.save_cheatsheet_path = save_cheatsheet_path
+        self.save_memory_path = save_memory_path
         self.progress_callback = progress_callback
         self.on_result = on_result
         self.logger = get_logger("batched_runner")
@@ -76,20 +76,20 @@ class BatchedRunner(ExperimentRunner):
         self,
         problems: list[dict[str, Any]],
         simulator_factory: Callable,
-        cheatsheet: Optional[Cheatsheet] = None,
+        memory: Optional[MemoryModule] = None,
     ) -> list[SimulationResult]:
-        """Run problems in batches with cheatsheet updates.
+        """Run problems in batches with memory updates.
 
         Args:
             problems: List of problem samples.
             simulator_factory: Factory that creates simulator for a problem.
-            cheatsheet: Cheatsheet to update (will be modified in place).
+            memory: Memory module to update (will be modified in place).
 
         Returns:
             List of all results.
         """
-        if cheatsheet is None:
-            cheatsheet = Cheatsheet()
+        if memory is None:
+            memory = CheatsheetMemory()
 
         all_results = []
         batches = list(self._batches(problems, self.batch_size))
@@ -102,31 +102,31 @@ class BatchedRunner(ExperimentRunner):
 
         for batch_num, batch in enumerate(batches, 1):
             self.logger.info(
-                f"Starting batch {batch_num}/{total_batches} " f"(cheatsheet v{cheatsheet.version})"
+                f"Starting batch {batch_num}/{total_batches} (memory v{memory.version})"
             )
 
-            # Run batch with current cheatsheet (frozen for this batch)
+            # Run batch with current memory (frozen for this batch)
             batch_results = await self.parallel_runner.run(
                 problems=batch,
                 simulator_factory=simulator_factory,
-                cheatsheet=cheatsheet,
+                memory=memory,
             )
             all_results.extend(batch_results)
 
-            # Update cheatsheet from batch results
+            # Update memory from batch results
             if self.model_client:
-                cheatsheet = await self.updater.batch_update(
-                    cheatsheet=cheatsheet,
+                memory = await self.updater.batch_update(
+                    memory=memory,
                     trajectories=batch_results,
                     model_client=self.model_client,
                 )
-                self.logger.info(f"Updated cheatsheet to v{cheatsheet.version}")
+                self.logger.info(f"Updated memory to v{memory.version}")
 
             # Save checkpoint
-            if self.save_cheatsheet_path:
-                checkpoint_path = f"{self.save_cheatsheet_path}.batch{batch_num}"
-                cheatsheet.save(checkpoint_path)
-                self.logger.info(f"Saved cheatsheet checkpoint: {checkpoint_path}")
+            if self.save_memory_path:
+                checkpoint_path = f"{self.save_memory_path}.batch{batch_num}"
+                memory.save(checkpoint_path)
+                self.logger.info(f"Saved memory checkpoint: {checkpoint_path}")
 
             # Progress callback
             if self.progress_callback:
@@ -140,10 +140,10 @@ class BatchedRunner(ExperimentRunner):
                 f"correct={sum(1 for r in batch_results if r.is_correct)}/{len(batch_results)}"
             )
 
-        # Save final cheatsheet
-        if self.save_cheatsheet_path:
-            cheatsheet.save(self.save_cheatsheet_path)
-            self.logger.info(f"Saved final cheatsheet: {self.save_cheatsheet_path}")
+        # Save final memory
+        if self.save_memory_path:
+            memory.save(self.save_memory_path)
+            self.logger.info(f"Saved final memory: {self.save_memory_path}")
 
         return all_results
 
@@ -151,33 +151,33 @@ class BatchedRunner(ExperimentRunner):
         self,
         problems: list[dict[str, Any]],
         simulator_factory: Callable,
-        cheatsheet: Optional[Cheatsheet] = None,
+        memory: Optional[MemoryModule] = None,
     ) -> list[SimulationResult]:
-        """Run problems sequentially, updating cheatsheet after each.
+        """Run problems sequentially, updating memory after each.
 
         This is useful for maximum learning but is slower.
 
         Args:
             problems: List of problem samples.
             simulator_factory: Factory that creates simulator.
-            cheatsheet: Cheatsheet to update.
+            memory: Memory module to update.
 
         Returns:
             List of all results.
         """
-        if cheatsheet is None:
-            cheatsheet = Cheatsheet()
+        if memory is None:
+            memory = CheatsheetMemory()
 
         results = []
 
         for i, problem in enumerate(problems, 1):
             self.logger.info(
                 f"Running problem {i}/{len(problems)}: {problem.get('task_id', 'unknown')} "
-                f"(cheatsheet v{cheatsheet.version})"
+                f"(memory v{memory.version})"
             )
 
             try:
-                simulator = simulator_factory(problem, cheatsheet=cheatsheet.clone())
+                simulator = simulator_factory(problem, memory=memory.clone())
                 result = await simulator.run()
                 results.append(result)
 
@@ -187,10 +187,10 @@ class BatchedRunner(ExperimentRunner):
                 if self.progress_callback:
                     self.progress_callback(len(results), len(problems))
 
-                # Update cheatsheet after each problem
+                # Update memory after each problem
                 if self.model_client:
-                    cheatsheet = await self.updater.update_from_trajectory(
-                        cheatsheet=cheatsheet,
+                    memory = await self.updater.update_from_trajectory(
+                        memory=memory,
                         trajectory=result,
                         model_client=self.model_client,
                     )

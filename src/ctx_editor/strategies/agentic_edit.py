@@ -7,11 +7,11 @@ from typing import TYPE_CHECKING, Optional
 from ..core.types import Message
 from .base import BaseStrategy
 from .baseline import BaselineStrategy
-from .context_edit import ContextEditStrategy, DEFAULT_EDITOR_PROMPT, CHEATSHEET_SECTION_TEMPLATE
+from .context_edit import ContextEditStrategy, DEFAULT_EDITOR_PROMPT, MEMORY_SECTION_TEMPLATE
 
 if TYPE_CHECKING:
-    from ..cheatsheet.cheatsheet import Cheatsheet
     from ..core.trace import ConversationTrace
+    from ..memory.base import MemoryModule
     from ..models.base import ModelClient
 
 
@@ -73,8 +73,8 @@ class AgenticEditStrategy(BaseStrategy):
         decision_model: str = "gpt-4o-mini",
         editor_model: str = "gpt-4o-mini",
         edit_threshold_turns: int = 3,
-        use_cheatsheet: bool = False,
-        cheatsheet_target: str = "context_editor",
+        use_memory: bool = False,
+        memory_target: str = "context_editor",
     ):
         """Initialize the agentic edit strategy.
 
@@ -83,8 +83,8 @@ class AgenticEditStrategy(BaseStrategy):
             decision_model: Model to use for deciding whether to edit.
             editor_model: Model to use for context editing.
             edit_threshold_turns: Minimum turns before considering editing.
-            use_cheatsheet: Whether to use cheatsheet.
-            cheatsheet_target: Where cheatsheet is used.
+            use_memory: Whether to use memory.
+            memory_target: Where memory is used.
         """
         self.decision_prompt = decision_prompt or DECISION_PROMPT
         self.decision_model = decision_model
@@ -92,13 +92,13 @@ class AgenticEditStrategy(BaseStrategy):
 
         # Create the underlying strategies
         self.baseline_strategy = BaselineStrategy(
-            use_cheatsheet=use_cheatsheet,
-            cheatsheet_target="system" if cheatsheet_target == "assistant" else "system",
+            use_memory=use_memory,
+            memory_target="system" if memory_target == "assistant" else "system",
         )
         self.edit_strategy = ContextEditStrategy(
             editor_model=editor_model,
-            use_cheatsheet=use_cheatsheet,
-            cheatsheet_target=cheatsheet_target,
+            use_memory=use_memory,
+            memory_target=memory_target,
         )
 
     async def _should_edit(
@@ -147,7 +147,7 @@ class AgenticEditStrategy(BaseStrategy):
     def _build_editor_input_with_analysis(
         self,
         trace: "ConversationTrace",
-        cheatsheet: Optional["Cheatsheet"],
+        memory: Optional["MemoryModule"],
         decision_notes: str,
     ) -> str:
         """Build the editor prompt with injected decision analysis.
@@ -157,7 +157,7 @@ class AgenticEditStrategy(BaseStrategy):
 
         Args:
             trace: The current conversation trace.
-            cheatsheet: Optional cheatsheet to include.
+            memory: Optional memory module to include.
             decision_notes: Analysis notes from the decision step.
 
         Returns:
@@ -165,16 +165,16 @@ class AgenticEditStrategy(BaseStrategy):
         """
         conversation_str = trace.get_conversation_string(skip_system=False)
 
-        cheatsheet_section = ""
-        if self.edit_strategy.use_cheatsheet and cheatsheet and cheatsheet.content:
-            if self.edit_strategy.cheatsheet_target == "context_editor":
-                cheatsheet_section = CHEATSHEET_SECTION_TEMPLATE.format(
-                    cheatsheet_content=cheatsheet.content
+        memory_section = ""
+        if self.edit_strategy.use_memory and memory and memory.content:
+            if self.edit_strategy.memory_target == "context_editor":
+                memory_section = MEMORY_SECTION_TEMPLATE.format(
+                    memory_content=memory.content
                 )
 
         base_prompt = self.edit_strategy.editor_prompt.format(
             conversation=conversation_str,
-            cheatsheet_section=cheatsheet_section,
+            memory_section=memory_section,
         )
 
         # Inject decision analysis before the final instruction
@@ -198,7 +198,7 @@ Condensed context:"""
     async def _perform_edit_with_analysis(
         self,
         trace: "ConversationTrace",
-        cheatsheet: Optional["Cheatsheet"],
+        memory: Optional["MemoryModule"],
         model_client: "ModelClient",
         decision_notes: str,
     ) -> list[Message]:
@@ -209,17 +209,17 @@ Condensed context:"""
 
         Args:
             trace: The current conversation trace (will be mutated).
-            cheatsheet: Optional cheatsheet for guidance.
+            memory: Optional memory module for guidance.
             model_client: Model client for generating the edit.
             decision_notes: Analysis notes from the decision step.
 
         Returns:
             Active messages from the trace after reset.
         """
-        # Inject cheatsheet to assistant (via system message) if configured
-        if self.edit_strategy.use_cheatsheet and cheatsheet:
-            if self.edit_strategy.cheatsheet_target == "assistant":
-                self._inject_cheatsheet_to_trace(trace, cheatsheet, target="system")
+        # Inject memory to assistant (via system message) if configured
+        if self.edit_strategy.use_memory and memory:
+            if self.edit_strategy.memory_target == "assistant":
+                self._inject_memory_to_trace(trace, memory, target="system")
 
         # If this is the first turn, no editing needed
         if trace.num_assistant_turns == 0:
@@ -227,7 +227,7 @@ Condensed context:"""
 
         # Build editor input with decision analysis injected
         editor_input = self._build_editor_input_with_analysis(
-            trace, cheatsheet, decision_notes
+            trace, memory, decision_notes
         )
 
         # Generate edited context
@@ -275,7 +275,7 @@ Condensed context:"""
     async def prepare_context(
         self,
         trace: "ConversationTrace",
-        cheatsheet: Optional["Cheatsheet"],
+        memory: Optional["MemoryModule"],
         model_client: "ModelClient",
     ) -> list[Message]:
         """Prepare context, deciding whether to edit first (mutates trace).
@@ -286,7 +286,7 @@ Condensed context:"""
 
         Args:
             trace: The current conversation trace (will be mutated).
-            cheatsheet: Optional cheatsheet.
+            memory: Optional memory module.
             model_client: Model client for decisions and editing.
 
         Returns:
@@ -306,7 +306,7 @@ Condensed context:"""
 
         if decision.should_edit:
             return await self._perform_edit_with_analysis(
-                trace, cheatsheet, model_client, decision.notes
+                trace, memory, model_client, decision.notes
             )
         else:
-            return await self.baseline_strategy.prepare_context(trace, cheatsheet, model_client)
+            return await self.baseline_strategy.prepare_context(trace, memory, model_client)

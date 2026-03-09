@@ -4,14 +4,14 @@ import asyncio
 import traceback
 from typing import Any, Callable, Optional
 
-from ..cheatsheet.cheatsheet import Cheatsheet
 from ..core.types import SimulationResult
+from ..memory.base import MemoryModule
 from ..utils.logging import get_logger
 from .runner import ExperimentRunner
 
 
 class ParallelRunner(ExperimentRunner):
-    """Run problems in parallel with a frozen cheatsheet.
+    """Run problems in parallel with a frozen memory module.
 
     This runner executes multiple simulations concurrently using asyncio,
     with a semaphore to limit the maximum number of concurrent executions.
@@ -39,15 +39,15 @@ class ParallelRunner(ExperimentRunner):
         self,
         problems: list[dict[str, Any]],
         simulator_factory: Callable,
-        cheatsheet: Optional[Cheatsheet] = None,
+        memory: Optional[MemoryModule] = None,
     ) -> list[SimulationResult]:
         """Run all problems in parallel.
 
         Args:
             problems: List of problem samples.
             simulator_factory: Factory that creates simulator for a problem.
-                Signature: simulator_factory(problem, cheatsheet=None) -> ConversationSimulator
-            cheatsheet: Optional frozen cheatsheet (same for all problems).
+                Signature: simulator_factory(problem, memory=None) -> ConversationSimulator
+            memory: Optional frozen memory module (same for all problems).
 
         Returns:
             List of results in the same order as problems.
@@ -62,11 +62,11 @@ class ParallelRunner(ExperimentRunner):
 
             async with semaphore:
                 try:
-                    # Clone cheatsheet if provided to avoid any shared state issues
-                    cs = cheatsheet.clone() if cheatsheet else None
+                    # Clone memory if provided to avoid any shared state issues
+                    mem = memory.clone() if memory else None
 
                     # Create and run simulator
-                    simulator = simulator_factory(problem, cheatsheet=cs)
+                    simulator = simulator_factory(problem, memory=mem)
                     result = await simulator.run()
 
                     completed += 1

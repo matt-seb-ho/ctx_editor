@@ -7,8 +7,8 @@ from ..utils.helpers import load_prompt
 from .base import BaseStrategy
 
 if TYPE_CHECKING:
-    from ..cheatsheet.cheatsheet import Cheatsheet
     from ..core.trace import ConversationTrace
+    from ..memory.base import MemoryModule
     from ..models.base import ModelClient
 
 
@@ -19,7 +19,7 @@ Analyze the conversation so far and provide a brief reflection that will help th
 {conversation}
 </conversation>
 
-{cheatsheet_section}
+{memory_section}
 
 Consider:
 1. What is the user's core goal or question?
@@ -41,10 +41,10 @@ REFLECTION_SYSTEM_ADDENDUM = """
 
 Note: User messages may contain a <conversation_state_reflection> section at the end. This is NOT part of the user's message - it is automatically injected context from an external system that analyzes conversation state. Use it as helpful context for your response, but do not reference or respond to it directly."""
 
-CHEATSHEET_SECTION_TEMPLATE = """\
+MEMORY_SECTION_TEMPLATE = """\
 <cheatsheet>
 Reference this cheatsheet when reflecting:
-{cheatsheet_content}
+{memory_content}
 </cheatsheet>
 """
 
@@ -68,7 +68,7 @@ class ReflectionStrategy(BaseStrategy):
         reflection_prompt: Optional[str] = None,
         reflection_prompt_file: Optional[str] = None,
         reflection_model: str = "gpt-4o-mini",
-        use_cheatsheet: bool = False,
+        use_memory: bool = False,
         min_turns_for_reflection: int = 2,
     ):
         """Initialize the reflection strategy.
@@ -77,7 +77,7 @@ class ReflectionStrategy(BaseStrategy):
             reflection_prompt: Custom prompt for generating reflections.
             reflection_prompt_file: Path to prompt file.
             reflection_model: Model to use for reflection generation.
-            use_cheatsheet: Whether to include cheatsheet in reflection prompt.
+            use_memory: Whether to include memory in reflection prompt.
             min_turns_for_reflection: Minimum user turns before adding reflection.
         """
         if reflection_prompt_file:
@@ -88,7 +88,7 @@ class ReflectionStrategy(BaseStrategy):
             self.reflection_prompt = DEFAULT_REFLECTION_PROMPT
 
         self.reflection_model = reflection_model
-        self.use_cheatsheet = use_cheatsheet
+        self.use_memory = use_memory
         self.min_turns_for_reflection = min_turns_for_reflection
 
     def _is_reflection_addendum_added(self, trace: "ConversationTrace") -> bool:
@@ -98,14 +98,14 @@ class ReflectionStrategy(BaseStrategy):
     async def _generate_reflection(
         self,
         trace: "ConversationTrace",
-        cheatsheet: Optional["Cheatsheet"],
+        memory: Optional["MemoryModule"],
         model_client: "ModelClient",
     ) -> str:
         """Generate a reflection on the conversation.
 
         Args:
             trace: The current conversation trace.
-            cheatsheet: Optional cheatsheet for guidance.
+            memory: Optional memory module for guidance.
             model_client: Model client for generation.
 
         Returns:
@@ -113,16 +113,16 @@ class ReflectionStrategy(BaseStrategy):
         """
         conversation_str = trace.get_conversation_string(skip_system=False)
 
-        # Build cheatsheet section
-        cheatsheet_section = ""
-        if self.use_cheatsheet and cheatsheet and cheatsheet.content:
-            cheatsheet_section = CHEATSHEET_SECTION_TEMPLATE.format(
-                cheatsheet_content=cheatsheet.content
+        # Build memory section
+        memory_section = ""
+        if self.use_memory and memory and memory.content:
+            memory_section = MEMORY_SECTION_TEMPLATE.format(
+                memory_content=memory.content
             )
 
         prompt = self.reflection_prompt.format(
             conversation=conversation_str,
-            cheatsheet_section=cheatsheet_section,
+            memory_section=memory_section,
         )
 
         response = await model_client.generate(
@@ -136,7 +136,7 @@ class ReflectionStrategy(BaseStrategy):
     async def prepare_context(
         self,
         trace: "ConversationTrace",
-        cheatsheet: Optional["Cheatsheet"],
+        memory: Optional["MemoryModule"],
         model_client: "ModelClient",
     ) -> list[Message]:
         """Prepare context with appended reflection (mutates trace).
@@ -149,7 +149,7 @@ class ReflectionStrategy(BaseStrategy):
 
         Args:
             trace: The current conversation trace (will be mutated).
-            cheatsheet: Optional cheatsheet.
+            memory: Optional memory module.
             model_client: Model client for reflection generation.
 
         Returns:
@@ -165,7 +165,7 @@ class ReflectionStrategy(BaseStrategy):
             trace.add_log("reflection_addendum_added", {})
 
         # Generate reflection
-        reflection = await self._generate_reflection(trace, cheatsheet, model_client)
+        reflection = await self._generate_reflection(trace, memory, model_client)
 
         # Log the reflection
         trace.add_log("reflection_generated", {"reflection": reflection})

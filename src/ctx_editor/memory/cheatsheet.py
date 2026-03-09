@@ -1,13 +1,128 @@
-"""Cheatsheet updater for post-simulation reflection."""
+"""Cheatsheet-based memory implementation.
 
-from typing import TYPE_CHECKING, Optional
+Concrete implementation of MemoryModule and MemoryUpdater following
+the Dynamic Cheatsheet approach (Suzgun et al 2025).
+"""
+
+import json
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..utils.helpers import load_prompt
-from .cheatsheet import Cheatsheet
+from .base import MemoryModule, MemoryUpdater
 
 if TYPE_CHECKING:
     from ..core.types import SimulationResult
     from ..models.base import ModelClient
+
+
+@dataclass
+class CheatsheetMemory(MemoryModule):
+    """A cheatsheet that accumulates learned knowledge across problems.
+
+    The cheatsheet can be used to provide guidance to either the context
+    editor or the assistant, helping them learn from previous experiences.
+    """
+
+    _content: str = ""
+    _version: int = 0
+    history: list[str] = field(default_factory=list)
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def content(self) -> str:
+        return self._content
+
+    @property
+    def version(self) -> int:
+        return self._version
+
+    def update(self, new_content: str) -> None:
+        """Update the cheatsheet with new content."""
+        if new_content != self._content:
+            self.history.append(self._content)
+            self._content = new_content
+            self._version += 1
+
+    def append(self, additional_content: str) -> None:
+        """Append additional content to the cheatsheet."""
+        self.history.append(self._content)
+        if self._content:
+            self._content = f"{self._content}\n\n{additional_content}"
+        else:
+            self._content = additional_content
+        self._version += 1
+
+    def rollback(self) -> bool:
+        """Rollback to the previous version.
+
+        Returns:
+            True if rollback was successful, False if no history.
+        """
+        if self.history:
+            self._content = self.history.pop()
+            self._version -= 1
+            return True
+        return False
+
+    def get_version(self, version: int) -> Optional[str]:
+        """Get a specific version of the cheatsheet.
+
+        Args:
+            version: The version number to retrieve.
+
+        Returns:
+            The cheatsheet content at that version, or None if not found.
+        """
+        if version == self._version:
+            return self._content
+        elif version < self._version and version >= 0:
+            history_idx = version
+            if history_idx < len(self.history):
+                return self.history[history_idx]
+        return None
+
+    def save(self, filepath: str) -> None:
+        """Save the cheatsheet to a file."""
+        path = Path(filepath)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        data = {
+            "content": self._content,
+            "version": self._version,
+            "history": self.history,
+            "metadata": self.metadata,
+        }
+
+        with open(path, "w") as f:
+            json.dump(data, f, indent=2)
+
+    @classmethod
+    def load(cls, filepath: str) -> "CheatsheetMemory":
+        """Load a cheatsheet from a file."""
+        with open(filepath, "r") as f:
+            data = json.load(f)
+
+        return cls(
+            _content=data.get("content", ""),
+            _version=data.get("version", 0),
+            history=data.get("history", []),
+            metadata=data.get("metadata", {}),
+        )
+
+    def clone(self) -> "CheatsheetMemory":
+        """Create a deep copy of the cheatsheet."""
+        return CheatsheetMemory(
+            _content=self._content,
+            _version=self._version,
+            history=list(self.history),
+            metadata=dict(self.metadata),
+        )
+
+    def __str__(self) -> str:
+        preview = self._content[:100] + "..." if len(self._content) > 100 else self._content
+        return f"CheatsheetMemory(v{self._version}, {len(self._content)} chars): {preview}"
 
 
 DEFAULT_REFLECTION_PROMPT = """\
@@ -39,7 +154,7 @@ Focus on generalizable insights rather than problem-specific details.
 Updated cheatsheet:"""
 
 
-class CheatsheetUpdater:
+class CheatsheetUpdater(MemoryUpdater):
     """Updates cheatsheet based on completed simulation trajectories.
 
     This implements the continual learning aspect where the cheatsheet
@@ -83,14 +198,7 @@ class CheatsheetUpdater:
         self.include_ground_truth_a = include_ground_truth_a
 
     def _extract_conversation(self, trace: list[dict]) -> str:
-        """Extract conversation from trace for reflection.
-
-        Args:
-            trace: The full trace.
-
-        Returns:
-            Formatted conversation string.
-        """
+        """Extract conversation from trace for reflection."""
         conversation_parts = []
         for entry in trace:
             role = entry.get("role", "")
@@ -100,17 +208,7 @@ class CheatsheetUpdater:
         return "\n\n".join(conversation_parts)
 
     def _build_grounding_info(self, trajectory: "SimulationResult") -> str:
-        """Build grounding information section for the prompt.
-
-        This includes the fully-specified question and/or ground truth answer
-        to help the model reflect on what the correct behavior should have been.
-
-        Args:
-            trajectory: The simulation result containing metadata.
-
-        Returns:
-            Formatted grounding info string, or empty string if nothing to include.
-        """
+        """Build grounding information section for the prompt."""
         parts = []
         metadata = trajectory.metadata or {}
 
@@ -134,25 +232,16 @@ The ground truth answer:
 
     async def update_from_trajectory(
         self,
-        cheatsheet: Cheatsheet,
+        memory: MemoryModule,
         trajectory: "SimulationResult",
         model_client: "ModelClient",
-    ) -> Cheatsheet:
-        """Update the cheatsheet based on a completed trajectory.
-
-        Args:
-            cheatsheet: The current cheatsheet.
-            trajectory: The completed simulation result.
-            model_client: Model client for reflection.
-
-        Returns:
-            Updated cheatsheet (the same object, modified in place).
-        """
+    ) -> MemoryModule:
+        """Update the memory based on a completed trajectory."""
         # Check if we should update based on outcome
         if trajectory.is_correct and not self.update_on_success:
-            return cheatsheet
+            return memory
         if not trajectory.is_correct and not self.update_on_failure:
-            return cheatsheet
+            return memory
 
         # Build reflection prompt
         conversation = self._extract_conversation(trajectory.trace)
@@ -160,7 +249,7 @@ The ground truth answer:
         grounding_info = self._build_grounding_info(trajectory)
 
         prompt = self.reflection_prompt.format(
-            current_cheatsheet=cheatsheet.content if cheatsheet.content else "(empty)",
+            current_cheatsheet=memory.content if memory.content else "(empty)",
             task_name=trajectory.task_name,
             sample_id=trajectory.sample_id,
             outcome=outcome,
@@ -174,43 +263,30 @@ The ground truth answer:
         response = await model_client.generate(
             messages=[{"role": "user", "content": prompt}],
             model=self.model,
-            temperature=0.3,  # Slightly creative but mostly consistent
+            temperature=0.3,
         )
 
         new_content = response.content.strip()
+        memory.update(new_content)
 
-        # Update the cheatsheet
-        cheatsheet.update(new_content)
+        # Add metadata about this update (only for CheatsheetMemory)
+        if isinstance(memory, CheatsheetMemory):
+            memory.metadata[f"update_{memory.version}"] = {
+                "sample_id": trajectory.sample_id,
+                "task_name": trajectory.task_name,
+                "outcome": outcome,
+                "score": trajectory.score,
+            }
 
-        # Add metadata about this update
-        cheatsheet.metadata[f"update_{cheatsheet.version}"] = {
-            "sample_id": trajectory.sample_id,
-            "task_name": trajectory.task_name,
-            "outcome": outcome,
-            "score": trajectory.score,
-        }
-
-        return cheatsheet
+        return memory
 
     async def batch_update(
         self,
-        cheatsheet: Cheatsheet,
+        memory: MemoryModule,
         trajectories: list["SimulationResult"],
         model_client: "ModelClient",
-    ) -> Cheatsheet:
-        """Update cheatsheet from multiple trajectories at once.
-
-        This can be more efficient for batch updates, synthesizing
-        insights from multiple problems.
-
-        Args:
-            cheatsheet: The current cheatsheet.
-            trajectories: List of completed simulation results.
-            model_client: Model client for reflection.
-
-        Returns:
-            Updated cheatsheet.
-        """
+    ) -> MemoryModule:
+        """Update memory from multiple trajectories at once."""
         # Filter trajectories based on update settings
         filtered = []
         for t in trajectories:
@@ -220,7 +296,7 @@ The ground truth answer:
                 filtered.append(t)
 
         if not filtered:
-            return cheatsheet
+            return memory
 
         # Build a combined reflection prompt
         trajectories_text = []
@@ -241,7 +317,7 @@ Turns: {t.num_turns}
         batch_prompt = f"""You are updating a cheatsheet based on multiple completed conversation trajectories.
 
 <current_cheatsheet>
-{cheatsheet.content if cheatsheet.content else "(empty)"}
+{memory.content if memory.content else "(empty)"}
 </current_cheatsheet>
 
 <trajectories>
@@ -261,12 +337,13 @@ Provide an updated, concise cheatsheet:"""
             temperature=0.3,
         )
 
-        cheatsheet.update(response.content.strip())
+        memory.update(response.content.strip())
 
-        # Record batch update metadata
-        cheatsheet.metadata[f"batch_update_{cheatsheet.version}"] = {
-            "num_trajectories": len(filtered),
-            "sample_ids": [t.sample_id for t in filtered],
-        }
+        # Record batch update metadata (only for CheatsheetMemory)
+        if isinstance(memory, CheatsheetMemory):
+            memory.metadata[f"batch_update_{memory.version}"] = {
+                "num_trajectories": len(filtered),
+                "sample_ids": [t.sample_id for t in filtered],
+            }
 
-        return cheatsheet
+        return memory

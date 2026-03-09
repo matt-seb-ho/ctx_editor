@@ -8,7 +8,7 @@ from .types import EvaluationResult, Message, SimulationResult, SimulatorConfig,
 if TYPE_CHECKING:
     from ..agents.system_agent import SystemAgent
     from ..agents.user_agent import UserAgent
-    from ..cheatsheet.cheatsheet import Cheatsheet
+    from ..memory.base import MemoryModule
     from ..models.base import ModelClient
     from ..strategies.base import ContextStrategy
 
@@ -28,7 +28,7 @@ class ConversationSimulator:
         system_agent: "SystemAgent",
         model_client: "ModelClient",
         strategy: "ContextStrategy",
-        cheatsheet: Optional["Cheatsheet"] = None,
+        memory: Optional["MemoryModule"] = None,
         config: Optional[SimulatorConfig] = None,
     ):
         """Initialize the simulator.
@@ -40,7 +40,7 @@ class ConversationSimulator:
             system_agent: Agent for verification and answer extraction.
             model_client: Client for model API calls.
             strategy: Strategy for context preparation.
-            cheatsheet: Optional cheatsheet for context augmentation.
+            memory: Optional memory module for context augmentation.
             config: Simulator configuration.
         """
         self.sample = sample
@@ -49,7 +49,7 @@ class ConversationSimulator:
         self.system_agent = system_agent
         self.model_client = model_client
         self.strategy = strategy
-        self.cheatsheet = cheatsheet
+        self.memory = memory
         self.config = config or SimulatorConfig()
 
         self.trace = ConversationTrace()
@@ -180,7 +180,7 @@ class ConversationSimulator:
         # 2. Apply context strategy to prepare context
         context_messages = await self.strategy.prepare_context(
             trace=self.trace,
-            cheatsheet=self.cheatsheet,
+            memory=self.memory,
             model_client=self.model_client,
         )
 

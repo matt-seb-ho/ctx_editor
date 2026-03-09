@@ -13,8 +13,8 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
 from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, SystemAgent, UserAgent
-from ctx_editor.cheatsheet import Cheatsheet, CheatsheetUpdater
 from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
+from ctx_editor.memory import CheatsheetMemory, CheatsheetUpdater, MemoryModule
 from ctx_editor.execution import BatchedRunner, ParallelRunner
 from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient, set_content_filter_log_path
 from ctx_editor.utils.ledger import add_run
@@ -127,40 +127,40 @@ def get_strategy(cfg: DictConfig):
     strategy_name = cfg.experiment.name
     if "baseline" in strategy_name:
         return BaselineStrategy(
-            use_cheatsheet=strategy_cfg.get("use_cheatsheet", False),
-            cheatsheet_target=strategy_cfg.get("cheatsheet_target", "system"),
+            use_memory=strategy_cfg.get("use_memory", False),
+            memory_target=strategy_cfg.get("memory_target", "system"),
         )
     elif "context_edit" in strategy_name:
         return ContextEditStrategy(
             editor_model=strategy_cfg.get("editor_model", "gpt-4o-mini"),
-            use_cheatsheet=strategy_cfg.get("use_cheatsheet", False),
-            cheatsheet_target=strategy_cfg.get("cheatsheet_target", "context_editor"),
+            use_memory=strategy_cfg.get("use_memory", False),
+            memory_target=strategy_cfg.get("memory_target", "context_editor"),
         )
     elif "agentic" in strategy_name:
         return AgenticEditStrategy(
             decision_model=strategy_cfg.get("decision_model", "gpt-4o-mini"),
             editor_model=strategy_cfg.get("editor_model", "gpt-4o-mini"),
-            use_cheatsheet=strategy_cfg.get("use_cheatsheet", False),
+            use_memory=strategy_cfg.get("use_memory", False),
         )
     elif "reflection" in strategy_name:
         return ReflectionStrategy(
             reflection_model=strategy_cfg.get("reflection_model", "gpt-4o-mini"),
-            use_cheatsheet=strategy_cfg.get("use_cheatsheet", False),
+            use_memory=strategy_cfg.get("use_memory", False),
         )
     else:
         return BaselineStrategy()
 
 
-def setup_cheatsheet(cfg: DictConfig) -> Optional[Cheatsheet]:
-    """Setup cheatsheet based on config."""
-    if not cfg.cheatsheet.enabled:
+def setup_memory(cfg: DictConfig) -> Optional[MemoryModule]:
+    """Setup memory module based on config."""
+    if not cfg.memory.enabled:
         return None
 
-    source = cfg.cheatsheet.source
+    source = cfg.memory.source
     if source and source != "continual" and Path(source).exists():
-        return Cheatsheet.load(source)
+        return CheatsheetMemory.load(source)
     else:
-        return Cheatsheet(content="")
+        return CheatsheetMemory(content="")
 
 
 async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
@@ -186,12 +186,12 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     samples = load_samples(cfg)
     model_client = get_model_client(cfg)
     strategy = get_strategy(cfg)
-    cheatsheet = setup_cheatsheet(cfg)
+    memory = setup_memory(cfg)
 
     logger.info(f"Loaded {len(samples)} samples for task config '{cfg.task.name}'")
 
     # Create simulator factory
-    def make_simulator(sample: dict, cheatsheet: Optional[Cheatsheet] = None):
+    def make_simulator(sample: dict, memory: Optional[MemoryModule] = None):
         # Build ModelConfig from hydra config
         model_cfg_dict = OmegaConf.to_container(cfg.model, resolve=True)
         model_config = ModelConfig.from_dict(model_cfg_dict)
@@ -235,7 +235,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             system_agent=SystemAgent(sample_task, sim_config.system_model, sample),
             model_client=model_client,
             strategy=strategy,
-            cheatsheet=cheatsheet,
+            memory=memory,
             config=sim_config,
         )
 
@@ -271,39 +271,39 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             assistant_model=cfg.model.assistant.model,
         )
 
-    # Create cheatsheet updater with grounding config
-    cheatsheet_updater = CheatsheetUpdater(
-        include_full_spec_q=cfg.cheatsheet.get("include_full_spec_q", False),
-        include_ground_truth_a=cfg.cheatsheet.get("include_ground_truth_a", False),
+    # Create memory updater with grounding config
+    memory_updater = CheatsheetUpdater(
+        include_full_spec_q=cfg.memory.get("include_full_spec_q", False),
+        include_ground_truth_a=cfg.memory.get("include_ground_truth_a", False),
     )
 
     if (
         execution_mode == "batched"
-        and cfg.cheatsheet.enabled
-        and cfg.cheatsheet.source == "continual"
+        and cfg.memory.enabled
+        and cfg.memory.source == "continual"
     ):
         # Batched execution with continual learning
         runner = BatchedRunner(
             batch_size=cfg.execution.batch_size,
             max_concurrent=cfg.execution.max_concurrent,
             model_client=model_client,
-            updater=cheatsheet_updater,
-            save_cheatsheet_path=cfg.cheatsheet.get("save_path"),
+            updater=memory_updater,
+            save_memory_path=cfg.memory.get("save_path"),
             progress_callback=update_progress,
             on_result=save_result_incrementally,
         )
-        results = await runner.run(samples, make_simulator, cheatsheet)
+        results = await runner.run(samples, make_simulator, memory)
     elif execution_mode == "sequential":
         # Sequential with continual learning
         runner = BatchedRunner(
             batch_size=1,
             max_concurrent=1,
             model_client=model_client,
-            updater=cheatsheet_updater,
+            updater=memory_updater,
             progress_callback=update_progress,
             on_result=save_result_incrementally,
         )
-        results = await runner.run_sequential(samples, make_simulator, cheatsheet)
+        results = await runner.run_sequential(samples, make_simulator, memory)
     else:
         # Parallel execution (default)
         runner = ParallelRunner(
@@ -311,7 +311,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             progress_callback=update_progress,
             on_result=save_result_incrementally,
         )
-        results = await runner.run(samples, make_simulator, cheatsheet)
+        results = await runner.run(samples, make_simulator, memory)
 
     pbar.close()
 
@@ -447,9 +447,9 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         },
     )
 
-    # Save final cheatsheet
-    if cheatsheet and cfg.cheatsheet.get("save_path"):
-        cheatsheet.save(cfg.cheatsheet.save_path)
+    # Save final memory
+    if memory and cfg.memory.get("save_path"):
+        memory.save(cfg.memory.save_path)
 
     logger.info(f"Results saved to {output_dir}")
 

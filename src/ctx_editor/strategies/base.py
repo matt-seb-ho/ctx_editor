@@ -4,11 +4,11 @@ from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
 from ..core.types import Message
 
-CHEATSHEET_BLOCK_TEMPLATE = "\n\n<cheatsheet>\n{cheatsheet_content}\n</cheatsheet>"
+MEMORY_BLOCK_TEMPLATE = "\n\n<cheatsheet>\n{memory_content}\n</cheatsheet>"
 
 if TYPE_CHECKING:
-    from ..cheatsheet.cheatsheet import Cheatsheet
     from ..core.trace import ConversationTrace
+    from ..memory.base import MemoryModule
     from ..models.base import ModelClient
 
 
@@ -28,7 +28,7 @@ class ContextStrategy(Protocol):
     async def prepare_context(
         self,
         trace: "ConversationTrace",
-        cheatsheet: Optional["Cheatsheet"],
+        memory: Optional["MemoryModule"],
         model_client: "ModelClient",
     ) -> list[Message]:
         """Prepare the context for the next assistant turn.
@@ -39,7 +39,7 @@ class ContextStrategy(Protocol):
 
         Args:
             trace: The current conversation trace (will be mutated).
-            cheatsheet: Optional cheatsheet for context augmentation.
+            memory: Optional memory module for context augmentation.
             model_client: Model client for generating edits/reflections.
 
         Returns:
@@ -51,45 +51,45 @@ class ContextStrategy(Protocol):
 class BaseStrategy:
     """Base class for strategies with common utilities."""
 
-    def _is_cheatsheet_injected(self, trace: "ConversationTrace") -> bool:
-        """Check if cheatsheet has already been injected into this trace."""
-        return any(log["type"] == "cheatsheet_injected" for log in trace.logs)
+    def _is_memory_injected(self, trace: "ConversationTrace") -> bool:
+        """Check if memory has already been injected into this trace."""
+        return any(log["type"] == "memory_injected" for log in trace.logs)
 
-    def _inject_cheatsheet_to_trace(
+    def _inject_memory_to_trace(
         self,
         trace: "ConversationTrace",
-        cheatsheet: "Cheatsheet",
+        memory: "MemoryModule",
         target: str = "system",
     ) -> bool:
-        """Inject cheatsheet content into the trace (mutates trace).
+        """Inject memory content into the trace (mutates trace).
 
         Only injects once - subsequent calls are no-ops.
 
         Args:
             trace: The conversation trace to mutate.
-            cheatsheet: Cheatsheet to inject.
+            memory: Memory module to inject.
             target: Where to inject ('system' or 'user').
 
         Returns:
-            True if cheatsheet was injected, False if skipped (already injected or empty).
+            True if memory was injected, False if skipped (already injected or empty).
         """
-        if not cheatsheet or not cheatsheet.content:
+        if not memory or not memory.content:
             return False
 
         # Only inject once per trace
-        if self._is_cheatsheet_injected(trace):
+        if self._is_memory_injected(trace):
             return False
 
-        cheatsheet_block = CHEATSHEET_BLOCK_TEMPLATE.format(cheatsheet_content=cheatsheet.content)
+        memory_block = MEMORY_BLOCK_TEMPLATE.format(memory_content=memory.content)
 
         if target == "system":
-            success = trace.append_to_system_message(cheatsheet_block)
+            success = trace.append_to_system_message(memory_block)
         elif target == "user":
-            success = trace.append_to_last_user_message(cheatsheet_block)
+            success = trace.append_to_last_user_message(memory_block)
         else:
             return False
 
         if success:
-            trace.add_log("cheatsheet_injected", {"target": target})
+            trace.add_log("memory_injected", {"target": target})
 
         return success
