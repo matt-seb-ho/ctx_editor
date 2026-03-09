@@ -24,9 +24,11 @@ Memory is a general mechanism. It can be targeted at different components:
 src/ctx_editor/memory/
   base.py         # MemoryModule, MemoryUpdater ABCs
   cheatsheet.py   # CheatsheetMemory, CheatsheetUpdater (concrete implementation)
+  renderers.py    # Target-specific trajectory rendering functions
   prompts/
-    reflection.txt    # Default prompt for per-trajectory reflection
-    context_editor.txt  # Prompt template for context editor use
+    assistant_reflection.txt       # Reflection prompt for assistant target
+    context_editor_reflection.txt  # Reflection prompt for context_editor target
+    edit_decision_reflection.txt   # Reflection prompt for edit_decision target
 ```
 
 ---
@@ -86,6 +88,7 @@ Reflects on completed trajectories and rewrites the memory with an LLM call.
 class CheatsheetUpdater(MemoryUpdater):
     def __init__(
         self,
+        target: str = "assistant",          # NEW: "assistant" | "context_editor" | "edit_decision"
         reflection_prompt: Optional[str] = None,
         reflection_prompt_file: Optional[str] = None,
         model: str = "gpt-4o-mini",
@@ -96,26 +99,49 @@ class CheatsheetUpdater(MemoryUpdater):
     )
 ```
 
-**Grounding options** — optional oracle context provided during reflection to help the model understand what the correct behavior should have been:
+### `target` parameter
+
+Controls two things automatically:
+1. **Which reflection prompt to use** — loaded from `memory/prompts/{target}_reflection.txt`
+2. **How the trajectory is rendered** — via `memory/renderers.py`
+
+| Target | Prompt focus | Rendering |
+|--------|-------------|-----------|
+| `assistant` | Response strategy, pitfalls, clarification patterns | Active messages only |
+| `context_editor` | What to preserve/remove, edit quality | All messages (visible + archived) with edit markers |
+| `edit_decision` | When to edit, false positives/negatives | Decision events + full active conversation |
+
+A custom `reflection_prompt` or `reflection_prompt_file` overrides the target default entirely.
+
+**Grounding options** — optional oracle context provided during reflection:
 - `include_full_spec_q`: inject the fully-specified single-turn question
 - `include_ground_truth_a`: inject the ground truth answer
 
 ### `update_from_trajectory(memory, trajectory, model_client)`
 
-The correct per-trajectory update path:
+Per-trajectory update:
 
 1. Skip if `update_on_success`/`update_on_failure` filters apply
-2. Format the reflection prompt with: current memory content, task name, sample ID, outcome, turn count, full conversation, optional grounding info
-3. Call the LLM (temperature 0.3)
-4. Call `memory.update(new_content)` with the response
-
-The default reflection prompt (`prompts/reflection.txt`) asks the model to consider: patterns/strategies, critical information to preserve, effective questions, task-specific insights, and what could have been safely compressed.
+2. Render trajectory via `self.renderer(trajectory)` (target-specific)
+3. Format the reflection prompt with: current memory content, task name, sample ID, outcome, turn count, rendered conversation, optional grounding info
+4. Call the LLM (temperature 0.3)
+5. Call `memory.update(new_content)` with the response
 
 ### `batch_update(memory, trajectories, model_client)`
 
-Synthesizes insights from multiple trajectories in a **single LLM call**. All trajectories are concatenated into one prompt. This is a rougher update used by `BatchedRunner` after each batch.
+Synthesizes insights from multiple trajectories in a **single LLM call**. All trajectories are concatenated into one prompt using the target-specific renderer. This is used by `BatchedRunner` after each batch.
 
-> **Note**: `batch_update` is the current default in `BatchedRunner` but is considered suboptimal. The planned replacement is sequential `update_from_trajectory` calls followed by a unification step.
+> **Note**: `batch_update` is the current default in `BatchedRunner` but is considered suboptimal. The planned replacement (Change 2 in `plans/memory_features_plan.md`) is a Reflect-then-Unify algorithm: parallel per-trajectory reflections → single unify call.
+
+## `renderers.py` — Trajectory Rendering
+
+Three rendering functions, registered in `RENDERERS: dict[str, Callable]`:
+
+- **`render_for_assistant`** — active messages only (role/content), omits edit internals
+- **`render_for_context_editor`** — all messages including archived ones, with `--- CONTEXT EDIT ---` markers at reset boundaries showing the editor's condensed output
+- **`render_for_edit_decision`** — lists each `edit_decision` log entry (should_edit + reasoning), then appends the full active conversation for context
+
+Source data: `trajectory.trace["messages"]` (full list with `visible` flags) and `trajectory.trace["logs"]` (typed event log).
 
 ---
 
@@ -129,7 +155,7 @@ Memory behavior is controlled under the `memory:` key in `config.yaml`:
 memory:
   enabled: false
   source: null          # null | path to frozen .json | "continual"
-  target: assistant     # assistant | context_editor
+  target: assistant     # assistant | context_editor | edit_decision
   save_path: null       # checkpoint path
   include_full_spec_q: false
   include_ground_truth_a: false
@@ -224,12 +250,17 @@ setup_memory()  →  CheatsheetMemory (empty or loaded)
 
 ## Prompts
 
-### `prompts/reflection.txt`
+All reflection prompts share the same template variables:
+`{current_cheatsheet}`, `{task_name}`, `{sample_id}`, `{outcome}`, `{score}`, `{num_turns}`, `{conversation}`, `{grounding_info}`
 
-Used by `CheatsheetUpdater` when reflecting on a single trajectory. Template variables: `{current_cheatsheet}`, `{task_name}`, `{sample_id}`, `{outcome}`, `{score}`, `{num_turns}`, `{conversation}`.
+### `prompts/assistant_reflection.txt`
 
-Asks the model to produce a 200–400 word, categorized memory covering: patterns, critical information, effective questions, task insights, and context management heuristics (what to preserve vs. compress).
+Default for `target="assistant"`. Asks the model to reflect on: response strategies, information extraction from the user, premature assumptions, effective clarifying questions, and task-specific pitfalls.
 
-### `prompts/context_editor.txt`
+### `prompts/context_editor_reflection.txt`
 
-Injected into `ContextEditStrategy`'s editor prompt as `{memory_section}`. Instructs the editor to use the memory to identify which information is most important to preserve during compression.
+Default for `target="context_editor"`. Asks the model to reflect on: what information was essential to preserve, what wrong reasoning should have been removed, whether the edit helped the assistant recover, signals that an edit was overdue, and what structure works best for the edited context.
+
+### `prompts/edit_decision_reflection.txt`
+
+Default for `target="edit_decision"`. Asks the model to reflect on: whether edit decisions were correct in hindsight, conversation signals that predicted benefit, false positives/negatives, optimal timing for edits, and patterns of context pollution that reliably indicate an edit is needed.

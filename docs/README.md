@@ -6,14 +6,9 @@ Project documentation for the Context Editor evaluation system.
 
 | File | Covers |
 |------|--------|
-| [architecture.md](architecture.md) | System overview, data flow, key concepts |
-| [run_experiment.md](run_experiment.md) | `run_experiment.py` entry point walkthrough |
 | [simulation.md](simulation.md) | `ConversationSimulator`, `ConversationTrace`, core types |
-| [strategies.md](strategies.md) | All four context strategies |
-| [context_strategies.md](context_strategies.md) | Deep-dive: strategy mechanics, parameters, memory integration, design notes |
-| [memory_learning.md](memory_learning.md) | Memory-based learning: `CheatsheetMemory` + `CheatsheetUpdater`, deployment in pipeline |
-| [agents.md](agents.md) | `UserAgent`, `SystemAgent`, variant user agents |
-| [evaluation.md](evaluation.md) | `identify_false_negatives.py` — post-hoc analysis |
+| [context_strategies.md](context_strategies.md) | All four strategies — mechanics, parameters, memory integration, design notes |
+| [memory_learning.md](memory_learning.md) | Memory-based learning: `CheatsheetMemory`, `CheatsheetUpdater`, `renderers.py`, pipeline integration |
 
 ## Quick Start
 
@@ -51,6 +46,8 @@ src/ctx_editor/
   memory/
     base.py                  # MemoryModule, MemoryUpdater ABCs
     cheatsheet.py            # CheatsheetMemory, CheatsheetUpdater
+    renderers.py             # Target-specific trajectory rendering (assistant/context_editor/edit_decision)
+    prompts/                 # Per-target reflection prompt templates
   execution/
     parallel.py              # ParallelRunner
     batched.py               # BatchedRunner (batched learning)
