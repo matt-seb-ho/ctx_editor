@@ -217,7 +217,7 @@ class CheatsheetUpdater(MemoryUpdater):
 <full_specification>
 The fully-specified single-turn version of this problem:
 {metadata["full_spec_q"]}
-</full_specification>""")
+</full_specification>"")
 
         if self.include_ground_truth_a and "ground_truth_a" in metadata:
             parts.append(f"""
