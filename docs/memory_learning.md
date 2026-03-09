@@ -26,9 +26,16 @@ src/ctx_editor/memory/
   cheatsheet.py   # CheatsheetMemory, CheatsheetUpdater (concrete implementation)
   renderers.py    # Target-specific trajectory rendering functions
   prompts/
-    assistant_reflection.txt       # Reflection prompt for assistant target
-    context_editor_reflection.txt  # Reflection prompt for context_editor target
-    edit_decision_reflection.txt   # Reflection prompt for edit_decision target
+    assistant_reflection.txt              # Full-rewrite reflection prompt (assistant target)
+    context_editor_reflection.txt         # Full-rewrite reflection prompt (context_editor target)
+    edit_decision_reflection.txt          # Full-rewrite reflection prompt (edit_decision target)
+    assistant_reflect_takeaways.txt       # Takeaway-only prompt for batch Step 1 (assistant)
+    context_editor_reflect_takeaways.txt  # Takeaway-only prompt for batch Step 1 (context_editor)
+    edit_decision_reflect_takeaways.txt   # Takeaway-only prompt for batch Step 1 (edit_decision)
+    unify_takeaways.txt                   # Unify prompt for batch Step 2 (shared across targets)
+
+src/ctx_editor/execution/
+  offline.py      # OfflineMemoryLearner, load_trajectories()
 ```
 
 ---
@@ -127,11 +134,22 @@ Per-trajectory update:
 4. Call the LLM (temperature 0.3)
 5. Call `memory.update(new_content)` with the response
 
-### `batch_update(memory, trajectories, model_client)`
+### `batch_update(memory, trajectories, model_client)` — Reflect-then-Unify
 
-Synthesizes insights from multiple trajectories in a **single LLM call**. All trajectories are concatenated into one prompt using the target-specific renderer. This is used by `BatchedRunner` after each batch.
+Updates memory from multiple trajectories using a two-step algorithm:
 
-> **Note**: `batch_update` is the current default in `BatchedRunner` but is considered suboptimal. The planned replacement (Change 2 in `plans/memory_features_plan.md`) is a Reflect-then-Unify algorithm: parallel per-trajectory reflections → single unify call.
+**Step 1: Reflect** — For each trajectory, generate a bullet list of takeaways using a target-specific takeaway prompt (`prompts/{target}_reflect_takeaways.txt`). All reflections run in parallel via `asyncio.gather`.
+
+**Step 2: Unify** — A single LLM call merges all per-trajectory takeaways with the current memory into a coherent updated cheatsheet (`prompts/unify_takeaways.txt`). The unify prompt instructs the model to deduplicate, resolve contradictions (prefer newer evidence), and keep the result concise.
+
+**Why this is better than the old single-call approach:**
+- Step 1 is embarrassingly parallel — all reflections run concurrently
+- Each reflection sees one trajectory in full detail (no token budget competition)
+- Step 2 is a simpler synthesis task — merging bullet points, not analyzing raw conversations
+
+**Internal methods:**
+- `_reflect_on_trajectory(trajectory, model_client) -> str` — Step 1 for one trajectory
+- `_unify_takeaways(memory, takeaways, model_client) -> str` — Step 2
 
 ## `renderers.py` — Trajectory Rendering
 
@@ -154,16 +172,20 @@ Memory behavior is controlled under the `memory:` key in `config.yaml`:
 ```yaml
 memory:
   enabled: false
-  source: null          # null | path to frozen .json | "continual"
+  source: null          # null | path to frozen .json | "continual" | "offline"
   target: assistant     # assistant | context_editor | edit_decision
   save_path: null       # checkpoint path
   include_full_spec_q: false
   include_ground_truth_a: false
+  # Offline learning settings (used when source=offline)
+  offline_trajectories: null  # Path to saved results (JSON, JSONL, or directory)
+  offline_batch_size: 5       # Batch size for offline learning
 ```
 
 - `source: null` — memory disabled
 - `source: "continual"` — start empty, update after each batch/problem
 - `source: "/path/to/file.json"` — load a frozen memory snapshot (no updates)
+- `source: "offline"` — learn memory from saved trajectories (no new simulations)
 
 A pre-built experiment config exists for the continual-learning case:
 
@@ -184,7 +206,7 @@ memory:
 
 ```
 enabled=false  →  return None
-source="continual" or source=None  →  return CheatsheetMemory(content="")
+source="continual", "offline", or None  →  return CheatsheetMemory(content="")
 source=<path>  →  return CheatsheetMemory.load(source)
 ```
 
@@ -212,8 +234,9 @@ The `execution.mode` config key controls how updates happen:
 | Mode | Runner | Update cadence |
 |------|--------|---------------|
 | `parallel` | `ParallelRunner` | No updates — memory is frozen (or None) |
-| `batched` | `BatchedRunner.run()` | `batch_update` after every batch of `batch_size` problems; within a batch the memory is frozen |
+| `batched` | `BatchedRunner.run()` | `batch_update` (Reflect-then-Unify) after every batch of `batch_size` problems; within a batch the memory is frozen |
 | `sequential` | `BatchedRunner.run_sequential()` | `update_from_trajectory` after every individual problem |
+| `offline` | `OfflineMemoryLearner` | `batch_update` (Reflect-then-Unify) over saved trajectories; no new simulations |
 
 In batched mode, `BatchedRunner` saves a checkpoint to `{save_path}.batch{N}` after each batch and the final memory to `save_path` at the end.
 
@@ -222,28 +245,33 @@ In sequential mode, each simulator receives a `.clone()` of the current memory �
 ### Data flow summary
 
 ```
-load_samples()
-    │
-    ▼
 setup_memory()  →  CheatsheetMemory (empty or loaded)
     │
-    ├─[parallel]─────────────────────────────────────────┐
-    │                                                     │
-    ├─[batched]──► BatchedRunner.run()                   │
-    │                 for each batch:                     │
-    │                   ParallelRunner (frozen memory)    │
-    │                   batch_update()  ◄── CheatsheetUpdater
-    │                   save checkpoint                   │
-    │                                                     │
-    └─[sequential]─► BatchedRunner.run_sequential()       │
-                        for each problem:                 │
-                          simulator.run()                 │
-                          update_from_trajectory()        │
-                                                          │
-    All paths ───────────────────────────────────────────►│
-                                                          ▼
-                                                   list[SimulationResult]
-                                                   + final memory saved
+    ├─[offline]──► OfflineMemoryLearner.learn()
+    │                 load_trajectories(path)
+    │                 for each batch of saved trajectories:
+    │                   batch_update() (Reflect-then-Unify)
+    │                 → returns early with memory-only metrics
+    │
+    ├─ load_samples()
+    │    │
+    │    ├─[parallel]─────────────────────────────────────────┐
+    │    │                                                     │
+    │    ├─[batched]──► BatchedRunner.run()                   │
+    │    │                 for each batch:                     │
+    │    │                   ParallelRunner (frozen memory)    │
+    │    │                   batch_update()  ◄── CheatsheetUpdater
+    │    │                   save checkpoint                   │
+    │    │                                                     │
+    │    └─[sequential]─► BatchedRunner.run_sequential()       │
+    │                        for each problem:                 │
+    │                          simulator.run()                 │
+    │                          update_from_trajectory()        │
+    │                                                          │
+    │    All paths ───────────────────────────────────────────►│
+    │                                                          ▼
+    │                                                   list[SimulationResult]
+    └──────────────────────────────────────────────────► final memory saved
 ```
 
 ---
@@ -264,3 +292,55 @@ Default for `target="context_editor"`. Asks the model to reflect on: what inform
 ### `prompts/edit_decision_reflection.txt`
 
 Default for `target="edit_decision"`. Asks the model to reflect on: whether edit decisions were correct in hindsight, conversation signals that predicted benefit, false positives/negatives, optimal timing for edits, and patterns of context pollution that reliably indicate an edit is needed.
+
+### Takeaway prompts (`prompts/{target}_reflect_takeaways.txt`)
+
+Used by `batch_update` Step 1 (Reflect). Same reflection questions as the full-rewrite prompts, but the output instruction is "produce a concise bullet list of generalizable takeaways" instead of "rewrite the full cheatsheet." There is one per target: `assistant_reflect_takeaways.txt`, `context_editor_reflect_takeaways.txt`, `edit_decision_reflect_takeaways.txt`.
+
+### `prompts/unify_takeaways.txt`
+
+Used by `batch_update` Step 2 (Unify). Shared across all targets. Takes the current cheatsheet and a set of labeled per-trajectory takeaways, and produces an updated cheatsheet that integrates them — deduplicating, resolving contradictions, and keeping it concise.
+
+---
+
+## Offline Learning
+
+`execution/offline.py` — Learn memory from pre-existing trajectories without running new simulations.
+
+### `load_trajectories(path) -> list[SimulationResult]`
+
+Loads saved results from disk. Supports three formats:
+- **JSON file** — a single file containing a list of result dicts
+- **JSONL file** — one result dict per line
+- **Directory** — loads all `.json` files, each containing one or a list of results
+
+Error results (those with `"error"` in metadata) are automatically filtered out.
+
+### `OfflineMemoryLearner`
+
+```python
+class OfflineMemoryLearner:
+    def __init__(self, updater: MemoryUpdater, model_client: ModelClient): ...
+
+    async def learn(
+        self,
+        trajectories: list[SimulationResult],
+        memory: Optional[MemoryModule] = None,  # starts empty if None
+        batch_size: int = 5,
+        save_path: Optional[str] = None,        # checkpoint + final save
+    ) -> MemoryModule
+```
+
+Processes trajectories in batches using `updater.batch_update()` (Reflect-then-Unify). Saves checkpoints after each batch if `save_path` is set.
+
+### Usage
+
+```bash
+# Learn memory from baseline trajectories, targeting the context editor
+ctx-editor memory.enabled=true memory.source=offline \
+  memory.offline_trajectories=outputs/baseline_run/results.json \
+  memory.target=context_editor \
+  memory.save_path=memories/editor_from_baseline.json
+```
+
+When `source=offline`, `run_experiment.py` skips all simulation logic and returns early after learning, producing memory-only metrics.

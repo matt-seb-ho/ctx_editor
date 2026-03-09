@@ -15,7 +15,7 @@ from tqdm import tqdm
 from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, SystemAgent, UserAgent
 from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
 from ctx_editor.memory import CheatsheetMemory, CheatsheetUpdater, MemoryModule
-from ctx_editor.execution import BatchedRunner, ParallelRunner
+from ctx_editor.execution import BatchedRunner, OfflineMemoryLearner, ParallelRunner, load_trajectories
 from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient, set_content_filter_log_path
 from ctx_editor.utils.ledger import add_run
 from ctx_editor.utils.logging import (
@@ -157,7 +157,7 @@ def setup_memory(cfg: DictConfig) -> Optional[MemoryModule]:
         return None
 
     source = cfg.memory.source
-    if source and source != "continual" and Path(source).exists():
+    if source and source not in ("continual", "offline") and Path(source).exists():
         return CheatsheetMemory.load(source)
     else:
         return CheatsheetMemory(content="")
@@ -271,11 +271,61 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             assistant_model=cfg.model.assistant.model,
         )
 
-    # Create memory updater with grounding config
+    # Create memory updater with grounding config and target
     memory_updater = CheatsheetUpdater(
+        target=cfg.memory.get("target", "assistant"),
         include_full_spec_q=cfg.memory.get("include_full_spec_q", False),
         include_ground_truth_a=cfg.memory.get("include_ground_truth_a", False),
     )
+
+    # Offline learning mode — learn memory from saved trajectories, no new simulations
+    if cfg.memory.enabled and cfg.memory.source == "offline":
+        offline_path = cfg.memory.get("offline_trajectories")
+        if not offline_path:
+            raise ValueError("memory.offline_trajectories must be set when memory.source=offline")
+
+        logger.info(f"Running offline memory learning from: {offline_path}")
+        trajectories = load_trajectories(offline_path)
+        logger.info(f"Loaded {len(trajectories)} trajectories for offline learning")
+
+        learner = OfflineMemoryLearner(
+            updater=memory_updater,
+            model_client=model_client,
+        )
+        memory = await learner.learn(
+            trajectories=trajectories,
+            memory=memory,
+            batch_size=cfg.memory.get("offline_batch_size", 5),
+            save_path=cfg.memory.get("save_path"),
+        )
+
+        # No simulation results in offline mode — return early with memory-only metrics
+        pbar.close()
+        metrics = {
+            "experiment_name": cfg.experiment_name,
+            "execution_mode": "offline",
+            "total_samples": 0,
+            "total_attempted": 0,
+            "errors": 0,
+            "correct": 0,
+            "accuracy": 0,
+            "average_score": 0,
+            "total_cost_usd": 0,
+            "average_turns": 0,
+            "average_user_tokens": 0,
+            "per_task": {},
+            "offline_learning": {
+                "source": offline_path,
+                "num_trajectories": len(trajectories),
+                "memory_version": memory.version,
+            },
+        }
+        save_metrics(metrics, str(output_dir))
+        logger.info(
+            f"Offline learning complete: memory v{memory.version} "
+            f"from {len(trajectories)} trajectories"
+        )
+        return metrics
 
     if (
         execution_mode == "batched"

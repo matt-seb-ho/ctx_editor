@@ -22,6 +22,11 @@ ctx-editor
 ctx-editor experiment=baseline model=gpt4o task=math
 ctx-editor experiment=context_edit execution.max_concurrent=10
 ctx-editor experiment=baseline memory.enabled=true memory.source=continual execution.mode=sequential
+
+# Offline memory learning from saved trajectories (no new simulations)
+ctx-editor memory.enabled=true memory.source=offline \
+  memory.offline_trajectories=outputs/baseline_run/results.json \
+  memory.target=context_editor memory.save_path=memories/editor_v1.json
 ```
 
 ## Key Source Paths
@@ -51,6 +56,7 @@ src/ctx_editor/
   execution/
     parallel.py              # ParallelRunner
     batched.py               # BatchedRunner (batched learning)
+    offline.py               # OfflineMemoryLearner (learn from saved trajectories)
   identify_false_negatives.py  # Post-hoc error analysis
   config/                    # Hydra YAML configs
 ```

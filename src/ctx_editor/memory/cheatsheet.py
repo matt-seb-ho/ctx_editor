@@ -4,6 +4,7 @@ Concrete implementation of MemoryModule and MemoryUpdater following
 the Dynamic Cheatsheet approach (Suzgun et al 2025).
 """
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -20,12 +21,22 @@ if TYPE_CHECKING:
 # Directory containing built-in prompt templates
 _PROMPTS_DIR = Path(__file__).parent / "prompts"
 
-# Map target → prompt file
+# Map target → full-rewrite reflection prompt file
 _DEFAULT_PROMPT_FILES: dict[str, Path] = {
     "assistant": _PROMPTS_DIR / "assistant_reflection.txt",
     "context_editor": _PROMPTS_DIR / "context_editor_reflection.txt",
     "edit_decision": _PROMPTS_DIR / "edit_decision_reflection.txt",
 }
+
+# Map target → takeaway-only reflection prompt file (for batch Step 1)
+_DEFAULT_TAKEAWAY_PROMPT_FILES: dict[str, Path] = {
+    "assistant": _PROMPTS_DIR / "assistant_reflect_takeaways.txt",
+    "context_editor": _PROMPTS_DIR / "context_editor_reflect_takeaways.txt",
+    "edit_decision": _PROMPTS_DIR / "edit_decision_reflect_takeaways.txt",
+}
+
+# Unify prompt (for batch Step 2) — shared across all targets
+_UNIFY_PROMPT_FILE: Path = _PROMPTS_DIR / "unify_takeaways.txt"
 
 
 @dataclass
@@ -185,6 +196,11 @@ class CheatsheetUpdater(MemoryUpdater):
         else:
             self.reflection_prompt = _DEFAULT_PROMPT_FILES[target].read_text()
 
+        # Takeaway prompt for batch Step 1 (Reflect)
+        self.takeaway_prompt = _DEFAULT_TAKEAWAY_PROMPT_FILES[target].read_text()
+        # Unify prompt for batch Step 2
+        self.unify_prompt = _UNIFY_PROMPT_FILE.read_text()
+
         self.model = model
         self.update_on_success = update_on_success
         self.update_on_failure = update_on_failure
@@ -268,13 +284,79 @@ The ground truth answer:
 
         return memory
 
+    async def _reflect_on_trajectory(
+        self,
+        trajectory: "SimulationResult",
+        model_client: "ModelClient",
+    ) -> str:
+        """Generate takeaways from a single trajectory (batch Step 1: Reflect).
+
+        Returns a bullet list of takeaways as a string.
+        """
+        conversation = self._render_trajectory(trajectory)
+        outcome = "Success" if trajectory.is_correct else "Failure"
+        grounding_info = self._build_grounding_info(trajectory)
+
+        prompt = self.takeaway_prompt.format(
+            task_name=trajectory.task_name,
+            sample_id=trajectory.sample_id,
+            outcome=outcome,
+            score=str(trajectory.score),
+            num_turns=str(trajectory.num_turns),
+            conversation=conversation,
+            grounding_info=grounding_info,
+        )
+
+        response = await model_client.generate(
+            messages=[{"role": "user", "content": prompt}],
+            model=self.model,
+            temperature=0.3,
+        )
+
+        return response.content.strip()
+
+    async def _unify_takeaways(
+        self,
+        memory: MemoryModule,
+        takeaways: list[str],
+        model_client: "ModelClient",
+    ) -> str:
+        """Merge per-trajectory takeaways into a coherent memory update (batch Step 2: Unify).
+
+        Returns the new cheatsheet content as a string.
+        """
+        current = memory.content if memory.content else "(empty)"
+
+        # Format takeaways with trajectory labels
+        takeaway_parts = []
+        for i, t in enumerate(takeaways, 1):
+            takeaway_parts.append(f"From trajectory {i}:\n{t}")
+        takeaways_text = "\n\n".join(takeaway_parts)
+
+        prompt = self.unify_prompt.format(
+            current_cheatsheet=current,
+            takeaways=takeaways_text,
+        )
+
+        response = await model_client.generate(
+            messages=[{"role": "user", "content": prompt}],
+            model=self.model,
+            temperature=0.3,
+        )
+
+        return response.content.strip()
+
     async def batch_update(
         self,
         memory: MemoryModule,
         trajectories: list["SimulationResult"],
         model_client: "ModelClient",
     ) -> MemoryModule:
-        """Update memory from multiple trajectories at once."""
+        """Update memory from multiple trajectories using Reflect-then-Unify.
+
+        Step 1 (Reflect): Generate per-trajectory takeaways in parallel.
+        Step 2 (Unify): Merge all takeaways into a coherent memory update.
+        """
         # Filter trajectories based on update settings
         filtered = []
         for t in trajectories:
@@ -286,42 +368,14 @@ The ground truth answer:
         if not filtered:
             return memory
 
-        # Build a combined reflection prompt
-        trajectories_text = []
-        for i, t in enumerate(filtered, 1):
-            conversation = self._render_trajectory(t)
-            outcome = "Success" if t.is_correct else "Failure"
-            grounding_info = self._build_grounding_info(t)
-            trajectories_text.append(f"""
---- Trajectory {i} ---
-Task: {t.task_name}
-Sample ID: {t.sample_id}
-Outcome: {outcome} (score: {t.score})
-Turns: {t.num_turns}
+        # Step 1: Reflect — parallel per-trajectory takeaways
+        takeaways = await asyncio.gather(*[
+            self._reflect_on_trajectory(t, model_client) for t in filtered
+        ])
 
-{conversation}
-{grounding_info}""")
-
-        current = memory.content if memory.content else "(empty)"
-        all_trajectories = "".join(trajectories_text)
-        batch_prompt = (
-            f"You are updating a cheatsheet based on multiple completed conversation trajectories.\n\n"
-            f"<current_cheatsheet>\n{current}\n</current_cheatsheet>\n\n"
-            f"<trajectories>\n{all_trajectories}\n</trajectories>\n\n"
-            "Synthesize insights from all trajectories to update the cheatsheet. Look for:\n"
-            "1. Common patterns across successful/failed attempts\n"
-            "2. Critical information that needed to be preserved\n"
-            "3. Effective strategies and pitfalls to avoid\n\n"
-            "Provide an updated, concise cheatsheet:"
-        )
-
-        response = await model_client.generate(
-            messages=[{"role": "user", "content": batch_prompt}],
-            model=self.model,
-            temperature=0.3,
-        )
-
-        memory.update(response.content.strip())
+        # Step 2: Unify — merge takeaways into updated memory
+        new_content = await self._unify_takeaways(memory, list(takeaways), model_client)
+        memory.update(new_content)
 
         # Record batch update metadata (only for CheatsheetMemory)
         if isinstance(memory, CheatsheetMemory):

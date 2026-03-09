@@ -119,7 +119,7 @@ The reflection prompt asks the LLM to produce separate sections:
 
 ---
 
-## Change 2: Fix Batched Memory Updates
+## Change 2: Fix Batched Memory Updates ✅ COMPLETE
 
 **Problem:** `batch_update()` dumps all trajectories into one LLM call. This doesn't scale (token limits) and produces low-quality reflections (too much to process at once).
 
@@ -185,7 +185,7 @@ Updated memory:
 
 ---
 
-## Change 3: Offline Learning Mode
+## Change 3: Offline Learning Mode ✅ COMPLETE
 
 **Problem:** Currently, memory updates are interleaved with trajectory generation (online learning). We also want offline learning: initialize memory from a fixed set of pre-existing trajectories without generating new ones.
 
@@ -259,6 +259,19 @@ ctx-learn-memory \
 ## Progress Notes
 
 ### Change 1 — completed
+
+### Change 2 — completed
+- `memory/prompts/assistant_reflect_takeaways.txt` — takeaway-only prompt for batch Step 1
+- `memory/prompts/context_editor_reflect_takeaways.txt` — takeaway-only prompt for batch Step 1
+- `memory/prompts/edit_decision_reflect_takeaways.txt` — takeaway-only prompt for batch Step 1
+- `memory/prompts/unify_takeaways.txt` — shared unify prompt for batch Step 2
+- `memory/cheatsheet.py` — `CheatsheetUpdater` now loads takeaway + unify prompts; added `_reflect_on_trajectory()` (Step 1) and `_unify_takeaways()` (Step 2); rewrote `batch_update()` to use Reflect-then-Unify with `asyncio.gather` for parallel reflection
+
+### Change 3 — completed
+- `execution/offline.py` — new `OfflineMemoryLearner` class + `load_trajectories()` helper (supports JSON, JSONL, directories)
+- `execution/__init__.py` — exports `OfflineMemoryLearner`, `load_trajectories`
+- `config/config.yaml` — added `offline_trajectories`, `offline_batch_size` settings; updated `source` and `target` comments
+- `run_experiment.py` — imports offline components; passes `target` to `CheatsheetUpdater`; added offline execution branch that loads trajectories, runs `OfflineMemoryLearner.learn()`, and returns early with memory-only metrics; updated `setup_memory()` to handle `source=offline`
 - `memory/prompts/assistant_reflection.txt` — target-specific prompt
 - `memory/prompts/context_editor_reflection.txt` — target-specific prompt
 - `memory/prompts/edit_decision_reflection.txt` — target-specific prompt
