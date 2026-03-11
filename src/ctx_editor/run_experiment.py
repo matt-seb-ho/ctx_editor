@@ -203,8 +203,23 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     # Load components
     samples = load_samples(cfg)
     model_client = get_model_client(cfg)
-    strategy = get_strategy(cfg)
     memory = setup_memory(cfg)
+
+    # Auto-compute min_turns for analysis strategies based on task data.
+    # Ensures at least 2 analyses run per conversation: skip_turns = min_shards - 2.
+    # Only applies when strategy config has min_turns="auto".
+    strategy_cfg_raw = OmegaConf.to_container(cfg.experiment.strategy, resolve=True)
+    if strategy_cfg_raw.get("min_turns") == "auto":
+        shard_counts = [len(s.get("shards", [])) for s in samples]
+        min_shards = min(shard_counts) if shard_counts else 5
+        auto_min_turns = max(min_shards - 2, 2)  # At least 2 turns before analysis
+        logger.info(
+            f"Auto min_turns: min_shards={min_shards}, setting min_turns={auto_min_turns}"
+        )
+        # Override in the Hydra config so strategy instantiation picks it up
+        cfg.experiment.strategy.min_turns = auto_min_turns
+
+    strategy = get_strategy(cfg)
 
     logger.info(f"Loaded {len(samples)} samples for task config '{cfg.task.name}'")
 

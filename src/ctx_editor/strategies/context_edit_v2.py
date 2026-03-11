@@ -46,7 +46,7 @@ class ContextEditV2Strategy(BaseStrategy):
             max_tokens=analyzer_max_tokens,
             reasoning_effort=analyzer_reasoning_effort,
         )
-        self.min_turns = min_turns
+        self.min_turns = min_turns if isinstance(min_turns, int) else 3
         self.max_resets = max_resets
         self.use_memory = use_memory
         self.memory_target = memory_target

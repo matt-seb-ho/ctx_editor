@@ -57,7 +57,9 @@ class AppendAnalysisStrategy(BaseStrategy):
             max_tokens=analyzer_max_tokens,
             reasoning_effort=analyzer_reasoning_effort,
         )
-        self.min_turns = min_turns
+        # min_turns="auto" is resolved by run_experiment before instantiation,
+        # but default to 3 if it somehow reaches here unresolved.
+        self.min_turns = min_turns if isinstance(min_turns, int) else 3
         self.use_memory = use_memory
         self.memory_target = memory_target
 
