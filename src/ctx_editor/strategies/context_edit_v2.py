@@ -1,0 +1,169 @@
+"""S2: Context edit strategy — analysis-driven context rewriting.
+
+Uses the ConversationAnalyzer to assess the conversation, then:
+- If no pivot needed: proceed like baseline (full conversation, no changes)
+- If pivot needed: rewrite the context into a compacted form using the analysis
+
+This replaces both the old ContextEditStrategy (which always edited) and
+AgenticEditStrategy (which used a separate decision prompt). Now the analysis
+itself produces the pivot decision as part of its structured output.
+"""
+
+from typing import TYPE_CHECKING, Optional
+
+from ..core.types import Message
+from .analyzer import ConversationAnalyzer
+from .base import BaseStrategy
+
+if TYPE_CHECKING:
+    from ..core.trace import ConversationTrace
+    from ..memory.base import MemoryModule
+    from ..models.base import ModelClient
+
+
+class ContextEditV2Strategy(BaseStrategy):
+    """S2: Analysis-driven context editing.
+
+    Runs the conversation analyzer before each turn (past min_turns threshold).
+    When the analysis indicates a pivot is needed, rewrites the conversation
+    context using the analysis output. Otherwise, passes through like baseline.
+    """
+
+    def __init__(
+        self,
+        analyzer_model: str = "gpt-4o-mini",
+        analyzer_timeout: int = 60,
+        analyzer_max_tokens: Optional[int] = None,
+        analyzer_reasoning_effort: Optional[str] = None,
+        min_turns: int = 3,
+        max_resets: int = 3,
+        use_memory: bool = False,
+        memory_target: str = "analyzer",
+    ):
+        self.analyzer = ConversationAnalyzer(
+            model=analyzer_model,
+            timeout=analyzer_timeout,
+            max_tokens=analyzer_max_tokens,
+            reasoning_effort=analyzer_reasoning_effort,
+        )
+        self.min_turns = min_turns
+        self.max_resets = max_resets
+        self.use_memory = use_memory
+        self.memory_target = memory_target
+
+    def _build_edited_context(
+        self,
+        trace: "ConversationTrace",
+        user_intent: str,
+        approach_eval: str,
+    ) -> list[Message]:
+        """Build compacted context from analysis output.
+
+        Produces:
+        - System message (original + approach evaluation as advisory notes)
+        - User intent summary (collated from user messages)
+        - Latest user message
+        """
+        new_messages = []
+
+        # System message with approach evaluation appended
+        system_msg = trace.system_message
+        system_content = system_msg.content if system_msg else ""
+        if approach_eval:
+            system_content += (
+                "\n\n<context_edit_notes>\n"
+                "The following is an independent analysis of the prior conversation. "
+                "The assistant's previous approach had issues. Read this critically and "
+                "be willing to take a completely different approach.\n\n"
+                f"{approach_eval}\n"
+                "</context_edit_notes>"
+            )
+        new_messages.append(Message(role="system", content=system_content))
+
+        # User intent as a user message (source of truth)
+        new_messages.append(
+            Message(
+                role="user",
+                content=(
+                    "[The following summarizes what I've told you so far across "
+                    "multiple messages. Please use this as the basis for your response.]\n\n"
+                    + user_intent
+                ),
+            )
+        )
+
+        # Latest user message
+        last_user = trace.last_user_message
+        if last_user:
+            new_messages.append(Message(role="user", content=last_user.content))
+
+        return new_messages
+
+    async def prepare_context(
+        self,
+        trace: "ConversationTrace",
+        memory: Optional["MemoryModule"],
+        model_client: "ModelClient",
+    ) -> list[Message]:
+        """Prepare context, editing if analysis warrants it (mutates trace).
+
+        Flow:
+        1. Skip analysis if too few turns or max resets reached
+        2. Run analyzer to get user_intent + approach_eval + pivot_decision
+        3. If pivot needed: reset trace with compacted context
+        4. If no pivot: return full conversation as-is (like baseline)
+        """
+        # Inject memory to assistant if configured
+        if self.use_memory and memory and self.memory_target == "assistant":
+            self._inject_memory_to_trace(trace, memory, target="system")
+
+        # Skip if first turn or too few turns
+        if trace.num_assistant_turns == 0 or trace.num_user_turns < self.min_turns:
+            return trace.get_active_messages()
+
+        # Stop editing if max resets reached
+        if trace.num_resets >= self.max_resets:
+            return trace.get_active_messages()
+
+        # Run analysis — pass memory only if targeting analyzer
+        analysis_memory = memory if (self.use_memory and self.memory_target == "analyzer") else None
+        result = await self.analyzer.analyze(trace, model_client, memory=analysis_memory)
+
+        # Log the analysis
+        trace.add_log(
+            "conversation_analysis",
+            {
+                "user_intent": result.user_intent,
+                "approach_evaluation": result.approach_evaluation,
+                "pivot_needed": result.pivot_needed,
+                "analyzer_model": self.analyzer.model,
+            },
+        )
+
+        if not result.pivot_needed:
+            # No pivot — pass through like baseline
+            trace.add_log("edit_decision", {"should_edit": False})
+            return trace.get_active_messages()
+
+        # Pivot needed — rewrite context
+        trace.add_log("edit_decision", {"should_edit": True})
+
+        # Use analysis output to build compacted context
+        user_intent = result.user_intent if result.user_intent else result.raw_output
+        new_messages = self._build_edited_context(
+            trace, user_intent, result.approach_evaluation
+        )
+
+        # Log before reset
+        trace.add_log(
+            "context_edit_output",
+            {
+                "edited_context": result.raw_output,
+                "analyzer_model": self.analyzer.model,
+                "original_turn_count": trace.total_user_turns,
+                "active_turn_count": trace.num_user_turns,
+            },
+        )
+
+        trace.reset_conversation(new_messages, label="context_edit")
+        return trace.get_active_messages()

@@ -119,8 +119,10 @@ def get_strategy(cfg: DictConfig):
     # Fallback to manual instantiation
     from ctx_editor.strategies import (
         AgenticEditStrategy,
+        AppendAnalysisStrategy,
         BaselineStrategy,
         ContextEditStrategy,
+        ContextEditV2Strategy,
         ReflectionStrategy,
     )
 
@@ -129,6 +131,21 @@ def get_strategy(cfg: DictConfig):
         return BaselineStrategy(
             use_memory=strategy_cfg.get("use_memory", False),
             memory_target=strategy_cfg.get("memory_target", "system"),
+        )
+    elif "append_analysis" in strategy_name:
+        return AppendAnalysisStrategy(
+            analyzer_model=strategy_cfg.get("analyzer_model", "gpt-4o-mini"),
+            min_turns=strategy_cfg.get("min_turns", 3),
+            use_memory=strategy_cfg.get("use_memory", False),
+            memory_target=strategy_cfg.get("memory_target", "analyzer"),
+        )
+    elif "context_edit_v2" in strategy_name:
+        return ContextEditV2Strategy(
+            analyzer_model=strategy_cfg.get("analyzer_model", "gpt-4o-mini"),
+            min_turns=strategy_cfg.get("min_turns", 3),
+            max_resets=strategy_cfg.get("max_resets", 3),
+            use_memory=strategy_cfg.get("use_memory", False),
+            memory_target=strategy_cfg.get("memory_target", "analyzer"),
         )
     elif "context_edit" in strategy_name:
         return ContextEditStrategy(
