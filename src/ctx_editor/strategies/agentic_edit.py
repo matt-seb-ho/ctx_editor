@@ -8,6 +8,7 @@ from ..core.types import Message
 from .base import BaseStrategy
 from .baseline import BaselineStrategy
 from .context_edit import ContextEditStrategy, DEFAULT_EDITOR_PROMPT, MEMORY_SECTION_TEMPLATE
+from .prompt_registry import get_decision_prompt
 
 if TYPE_CHECKING:
     from ..core.trace import ConversationTrace
@@ -16,30 +17,36 @@ if TYPE_CHECKING:
 
 
 DECISION_PROMPT = """\
-Analyze the current conversation and decide whether context compression would be beneficial.
+Analyze this conversation and decide: should the assistant get a fresh start?
 
 <conversation>
 {conversation}
 </conversation>
 
-Consider these common failure modes that compression can help address:
-1. Premature answer attempts - did the assistant make guesses that were later invalidated?
-2. Invalid assumptions - are there assumptions in the context that turned out to be wrong?
-3. Outdated intermediate work - is there prior reasoning/work that was invalidated by new information?
-4. Redundant clarifications - are there repeated exchanges that can be summarized?
-5. Information scatter - is critical information spread across many turns?
+A context reset clears the conversation and gives the assistant a clean summary of what the \
+user actually asked for, helping it avoid repeating mistakes.
 
-Compression is beneficial when the context contains invalidated work or wrong assumptions that might mislead the assistant. Compression is risky if it might lose still-valid critical details.
+Answer these questions one by one:
 
-Respond with your decision and analysis using the following format. Always provide thorough notes \
-regardless of your decision — these notes are used for downstream editing and error analysis.
+1. WHAT DID THE USER ASK FOR? (Summarize the user's actual requirements in 1-2 sentences)
+
+2. WHAT IS THE ASSISTANT DOING? (Summarize the assistant's current approach in 1-2 sentences)
+
+3. IS THE ASSISTANT'S APPROACH CORRECT? Check for these specific problems:
+   - Has the assistant introduced parameters, function names, or return types the user never mentioned?
+   - Is the assistant building on an earlier wrong answer instead of reconsidering?
+   - Has the user corrected the assistant, but the assistant ignored or misunderstood the correction?
+   - Is the assistant producing similar wrong outputs repeatedly?
+
+4. DECISION: Based on your analysis, should we reset? Answer "yes" if the assistant is on a \
+fundamentally wrong path, or "no" if it is making reasonable progress.
+
+You MUST answer all 4 questions. Format your response exactly like this:
 
 <notes>
-Your detailed analysis of the conversation state. Include:
-- What failure modes (if any) are present in the conversation
-- What information is critical to preserve
-- What content is misleading, outdated, or redundant
-- How an edit might help or hurt at this point
+1. User wants: [your answer]
+2. Assistant is: [your answer]
+3. Problems found: [your answer, or "None — approach looks correct"]
 </notes>
 
 <edit_decision>yes or no</edit_decision>"""
@@ -70,8 +77,12 @@ class AgenticEditStrategy(BaseStrategy):
     def __init__(
         self,
         decision_prompt: Optional[str] = None,
+        prompt_version: Optional[str] = None,
         decision_model: str = "gpt-4o-mini",
         editor_model: str = "gpt-4o-mini",
+        editor_timeout: int = 60,
+        editor_max_tokens: Optional[int] = None,
+        editor_reasoning_effort: Optional[str] = None,
         edit_threshold_turns: int = 3,
         use_memory: bool = False,
         memory_target: str = "context_editor",
@@ -79,15 +90,27 @@ class AgenticEditStrategy(BaseStrategy):
         """Initialize the agentic edit strategy.
 
         Args:
-            decision_prompt: Custom prompt for the edit decision.
+            decision_prompt: Custom prompt for the edit decision (highest priority).
+            prompt_version: Named version from prompt registry (e.g., 'v2', 'v3').
             decision_model: Model to use for deciding whether to edit.
             editor_model: Model to use for context editing.
+            editor_timeout: Timeout in seconds for editor model calls.
+            editor_max_tokens: Max tokens for editor model calls.
+            editor_reasoning_effort: Reasoning effort for decision model only.
             edit_threshold_turns: Minimum turns before considering editing.
             use_memory: Whether to use memory.
             memory_target: Where memory is used.
         """
-        self.decision_prompt = decision_prompt or DECISION_PROMPT
+        if decision_prompt:
+            self.decision_prompt = decision_prompt
+        elif prompt_version:
+            self.decision_prompt = get_decision_prompt(prompt_version)
+        else:
+            self.decision_prompt = DECISION_PROMPT
         self.decision_model = decision_model
+        self.editor_timeout = editor_timeout
+        self.editor_max_tokens = editor_max_tokens
+        self.editor_reasoning_effort = editor_reasoning_effort
         self.edit_threshold_turns = edit_threshold_turns
 
         # Create the underlying strategies
@@ -97,6 +120,9 @@ class AgenticEditStrategy(BaseStrategy):
         )
         self.edit_strategy = ContextEditStrategy(
             editor_model=editor_model,
+            editor_timeout=editor_timeout,
+            editor_max_tokens=editor_max_tokens,
+            prompt_version=prompt_version,
             use_memory=use_memory,
             memory_target=memory_target,
         )
@@ -127,11 +153,15 @@ class AgenticEditStrategy(BaseStrategy):
         conversation_str = trace.get_conversation_string(skip_system=False)
         prompt = self.decision_prompt.format(conversation=conversation_str)
 
-        response = await model_client.generate(
-            messages=[{"role": "user", "content": prompt}],
-            model=self.decision_model,
-            temperature=0.0,
-        )
+        generate_kwargs: dict = {
+            "messages": [{"role": "user", "content": prompt}],
+            "model": self.decision_model,
+            "temperature": 0.0,
+            "timeout": self.editor_timeout,
+        }
+        if self.editor_reasoning_effort:
+            generate_kwargs["reasoning_effort"] = self.editor_reasoning_effort
+        response = await model_client.generate(**generate_kwargs)
 
         text = response.content
         decision_str = _parse_xml_tag(text, "edit_decision").lower()
@@ -180,17 +210,14 @@ class AgenticEditStrategy(BaseStrategy):
         # Inject decision analysis before the final instruction
         analysis_section = f"""
 <decision_analysis>
-The following analysis was produced during the decision to compress this context.
-Use it to guide your editing — it identifies key issues to address:
+The following analysis was produced during the decision to reset this context.
+Use it to guide your editing — it identifies specific problems with the assistant's approach:
 
 {decision_notes}
-</decision_analysis>
+</decision_analysis>"""
 
-Condensed context:"""
-
-        # Replace the trailing "Condensed context:" with the augmented version
-        if base_prompt.rstrip().endswith("Condensed context:"):
-            base_prompt = base_prompt.rstrip()[: -len("Condensed context:")].rstrip()
+        # Replace the trailing </approach_evaluation> marker with the augmented version
+        if base_prompt.rstrip().endswith("</approach_evaluation>"):
             return base_prompt + "\n" + analysis_section
         else:
             return base_prompt + "\n" + analysis_section
@@ -230,12 +257,16 @@ Condensed context:"""
             trace, memory, decision_notes
         )
 
-        # Generate edited context
-        response = await model_client.generate(
-            messages=[{"role": "user", "content": editor_input}],
-            model=self.edit_strategy.editor_model,
-            temperature=0.0,
-        )
+        # Generate edited context (no reasoning_effort — editor needs full reasoning)
+        generate_kwargs: dict = {
+            "messages": [{"role": "user", "content": editor_input}],
+            "model": self.edit_strategy.editor_model,
+            "temperature": 0.0,
+            "timeout": self.editor_timeout,
+        }
+        if self.editor_max_tokens:
+            generate_kwargs["max_tokens"] = self.editor_max_tokens
+        response = await model_client.generate(**generate_kwargs)
         edited_context = response.content
 
         # Log the context edit operation
@@ -250,22 +281,45 @@ Condensed context:"""
             },
         )
 
-        # Build new context: system + condensed prior context + last user message
+        # Build new context with structured separation (same as ContextEditStrategy)
         new_messages = []
 
+        # Parse the structured editor output
+        user_intent, approach_eval = ContextEditStrategy._parse_editor_output(edited_context)
+
+        # Add system message with approach evaluation appended
         system_msg = trace.system_message
-        if system_msg:
-            new_messages.append(Message(role="system", content=system_msg.content))
+        system_content = system_msg.content if system_msg else ""
+        if approach_eval:
+            system_content += (
+                "\n\n<context_edit_notes>\n"
+                "The following is an analysis of the prior conversation. The assistant's "
+                "previous approach may have had errors. Read this critically and be willing "
+                "to take a completely different approach if the evaluation suggests it.\n\n"
+                f"{approach_eval}\n"
+                "</context_edit_notes>"
+            )
+        new_messages.append(Message(role="system", content=system_content))
 
+        # Add user intent collation as user message (source of truth)
+        user_context = user_intent if user_intent else edited_context
         new_messages.append(
-            Message(role="user", content="[Prior conversation context, condensed]")
-        )
-        new_messages.append(
-            Message(role="assistant", content=edited_context)
+            Message(
+                role="user",
+                content=(
+                    "[The following summarizes what I've told you so far across "
+                    "multiple messages. Please use this as the basis for your response.]\n\n"
+                    + user_context
+                ),
+            )
         )
 
+        # Add last user message
         last_user = trace.last_user_message
         if last_user:
+            new_messages.append(
+                Message(role="assistant", content="Understood. Let me work on this with the updated context.")
+            )
             new_messages.append(Message(role="user", content=last_user.content))
 
         trace.reset_conversation(new_messages, label="context_edit")

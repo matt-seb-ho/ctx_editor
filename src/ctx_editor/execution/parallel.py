@@ -89,7 +89,7 @@ class ParallelRunner(ExperimentRunner):
                         score=0.0,
                         num_turns=0,
                         total_cost_usd=0.0,
-                        trace=[],
+                        trace={"messages": [], "logs": [], "num_resets": 0},
                         metadata={
                             "error": str(e),
                             "traceback": traceback.format_exc(),

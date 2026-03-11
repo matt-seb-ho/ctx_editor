@@ -9,6 +9,8 @@ Project documentation for the Context Editor evaluation system.
 | [simulation.md](simulation.md) | `ConversationSimulator`, `ConversationTrace`, core types |
 | [context_strategies.md](context_strategies.md) | All four strategies — mechanics, parameters, memory integration, design notes |
 | [memory_learning.md](memory_learning.md) | Memory-based learning: `CheatsheetMemory`, `CheatsheetUpdater`, `renderers.py`, pipeline integration |
+| [false_negatives_and_test_subset.md](false_negatives_and_test_subset.md) | User-sim error classification, false negative identification, test subset construction |
+| [code_experiment_analysis.md](code_experiment_analysis.md) | Why context editing hurts code, trace analysis, reflection advantage, cheatsheet comparison |
 
 ## Quick Start
 
@@ -57,6 +59,7 @@ src/ctx_editor/
     parallel.py              # ParallelRunner
     batched.py               # BatchedRunner (batched learning)
     offline.py               # OfflineMemoryLearner (learn from saved trajectories)
-  identify_false_negatives.py  # Post-hoc error analysis
+  identify_false_negatives.py  # Post-hoc error analysis (per-run)
+  build_test_subset.py         # Aggregate across runs → test subset
   config/                    # Hydra YAML configs
 ```

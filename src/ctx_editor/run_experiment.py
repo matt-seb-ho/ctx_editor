@@ -160,7 +160,7 @@ def setup_memory(cfg: DictConfig) -> Optional[MemoryModule]:
     if source and source not in ("continual", "offline") and Path(source).exists():
         return CheatsheetMemory.load(source)
     else:
-        return CheatsheetMemory(content="")
+        return CheatsheetMemory(_content="")
 
 
 async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
@@ -274,6 +274,8 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     # Create memory updater with grounding config and target
     memory_updater = CheatsheetUpdater(
         target=cfg.memory.get("target", "assistant"),
+        model=cfg.model.ctx_editor.model,
+        timeout=cfg.model.ctx_editor.get("timeout", 60),
         include_full_spec_q=cfg.memory.get("include_full_spec_q", False),
         include_ground_truth_a=cfg.memory.get("include_ground_truth_a", False),
     )

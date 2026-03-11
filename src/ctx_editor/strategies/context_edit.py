@@ -1,10 +1,12 @@
 """Fixed context editing strategy."""
 
+import re
 from typing import TYPE_CHECKING, Optional
 
 from ..core.types import Message
 from ..utils.helpers import load_prompt
 from .base import BaseStrategy
+from .prompt_registry import get_editor_prompt
 
 if TYPE_CHECKING:
     from ..core.trace import ConversationTrace
@@ -13,19 +15,12 @@ if TYPE_CHECKING:
 
 
 DEFAULT_EDITOR_PROMPT = """\
-You are a context editor. Your task is to condense the conversation history into a concise summary that preserves essential information while removing content that could mislead the assistant.
+You are a context editor for a multi-turn conversation. Your job is to produce a clean \
+context that helps the assistant avoid repeating past mistakes.
 
-Given the conversation so far, create a condensed version that:
-1. Preserves the user's original request and key requirements
-2. Keeps track of all revealed information and constraints
-3. Maintains ONLY still-valid progress and intermediate results
-4. Removes redundant back-and-forth while keeping critical context
-
-IMPORTANT - Remove or correct these common sources of confusion:
-- Premature answer attempts that were later shown to be wrong
-- Invalid assumptions that were corrected by subsequent information
-- Outdated intermediate work that was invalidated by new constraints
-- Incorrect reasoning paths that led nowhere
+CRITICAL PRINCIPLE: The user's messages are the source of truth. The assistant's prior \
+responses may contain wrong assumptions, incorrect approaches, or errors that snowballed \
+across turns. You must clearly separate what the USER said from what the ASSISTANT tried.
 
 <conversation>
 {conversation}
@@ -33,9 +28,36 @@ IMPORTANT - Remove or correct these common sources of confusion:
 
 {memory_section}
 
-Provide a condensed context that the assistant can use to continue helping the user. Focus on information density and accuracy - include only what the assistant needs to know, and ensure nothing misleading remains.
+Produce your output in these two clearly separated sections:
 
-Condensed context:"""
+<user_intent>
+Collate ONLY information from the user's messages (and system message if present). Include:
+- The user's goal/question
+- All requirements, constraints, and specifications the user has provided
+- Any examples, test cases, or clarifications from the user
+- Any corrections the user made to the assistant's understanding
+
+IMPORTANT:
+- Do NOT include the assistant's interpretations, assumptions, or invented details here.
+- If the user didn't specify something (e.g., function name, parameter types, return format), \
+do NOT fill it in from the assistant's choices — leave it unspecified.
+- If the assistant added parameters or constraints the user never mentioned, do NOT include them.
+</user_intent>
+
+<approach_evaluation>
+Critically evaluate the assistant's current approach. Be BRIEF and SPECIFIC — focus on what's wrong.
+- List any assumptions the assistant made that the user never confirmed (e.g., invented parameters, \
+wrong function signatures, assumed return types).
+- List any specific errors in the solution.
+- State what the assistant should do differently in 1-2 sentences.
+
+Do not flag ambiguity unless it's causing the assistant to do the wrong thing. If the user \
+hasn't specified something and the assistant's default seems reasonable, that's fine — don't \
+flag it. The goal is to fix actual errors, not to enumerate every unspecified detail.
+
+If the assistant's approach is broadly correct but has minor issues, say so — don't make it \
+sound worse than it is. If it has fundamental problems, say so clearly.
+</approach_evaluation>"""
 
 MEMORY_SECTION_TEMPLATE = """\
 <cheatsheet>
@@ -57,16 +79,26 @@ class ContextEditStrategy(BaseStrategy):
         self,
         editor_prompt: Optional[str] = None,
         editor_prompt_file: Optional[str] = None,
+        prompt_version: Optional[str] = None,
         editor_model: str = "gpt-4o-mini",
+        editor_timeout: int = 60,
+        editor_max_tokens: Optional[int] = None,
+        editor_reasoning_effort: Optional[str] = None,
+        max_resets: int = 3,
         use_memory: bool = False,
         memory_target: str = "context_editor",
     ):
         """Initialize the context edit strategy.
 
         Args:
-            editor_prompt: Custom prompt for the context editor.
-            editor_prompt_file: Path to prompt file (alternative to editor_prompt).
+            editor_prompt: Custom prompt for the context editor (highest priority).
+            editor_prompt_file: Path to prompt file (second priority).
+            prompt_version: Named version from prompt registry (e.g., 'v2', 'v3').
             editor_model: Model to use for context editing.
+            editor_timeout: Timeout in seconds for editor model calls.
+            editor_max_tokens: Max tokens for editor model calls.
+            editor_reasoning_effort: Reasoning effort for editor model.
+            max_resets: Maximum number of context resets per conversation.
             use_memory: Whether to include memory in editor input.
             memory_target: Where memory is used ('context_editor' or 'assistant').
         """
@@ -74,12 +106,36 @@ class ContextEditStrategy(BaseStrategy):
             self.editor_prompt = load_prompt(editor_prompt_file)
         elif editor_prompt:
             self.editor_prompt = editor_prompt
+        elif prompt_version:
+            self.editor_prompt = get_editor_prompt(prompt_version)
         else:
             self.editor_prompt = DEFAULT_EDITOR_PROMPT
 
         self.editor_model = editor_model
+        self.editor_timeout = editor_timeout
+        self.editor_max_tokens = editor_max_tokens
+        self.editor_reasoning_effort = editor_reasoning_effort
+        self.max_resets = max_resets
         self.use_memory = use_memory
         self.memory_target = memory_target
+
+    @staticmethod
+    def _parse_editor_output(text: str) -> tuple[str, str]:
+        """Parse structured editor output into user_intent and approach_evaluation.
+
+        Returns:
+            Tuple of (user_intent, approach_evaluation). Either may be empty if
+            the editor didn't produce structured output.
+        """
+        user_match = re.search(
+            r"<user_intent>(.*?)</user_intent>", text, re.DOTALL
+        )
+        eval_match = re.search(
+            r"<approach_evaluation>(.*?)</approach_evaluation>", text, re.DOTALL
+        )
+        user_intent = user_match.group(1).strip() if user_match else ""
+        approach_eval = eval_match.group(1).strip() if eval_match else ""
+        return user_intent, approach_eval
 
     def _build_editor_input(
         self,
@@ -143,6 +199,10 @@ class ContextEditStrategy(BaseStrategy):
         if trace.num_assistant_turns == 0:
             return trace.get_active_messages()
 
+        # If we've hit the max reset limit, stop editing and pass through
+        if trace.num_resets >= self.max_resets:
+            return trace.get_active_messages()
+
         # Build editor input (uses active conversation only)
         editor_input = self._build_editor_input(
             trace,
@@ -150,11 +210,17 @@ class ContextEditStrategy(BaseStrategy):
         )
 
         # Generate edited context
-        response = await model_client.generate(
-            messages=[{"role": "user", "content": editor_input}],
-            model=self.editor_model,
-            temperature=0.0,
-        )
+        generate_kwargs: dict = {
+            "messages": [{"role": "user", "content": editor_input}],
+            "model": self.editor_model,
+            "temperature": 0.0,
+            "timeout": self.editor_timeout,
+        }
+        if self.editor_max_tokens:
+            generate_kwargs["max_tokens"] = self.editor_max_tokens
+        if self.editor_reasoning_effort:
+            generate_kwargs["reasoning_effort"] = self.editor_reasoning_effort
+        response = await model_client.generate(**generate_kwargs)
         edited_context = response.content
 
         # Log the context edit operation for auditing (before reset)
@@ -168,34 +234,49 @@ class ContextEditStrategy(BaseStrategy):
             },
         )
 
-        # Build the new context:
-        # 1. Original system message (with memory if already injected)
-        # 2. Edited context as a "prior context" assistant message
+        # Build the new context with structured separation:
+        # 1. System message (original + approach evaluation as advisory context)
+        # 2. User intent collation as user message (source of truth)
         # 3. Last user message
         new_messages = []
 
-        # Add system message
-        system_msg = trace.system_message
-        if system_msg:
-            new_messages.append(Message(role="system", content=system_msg.content))
+        # Parse the structured editor output
+        user_intent, approach_eval = self._parse_editor_output(edited_context)
 
-        # Add a user message explaining this is condensed context, then the edited context
+        # Add system message with approach evaluation appended
+        system_msg = trace.system_message
+        system_content = system_msg.content if system_msg else ""
+        if approach_eval:
+            system_content += (
+                "\n\n<context_edit_notes>\n"
+                "The following is an analysis of the prior conversation. The assistant's "
+                "previous approach may have had errors. Read this critically and be willing "
+                "to take a completely different approach if the evaluation suggests it.\n\n"
+                f"{approach_eval}\n"
+                "</context_edit_notes>"
+            )
+        new_messages.append(Message(role="system", content=system_content))
+
+        # Add user intent collation as user message (this is the source of truth)
+        user_context = user_intent if user_intent else edited_context
         new_messages.append(
             Message(
                 role="user",
-                content="[Prior conversation context, condensed]",
-            )
-        )
-        new_messages.append(
-            Message(
-                role="assistant",
-                content=edited_context,
+                content=(
+                    "[The following summarizes what I've told you so far across "
+                    "multiple messages. Please use this as the basis for your response.]\n\n"
+                    + user_context
+                ),
             )
         )
 
         # Add last user message
         last_user = trace.last_user_message
         if last_user:
+            # Need a placeholder assistant response between user messages
+            new_messages.append(
+                Message(role="assistant", content="Understood. Let me work on this with the updated context.")
+            )
             new_messages.append(Message(role="user", content=last_user.content))
 
         # Reset the trace's active conversation to the edited context

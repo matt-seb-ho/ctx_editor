@@ -113,11 +113,12 @@ class BatchedRunner(ExperimentRunner):
             )
             all_results.extend(batch_results)
 
-            # Update memory from batch results
-            if self.model_client:
+            # Update memory from batch results (skip error results with no conversation)
+            valid_results = [r for r in batch_results if not r.metadata.get("error")]
+            if self.model_client and valid_results:
                 memory = await self.updater.batch_update(
                     memory=memory,
-                    trajectories=batch_results,
+                    trajectories=valid_results,
                     model_client=self.model_client,
                 )
                 self.logger.info(f"Updated memory to v{memory.version}")
@@ -206,7 +207,7 @@ class BatchedRunner(ExperimentRunner):
                     score=0.0,
                     num_turns=0,
                     total_cost_usd=0.0,
-                    trace=[],
+                    trace={"messages": [], "logs": [], "num_resets": 0},
                     metadata={
                         "error": str(e),
                         "traceback": traceback.format_exc(),

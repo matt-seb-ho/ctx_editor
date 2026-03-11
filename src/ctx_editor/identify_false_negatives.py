@@ -39,6 +39,41 @@ from .paths import PROJECT_ROOT
 
 load_dotenv(PROJECT_ROOT / ".env")
 
+# ---------------------------------------------------------------------------
+# Data loading helpers
+# ---------------------------------------------------------------------------
+
+# Map task names to their data files
+TASK_DATA_FILES: dict[str, str] = {
+    "math": "full_math_subset.json",
+    "code": "full_code_subset.json",
+    "database": "full_database_subset.json",
+    "actions": "full_actions_subset.json",
+}
+
+
+def load_task_metadata() -> dict[str, dict[str, str]]:
+    """Load full_spec_q and ground_truth_a from data files, keyed by task_id.
+
+    Returns dict mapping task_id -> {"full_spec_q": ..., "ground_truth_a": ...}
+    """
+    data_dir = PROJECT_ROOT / "data"
+    metadata: dict[str, dict[str, str]] = {}
+    for task_name, filename in TASK_DATA_FILES.items():
+        filepath = data_dir / filename
+        if not filepath.exists():
+            continue
+        with open(filepath) as f:
+            samples = json.load(f)
+        for sample in samples:
+            tid = sample.get("task_id", "")
+            if tid:
+                metadata[tid] = {
+                    "full_spec_q": sample.get("full_spec_q", ""),
+                    "ground_truth_a": sample.get("ground_truth_a", ""),
+                }
+    return metadata
+
 
 # ---------------------------------------------------------------------------
 # Prompts
@@ -47,8 +82,9 @@ load_dotenv(PROJECT_ROOT / ".env")
 USER_SIM_SUFFICIENCY_PROMPT = """\
 You are auditing an AI evaluation system. In this system a "user simulator" \
 reveals a problem to an assistant piece-by-piece across multiple turns. \
-Your job is to decide whether the user simulator's messages, taken together, \
-gave a capable solver ALL the information needed to solve the problem correctly.
+Your job is to decide whether the user simulator's messages, taken together \
+(i.e. their UNION), gave a capable solver ALL the information needed to solve \
+the problem correctly.
 
 ## Original Problem (complete, single-turn version)
 {full_spec_q}
@@ -56,22 +92,36 @@ gave a capable solver ALL the information needed to solve the problem correctly.
 ## Ground Truth Answer
 {ground_truth_a}
 
+## System Message (instructions/context given to the assistant)
+{system_message}
+
 ## User Simulator Messages (all turns, in order)
 {user_messages}
 
 ## Instructions
-Compare the user messages against the original problem.
+Compare the COMBINED content of the system message and all user messages against the original problem.
 
-- Do the user messages collectively convey every constraint, quantity, \
-relationship, and instruction that is necessary to arrive at the ground-truth answer?
-- Minor rewordings are acceptable. Focus on whether any critical detail is \
-missing or was stated in a way that changes the problem's meaning.
+IMPORTANT context: It is EXPECTED that information is split across turns. \
+That is by design, not a flaw. You must evaluate the UNION of all user \
+messages — treat them as if you concatenated them into one block of text.
+
+Mark the information as "sufficient" UNLESS one of these is true:
+1. A critical detail (number, constraint, relationship, entity) from the \
+original problem is completely absent from ALL user messages.
+2. A critical detail was CHANGED in meaning (not merely reworded) in a way \
+that makes the correct answer unreachable.
+
+Do NOT flag:
+- Information arriving late or in a different order than the original.
+- Minor rewordings, paraphrasing, or splitting of sentences.
+- Information that is inferable from the combination of user messages even if \
+not stated in exactly the same words as the original.
 
 Respond with a JSON object:
 {{
-    "sufficient": <true if all necessary information was present, false otherwise>,
-    "missing_elements": ["list every crucial detail that was absent or distorted; empty list if sufficient"],
-    "explanation": "one or two sentence summary of your assessment"
+    "sufficient": <true if a capable solver who read ALL the user messages has enough info to reach the ground-truth answer>,
+    "missing_elements": ["list ONLY details that are truly absent or materially distorted; empty list if sufficient"],
+    "explanation": "one or two sentence summary"
 }}
 """
 
@@ -121,6 +171,14 @@ def format_user_messages(messages: list[dict]) -> str:
     for i, m in enumerate(user_msgs, 1):
         lines.append(f"[Turn {i}] {m.get('content', '').strip()}")
     return "\n\n".join(lines)
+
+
+def format_system_message(messages: list[dict]) -> str:
+    """Return the system message content, if any."""
+    sys_msgs = [m for m in messages if m.get("role") == "system"]
+    if not sys_msgs:
+        return ""
+    return sys_msgs[0].get("content", "").strip()
 
 
 def get_active_messages(trace: dict) -> list[dict]:
@@ -198,10 +256,12 @@ async def analyze_sample(
     trace = sample.get("trace", {})
     messages = get_active_messages(trace) if isinstance(trace, dict) else []
     user_messages_str = format_user_messages(messages)
+    system_message_str = format_system_message(messages)
 
     prompt = USER_SIM_SUFFICIENCY_PROMPT.format(
         full_spec_q=full_spec_q or "(not available)",
         ground_truth_a=ground_truth_a or "(not available)",
+        system_message=system_message_str or "(none)",
         user_messages=user_messages_str,
     )
 
@@ -285,6 +345,9 @@ async def run_analysis(
     """Run preliminary false-negative checks on all incorrect samples in a run directory."""
     run_path = Path(run_dir)
 
+    # Load task metadata (full_spec_q, ground_truth_a) from data files
+    task_metadata = load_task_metadata()
+
     # Load samples
     samples: list[dict] = []
     traces_dir = run_path / "traces"
@@ -304,6 +367,13 @@ async def run_analysis(
             )
         with open(results_path) as f:
             samples = json.load(f)
+
+    # Inject metadata from data files if not already present
+    for sample in samples:
+        if not sample.get("metadata"):
+            sample_id = sample.get("sample_id", "")
+            meta = task_metadata.get(sample_id, {})
+            sample["metadata"] = meta
 
     # Keep only incorrect samples
     incorrect = [s for s in samples if not s.get("is_correct", True)]

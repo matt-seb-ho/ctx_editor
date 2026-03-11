@@ -163,6 +163,7 @@ class CheatsheetUpdater(MemoryUpdater):
         reflection_prompt: Optional[str] = None,
         reflection_prompt_file: Optional[str] = None,
         model: str = "gpt-4o-mini",
+        timeout: int = 60,
         update_on_success: bool = True,
         update_on_failure: bool = True,
         include_full_spec_q: bool = False,
@@ -202,6 +203,7 @@ class CheatsheetUpdater(MemoryUpdater):
         self.unify_prompt = _UNIFY_PROMPT_FILE.read_text()
 
         self.model = model
+        self.timeout = timeout
         self.update_on_success = update_on_success
         self.update_on_failure = update_on_failure
         self.include_full_spec_q = include_full_spec_q
@@ -268,6 +270,7 @@ The ground truth answer:
             messages=[{"role": "user", "content": prompt}],
             model=self.model,
             temperature=0.3,
+            timeout=self.timeout,
         )
 
         new_content = response.content.strip()
@@ -311,6 +314,7 @@ The ground truth answer:
             messages=[{"role": "user", "content": prompt}],
             model=self.model,
             temperature=0.3,
+            timeout=self.timeout,
         )
 
         return response.content.strip()
@@ -342,6 +346,7 @@ The ground truth answer:
             messages=[{"role": "user", "content": prompt}],
             model=self.model,
             temperature=0.3,
+            timeout=self.timeout,
         )
 
         return response.content.strip()
