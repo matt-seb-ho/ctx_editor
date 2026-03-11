@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, SystemAgent, UserAgent
 from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
+from ctx_editor.error_analysis import analyze_simulation_result, print_summary, save_results as save_error_results
 from ctx_editor.memory import CheatsheetMemory, CheatsheetUpdater, MemoryModule
 from ctx_editor.execution import BatchedRunner, OfflineMemoryLearner, ParallelRunner, load_trajectories
 from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient, set_content_filter_log_path
@@ -266,9 +267,27 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         pbar.n = completed
         pbar.refresh()
 
+    # Error attribution setup
+    ea_enabled = cfg.get("error_attribution", {}).get("enabled", False)
+    ea_mode = cfg.get("error_attribution", {}).get("mode", "batch")
+    ea_model = cfg.get("error_attribution", {}).get("model", "gpt-4o-mini")
+    error_attribution_results = []  # Collect for batch mode or immediate results
+
     # Incremental result saving - save each result as it completes so
     # progress is not lost if the experiment hangs or is interrupted.
     partial_results_path = output_dir / "results_partial.jsonl"
+
+    async def _run_immediate_error_attribution(result: "SimulationResult") -> None:
+        """Run error attribution immediately after a conversation completes."""
+        if not ea_enabled or ea_mode != "immediate":
+            return
+        try:
+            result_dict = result.to_dict()
+            ea_result = await analyze_simulation_result(result_dict, model_client, ea_model)
+            if ea_result:
+                error_attribution_results.append(ea_result)
+        except Exception as e:
+            logger.warning(f"Error attribution failed for {result.sample_id}: {e}")
 
     def save_result_incrementally(result: "SimulationResult") -> None:
         """Save a single result to disk immediately upon completion."""
@@ -287,6 +306,10 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             output_dir=str(output_dir),
             assistant_model=cfg.model.assistant.model,
         )
+
+        # Immediate error attribution (fire-and-forget via event loop)
+        if ea_enabled and ea_mode == "immediate":
+            asyncio.ensure_future(_run_immediate_error_attribution(result))
 
     # Create memory updater with grounding config and target
     memory_updater = CheatsheetUpdater(
@@ -515,6 +538,28 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             "data_file": cfg.task.get("data_file", ""),
         },
     )
+
+    # Run batch error attribution if enabled
+    if ea_enabled and ea_mode == "batch":
+        incorrect_results = [r for r in valid_results if not r.is_correct]
+        if incorrect_results:
+            logger.info(f"Running batch error attribution on {len(incorrect_results)} incorrect samples...")
+            for r in tqdm(incorrect_results, desc="Error attribution", unit="sample"):
+                try:
+                    ea_result = await analyze_simulation_result(
+                        r.to_dict(), model_client, ea_model
+                    )
+                    if ea_result:
+                        error_attribution_results.append(ea_result)
+                except Exception as e:
+                    logger.warning(f"Error attribution failed for {r.sample_id}: {e}")
+
+    # Save error attribution results if any
+    if error_attribution_results:
+        ea_output_path = str(output_dir / "error_analysis.json")
+        save_error_results(error_attribution_results, ea_output_path)
+        print_summary(error_attribution_results)
+        logger.info(f"Error attribution: {len(error_attribution_results)} samples analyzed")
 
     # Save final memory
     if memory and cfg.memory.get("save_path"):
