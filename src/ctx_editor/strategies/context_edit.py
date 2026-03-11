@@ -34,26 +34,35 @@ Produce your output in these two clearly separated sections:
 Collate ONLY information from the user's messages (and system message if present). Include:
 - The user's goal/question
 - All requirements, constraints, and specifications the user has provided
-- Any examples, test cases, or clarifications from the user
-- Any corrections the user made to the assistant's understanding
+- Any examples, clarifications, or corrections from the user
 
 IMPORTANT:
 - Do NOT include the assistant's interpretations, assumptions, or invented details here.
-- If the user didn't specify something (e.g., function name, parameter types, return format), \
-do NOT fill it in from the assistant's choices — leave it unspecified.
-- If the assistant added parameters or constraints the user never mentioned, do NOT include them.
+- If the user didn't specify something, do NOT fill it in from the assistant's choices — \
+leave it unspecified.
+- If the assistant added requirements or constraints the user never mentioned, do NOT include them.
+- If the user provided concrete examples, include them verbatim — they are the strongest \
+signal for resolving ambiguity.
 </user_intent>
 
 <approach_evaluation>
-Critically evaluate the assistant's current approach. Be BRIEF and SPECIFIC — focus on what's wrong.
-- List any assumptions the assistant made that the user never confirmed (e.g., invented parameters, \
-wrong function signatures, assumed return types).
-- List any specific errors in the solution.
-- State what the assistant should do differently in 1-2 sentences.
+Critically evaluate the assistant's current approach:
+
+1. ERRORS: List specific mistakes in the assistant's solution. Check whether the output \
+format/structure matches what the user asked for (e.g., is the assistant returning something \
+different from what was requested?).
+
+2. UNGROUNDED ASSUMPTIONS: List any assumptions the assistant introduced that the user never \
+stated. Only flag these if they are likely causing incorrect behavior.
+
+3. CORRECTIVE DIRECTION: Based on the errors found and the user's examples/constraints, \
+state specifically what the assistant should do differently. Don't just say "reconsider the \
+approach" — propose a concrete direction grounded in the user's messages. If the user provided \
+examples, use them to determine the correct interpretation.
 
 Do not flag ambiguity unless it's causing the assistant to do the wrong thing. If the user \
-hasn't specified something and the assistant's default seems reasonable, that's fine — don't \
-flag it. The goal is to fix actual errors, not to enumerate every unspecified detail.
+hasn't specified something and the assistant's default seems reasonable, that's fine. The goal \
+is to fix actual errors, not to enumerate every unspecified detail.
 
 If the assistant's approach is broadly correct but has minor issues, say so — don't make it \
 sound worse than it is. If it has fundamental problems, say so clearly.

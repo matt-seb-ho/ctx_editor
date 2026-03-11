@@ -1,14 +1,8 @@
 Reflect on this conversation trajectory from the context editor's perspective and produce a bullet list of takeaways.
 The context editor's job is to separate user-provided facts (source of truth) from the assistant's
 potentially wrong approach, then give the assistant a fresh start. The editor produces two sections:
-<user_intent> (what the user actually said) and <approach_evaluation> (critical analysis of the assistant's work).
-
-IMPORTANT CONTEXT about the task setup:
-- The user reveals the problem specification gradually across turns (sharded disclosure).
-- The user will NOT answer clarifying questions — they only reveal the next shard on their schedule.
-- Therefore the editor should NEVER instruct the assistant to ask clarifying questions — this wastes turns.
-- The assistant should code eagerly with the information available and update when new info arrives.
-- Turns are limited, so every turn spent asking questions instead of coding is a wasted turn.
+<user_intent> (what the user actually said) and <approach_evaluation> (critical analysis of the
+assistant's work, including errors, ungrounded assumptions, and a corrective direction).
 
 <trajectory>
 Task: {task_name}
@@ -23,23 +17,24 @@ Conversation (including context edit operations):
 Focus on CONCRETE, SPECIFIC takeaways — not generic advice. Good takeaways look like:
 - "When the user corrects the assistant's interpretation, the <user_intent> must explicitly
   override the old interpretation, not just add the correction alongside it"
-- "The editor should identify SPECIFIC algorithmic mismatches (e.g., 'code uses constant k-step
-  but user specified variable i*k') rather than vaguely noting 'the approach may be wrong'"
-- "The editor preserved the assistant's wrong return type (List[List[str]] vs List[str]) across
-  3 resets because it treated the assistant's choice as established fact"
-- "Return ONLY the requested value — never wrap in tuples or add extra metadata like counts"
+- "The editor should use the user's examples to resolve ambiguities definitively — e.g., if the
+  example shows input [3,1,2] producing output [1,4], derive the rule from the example rather
+  than listing multiple possible interpretations"
+- "The editor preserved the assistant's wrong output format across multiple resets because it
+  treated the assistant's choice as established fact rather than an ungrounded assumption"
+- "The corrective direction was too vague ('reconsider the approach') — it should have said
+  specifically what to change based on the user's examples"
 
 Bad takeaways (too generic or counterproductive):
 - "Preserve key requirements" (vague — which requirements? how?)
-- "Ask the user to clarify X" (the user won't answer — they only reveal shards)
-- "Confirm the function signature with the user" (wastes a turn — just use the best guess)
-- "Force A/B clarification questions" (the user won't answer and it wastes a turn)
+- "Be more careful with assumptions" (not actionable)
+- "Simplify the solution" (when? why? what specifically is over-complicated?)
 
 Consider:
 1. Did the <user_intent> section accurately capture ONLY what the user said, without mixing in assistant assumptions?
-2. Did the <approach_evaluation> identify SPECIFIC algorithmic bugs (not just note "unconfirmed assumptions")?
-3. Were there assistant mistakes that the editor preserved or failed to flag?
-4. Did the edit cause the assistant to waste turns asking questions instead of coding?
+2. Did the <approach_evaluation> identify SPECIFIC errors (not just note "unconfirmed assumptions")?
+3. Was the corrective direction concrete enough to actually change the assistant's behavior?
+4. Did the editor verify that the assistant's output format matches the user's request?
 5. What specific aspect of the edit helped or hurt the outcome?
 
 Produce a concise bullet list of takeaways. Each must be specific enough that someone could implement it.

@@ -37,10 +37,10 @@ Critically evaluate the assistant's current approach:
 - Has the assistant made assumptions that the user never confirmed or that contradict user messages?
 - Are there specific errors in the assistant's solution that need to be corrected?
 - What should the assistant do differently on the next attempt?
-If the assistant's approach has fundamental problems (wrong function signature, wrong algorithm, \
-wrong interpretation), say so clearly. Do not preserve wrong work just because it was produced \
-with effort. The whole point of this edit is to let the assistant start fresh without the \
-baggage of prior wrong reasoning.
+If the assistant's approach has fundamental problems (wrong interpretation, wrong method, \
+incorrect output format), say so clearly. Do not preserve wrong work just because it was \
+produced with effort. The whole point of this edit is to let the assistant start fresh without \
+the baggage of prior wrong reasoning.
 </approach_evaluation>"""
 
 DECISION_PROMPT_V2 = """\
@@ -55,7 +55,7 @@ summary of what the user wants. This is beneficial when the assistant has gone d
 path and accumulated errors are making things worse.
 
 Look for these signs that a reset would help:
-1. The assistant's approach is fundamentally wrong (wrong algorithm, wrong interpretation, wrong function signature)
+1. The assistant's approach is fundamentally wrong (wrong interpretation, wrong method, incorrect output)
 2. The assistant is building on top of earlier mistakes instead of reconsidering
 3. New user information contradicts assumptions the assistant made earlier
 4. The assistant keeps producing similar wrong answers turn after turn
@@ -71,7 +71,7 @@ Respond with your analysis and decision:
 Be specific and concrete:
 - What exactly has the user asked for? (Cite their messages)
 - What is the assistant's current approach? Is it correct?
-- If the approach is wrong, what specifically is wrong? (e.g., "wrong return type: returns List[List[str]] but should return flat List[str]")
+- If the approach is wrong, what specifically is wrong? (Be precise — name the exact mismatch between what the user asked and what the assistant is doing.)
 - What should the assistant do differently?
 </notes>
 
@@ -100,26 +100,35 @@ Produce your output in these two clearly separated sections:
 Collate ONLY information from the user's messages (and system message if present). Include:
 - The user's goal/question
 - All requirements, constraints, and specifications the user has provided
-- Any examples, test cases, or clarifications from the user
-- Any corrections the user made to the assistant's understanding
+- Any examples, clarifications, or corrections from the user
 
 IMPORTANT:
 - Do NOT include the assistant's interpretations, assumptions, or invented details here.
-- If the user didn't specify something (e.g., function name, parameter types, return format), \
-do NOT fill it in from the assistant's choices — leave it unspecified.
-- If the assistant added parameters or constraints the user never mentioned, do NOT include them.
+- If the user didn't specify something, do NOT fill it in from the assistant's choices — \
+leave it unspecified.
+- If the assistant added requirements or constraints the user never mentioned, do NOT include them.
+- If the user provided concrete examples, include them verbatim — they are the strongest \
+signal for resolving ambiguity.
 </user_intent>
 
 <approach_evaluation>
-Critically evaluate the assistant's current approach. Be BRIEF and SPECIFIC — focus on what's wrong.
-- List any assumptions the assistant made that the user never confirmed (e.g., invented parameters, \
-wrong function signatures, assumed return types).
-- List any specific errors in the solution.
-- State what the assistant should do differently in 1-2 sentences.
+Critically evaluate the assistant's current approach:
+
+1. ERRORS: List specific mistakes in the assistant's solution. Check whether the output \
+format/structure matches what the user asked for (e.g., is the assistant returning something \
+different from what was requested?).
+
+2. UNGROUNDED ASSUMPTIONS: List any assumptions the assistant introduced that the user never \
+stated. Only flag these if they are likely causing incorrect behavior.
+
+3. CORRECTIVE DIRECTION: Based on the errors found and the user's examples/constraints, \
+state specifically what the assistant should do differently. Don't just say "reconsider the \
+approach" — propose a concrete direction grounded in the user's messages. If the user provided \
+examples, use them to determine the correct interpretation.
 
 Do not flag ambiguity unless it's causing the assistant to do the wrong thing. If the user \
-hasn't specified something and the assistant's default seems reasonable, that's fine — don't \
-flag it. The goal is to fix actual errors, not to enumerate every unspecified detail.
+hasn't specified something and the assistant's default seems reasonable, that's fine. The goal \
+is to fix actual errors, not to enumerate every unspecified detail.
 
 If the assistant's approach is broadly correct but has minor issues, say so — don't make it \
 sound worse than it is. If it has fundamental problems, say so clearly.
@@ -142,9 +151,11 @@ Answer these questions one by one:
 2. WHAT IS THE ASSISTANT DOING? (Summarize the assistant's current approach in 1-2 sentences)
 
 3. IS THE ASSISTANT'S APPROACH CORRECT? Check for these specific problems:
-   - Has the assistant introduced parameters, function names, or return types the user never mentioned?
+   - Is the assistant's core interpretation of the problem correct?
+   - Has the assistant introduced requirements or constraints the user never mentioned?
    - Is the assistant building on an earlier wrong answer instead of reconsidering?
    - Has the user corrected the assistant, but the assistant ignored or misunderstood the correction?
+   - Does the assistant's output format/structure match what the user asked for?
    - Is the assistant producing similar wrong outputs repeatedly?
 
 4. DECISION: Based on your analysis, should we reset? Answer "yes" if the assistant is on a \
