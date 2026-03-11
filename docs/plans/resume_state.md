@@ -115,16 +115,17 @@ trails agentic edit. Memory consistently hurts the agentic decider across tasks.
 
 ### Full Results Table (all tasks × all conditions)
 
-| Task (N) | Baseline | Ctx Edit | Ctx Edit+Mem | Agentic | Agentic+Mem | Best |
-|---|---|---|---|---|---|---|
-| **Code** (20) | 6/20 (30%) | 8/20 (40%) | **12/20 (60%)** | 8/19 (42%) | 4/20 (20%) | CE+M |
-| **Math** (9) | 2/9 (22%) | 2/9 (22%) | 2/9 (22%) | 3/9 (33%) | 4/8 (50%)* | AE+M |
-| **DB t3** (48) | 30/48 (63%) | 24/48 (50%) | 35/48 (73%) | **38/48 (79%)** | 28/48 (58%) | AE |
-| **Actions** (47) | 14/47 (30%) | 16/47 (34%) | 15/47 (32%) | 11/47 (23%) | **17/47 (36%)** | AE+M |
+| Task (N) | Baseline | Reflect | Ctx Edit | CE+Mem | Agentic | AE+Mem | Best |
+|---|---|---|---|---|---|---|---|
+| **Code** (20) | 6/20 (30%) | 3/18 (17%)† | 8/20 (40%) | **12/20 (60%)** | 8/19 (42%) | 4/20 (20%) | CE+M |
+| **Math** (9) | 2/9 (22%) | 2/9 (22%) | 2/9 (22%) | 2/9 (22%) | 3/9 (33%) | 4/8 (50%)† | AE+M |
+| **DB t3** (48) | 30/48 (63%) | 24/48 (50%) | 24/48 (50%) | 35/48 (73%) | **38/48 (79%)** | 28/48 (58%) | AE |
+| **Actions** (47) | 14/47 (30%) | 8/34 (24%)† | 16/47 (34%) | 15/47 (32%) | 11/47 (23%) | **17/47 (36%)** | AE+M |
 
-*1 error excluded. CE=context_edit, AE=agentic_edit, M=memory.
+†errors excluded (content filter). CE=context_edit, AE=agentic_edit, M=memory.
 
 **At least one method beats baseline on every task.** Best config varies by task.
+**Reflection-only is consistently at or below baseline** — append-only reflection adds noise without cleaning context. Context *rewriting* is the key mechanism.
 
 ### Output Directories
 
@@ -154,6 +155,10 @@ trails agentic edit. Memory consistently hurts the agentic decider across tasks.
 | Math agentic edit+mem | `2026-03-11/13-40-11` | Complete (8/9, 1 err) |
 | Actions agentic edit | `2026-03-11/13-40-12` | Complete (47/47, 0 err) |
 | Actions agentic edit+mem | `2026-03-11/13-40-14` | Complete (47/47, 0 err) |
+| Code reflection only | `2026-03-11/15-09-02` | Complete (18/20, 2 err) |
+| Math reflection only | `2026-03-11/15-09-04` | Complete (9/9, 0 err) |
+| DB t3 reflection only | `2026-03-11/15-09-05` | Complete (48/48, 0 err) |
+| Actions reflection only | `2026-03-11/15-09-06` | Complete (34/47, 13 err) |
 
 ### Cross-Task Analysis
 
@@ -168,6 +173,8 @@ trails agentic edit. Memory consistently hurts the agentic decider across tasks.
 5. **Code is unique in that context_edit+memory is best.** On code, always-resetting with learned editing principles (60%) beats agentic edit (42%). Code problems may have more consistent failure patterns that benefit from systematic editing.
 
 6. **Memory on the decider needs different treatment.** The current cheatsheet (editing principles) doesn't translate to good reset decisions. The decider may need its own memory target with decision-oriented principles (when to reset vs. continue).
+
+7. **Reflection-only (append without rewriting) hurts.** Consistently at or below baseline across all tasks. On code it drops to 17% (vs 30% baseline). This confirms that the value comes from context *rewriting* (removing polluted reasoning), not from generating reflections per se.
 
 ## What Needs To Happen Next
 
