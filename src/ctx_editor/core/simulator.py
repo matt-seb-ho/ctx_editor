@@ -12,6 +12,15 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
     from ..strategies.base import ContextStrategy
 
+# Prompt wrapper for Option 2 conversation format: render history as string
+# inside a single user message rather than as alternating API messages.
+ASSISTANT_PROMPT_WRAPPER = """\
+Here is the current conversation:
+
+{conversation}
+
+Please respond to the user. Do not include [user] or [assistant] tags in your response."""
+
 
 class ConversationSimulator:
     """Orchestrates multi-turn conversations for evaluation.
@@ -60,6 +69,38 @@ class ConversationSimulator:
         # Initialize with system message
         system_prompt = task.generate_system_prompt(sample)
         self.trace.add_system_message(system_prompt)
+
+    @staticmethod
+    def _render_for_assistant(context_messages: list[Message]) -> list[dict[str, str]]:
+        """Render context messages into Option 2 format for the API call.
+
+        Instead of passing the conversation as alternating user/assistant API messages,
+        we render it as a tagged string inside a single user message. This gives full
+        control over formatting and allows injecting arbitrary content (analysis, edited
+        context) without worrying about API message alternation requirements.
+
+        Format sent to API:
+            [{"role": "system", "content": "..."},
+             {"role": "user", "content": "Here is the current conversation:\\n\\n[CONTENT]\\n\\n..."}]
+        """
+        system_content = None
+        conversation_parts = []
+
+        for msg in context_messages:
+            if msg.role == "system":
+                system_content = msg.content
+            else:
+                conversation_parts.append(f"[{msg.role}]\n{msg.content}")
+
+        conversation_str = "\n\n".join(conversation_parts)
+        user_content = ASSISTANT_PROMPT_WRAPPER.format(conversation=conversation_str)
+
+        api_messages = []
+        if system_content:
+            api_messages.append({"role": "system", "content": system_content})
+        api_messages.append({"role": "user", "content": user_content})
+
+        return api_messages
 
     def _build_result_metadata(self, extra: dict[str, Any] | None = None) -> dict[str, Any]:
         """Build metadata dict for SimulationResult, including grounding info.
@@ -184,12 +225,9 @@ class ConversationSimulator:
             model_client=self.model_client,
         )
 
-        # Convert to dict format for API call
-        messages_for_api = [
-            msg.to_dict() if isinstance(msg, Message) else msg for msg in context_messages
-        ]
+        # 3. Render as Option 2 format and generate assistant response
+        messages_for_api = self._render_for_assistant(context_messages)
 
-        # 3. Generate assistant response using role config
         assistant_cfg = self.config.model_config.assistant
         max_tokens = assistant_cfg.get_effective_max_tokens()
 

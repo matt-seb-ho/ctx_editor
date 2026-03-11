@@ -282,10 +282,6 @@ class ContextEditStrategy(BaseStrategy):
         # Add last user message
         last_user = trace.last_user_message
         if last_user:
-            # Need a placeholder assistant response between user messages
-            new_messages.append(
-                Message(role="assistant", content="Understood. Let me work on this with the updated context.")
-            )
             new_messages.append(Message(role="user", content=last_user.content))
 
         # Reset the trace's active conversation to the edited context
