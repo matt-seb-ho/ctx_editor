@@ -1,6 +1,6 @@
 # Resume State — Context Edit + Memory Experiments
 
-**Last updated**: 2026-03-11 (Session 3, continued)
+**Last updated**: 2026-03-11 (Session 4 — cross-task expansion + reflection ablation)
 
 ## Current Results — Session 3 (Azure, gpt-4o user/system)
 
@@ -179,19 +179,39 @@ trails agentic edit. Memory consistently hurts the agentic decider across tasks.
 ## What Needs To Happen Next
 
 ### Immediate
-- **Spot-check failure modes**: Examine traces from database agentic_edit+memory and context_edit to understand why memory hurts the decider and why always-resetting disrupts database conversations
+- **Spot-check failure modes**: Examine traces to understand why memory hurts the agentic decider and why always-resetting disrupts database conversations
 - **Variance runs on code**: Run 2-3x more to confirm the 60% result isn't temperature noise (n=20 is small)
 - **Larger math subset**: 9 problems is too few — find or create a larger math subset
+- **Prompt improvements**: Last prompt change was commits e41933a and 11c07ef (this session). Consider task-specific tuning based on failure analysis.
 
 ### If results hold
 - **Separate memory targets**: The decider needs its own memory with decision-oriented principles (when to reset), not editing principles
-- **Best config per task**: code=context_edit+memory, database=agentic_edit, actions=TBD
+- **Best config per task**: code=context_edit+memory, database=agentic_edit, actions=agentic_edit+memory
 - **Write-up**: Document the cross-task findings
 
 ### Longer-term
 - **Hybrid strategy**: agentic_edit with memory on the editor (not the decider)
 - **Cross-task cheatsheet transfer**: Can a cheatsheet learned on code help with actions?
 - **Retrieval-based memory**: As cheatsheet grows across tasks, consider retrieval to avoid token limits
+
+## Session 4 Summary
+
+### What was done
+1. **Cross-task expansion**: Ran baseline, context_edit, context_edit+memory across math (9), database (63), and actions (47) — previously only had code results
+2. **Database re-filtering**: Created `data/test_database_subset_t3.json` (48 problems, threshold=3 — failed in all 3 variance runs) for tighter evaluation
+3. **Agentic edit experiments**: Ran agentic_edit and agentic_edit+memory across all 4 tasks
+4. **Reflection-only ablation**: Ran reflection_only (append-only, no rewriting) across all 4 tasks — consistently at or below baseline, validating that context rewriting is the key mechanism
+5. **Total experiments run this session**: 24 (4 tasks × 6 conditions)
+
+### What was NOT changed
+- No prompt changes this session — all experiments used prompts from commits e41933a and 11c07ef
+- No infrastructure changes
+
+### Key results
+- At least one method beats baseline on every task
+- Best strategy is task-dependent (CE+M for code, AE for database, AE+M for actions/math)
+- Reflection-only never helps — confirms rewriting > appending
+- Memory helps the editor but hurts the agentic decider (consistent across code and database)
 
 ## Configuration Reference
 
