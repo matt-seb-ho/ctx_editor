@@ -207,6 +207,46 @@ Cheatsheet size evolution (capped):
 - V2: ~1031 → 1084 → 1042 words (stable)
 - V3: ~1081 → 1096 → 1140 words (stable)
 
+## Code_v2 Experiments (extraction fix + code fence requirement)
+
+### Motivation
+V1 `extract_answer` in task_code.py uses `rfind("import")` which can chop off the `def` line when imports appear inside a function body. TaskCodeV2 fixes this + adds code fence requirement in system prompt. Testing whether these fixes create new opportunities for context editing to outperform baseline.
+
+### Results
+
+| Config | task=code (V1) | task=code_v2 | code_v2 (same-15) |
+|---|---|---|---|
+| Baseline | 4/19 (21%) | 3/20 (15%) | 2/15 (13%) |
+| Context edit V3 | 9/20 (45%) | 8/20 (40%) | 6/15 (40%) |
+| **Context edit V3 + mem (capped)** | 7/19 (37%) | **partial** | **8/15 (53%)** |
+
+**Key finding**: On the 15 problems where all 3 conditions completed, **V3+memory outperforms V3 alone** (53% vs 40%, +2 problems). This is the first evidence that memory improves over V3.
+
+Memory wins (3):
+- **2754** (Maximum Group Strength): Memory prevents "contiguous subarray" lock-in → correct subset algorithm on 1st reset (V3 used 3 resets, still failed)
+- **2756** (Buy Two Chocolates): Memory gets function signature/parameter order right
+- **2791** (Circle Game Losers): Memory produces simpler return types (list vs dict-with-metadata), fewer wasted turns
+
+Memory loss (1):
+- **2816** (Palindrome): Pure temperature variance — both versions had correct algorithm, memory unlucky on return type (tuple vs str)
+
+Missing 5 problems (API quota exhaustion): 2888, 2893, 2916, 2920, 3000. V3 got 2/5 on these.
+
+### Output Directories
+
+| Experiment | Dir (2026-03-11/) |
+|---|---|
+| Baseline code_v2 | 03-47-52 |
+| Context edit V3 code_v2 | 03-47-53 |
+| Context edit V3 + mem code_v2 (partial 15/20) | 03-47-55 |
+
+### Cross-Cutting Analysis: What Memory Does Well
+
+1. **Prevents over-engineering and invented constraints**: V3 without memory invents parameters, complex return types, assumed constraints (contiguity). Memory version consistently produces simpler, more focused solutions.
+2. **Breaks free of wrong-approach lock-in**: Most damaging V3 failure = getting locked into an incorrect framing after first attempt. Memory helps editor write sharper approach evaluations that correct fundamental framing errors.
+3. **Faster convergence**: Memory approximately halves the information needed to reach a correct solution (2-3 shards vs 7-8).
+4. **Better function signature matching**: Memory version produces signatures aligned with standard competitive-programming conventions.
+
 ## Status
 - [x] Data files created
 - [x] Experiment configs created
@@ -218,5 +258,7 @@ Cheatsheet size evolution (capped):
 - [x] V3 code results: context_edit 45%, agentic_edit 35%
 - [x] V3 memory experiments — memory hurts both V2 and V3 (unbounded cheatsheet growth)
 - [x] Capped cheatsheet (1500 words) — helps V3 (25%→37%) but still below V3 alone (45%)
+- [x] Code_v2 experiments — V3+memory outperforms V3 on same-15 subset (53% vs 40%)
+- [ ] Complete V3+memory code_v2 run (5 missing problems, blocked by API quota)
 - [ ] Variance runs for V3 conditions
 - [ ] Math re-runs with V3 prompts

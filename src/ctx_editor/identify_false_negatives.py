@@ -140,6 +140,11 @@ class PrelimFNResult:
     extracted_answer: str = ""
     last_turn_classification: str = ""  # e.g. "answer_attempt", "clarification", ...
 
+    # Check 1b: extraction failure analysis
+    extraction_failed: bool = False
+    v2_would_extract: bool = False
+    extraction_failure_reason: str = ""
+
     # Check 2: user sim sufficiency (LLM)
     user_sim_sufficient: bool = True
     missing_elements: list[str] = field(default_factory=list)
@@ -155,7 +160,11 @@ class PrelimFNResult:
     @property
     def is_preliminary_fn(self) -> bool:
         """True if either preliminary check flags this as a likely false negative."""
-        return not self.has_extracted_answer or not self.user_sim_sufficient
+        return (
+            not self.has_extracted_answer
+            or not self.user_sim_sufficient
+            or self.extraction_failed
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -201,6 +210,77 @@ def get_extracted_answer(sample: dict) -> str:
                 if ans:
                     return ans
     return ""
+
+
+def check_extraction_failure(sample: dict, task_name: str) -> dict[str, Any]:
+    """Check if the answer extractor failed to extract code that was present.
+
+    For code tasks, tries the V2 extractor (which fixes a bug where an `import`
+    inside a function body caused the V1 extractor to drop the function header).
+    Also checks if the assistant ever produced code but it was never extracted.
+
+    Returns dict with:
+        extraction_failed: True if code was present but not extracted
+        v2_would_extract: True if V2 extractor would succeed where V1 failed
+        failure_reason: description of why extraction failed
+    """
+    result = {
+        "extraction_failed": False,
+        "v2_would_extract": False,
+        "failure_reason": "",
+    }
+
+    if task_name != "code":
+        return result
+
+    try:
+        from lic.tasks.code.task_code import TaskCode
+        from lic.tasks.code.task_code_v2 import TaskCodeV2
+    except ImportError:
+        return result
+
+    task_v1 = TaskCode()
+    task_v2 = TaskCodeV2()
+
+    trace = sample.get("trace", {})
+    if not isinstance(trace, dict):
+        return result
+
+    messages = trace.get("messages", [])
+    assistant_msgs = [
+        m.get("content", "")
+        for m in messages
+        if isinstance(m, dict) and m.get("role") == "assistant"
+    ]
+
+    if not assistant_msgs:
+        return result
+
+    # Check: does any assistant message contain "def " (code was produced)?
+    has_code = any("def " in msg for msg in assistant_msgs)
+    if not has_code:
+        return result
+
+    # Check last assistant message with V1 vs V2
+    last_msg = assistant_msgs[-1]
+    v1_extracted = task_v1.extract_answer(last_msg)
+    v2_extracted = task_v2.extract_answer(last_msg)
+
+    if not v1_extracted and v2_extracted:
+        result["extraction_failed"] = True
+        result["v2_would_extract"] = True
+        result["failure_reason"] = (
+            "V1 extractor failed (import-inside-function bug) but V2 would succeed"
+        )
+    elif not v1_extracted and not v2_extracted:
+        # Neither extracted — check if code blocks are missing
+        if "```" not in last_msg and "def " in last_msg:
+            result["extraction_failed"] = True
+            result["failure_reason"] = (
+                "Assistant produced code without markdown fences and extractor could not parse it"
+            )
+
+    return result
 
 
 def get_last_turn_classification(sample: dict) -> str:
@@ -276,12 +356,20 @@ async def analyze_sample(
     missing_elements = llm_result.get("missing_elements", [])
     explanation = llm_result.get("explanation", "")
 
+    # ------------------------------------------------------------------
+    # Check 1b (programmatic): extraction failure analysis
+    # ------------------------------------------------------------------
+    extraction_info = check_extraction_failure(sample, task_name)
+
     result = PrelimFNResult(
         sample_id=sample_id,
         task_name=task_name,
         has_extracted_answer=has_extracted,
         extracted_answer=extracted_answer,
         last_turn_classification=last_classification,
+        extraction_failed=extraction_info["extraction_failed"],
+        v2_would_extract=extraction_info["v2_would_extract"],
+        extraction_failure_reason=extraction_info["failure_reason"],
         user_sim_sufficient=sufficient,
         missing_elements=missing_elements,
         sufficiency_explanation=explanation,
@@ -447,12 +535,22 @@ def print_summary(results: list[PrelimFNResult]) -> None:
     if errors:
         print(f"Analysis errors: {errors}")
 
+    # Check 1b stats
+    extraction_failures = [r for r in results if r.extraction_failed]
+
     print("\n--- Check 1: Answer Extraction ---")
     print(f"Missing extracted answer: {len(no_answer)} / {total} ({len(no_answer)/total:.1%})")
     if classification_counts:
         print("  Last turn classifications for missing-answer cases:")
         for cls, count in sorted(classification_counts.items(), key=lambda x: -x[1]):
             print(f"    {cls or '(empty)':<20} {count:3d}")
+    if extraction_failures:
+        print(f"\n--- Check 1b: Extraction Failures ---")
+        print(f"Extraction bug detected: {len(extraction_failures)} / {total} ({len(extraction_failures)/total:.1%})")
+        v2_fixable = sum(1 for r in extraction_failures if r.v2_would_extract)
+        print(f"  Fixable by V2 extractor: {v2_fixable}")
+        for r in extraction_failures[:5]:
+            print(f"    [{r.sample_id}] {r.extraction_failure_reason}")
 
     print("\n--- Check 2: User Sim Sufficiency ---")
     print(f"Sharding distortion: {len(distortions)} / {total} ({len(distortions)/total:.1%})")
@@ -499,6 +597,9 @@ def save_results(results: list[PrelimFNResult], output_path: str) -> None:
                 "has_extracted_answer": r.has_extracted_answer,
                 "extracted_answer": r.extracted_answer,
                 "last_turn_classification": r.last_turn_classification,
+                "extraction_failed": r.extraction_failed,
+                "v2_would_extract": r.v2_would_extract,
+                "extraction_failure_reason": r.extraction_failure_reason,
                 "user_sim_sufficient": r.user_sim_sufficient,
                 "missing_elements": r.missing_elements,
                 "sufficiency_explanation": r.sufficiency_explanation,
