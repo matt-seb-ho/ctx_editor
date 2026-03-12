@@ -102,9 +102,67 @@ def render_for_edit_decision(trajectory: "SimulationResult") -> str:
     return "\n\n".join(parts)
 
 
+def render_for_analyzer(trajectory: "SimulationResult") -> str:
+    """Renders the full trajectory with analysis outputs highlighted.
+
+    Shows all messages and marks where analyses were produced and what
+    the analyzer generated at each point. If context edits occurred,
+    those are shown too since the analyzer drives edit decisions in S2.
+    """
+    messages = trajectory.trace.get("messages", [])
+    logs = trajectory.trace.get("logs", [])
+
+    # Extract analysis and edit events
+    analysis_logs = [l for l in logs if l["type"] == "conversation_analysis"]
+    edit_logs = [l for l in logs if l["type"] in ("context_edit_output", "conversation_reset")]
+
+    parts = []
+    reset_count = 0
+
+    for msg in messages:
+        role = msg.get("role", "")
+        visible = msg.get("visible", True)
+        content = msg.get("content", "")
+
+        if role not in ("system", "user", "assistant"):
+            continue
+
+        # Insert edit markers for archived messages
+        if visible and reset_count < len(edit_logs):
+            edit_log = edit_logs[reset_count]
+            if edit_log["type"] == "context_edit_output":
+                edited = edit_log["data"].get("edited_context", "(no output)")
+                parts.append(
+                    f"\n--- CONTEXT EDIT (Reset #{reset_count + 1}) ---\n"
+                    f"Editor output:\n{edited}\n"
+                    f"--- NEW THREAD BEGINS ---\n"
+                )
+            reset_count += 1
+
+        prefix = f"[{role}]" if visible else f"[{role} — ARCHIVED]"
+        parts.append(f"{prefix} {content}")
+
+    # Append analysis outputs at the end for clear review
+    if analysis_logs:
+        parts.append("\n--- ANALYSIS OUTPUTS ---")
+        for i, log in enumerate(analysis_logs, 1):
+            d = log["data"]
+            pivot = d.get("pivot_needed", "unknown")
+            user_intent = d.get("user_intent", "")
+            approach_eval = d.get("approach_evaluation", "")
+            parts.append(
+                f"Analysis {i} (pivot={pivot}):\n"
+                f"<user_intent>\n{user_intent}\n</user_intent>\n"
+                f"<approach_evaluation>\n{approach_eval}\n</approach_evaluation>"
+            )
+
+    return "\n\n".join(parts)
+
+
 # Registry mapping target name → renderer function
 RENDERERS: dict[str, Callable[["SimulationResult"], str]] = {
     "assistant": render_for_assistant,
     "context_editor": render_for_context_editor,
     "edit_decision": render_for_edit_decision,
+    "analyzer": render_for_analyzer,
 }
