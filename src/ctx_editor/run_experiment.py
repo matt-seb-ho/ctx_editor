@@ -551,6 +551,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         extra={
             "user_mode": cfg.user_mode.name,
             "data_file": cfg.task.get("data_file", ""),
+            **dict(cfg.get("metadata", {})),
         },
     )
 
