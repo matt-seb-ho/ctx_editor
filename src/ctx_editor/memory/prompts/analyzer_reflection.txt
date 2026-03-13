@@ -1,18 +1,75 @@
 You are updating a memory cheatsheet based on a completed conversation trajectory.
-The cheatsheet captures lessons to help a conversation analyzer work more effectively.
+The cheatsheet captures lessons for the conversation analyzer — the component that reviews
+multi-turn conversations and identifies where the assistant's approach has gone wrong.
 
-The analyzer's job is to independently review a multi-turn conversation and produce:
-- <user_intent>: ONLY what the user actually said — their goal, constraints, examples, corrections
-- <approach_evaluation>: Critical analysis of the assistant's approach — errors, ungrounded
-  assumptions, and a concrete corrective direction
-- <pivot_decision>: Whether the assistant needs to fundamentally change its approach
+## What the Analyzer Does
 
-The key failure modes to avoid:
-1. Including the assistant's assumptions in the user_intent section (laundering wrong ideas)
-2. Missing errors because the assistant's reasoning sounds plausible
-3. Recommending a pivot when the approach is reasonable (unnecessary disruption)
-4. NOT recommending a pivot when the assistant is stuck in a wrong direction
-5. Writing vague corrective directions that don't actually change behavior
+The analyzer independently reviews a multi-turn conversation and produces a structured analysis:
+- **Task Spec (user intent)**: A clean specification derived ONLY from user messages — no
+  assistant assumptions. This separates what the user actually asked for from what the assistant
+  decided to do.
+- **What Looks Right (aligned)**: Parts of the assistant's approach that correctly address the task.
+- **What Needs to Change (issues)**: Where the assistant's approach contradicts or deviates from
+  user requirements. If substantive issues are found, the analysis triggers an intervention.
+
+The analysis is used in two strategies:
+
+**S1 (Append Analysis)**: The analysis is appended to the conversation so the assistant can see
+it before its next response. The assistant sees the full conversation history with the analysis
+interleaved. Goal: the assistant course-corrects on its own after reading the critical review.
+
+**S2 (Context Edit)**: When issues are found, the old conversation is replaced with compacted
+context containing only the task spec and aligned work. This removes "hard attention" — the
+assistant's previous wrong reasoning that anchors it to incorrect approaches. The assistant then
+responds with clean context, free from its own earlier mistakes.
+
+## How to Read the Conversation Trace
+
+The trajectory shows the conversation with analysis outputs interleaved at the point they occurred:
+
+```
+[user]
+{{user message}}
+[assistant]
+{{assistant response}}
+...
+[conversation analysis]         ← analysis generated here, between turns
+# Task Spec
+...
+# What Needs to Change
+...
+→ Decision: EDIT / NO EDIT      ← (S2 only) whether context was rewritten
+
+================================================
+NEW CONVERSATION (Reset #1)     ← (S2 only) old context discarded
+================================================
+[compacted conversation]        ← cleaned-up context: task spec + aligned work
+...
+[user]
+{{next user message}}
+[assistant]
+{{response in new context}}
+```
+
+## How the Cheatsheet Controls Behavior
+
+The analyzer's prompt defines WHAT to produce — the input/output format and high-level goal.
+But the prompt is intentionally lean. The cheatsheet controls HOW the analyzer actually works:
+
+- **Strategies and sequencing**: Specify subgoals and their order.
+  e.g., "First gather all user-stated constraints into a checklist, then evaluate the assistant's
+  approach against each one" or "Check output format requirements last, after verifying logic"
+- **Diagnostic patterns**: What conversation patterns indicate specific types of errors.
+  e.g., "When the assistant gives a very confident early answer, check whether it's grounded in
+  user requirements or just plausible-sounding"
+- **Concepts and mental models**: Reusable frameworks for analysis.
+  e.g., "Distinguish 'did something wrong' from 'did something not asked for' — the first needs
+  correction, the second needs removal"
+- **Pitfalls to avoid**: Common analyzer mistakes to watch for.
+  e.g., "Don't flag ambiguity when the user's example clearly resolves it"
+- **Successful strategies**: What worked well in past analyses.
+  e.g., "When the user provides test cases, use them as ground truth to verify the assistant's
+  logic rather than reasoning abstractly"
 
 <current_cheatsheet>
 {current_cheatsheet}
@@ -24,36 +81,24 @@ Sample ID: {sample_id}
 Outcome: {outcome} (score: {score})
 Number of turns: {num_turns}
 
-Conversation (including any analysis or edit operations):
 {conversation}
 </trajectory>
 {grounding_info}
 SIZE LIMIT: The updated cheatsheet MUST be between 500 and 1500 words. If it would exceed 1500 words,
 aggressively prioritize: keep only the most impactful lessons and drop or merge less critical entries.
 
-WHAT BELONGS IN THE CHEATSHEET — meta-level analysis principles:
+WHAT BELONGS IN THE CHEATSHEET — transferable analysis principles:
+- Sequencing strategies: what to check first, what order to evaluate in
+- Diagnostic patterns: conversation signals that indicate specific error types
 - How to correctly separate user intent from assistant assumptions
-- Patterns that indicate a pivot is needed vs. the approach is fine
-- How to write corrective directions specific enough to change the assistant's behavior
-- Common error patterns in multi-turn conversations (e.g., over-commitment to early assumptions)
-- How to use user-provided examples to resolve ambiguities definitively
+- How to write issues/corrective directions specific enough to change behavior
+- Patterns that indicate the assistant is stuck vs making progress
 
 WHAT DOES NOT BELONG — these actively harm performance:
 - Algorithmic recipes, code snippets, or solution templates from specific problems
-- Prescriptive rules about function signatures, parameter names, or specific data structures
-- Problem-specific details that won't generalize (e.g., "for the palindrome problem, do X")
-The analyzer should evaluate each conversation on its own merits, not apply templates from past problems.
+- Problem-specific details that won't generalize (e.g., "for palindrome problems, do X")
+- Generic advice like "be thorough" or "pay attention to details"
 
-Reflect on this trajectory. Focus on CONCRETE, SPECIFIC lessons:
-1. Did the analysis correctly separate user facts from assistant assumptions?
-2. Did the approach evaluation identify the right errors (or miss them)?
-3. Was the corrective direction concrete enough to change the assistant's behavior?
-4. Was the pivot decision correct given the conversation state?
-5. What patterns in the conversation were diagnostic of the eventual outcome?
-
-Update the cheatsheet with specific, actionable analysis principles. Avoid generic advice like
-"be thorough" — instead write things like "when the user provides a concrete example that resolves
-an ambiguity, the analyzer must use it to determine the correct interpretation rather than listing
-both possibilities."
+Reflect on this trajectory and update the cheatsheet with specific, actionable principles.
 
 Updated cheatsheet:
