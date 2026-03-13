@@ -34,10 +34,11 @@ Termination reasons: `correct_answer` (implicit via `is_completed`), `all_shards
 **Single turn (`_run_turn`):**
 
 1. **User generates response** — UserAgent produces the next message and optionally reveals a shard
-2. **Apply context strategy** — prepares `context_messages` for the assistant (baseline: full history)
-3. **Assistant generates response** — model call with `context_messages`
-4. **System verifies** — SystemAgent classifies the assistant's response type
-5. **If answer attempt** — extract the answer and evaluate against ground truth
+2. **Apply context strategy** — `strategy.prepare_context()` prepares the context (may run the `ConversationAnalyzer` for S1/S2, may reset the trace for S2)
+3. **Render for assistant** — `_render_for_assistant()` converts the message list into a tagged string inside a single user message (Option 2 format: `[user]`/`[assistant]`/`[compacted conversation]` tags)
+4. **Assistant generates response** — model call with the rendered context
+5. **System verifies** — SystemAgent classifies the assistant's response type
+6. **If answer attempt** — extract the answer and evaluate against ground truth
    - Correct → mark completed, store `SimulationResult`
    - Incorrect → conversation continues (user can reveal more shards)
 
