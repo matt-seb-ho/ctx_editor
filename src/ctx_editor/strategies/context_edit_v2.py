@@ -12,7 +12,7 @@ itself produces the pivot decision as part of its structured output.
 from typing import TYPE_CHECKING, Optional
 
 from ..core.types import Message
-from .analyzer import ConversationAnalyzer
+from .analyzer import AnalysisResult, ConversationAnalyzer
 from .base import BaseStrategy
 
 if TYPE_CHECKING:
@@ -51,44 +51,42 @@ class ContextEditV2Strategy(BaseStrategy):
         self.use_memory = use_memory
         self.memory_target = memory_target
 
+    @staticmethod
     def _build_edited_context(
-        self,
         trace: "ConversationTrace",
-        user_intent: str,
-        approach_eval: str,
+        result: "AnalysisResult",
     ) -> list[Message]:
         """Build compacted context from analysis output.
 
+        Purges the full conversation history (hard attention) and replaces it
+        with a compacted version. The "issues" from the analysis guided the
+        decision to edit but are NOT reintroduced — the point is to remove
+        harmful content from context, not redescribe it.
+
+        The compacted context uses a [compacted conversation] role tag so the
+        simulator's Option 2 renderer treats it like any other conversation
+        turn, keeping everything in a single user message.
+
         Produces:
-        - System message (original + approach evaluation as advisory notes)
-        - User intent summary (collated from user messages)
+        - System message (original, unmodified)
+        - Compacted conversation (task spec + what looks right)
         - Latest user message
         """
         new_messages = []
 
-        # System message with approach evaluation appended
+        # System message — pass through unmodified
         system_msg = trace.system_message
-        system_content = system_msg.content if system_msg else ""
-        if approach_eval:
-            system_content += (
-                "\n\n<context_edit_notes>\n"
-                "An independent review of the prior conversation identified areas "
-                "for improvement. Consider this feedback when formulating your response.\n\n"
-                f"{approach_eval}\n"
-                "</context_edit_notes>"
-            )
-        new_messages.append(Message(role="system", content=system_content))
+        if system_msg:
+            new_messages.append(Message(role="system", content=system_msg.content))
 
-        # User intent as a user message (source of truth)
+        # Compacted conversation: task spec + aligned content
+        task_spec = result.user_intent if result.user_intent else result.raw_output
+        compact_parts = [f"# Task Spec\n{task_spec}"]
+        if result.aligned:
+            compact_parts.append(f"# What Looks Right So Far\n{result.aligned}")
+
         new_messages.append(
-            Message(
-                role="user",
-                content=(
-                    "[The following summarizes what I've told you so far across "
-                    "multiple messages. Please use this as the basis for your response.]\n\n"
-                    + user_intent
-                ),
-            )
+            Message(role="compacted conversation", content="\n\n".join(compact_parts))
         )
 
         # Latest user message
@@ -133,25 +131,23 @@ class ContextEditV2Strategy(BaseStrategy):
             "conversation_analysis",
             {
                 "user_intent": result.user_intent,
-                "approach_evaluation": result.approach_evaluation,
-                "pivot_needed": result.pivot_needed,
+                "aligned": result.aligned,
+                "issues": result.issues,
+                "needs_edit": result.needs_edit,
                 "analyzer_model": self.analyzer.model,
             },
         )
 
-        if not result.pivot_needed:
-            # No pivot — pass through like baseline
+        if not result.needs_edit:
+            # No substantive issues — pass through like baseline
             trace.add_log("edit_decision", {"should_edit": False})
             return trace.get_active_messages()
 
-        # Pivot needed — rewrite context
+        # Issues found — rewrite context
         trace.add_log("edit_decision", {"should_edit": True})
 
-        # Use analysis output to build compacted context
-        user_intent = result.user_intent if result.user_intent else result.raw_output
-        new_messages = self._build_edited_context(
-            trace, user_intent, result.approach_evaluation
-        )
+        # Build compacted context from analysis
+        new_messages = self._build_edited_context(trace, result)
 
         # Log before reset
         trace.add_log(

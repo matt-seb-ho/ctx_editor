@@ -249,6 +249,15 @@ class ConversationTrace:
             "num_resets": self.num_resets,
         }
 
+    def get_user_messages_string(self, active_only: bool = True) -> str:
+        """Get only user messages as a formatted string, numbered by turn."""
+        messages = self.to_messages(include_system=False, active_only=active_only)
+        user_msgs = [msg for msg in messages if msg.role == "user"]
+        parts = []
+        for i, msg in enumerate(user_msgs, 1):
+            parts.append(f"[Message {i}]\n{msg.content}")
+        return "\n\n".join(parts)
+
     def get_conversation_string(
         self,
         skip_system: bool = False,

@@ -104,18 +104,22 @@ class AppendAnalysisStrategy(BaseStrategy):
             "conversation_analysis",
             {
                 "user_intent": result.user_intent,
-                "approach_evaluation": result.approach_evaluation,
-                "pivot_needed": result.pivot_needed,
+                "aligned": result.aligned,
+                "issues": result.issues,
+                "needs_edit": result.needs_edit,
                 "analyzer_model": self.analyzer.model,
             },
         )
 
         # Build analysis text to append
-        analysis_text = ""
+        parts = []
         if result.user_intent:
-            analysis_text += f"User Intent:\n{result.user_intent}\n\n"
-        if result.approach_evaluation:
-            analysis_text += f"Approach Evaluation:\n{result.approach_evaluation}"
+            parts.append(f"# Task Spec\n{result.user_intent}")
+        if result.aligned:
+            parts.append(f"# What Looks Right So Far\n{result.aligned}")
+        if result.issues and result.needs_edit:
+            parts.append(f"# What Needs to Change\n{result.issues}")
+        analysis_text = "\n\n".join(parts)
 
         if analysis_text:
             analysis_block = ANALYSIS_BLOCK_TEMPLATE.format(analysis=analysis_text.strip())
