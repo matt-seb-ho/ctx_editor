@@ -148,6 +148,21 @@ class ConversationAnalyzer:
             raw_output=text,
         )
 
+    @staticmethod
+    def _strip_edit_notes(text: str) -> str:
+        """Strip <context_edit_notes> blocks from conversation text.
+
+        After a context reset, the system message contains edit notes that
+        (a) are not part of the raw conversation and (b) trigger Azure's
+        jailbreak content filter due to nested instruction patterns.
+        """
+        return re.sub(
+            r"\s*<context_edit_notes>.*?</context_edit_notes>",
+            "",
+            text,
+            flags=re.DOTALL,
+        )
+
     def _build_prompt(
         self,
         trace: "ConversationTrace",
@@ -155,10 +170,13 @@ class ConversationAnalyzer:
     ) -> str:
         """Build the analysis prompt from the conversation trace.
 
-        Important: this uses the raw conversation WITHOUT previous analyses,
-        so the analyzer always sees the original user/assistant exchange.
+        Important: this uses the raw conversation WITHOUT previous analyses
+        or edit notes, so the analyzer always sees the original exchange.
         """
         conversation_str = trace.get_conversation_string(skip_system=False)
+        # Remove any <context_edit_notes> left from prior resets to avoid
+        # content filter triggers and keep the analyzer's input clean.
+        conversation_str = self._strip_edit_notes(conversation_str)
 
         memory_section = ""
         if memory and memory.content:

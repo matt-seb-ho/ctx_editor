@@ -258,9 +258,8 @@ class ContextEditStrategy(BaseStrategy):
         if approach_eval:
             system_content += (
                 "\n\n<context_edit_notes>\n"
-                "The following is an analysis of the prior conversation. The assistant's "
-                "previous approach may have had errors. Read this critically and be willing "
-                "to take a completely different approach if the evaluation suggests it.\n\n"
+                "An independent review of the prior conversation identified areas "
+                "for improvement. Consider this feedback when formulating your response.\n\n"
                 f"{approach_eval}\n"
                 "</context_edit_notes>"
             )
