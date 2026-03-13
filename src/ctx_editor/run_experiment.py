@@ -13,11 +13,26 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
 from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, SystemAgent, UserAgent
-from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
-from ctx_editor.error_analysis import analyze_simulation_result, print_summary, save_results as save_error_results
+from ctx_editor.core import ConversationSimulator, ConversationTrace, ModelConfig, SimulatorConfig
+from ctx_editor.error_analysis import (
+    analyze_simulation_result,
+    print_summary,
+    save_results as save_error_results,
+)
 from ctx_editor.memory import CheatsheetMemory, CheatsheetUpdater, MemoryModule
-from ctx_editor.execution import BatchedRunner, OfflineMemoryLearner, ParallelRunner, load_trajectories
-from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient, set_content_filter_log_path
+from ctx_editor.execution import (
+    BatchedRunner,
+    OfflineMemoryLearner,
+    ParallelRunner,
+    ReplayRunner,
+    load_trajectories,
+)
+from ctx_editor.models import (
+    AnthropicModelClient,
+    LoadBalancerConfig,
+    OpenAIModelClient,
+    set_content_filter_log_path,
+)
 from ctx_editor.utils.ledger import add_run
 from ctx_editor.utils.logging import (
     get_logger,
@@ -213,9 +228,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         shard_counts = [len(s.get("shards", [])) for s in samples]
         min_shards = min(shard_counts) if shard_counts else 5
         auto_min_turns = max(min_shards - 2, 2)  # At least 2 turns before analysis
-        logger.info(
-            f"Auto min_turns: min_shards={min_shards}, setting min_turns={auto_min_turns}"
-        )
+        logger.info(f"Auto min_turns: min_shards={min_shards}, setting min_turns={auto_min_turns}")
         # Override in the Hydra config so strategy instantiation picks it up
         cfg.experiment.strategy.min_turns = auto_min_turns
 
@@ -224,7 +237,11 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     logger.info(f"Loaded {len(samples)} samples for task config '{cfg.task.name}'")
 
     # Create simulator factory
-    def make_simulator(sample: dict, memory: Optional[MemoryModule] = None):
+    def make_simulator(
+        sample: dict,
+        memory: Optional[MemoryModule] = None,
+        trace: Optional[ConversationTrace] = None,
+    ):
         # Build ModelConfig from hydra config
         model_cfg_dict = OmegaConf.to_container(cfg.model, resolve=True)
         model_config = ModelConfig.from_dict(model_cfg_dict)
@@ -270,6 +287,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             strategy=strategy,
             memory=memory,
             config=sim_config,
+            trace=trace,
         )
 
     # Run experiment
@@ -384,11 +402,24 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         )
         return metrics
 
-    if (
-        execution_mode == "batched"
-        and cfg.memory.enabled
-        and cfg.memory.source == "continual"
-    ):
+    if execution_mode == "replay":
+        # Replay mode: load baseline traces, only regenerate final turn
+        replay_source = cfg.execution.get("replay_source")
+        if not replay_source:
+            raise ValueError(
+                "execution.replay_source must be set when execution.mode=replay. "
+                "Point it to a baseline output directory or traces folder."
+            )
+        logger.info(f"Replay mode: loading baseline traces from {replay_source}")
+
+        runner = ReplayRunner(
+            trace_source=replay_source,
+            max_concurrent=cfg.execution.max_concurrent,
+            progress_callback=update_progress,
+            on_result=save_result_incrementally,
+        )
+        results = await runner.run(samples, make_simulator, memory)
+    elif execution_mode == "batched" and cfg.memory.enabled and cfg.memory.source == "continual":
         # Batched execution with continual learning
         runner = BatchedRunner(
             batch_size=cfg.execution.batch_size,
@@ -440,9 +471,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     avg_score = sum(r.score for r in valid_results) / total if total > 0 else 0
     total_cost = sum(r.total_cost_usd for r in results)  # cost includes errors
     avg_turns = sum(r.num_turns for r in valid_results) / total if total > 0 else 0
-    avg_user_tokens = (
-        sum(_user_output_tokens(r) for r in valid_results) / total if total > 0 else 0
-    )
+    avg_user_tokens = sum(_user_output_tokens(r) for r in valid_results) / total if total > 0 else 0
 
     # Compute per-task metrics (excluding errored conversations)
     valid_by_task = defaultdict(list)
@@ -468,9 +497,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             sum(r.num_turns for r in task_results) / task_total if task_total > 0 else 0
         )
         task_avg_user_tokens = (
-            sum(_user_output_tokens(r) for r in task_results) / task_total
-            if task_total > 0
-            else 0
+            sum(_user_output_tokens(r) for r in task_results) / task_total if task_total > 0 else 0
         )
 
         per_task_metrics[task_name] = {
@@ -499,6 +526,12 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         "execution_mode": execution_mode,
         "per_task": per_task_metrics,
     }
+
+    # Add replay provenance to metrics
+    if execution_mode == "replay":
+        metrics["replay"] = {
+            "source": cfg.execution.replay_source,
+        }
 
     # Log overall metrics
     error_suffix = f" ({num_errors} errors excluded)" if num_errors > 0 else ""
@@ -559,12 +592,12 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     if ea_enabled and ea_mode == "batch":
         incorrect_results = [r for r in valid_results if not r.is_correct]
         if incorrect_results:
-            logger.info(f"Running batch error attribution on {len(incorrect_results)} incorrect samples...")
+            logger.info(
+                f"Running batch error attribution on {len(incorrect_results)} incorrect samples..."
+            )
             for r in tqdm(incorrect_results, desc="Error attribution", unit="sample"):
                 try:
-                    ea_result = await analyze_simulation_result(
-                        r.to_dict(), model_client, ea_model
-                    )
+                    ea_result = await analyze_simulation_result(r.to_dict(), model_client, ea_model)
                     if ea_result:
                         error_attribution_results.append(ea_result)
                 except Exception as e:

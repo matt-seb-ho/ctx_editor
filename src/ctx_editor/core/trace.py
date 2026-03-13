@@ -26,6 +26,8 @@ class ConversationTrace:
     logs: list[dict[str, Any]] = field(default_factory=list)
     # Track number of context resets for analysis
     num_resets: int = 0
+    # Provenance tracking for replay mode — records where this trace originated
+    provenance: Optional[dict[str, Any]] = None
 
     def get_active_messages(self) -> list[Message]:
         """Get only visible messages (the active conversation)."""
@@ -227,7 +229,7 @@ class ConversationTrace:
         """Get the full trace including logs for serialization.
 
         Returns:
-            Dictionary with 'messages', 'logs', and 'num_resets'.
+            Dictionary with 'messages', 'logs', 'num_resets', and optionally 'provenance'.
             All messages (visible and hidden) are included - use the 'visible'
             field to reconstruct pre/post-edit states.
         """
@@ -243,11 +245,14 @@ class ConversationTrace:
                 entry["metadata"] = msg.metadata
             messages.append(entry)
 
-        return {
+        result = {
             "messages": messages,
             "logs": self.logs,
             "num_resets": self.num_resets,
         }
+        if self.provenance:
+            result["provenance"] = self.provenance
+        return result
 
     def get_user_messages_string(self, active_only: bool = True) -> str:
         """Get only user messages as a formatted string, numbered by turn."""
@@ -304,4 +309,56 @@ class ConversationTrace:
         ]
         new_trace.logs = [dict(log) for log in self.logs]
         new_trace.num_resets = self.num_resets
+        new_trace.provenance = dict(self.provenance) if self.provenance else None
         return new_trace
+
+    @classmethod
+    def from_saved_trace(
+        cls,
+        trace_data: dict[str, Any],
+        truncate_final_assistant: bool = False,
+        provenance: Optional[dict[str, Any]] = None,
+    ) -> "ConversationTrace":
+        """Reconstruct a ConversationTrace from saved trace data.
+
+        Args:
+            trace_data: The 'trace' dict from a saved trace file, containing
+                'messages', 'logs', and 'num_resets'.
+            truncate_final_assistant: If True, remove the last assistant message
+                from visible messages (for replay mode — we want to regenerate it).
+            provenance: Optional provenance metadata to attach to this trace.
+
+        Returns:
+            A ConversationTrace with the reconstructed state.
+        """
+        trace = cls()
+        trace.provenance = provenance
+
+        # Reconstruct messages
+        for msg_data in trace_data.get("messages", []):
+            trace.messages.append(Message.from_dict(msg_data))
+
+        # Reconstruct logs
+        trace.logs = list(trace_data.get("logs", []))
+        trace.num_resets = trace_data.get("num_resets", 0)
+
+        if truncate_final_assistant:
+            # Remove the last visible assistant message (the response we want to regenerate).
+            # Walk backwards to find and remove it.
+            for i in range(len(trace.messages) - 1, -1, -1):
+                msg = trace.messages[i]
+                if msg.role == "assistant" and msg.visible:
+                    trace.messages.pop(i)
+                    break
+
+            # Also strip logs that came from the final turn's verification/evaluation,
+            # since those correspond to the removed assistant response.
+            # Walk backwards and remove verification + answer_evaluation logs that
+            # follow the last shard_revealed or last remaining log.
+            while trace.logs and trace.logs[-1]["type"] in (
+                "verification",
+                "answer_evaluation",
+            ):
+                trace.logs.pop()
+
+        return trace
