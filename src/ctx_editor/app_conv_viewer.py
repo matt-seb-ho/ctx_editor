@@ -113,6 +113,23 @@ def load_sample_with_trace(run_dir: str, sample: dict, experiment_type: str) -> 
         # Also merge models info if present in trace file
         if "models" in trace_data and "models" not in merged:
             merged["models"] = trace_data["models"]
+
+        # Load error attribution if available
+        ea_path = os.path.join(run_dir, "error_analysis.json")
+        if os.path.exists(ea_path):
+            try:
+                ea_data = json.load(open(ea_path))
+                ea_results = ea_data.get("results", [])
+                sample_id = merged.get("sample_id", "")
+                for ea in ea_results:
+                    if ea.get("sample_id") == sample_id:
+                        if "metadata" not in merged:
+                            merged["metadata"] = {}
+                        merged["metadata"]["error_attribution"] = ea
+                        break
+            except Exception:
+                pass
+
         return merged
     except Exception:
         return sample
@@ -1037,6 +1054,47 @@ def display_sidebar_info(sample: dict) -> None:
                 st.sidebar.write(f"**{role}:** {role_stats.get('num_requests', 0)} requests")
                 st.sidebar.write(f"  - Input: {role_stats.get('input_tokens', 0)} tokens")
                 st.sidebar.write(f"  - Output: {role_stats.get('output_tokens', 0)} tokens")
+
+    # Provenance (replay mode)
+    trace = sample.get("trace", {})
+    provenance = trace.get("provenance")
+    if provenance:
+        st.sidebar.subheader("Replay Provenance")
+        src_exp = provenance.get("source_experiment", "?")
+        src_correct = provenance.get("source_is_correct")
+        src_score = provenance.get("source_score")
+        st.sidebar.write(f"**Source:** {src_exp}")
+        if src_correct is not None:
+            result_str = f"{'Correct' if src_correct else 'Incorrect'} (score: {src_score})"
+            st.sidebar.write(f"**Source result:** {result_str}")
+        src_path = provenance.get("source_path", "")
+        if src_path:
+            st.sidebar.caption(f"From: {src_path}")
+
+    # Error attribution
+    metadata = sample.get("metadata", {})
+    error_attr = metadata.get("error_attribution")
+    if error_attr:
+        st.sidebar.subheader("Error Attribution")
+        category = error_attr.get("error_category", error_attr.get("category", "unknown"))
+        cat_colors = {
+            "assistant_error": "red",
+            "extraction_failure": "orange",
+            "sharding_distortion": "blue",
+            "strict_comparison": "violet",
+            "clarification_ignored": "orange",
+        }
+        color = cat_colors.get(category, "grey")
+        st.sidebar.markdown(f":{color}[**{category}**]")
+        explanation = error_attr.get("explanation", "")
+        if explanation:
+            with st.sidebar.expander("Details", expanded=False):
+                st.write(explanation)
+
+    # Branch info
+    branch = metadata.get("branch", "")
+    if branch:
+        st.sidebar.write(f"**Branch:** `{branch}`")
 
     # Extracted answer
     extracted = sample.get("extracted_answer")
