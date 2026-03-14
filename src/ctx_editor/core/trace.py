@@ -254,13 +254,29 @@ class ConversationTrace:
             result["provenance"] = self.provenance
         return result
 
-    def get_user_messages_string(self, active_only: bool = True) -> str:
-        """Get only user messages as a formatted string, numbered by turn."""
+    def get_user_messages_string(
+        self, active_only: bool = True, include_compacted: bool = False
+    ) -> str:
+        """Get only user messages as a formatted string, numbered by turn.
+
+        Args:
+            active_only: If True, only include visible messages.
+            include_compacted: If True, also include "compacted conversation" messages.
+                This is important for S2 (context edit) — after a reset, the compacted
+                conversation contains the previous task spec and should be included
+                when the analyzer builds a new task spec.
+        """
         messages = self.to_messages(include_system=False, active_only=active_only)
-        user_msgs = [msg for msg in messages if msg.role == "user"]
+        relevant_roles = {"user"}
+        if include_compacted:
+            relevant_roles.add("compacted conversation")
+        relevant_msgs = [msg for msg in messages if msg.role in relevant_roles]
         parts = []
-        for i, msg in enumerate(user_msgs, 1):
-            parts.append(f"[Message {i}]\n{msg.content}")
+        for i, msg in enumerate(relevant_msgs, 1):
+            if msg.role == "compacted conversation":
+                parts.append(f"[Previous Task Summary]\n{msg.content}")
+            else:
+                parts.append(f"[Message {i}]\n{msg.content}")
         return "\n\n".join(parts)
 
     def get_conversation_string(

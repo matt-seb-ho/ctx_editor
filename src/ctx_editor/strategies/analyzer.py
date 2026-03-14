@@ -167,7 +167,9 @@ class ConversationAnalyzer:
         Query 1: User messages only → task spec (no assistant contamination)
         Query 2: Task spec + full conversation → critical comparison
         """
-        user_messages_str = trace.get_user_messages_string()
+        # Include compacted conversation content (from prior S2 resets) so the
+        # task spec query sees the previously-extracted task spec + new user messages.
+        user_messages_str = trace.get_user_messages_string(include_compacted=True)
         conversation_str = trace.get_conversation_string(skip_system=False)
         conversation_str = self._strip_edit_notes(conversation_str)
 
@@ -177,9 +179,9 @@ class ConversationAnalyzer:
         )
         spec_output = await self._generate(spec_prompt, model_client)
 
-        task_spec = self._extract_tag(spec_output, "task_spec")
-        if not task_spec:
-            task_spec = spec_output.strip()
+        # Task spec prompt asks for plain output (no XML tags needed for
+        # single-artifact queries). Just use the raw output.
+        task_spec = spec_output.strip()
 
         # Query 2: Compare task spec against full conversation
         memory_section = ""
@@ -199,6 +201,10 @@ class ConversationAnalyzer:
 
         aligned = self._extract_tag(compare_output, "aligned")
         issues = self._extract_tag(compare_output, "issues")
+
+        # Fallback: if the model didn't use XML tags, try section-header parsing
+        if not aligned and not issues:
+            aligned, issues = self._parse_numbered_comparison(compare_output)
 
         return AnalysisResult(
             user_intent=task_spec,
@@ -313,6 +319,39 @@ class ConversationAnalyzer:
         return AnalysisResult(
             user_intent=user_intent, aligned=assessment, issues="", raw_output=text
         )
+
+    @staticmethod
+    def _parse_numbered_comparison(text: str) -> tuple[str, str]:
+        """Parse comparison output in numbered-question format.
+
+        Handles output like:
+            1. ALIGNED: ...
+            2. ISSUES: ...
+
+        Also handles variations like "1. ALIGNED -", "1) ALIGNED:", "ALIGNED:", etc.
+        Returns (aligned, issues) tuple.
+        """
+        aligned = ""
+        issues = ""
+
+        # Try to find ALIGNED and ISSUES sections by header
+        aligned_match = re.search(
+            r"(?:1[\.\)]\s*)?ALIGNED[:\s\-]+(.+?)(?=(?:2[\.\)]\s*)?ISSUES[:\s\-]|\Z)",
+            text,
+            re.DOTALL | re.IGNORECASE,
+        )
+        issues_match = re.search(
+            r"(?:2[\.\)]\s*)?ISSUES[:\s\-]+(.+?)$",
+            text,
+            re.DOTALL | re.IGNORECASE,
+        )
+
+        if aligned_match:
+            aligned = aligned_match.group(1).strip()
+        if issues_match:
+            issues = issues_match.group(1).strip()
+
+        return aligned, issues
 
     @staticmethod
     def _strip_edit_notes(text: str) -> str:
