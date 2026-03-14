@@ -21,11 +21,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
+from ..utils.logging import get_logger
+
 if TYPE_CHECKING:
     from ..core.trace import ConversationTrace
     from ..memory.base import MemoryModule
     from ..models.base import ModelClient
 
+logger = get_logger("analyzer")
 
 _PROMPT_DIR = Path(__file__).parent / "prompts"
 
@@ -181,7 +184,10 @@ class ConversationAnalyzer:
 
         task_spec = self._extract_tag(spec_output, "task_spec")
         if not task_spec:
-            # Fallback: model didn't use tags, use raw output
+            logger.warning(
+                "Task spec extraction: <task_spec> tag not found, using raw output. "
+                f"Output preview: {spec_output[:150]!r}"
+            )
             task_spec = spec_output.strip()
 
         # Query 2: Compare task spec against full conversation
@@ -205,7 +211,17 @@ class ConversationAnalyzer:
 
         # Fallback: if the model didn't use XML tags, try section-header parsing
         if not aligned and not issues:
+            logger.warning(
+                "Comparison extraction: <aligned>/<issues> tags not found, "
+                f"trying section-header fallback. Output preview: {compare_output[:150]!r}"
+            )
             aligned, issues = self._parse_numbered_comparison(compare_output)
+            if not aligned and not issues:
+                logger.error(
+                    "Comparison extraction: both XML and section-header parsing failed. "
+                    "Analysis will return empty aligned/issues. "
+                    f"Full output: {compare_output[:300]!r}"
+                )
 
         return AnalysisResult(
             user_intent=task_spec,
