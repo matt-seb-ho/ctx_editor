@@ -179,9 +179,10 @@ class ConversationAnalyzer:
         )
         spec_output = await self._generate(spec_prompt, model_client)
 
-        # Task spec prompt asks for plain output (no XML tags needed for
-        # single-artifact queries). Just use the raw output.
-        task_spec = spec_output.strip()
+        task_spec = self._extract_tag(spec_output, "task_spec")
+        if not task_spec:
+            # Fallback: model didn't use tags, use raw output
+            task_spec = spec_output.strip()
 
         # Query 2: Compare task spec against full conversation
         memory_section = ""
