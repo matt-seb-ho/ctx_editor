@@ -132,8 +132,16 @@ class ConversationSimulator:
 
         return metadata
 
+    @property
+    def is_replay(self) -> bool:
+        """Whether this simulator is running in replay mode (pre-loaded trace)."""
+        return self.trace.provenance is not None
+
     async def run(self, verbose: bool = False) -> SimulationResult:
         """Run the full conversation simulation.
+
+        If the simulator was initialized with a pre-loaded trace (replay mode),
+        delegates to run_final_turn() instead of running the full loop.
 
         Args:
             verbose: Whether to print conversation progress.
@@ -141,6 +149,10 @@ class ConversationSimulator:
         Returns:
             SimulationResult with evaluation outcome and trace.
         """
+        # Replay mode: only regenerate the final assistant turn
+        if self.is_replay:
+            return await self.run_final_turn(verbose)
+
         verbose = verbose or self.config.verbose
 
         shards = self.sample.get("shards", [])

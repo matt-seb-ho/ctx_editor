@@ -24,7 +24,6 @@ from ctx_editor.execution import (
     BatchedRunner,
     OfflineMemoryLearner,
     ParallelRunner,
-    ReplayRunner,
     load_trajectories,
 )
 from ctx_editor.models import (
@@ -402,24 +401,45 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         )
         return metrics
 
-    if execution_mode == "replay":
-        # Replay mode: load baseline traces, only regenerate final turn
-        replay_source = cfg.execution.get("replay_source")
-        if not replay_source:
-            raise ValueError(
-                "execution.replay_source must be set when execution.mode=replay. "
-                "Point it to a baseline output directory or traces folder."
-            )
-        logger.info(f"Replay mode: loading baseline traces from {replay_source}")
+    # Replay setup: if replay_source is set, load baseline traces and wrap the
+    # simulator factory so each simulator gets a pre-loaded trace. This composes
+    # with any execution mode (parallel, batched, sequential).
+    replay_source = cfg.execution.get("replay_source")
+    replay_traces = None
+    if replay_source:
+        from ctx_editor.execution.replay import load_baseline_traces, build_replay_trace
 
-        runner = ReplayRunner(
-            trace_source=replay_source,
-            max_concurrent=cfg.execution.max_concurrent,
-            progress_callback=update_progress,
-            on_result=save_result_incrementally,
+        replay_traces = load_baseline_traces(replay_source)
+        logger.info(
+            f"Replay mode: loaded {len(replay_traces)} baseline traces from {replay_source}"
         )
-        results = await runner.run(samples, make_simulator, memory)
-    elif execution_mode == "batched" and cfg.memory.enabled and cfg.memory.source == "continual":
+
+        # Filter samples to only those with matching baseline traces
+        original_count = len(samples)
+        samples = [s for s in samples if s.get("task_id", "unknown") in replay_traces]
+        if len(samples) < original_count:
+            logger.warning(
+                f"Replay: {original_count - len(samples)} samples skipped "
+                f"(no matching baseline trace)"
+            )
+        pbar.total = len(samples)
+        pbar.refresh()
+
+        # Wrap the factory to inject replay traces
+        _original_factory = make_simulator
+
+        def make_simulator(
+            sample: dict,
+            memory: Optional[MemoryModule] = None,
+            trace: Optional[ConversationTrace] = None,
+        ):
+            sample_id = sample.get("task_id", "unknown")
+            trace_data = replay_traces.get(sample_id)
+            if trace_data:
+                trace = build_replay_trace(trace_data, replay_source)
+            return _original_factory(sample, memory=memory, trace=trace)
+
+    if execution_mode == "batched" and cfg.memory.enabled and cfg.memory.source == "continual":
         # Batched execution with continual learning
         runner = BatchedRunner(
             batch_size=cfg.execution.batch_size,
@@ -528,9 +548,9 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     }
 
     # Add replay provenance to metrics
-    if execution_mode == "replay":
+    if replay_source:
         metrics["replay"] = {
-            "source": cfg.execution.replay_source,
+            "source": replay_source,
         }
 
     # Log overall metrics

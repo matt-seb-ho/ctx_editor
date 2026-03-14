@@ -191,8 +191,9 @@ class ReplayRunner:
                     # Create simulator with pre-loaded trace
                     simulator = simulator_factory(problem, memory=mem, trace=replay_trace)
 
-                    # Run only the final turn
-                    result = await simulator.run_final_turn()
+                    # Run the simulator — it detects replay mode via trace.provenance
+                    # and only regenerates the final turn
+                    result = await simulator.run()
 
                     completed += 1
                     if self.on_result:
