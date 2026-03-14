@@ -19,19 +19,18 @@ mkdir -p "$MEMORY_DIR" "$LOG_DIR"
 
 FILTER="${1:-all}"
 
-# S0 baseline trace directories (from the main dev experiment run)
-S0_MATH="outputs/2026-03-13/13-44-00/traces/math/baseline"
-S0_CODE="outputs/2026-03-13/13-53-02/traces/code/baseline"
-S0_ACTIONS="outputs/2026-03-13/14-15-27/traces/actions/baseline"
+# S0 baseline traces — portable, lives in data/ so it works across machines
+TRACE_DIR="${TRACE_DIR:-data/baseline_traces}"
 
 # Common settings
 COMMON="model=gpt5_mini execution.max_concurrent=8 logging.verbose=true metadata.branch=newleaf2"
 
 # Task configs paired with their S0 trace sources
 declare -A TRACE_SOURCES
-TRACE_SOURCES[dev_math]="$S0_MATH"
-TRACE_SOURCES[dev_code]="$S0_CODE"
-TRACE_SOURCES[dev_actions]="$S0_ACTIONS"
+TRACE_SOURCES[dev_math]="${TRACE_DIR}/math"
+TRACE_SOURCES[dev_code]="${TRACE_DIR}/code"
+TRACE_SOURCES[dev_actions]="${TRACE_DIR}/actions"
+TRACE_SOURCES[dev_database]="${TRACE_DIR}/database"
 
 TASKS=(dev_math dev_code dev_actions)
 
