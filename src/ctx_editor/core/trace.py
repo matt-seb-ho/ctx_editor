@@ -333,6 +333,7 @@ class ConversationTrace:
         cls,
         trace_data: dict[str, Any],
         truncate_final_assistant: bool = False,
+        truncate_turns: int = 0,
         provenance: Optional[dict[str, Any]] = None,
     ) -> "ConversationTrace":
         """Reconstruct a ConversationTrace from saved trace data.
@@ -342,6 +343,10 @@ class ConversationTrace:
                 'messages', 'logs', and 'num_resets'.
             truncate_final_assistant: If True, remove the last assistant message
                 from visible messages (for replay mode — we want to regenerate it).
+                Ignored if truncate_turns > 0.
+            truncate_turns: Number of complete turns (user+assistant pairs) to
+                remove from the end for multi-turn replay. When > 0, overrides
+                truncate_final_assistant.
             provenance: Optional provenance metadata to attach to this trace.
 
         Returns:
@@ -358,19 +363,49 @@ class ConversationTrace:
         trace.logs = list(trace_data.get("logs", []))
         trace.num_resets = trace_data.get("num_resets", 0)
 
-        if truncate_final_assistant:
-            # Remove the last visible assistant message (the response we want to regenerate).
-            # Walk backwards to find and remove it.
+        if truncate_turns > 0:
+            # Multi-turn truncation: remove the last k visible (user, assistant) pairs.
+            # Walk backwards removing messages, counting complete turns removed.
+            turns_removed = 0
+            while turns_removed < truncate_turns:
+                # Remove the last visible assistant message
+                found_assistant = False
+                for i in range(len(trace.messages) - 1, -1, -1):
+                    if trace.messages[i].role == "assistant" and trace.messages[i].visible:
+                        trace.messages.pop(i)
+                        found_assistant = True
+                        break
+                if not found_assistant:
+                    break  # No more assistant messages to remove
+
+                # Remove the last visible user message
+                for i in range(len(trace.messages) - 1, -1, -1):
+                    if trace.messages[i].role == "user" and trace.messages[i].visible:
+                        trace.messages.pop(i)
+                        break
+
+                # Strip the corresponding logs for this turn (verification, answer_evaluation,
+                # shard_revealed — each turn produces one verification log and optionally others)
+                while trace.logs and trace.logs[-1]["type"] in (
+                    "verification",
+                    "answer_evaluation",
+                ):
+                    trace.logs.pop()
+                # Remove the shard_revealed log for this turn if present
+                if trace.logs and trace.logs[-1]["type"] == "shard_revealed":
+                    trace.logs.pop()
+
+                turns_removed += 1
+
+        elif truncate_final_assistant:
+            # Single-turn truncation (original behavior): remove last assistant message only.
             for i in range(len(trace.messages) - 1, -1, -1):
                 msg = trace.messages[i]
                 if msg.role == "assistant" and msg.visible:
                     trace.messages.pop(i)
                     break
 
-            # Also strip logs that came from the final turn's verification/evaluation,
-            # since those correspond to the removed assistant response.
-            # Walk backwards and remove verification + answer_evaluation logs that
-            # follow the last shard_revealed or last remaining log.
+            # Strip logs from the final turn's verification/evaluation.
             while trace.logs and trace.logs[-1]["type"] in (
                 "verification",
                 "answer_evaluation",

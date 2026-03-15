@@ -409,9 +409,11 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     if replay_source:
         from ctx_editor.execution.replay import load_baseline_traces, build_replay_trace
 
+        replay_turns = cfg.execution.get("replay_turns", 1)
         replay_traces = load_baseline_traces(replay_source)
         logger.info(
             f"Replay mode: loaded {len(replay_traces)} baseline traces from {replay_source}"
+            f" (replaying last {replay_turns} turn{'s' if replay_turns > 1 else ''})"
         )
 
         # Filter samples to only those with matching baseline traces
@@ -436,7 +438,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             sample_id = sample.get("task_id", "unknown")
             trace_data = replay_traces.get(sample_id)
             if trace_data:
-                trace = build_replay_trace(trace_data, replay_source)
+                trace = build_replay_trace(trace_data, replay_source, replay_turns=replay_turns)
             return _original_factory(sample, memory=memory, trace=trace)
 
     if execution_mode == "batched" and cfg.memory.enabled and cfg.memory.source == "continual":

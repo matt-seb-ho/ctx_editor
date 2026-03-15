@@ -149,9 +149,15 @@ class ConversationSimulator:
         Returns:
             SimulationResult with evaluation outcome and trace.
         """
-        # Replay mode: only regenerate the final assistant turn
+        # Replay mode
         if self.is_replay:
-            return await self.run_final_turn(verbose)
+            replay_turns = (self.trace.provenance or {}).get("replay_turns", 1)
+            if replay_turns <= 1:
+                # Single-turn replay: only regenerate the final assistant turn
+                return await self.run_final_turn(verbose)
+            else:
+                # Multi-turn replay: run k turns of the normal loop
+                return await self._run_multi_turn_replay(replay_turns, verbose)
 
         verbose = verbose or self.config.verbose
 
@@ -323,6 +329,61 @@ class ConversationSimulator:
             evaluation_result=eval_result,
             usage_stats=self.usage_stats,
             metadata=self._build_result_metadata({"replay_mode": True}),
+        )
+
+    async def _run_multi_turn_replay(
+        self, num_turns: int, verbose: bool = False
+    ) -> SimulationResult:
+        """Run multiple turns on a pre-loaded trace (multi-turn replay mode).
+
+        Truncated turns are re-simulated using the normal turn loop, with
+        user agent generating new user messages and strategy applied fresh.
+
+        Args:
+            num_turns: Number of turns to replay.
+            verbose: Whether to print progress.
+
+        Returns:
+            SimulationResult with evaluation outcome and trace.
+        """
+        verbose = verbose or self.config.verbose
+        turns_run = 0
+
+        while turns_run < num_turns and not self.is_completed:
+            # Check if all shards have been revealed
+            shards = self.sample.get("shards", [])
+            revealed_shard_ids = set(self.trace.get_revealed_shard_ids())
+            if len(revealed_shard_ids) == len(shards) and len(shards) > 0:
+                if verbose:
+                    print(
+                        f"\033[94m[log] all shards revealed "
+                        f"({len(revealed_shard_ids)}/{len(shards)})\033[0m"
+                    )
+                break
+
+            await self._run_turn(verbose)
+
+            # Check if user budget was exhausted
+            if any(log["type"] == "user_budget_exhausted" for log in self.trace.logs):
+                break
+
+            turns_run += 1
+
+        if self.final_result is not None:
+            return self.final_result
+
+        return SimulationResult(
+            sample_id=self.sample.get("task_id", "unknown"),
+            task_name=(
+                self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown"
+            ),
+            is_correct=False,
+            score=0.0,
+            num_turns=self.trace.total_user_turns,
+            total_cost_usd=self.usage_stats.total_cost_usd(),
+            trace=self.trace.to_full_trace(),
+            usage_stats=self.usage_stats,
+            metadata=self._build_result_metadata({"replay_mode": True, "replay_turns": num_turns}),
         )
 
     async def _run_turn(self, verbose: bool = False) -> None:

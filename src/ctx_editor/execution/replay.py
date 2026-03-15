@@ -73,16 +73,17 @@ def load_baseline_traces(
 def build_replay_trace(
     trace_file_data: dict[str, Any],
     source_path: str,
+    replay_turns: int = 1,
 ) -> ConversationTrace:
     """Build a ConversationTrace for replay from saved trace data.
 
-    Reconstructs the conversation up to and including the last user message,
-    removing the final assistant response so it can be regenerated with a
-    new strategy.
+    Reconstructs the conversation prefix, removing the last `replay_turns`
+    turns so they can be regenerated with a new strategy.
 
     Args:
         trace_file_data: The full saved trace file data (with 'trace', 'sample_id', etc.)
         source_path: Path to the source trace directory/file (for provenance).
+        replay_turns: Number of turns to replay (1 = final turn only, >1 = multi-turn).
 
     Returns:
         ConversationTrace ready for replay, with provenance metadata.
@@ -95,13 +96,21 @@ def build_replay_trace(
         "source_score": trace_file_data.get("score"),
         "source_models": trace_file_data.get("models"),
         "source_timestamp": trace_file_data.get("timestamp"),
+        "replay_turns": replay_turns,
     }
 
-    return ConversationTrace.from_saved_trace(
-        trace_data=trace_file_data["trace"],
-        truncate_final_assistant=True,
-        provenance=provenance,
-    )
+    if replay_turns > 1:
+        return ConversationTrace.from_saved_trace(
+            trace_data=trace_file_data["trace"],
+            truncate_turns=replay_turns,
+            provenance=provenance,
+        )
+    else:
+        return ConversationTrace.from_saved_trace(
+            trace_data=trace_file_data["trace"],
+            truncate_final_assistant=True,
+            provenance=provenance,
+        )
 
 
 class ReplayRunner:
