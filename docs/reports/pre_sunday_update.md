@@ -108,6 +108,44 @@ the assistant for subsequent turns. This is the first thing to address in the ne
 - **Run index**: `docs/reports/run_index.md` — all batches with output dirs, costs, wall times
 - **Dev task configs**: `dev_math`, `dev_code`, `dev_database`, `dev_actions` with v2 evaluators
 
+## Run Configuration Reference
+
+To ensure consistency across sessions/machines:
+
+**Model**: `model=gpt5_mini` — gpt-5-mini (medium reasoning) for assistant/analyzer, gpt-4o-mini for user/system agents.
+
+**Task configs**: Use `task=dev_{task}` (NOT `task=math` etc. which points to `lic_eval_subset.json`):
+- `dev_math` → `data/dev_math_subset.json` (23 samples), v2 evaluator
+- `dev_code` → `data/dev_code_subset.json` (25 samples), v2 evaluator
+- `dev_database` → `data/dev_database_subset.json` (25 samples), v2 evaluator
+- `dev_actions` → `data/dev_actions_subset.json` (25 samples), no v2 available
+
+**Replay traces**: Fixed across all runs. Stored in `data/baseline_traces_v2/` (gitignored, share as artifact). Generated from S0 v2 baseline runs:
+- `data/baseline_traces_v2/math/` — 23 traces, from `outputs/2026-03-15/01-01-10`
+- `data/baseline_traces_v2/code/` — 25 traces, from `outputs/2026-03-15/01-07-56`
+- `data/baseline_traces_v2/database/` — 25 traces, from `outputs/2026-03-15/04-20-34`
+- Actions: no v2 evaluator, v1 traces in `data/baseline_traces/actions/` from `outputs/2026-03-13/14-15-27`
+
+**Replay commands**:
+```bash
+# No memory
+ctx-editor experiment={strategy} task=dev_{task} model=gpt5_mini \
+  execution.replay_source=data/baseline_traces_v2/{task} \
+  execution.max_concurrent=8 logging.verbose=true
+
+# With memory
+ctx-editor experiment={strategy}_memory task=dev_{task} model=gpt5_mini \
+  execution.replay_source=data/baseline_traces_v2/{task} \
+  execution.mode=batched execution.batch_size=5 \
+  memory.enabled=true memory.source=continual memory.target=analyzer \
+  memory.save_path={path} memory.include_full_spec_q=true \
+  memory.include_ground_truth_a=true
+```
+
+**Strategies**: `baseline`, `append_analysis`, `context_edit_v2` (and `*_memory` variants). For memory runs, `memory.target=analyzer` for S1/S2, `memory.target=assistant` for S0.
+
+**Error attribution**: Enabled by default in `config.yaml` (gpt-5-mini, batch mode).
+
 ## Key Files Changed
 
 | File | Change |
