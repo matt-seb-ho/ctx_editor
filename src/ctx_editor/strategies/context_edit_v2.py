@@ -83,7 +83,11 @@ class ContextEditV2Strategy(BaseStrategy):
         task_spec = result.user_intent if result.user_intent else result.raw_output
         compact_parts = [f"# Task Spec\n{task_spec}"]
         if result.aligned:
-            compact_parts.append(f"# What Looks Right So Far\n{result.aligned}")
+            compact_parts.append(
+                f"# Progress So Far\n"
+                f"The following work is correct and should be preserved in your response:\n"
+                f"{result.aligned}"
+            )
 
         new_messages.append(
             Message(role="compacted conversation", content="\n\n".join(compact_parts))
