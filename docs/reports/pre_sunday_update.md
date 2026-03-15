@@ -6,12 +6,12 @@ We've run 6 batches of experiments across math, code, database, and actions task
 gpt-5-mini with our S0/S1/S2 ± memory strategies. The system is in good shape with several
 critical bugs fixed, but one open issue needs addressing before the next full simulation run.
 
-## Best Results So Far (Batch 4 — v2 evaluators, fixed XML prompts, replay mode)
+## Best Results So Far (Batches 4–6 — v2 evaluators, fixed XML prompts, replay mode)
 
 | Task | S0 | S1 | S1+mem | S2 | S2+mem | Concat |
 |------|:--:|:--:|:------:|:--:|:------:|:------:|
 | **math** | 57% | 52% | 61% | **65%** | **65%** | 65% |
-| **code** | 12% | 24% | 28% | 28%→36%* | 24%→**44%*** | 84%† |
+| **code** | 12% | 24% | 28% | 36% | **44%*** | 84%† |
 | **database** | 4% | 12% | 8% | **16%** | **16%** | — |
 | **actions** | 8% | 12% | **20%** | 8% | 8% | 60% |
 
@@ -19,6 +19,42 @@ critical bugs fixed, but one open issue needs addressing before the next full si
 †Code concat includes starter code/function signatures not available in sharded setting
 
 **S2 math matches the concat ceiling (65%).** This is the headline result.
+
+### Output Directories
+
+**Batch 4 — v2 eval, fixed XML prompts (2026-03-15)**
+
+| Run | Result | Dir |
+|-----|:------:|-----|
+| S0 v2 math | 13/23 (57%) | `outputs/2026-03-15/01-01-10` |
+| S0 v2 code | 3/25 (12%) | `outputs/2026-03-15/01-07-56` |
+| S1 math | 12/23 (52%) | `outputs/2026-03-15/01-27-27` |
+| S2 math | **15/23 (65%)** | `outputs/2026-03-15/01-31-57` |
+| S1+mem math | 14/23 (61%) | `outputs/2026-03-15/01-36-02` |
+| S2+mem math | **15/23 (65%)** | `outputs/2026-03-15/01-46-37` |
+| S1 code | 6/25 (24%) | `outputs/2026-03-15/01-56-09` |
+| S2 code | 9/25 (36%) | `outputs/2026-03-15/02-05-08` |
+| S1+mem code | 7/25 (28%) | `outputs/2026-03-15/02-12-34` |
+| S2+mem code | 6/25 (24%) | `outputs/2026-03-15/02-26-23` |
+
+**Batch 5 — S2/S2+mem code with memory guardrail (2026-03-15)**
+
+| Run | Result | Dir |
+|-----|:------:|-----|
+| S2 code | 7/25 (28%) | `outputs/2026-03-15/03-46-17` |
+| S2+mem code | **11/25 (44%)** | `outputs/2026-03-15/03-53-34` |
+
+**Batch 6 — Database v2 (2026-03-15)**
+
+| Run | Result | Dir |
+|-----|:------:|-----|
+| S0 database | 1/25 (4%) | `outputs/2026-03-15/04-20-34` |
+| S1 database | 3/25 (12%) | `outputs/2026-03-15/04-26-41` |
+| S2 database | 4/25 (16%) | `outputs/2026-03-15/04-32-04` |
+| S1+mem database | 2/25 (8%) | `outputs/2026-03-15/04-37-04` |
+| S2+mem database | 4/25 (16%) | `outputs/2026-03-15/04-48-28` |
+
+**Earlier batches** — see `docs/reports/run_index.md` for full listing with Batch 1–3 output dirs.
 
 ## Bugs Fixed This Session
 
@@ -102,7 +138,7 @@ the assistant for subsequent turns. This is the first thing to address in the ne
 ## Git State
 
 Branch: `newleaf2`
-Latest commit: `c55db5b` (revert of accumulation change)
+Latest commit: `c249581` (multi-turn replay mode)
 All changes committed. Clean working tree (except user files: cmd_backup.md, writing/, etc.)
 
 ## Reports Written
