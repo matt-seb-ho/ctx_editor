@@ -75,13 +75,6 @@ class ConversationSimulator:
             # Normal mode: create fresh trace with system message
             self.trace = ConversationTrace()
             system_prompt = task.generate_system_prompt(sample)
-            # LiC guardrail: the user simulator does not answer clarifying questions,
-            # so asking them wastes turns. Direct the assistant to work with available info.
-            system_prompt += (
-                "\n\nImportant: The user will provide information incrementally. "
-                "Do not ask clarifying questions — work with the information provided so far "
-                "and refine your answer as more details arrive."
-            )
             self.trace.add_system_message(system_prompt)
 
     @staticmethod
