@@ -35,6 +35,7 @@ class ContextEditV2Strategy(BaseStrategy):
         analyzer_timeout: int = 60,
         analyzer_max_tokens: Optional[int] = None,
         analyzer_reasoning_effort: Optional[str] = None,
+        analyzer_prompt_version: str = "v6",
         min_turns: int = 3,
         max_resets: int = 3,
         use_memory: bool = False,
@@ -45,6 +46,7 @@ class ContextEditV2Strategy(BaseStrategy):
             timeout=analyzer_timeout,
             max_tokens=analyzer_max_tokens,
             reasoning_effort=analyzer_reasoning_effort,
+            prompt_version=analyzer_prompt_version,
         )
         self.min_turns = min_turns if isinstance(min_turns, int) else 3
         self.max_resets = max_resets

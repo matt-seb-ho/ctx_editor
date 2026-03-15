@@ -47,6 +47,7 @@ class AppendAnalysisStrategy(BaseStrategy):
         analyzer_timeout: int = 60,
         analyzer_max_tokens: Optional[int] = None,
         analyzer_reasoning_effort: Optional[str] = None,
+        analyzer_prompt_version: str = "v6",
         min_turns: int = 3,
         use_memory: bool = False,
         memory_target: str = "analyzer",
@@ -56,6 +57,7 @@ class AppendAnalysisStrategy(BaseStrategy):
             timeout=analyzer_timeout,
             max_tokens=analyzer_max_tokens,
             reasoning_effort=analyzer_reasoning_effort,
+            prompt_version=analyzer_prompt_version,
         )
         # min_turns="auto" is resolved by run_experiment before instantiation,
         # but default to 3 if it somehow reaches here unresolved.

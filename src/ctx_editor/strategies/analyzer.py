@@ -132,9 +132,9 @@ class ConversationAnalyzer:
         self.reasoning_effort = reasoning_effort
         self.prompt_version = prompt_version
 
-        if prompt_version == "v6":
-            self._task_spec_template = _load_prompt("analyzer_v6_task_spec")
-            self._compare_template = _load_prompt("analyzer_v6_compare")
+        if prompt_version in ("v6", "v7"):
+            self._task_spec_template = _load_prompt(f"analyzer_{prompt_version}_task_spec")
+            self._compare_template = _load_prompt(f"analyzer_{prompt_version}_compare")
         else:
             # Single-query prompt (v4, v5)
             self._prompt_template = _load_prompt(f"analyzer_{prompt_version}")
@@ -271,7 +271,7 @@ class ConversationAnalyzer:
 
         Dispatches to v6 (two-query) or single-query based on prompt_version.
         """
-        if self.prompt_version == "v6":
+        if self.prompt_version in ("v6", "v7"):
             return await self._analyze_v6(trace, model_client, memory)
         return await self._analyze_single(trace, model_client, memory)
 
