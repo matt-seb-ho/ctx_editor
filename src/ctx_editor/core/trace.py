@@ -331,6 +331,31 @@ class ConversationTrace:
 
         return "\n\n".join([f"[{msg.role}] {msg.content}" for msg in messages])
 
+    @property
+    def previous_task_spec(self) -> Optional[str]:
+        """Extract the task spec from the last compacted conversation message, if any.
+
+        Returns the content under '# User Task Specification (So Far)' from
+        the most recent compacted conversation message, or None if no resets
+        have occurred.
+        """
+        for msg in reversed(self.messages):
+            if msg.role == "compacted conversation":
+                content = msg.content
+                marker = "# User Task Specification (So Far)"
+                idx = content.find(marker)
+                if idx == -1:
+                    return None
+                # Extract from after the marker to the next section header or end
+                start = idx + len(marker)
+                rest = content[start:]
+                # Find next section header (# ...) if any
+                next_section = rest.find("\n# ")
+                if next_section != -1:
+                    return rest[:next_section].strip()
+                return rest.strip()
+        return None
+
     def get_revealed_shard_ids(self) -> list[str]:
         """Get IDs of shards that have been revealed."""
         return [log["data"]["shard_id"] for log in self.logs if log["type"] == "shard_revealed"]

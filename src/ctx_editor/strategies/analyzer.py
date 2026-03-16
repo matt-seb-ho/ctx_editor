@@ -172,16 +172,28 @@ class ConversationAnalyzer:
         Query 2: Task spec + full conversation → critical comparison
         """
         # Include ALL user messages across resets (deduplicated) so the task spec
-        # query always builds from the complete set of user information. This avoids
-        # losing details that were in pre-reset messages and prevents bias from
-        # a previous compacted task spec.
+        # query always builds from the complete set of user information.
         user_messages_str = trace.get_user_messages_string(all_unique=True)
         conversation_str = trace.get_conversation_string(skip_system=False)
         conversation_str = self._strip_edit_notes(conversation_str)
 
+        # If there was a previous reset, include the prior task spec as reference
+        prev_spec = trace.previous_task_spec
+        prev_spec_section = ""
+        if prev_spec:
+            prev_spec_section = (
+                "\n\nFor reference, here is the task specification produced by a previous "
+                "analysis pass. It may be incomplete or contain errors — use the user's "
+                "messages above as the primary source of truth.\n\n"
+                f"<previous_task_spec>\n{prev_spec}\n</previous_task_spec>"
+            )
+
         # Query 1: Build task spec from user messages only
         spec_prompt = self._task_spec_template.format_map(
-            defaultdict(str, {"user_messages": user_messages_str})
+            defaultdict(str, {
+                "user_messages": user_messages_str,
+                "previous_task_spec_section": prev_spec_section,
+            })
         )
         spec_output = await self._generate(spec_prompt, model_client)
 
