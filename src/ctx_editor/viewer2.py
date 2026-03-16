@@ -18,15 +18,29 @@ import yaml
 
 OUTPUTS_ROOT = "outputs"
 
+# Rosé Pine palette
+RP_BASE = "#191724"
+RP_SURFACE = "#1f1d2e"
+RP_OVERLAY = "#26233a"
+RP_MUTED = "#6e6a86"
+RP_SUBTLE = "#908caa"
+RP_TEXT = "#e0def4"
+RP_LOVE = "#eb6f92"  # red/pink
+RP_GOLD = "#f6c177"  # warm yellow
+RP_ROSE = "#ebbcba"  # soft pink
+RP_PINE = "#31748f"  # teal/blue
+RP_FOAM = "#9ccfd8"  # light cyan
+RP_IRIS = "#c4a7e7"  # purple
+
 ROLE_COLORS = {
-    "system": "#6c757d",
-    "user": "#0d6efd",
-    "assistant": "#198754",
-    "compacted conversation": "#6f42c1",
-    "analysis": "#fd7e14",
-    "analyst": "#fd7e14",
-    "context_edit_output": "#e83e8c",
-    "reset_marker": "#dc3545",
+    "system": RP_MUTED,
+    "user": RP_FOAM,
+    "assistant": RP_PINE,
+    "compacted conversation": RP_IRIS,
+    "analysis": RP_GOLD,
+    "analyst": RP_GOLD,
+    "context_edit_output": RP_ROSE,
+    "reset_marker": RP_LOVE,
 }
 
 ROLE_ICONS = {
@@ -59,6 +73,25 @@ ERROR_CATEGORY_LABELS = {
     "user_simulator_error": "User Simulator Error",
     "other": "Other",
 }
+
+# Short labels for experiment types in the sidebar run stats
+_EXP_SHORT = {
+    "baseline": "baseline",
+    "baseline_memory": "baseline+mem",
+    "append_analysis": "append",
+    "append_analysis_memory": "append+mem",
+    "context_edit": "edit",
+    "context_edit_memory": "edit+mem",
+    "context_edit_v2": "edit",
+    "context_edit_v2_memory": "edit+mem",
+    "agentic_edit": "agentic",
+    "agentic_edit_memory": "agentic+mem",
+}
+
+
+def _short_exp_name(name: str) -> str:
+    return _EXP_SHORT.get(name, name)
+
 
 # ---------------------------------------------------------------------------
 # Data loading helpers
@@ -131,14 +164,12 @@ def list_trace_files(run_dir: str) -> list[dict[str, Any]]:
 
 @st.cache_data
 def load_trace(path: str) -> dict[str, Any]:
-    """Load a single trace file."""
     with open(path, "r") as f:
         return json.load(f)
 
 
 @st.cache_data
 def load_config(run_dir: str) -> Optional[dict]:
-    """Load config.yaml from a run directory."""
     config_path = os.path.join(run_dir, "config.yaml")
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
@@ -148,7 +179,6 @@ def load_config(run_dir: str) -> Optional[dict]:
 
 @st.cache_data
 def load_metrics(run_dir: str) -> Optional[dict]:
-    """Load metrics.json from a run directory."""
     metrics_path = os.path.join(run_dir, "metrics.json")
     if os.path.exists(metrics_path):
         with open(metrics_path, "r") as f:
@@ -158,7 +188,6 @@ def load_metrics(run_dir: str) -> Optional[dict]:
 
 @st.cache_data
 def load_results_json(run_dir: str) -> Optional[list[dict]]:
-    """Load results.json (list of SimulationResult dicts) from a run directory."""
     results_path = os.path.join(run_dir, "results.json")
     if os.path.exists(results_path):
         with open(results_path, "r") as f:
@@ -168,7 +197,6 @@ def load_results_json(run_dir: str) -> Optional[list[dict]]:
 
 @st.cache_data
 def load_error_analysis(run_dir: str) -> Optional[dict]:
-    """Load error_analysis.json from a run directory."""
     path = os.path.join(run_dir, "error_analysis.json")
     if os.path.exists(path):
         with open(path, "r") as f:
@@ -176,10 +204,18 @@ def load_error_analysis(run_dir: str) -> Optional[dict]:
     return None
 
 
+@st.cache_data
+def load_cheatsheet_file(path: str) -> Optional[dict]:
+    """Load a cheatsheet JSON file (content, version, history, metadata)."""
+    if not os.path.exists(path):
+        return None
+    with open(path, "r") as f:
+        return json.load(f)
+
+
 def find_result_for_sample(
     results: Optional[list[dict]], sample_id: str
 ) -> Optional[dict]:
-    """Find the result entry for a given sample_id in results.json."""
     if not results:
         return None
     normalized = sample_id.replace("_", "/")
@@ -192,7 +228,6 @@ def find_result_for_sample(
 def find_error_for_sample(
     error_analysis: Optional[dict], sample_id: str
 ) -> Optional[dict]:
-    """Find the error attribution entry for a given sample_id."""
     if not error_analysis:
         return None
     normalized = sample_id.replace("_", "/")
@@ -203,7 +238,6 @@ def find_error_for_sample(
 
 
 def load_sample_data(data_file: str, task_id: str) -> Optional[dict]:
-    """Load the original sample from the data file."""
     if not os.path.exists(data_file):
         return None
     with open(data_file, "r") as f:
@@ -212,6 +246,38 @@ def load_sample_data(data_file: str, task_id: str) -> Optional[dict]:
     for sample in data:
         if sample.get("task_id") == task_id or sample.get("task_id") == normalized:
             return sample
+    return None
+
+
+def _get_cheatsheet_content(
+    trace_data: dict, config: Optional[dict]
+) -> Optional[str]:
+    """Extract cheatsheet content from either trace messages or the save file.
+
+    For memory_target=assistant/system: cheatsheet is embedded in the system
+    message within <cheatsheet>...</cheatsheet> tags.
+
+    For memory_target=analyzer: cheatsheet is passed at runtime to the analyzer
+    prompt and NOT stored in trace messages. We load it from cfg.memory.save_path.
+    """
+    # 1) Check trace messages for <cheatsheet> tags (assistant-target)
+    messages = trace_data.get("messages", [])
+    for msg in messages:
+        content = msg.get("content", "")
+        if "<cheatsheet>" in content:
+            start = content.find("<cheatsheet>")
+            end = content.find("</cheatsheet>")
+            if start != -1 and end != -1:
+                return content[start + len("<cheatsheet>"):end].strip()
+
+    # 2) Fall back to loading from save_path (analyzer-target)
+    if config:
+        save_path = config.get("memory", {}).get("save_path")
+        if save_path and os.path.exists(save_path):
+            cs_data = load_cheatsheet_file(save_path)
+            if cs_data and cs_data.get("content"):
+                return cs_data["content"]
+
     return None
 
 
@@ -339,8 +405,7 @@ def render_message_card(msg: dict, idx: int, task_name: str = ""):
     visible = msg.get("visible", True)
     content = msg.get("content", "")
 
-    color = ROLE_COLORS.get(role, "#333")
-    icon = ROLE_ICONS.get(role, "chat-dots")
+    color = ROLE_COLORS.get(role, RP_SUBTLE)
     opacity = "1.0" if visible else "0.5"
 
     # Role label
@@ -365,10 +430,11 @@ def render_message_card(msg: dict, idx: int, task_name: str = ""):
     if role == "reset_marker":
         st.divider()
         st.markdown(
-            f"""<div style="text-align:center; padding:8px; background:#dc354520;
-            border:1px solid #dc3545; border-radius:8px; margin:8px 0;">
-            <strong>🔄 {content}</strong>
-            </div>""",
+            f'<div style="text-align:center; padding:8px; '
+            f"background:{RP_LOVE}18; border:1px solid {RP_LOVE}; "
+            f'border-radius:8px; margin:8px 0;">'
+            f"<strong>Context Reset #{msg.get('metadata', {}).get('total_resets', '?')}</strong>"
+            f"</div>",
             unsafe_allow_html=True,
         )
         st.divider()
@@ -376,22 +442,32 @@ def render_message_card(msg: dict, idx: int, task_name: str = ""):
 
     # --- Render card ---
     with st.container():
-        # Build header parts as separate elements to avoid markdown-in-html issues
-        header_parts = [f":{icon}: **{role_label}**"]
+        # Header line: colored role label + metadata
+        header_parts = []
+        header_parts.append(
+            f'<span style="color:{color}; font-weight:600;">{role_label}</span>'
+        )
         if shard_tag:
-            header_parts.append(f"`{shard_tag}`")
+            header_parts.append(
+                f'<code style="font-size:0.85em;">{shard_tag}</code>'
+            )
         if vis_tag:
-            header_parts.append(f"*{vis_tag}*")
+            header_parts.append(
+                f'<span style="color:{RP_MUTED}; font-style:italic;">{vis_tag}</span>'
+            )
         ts = msg.get("timestamp", "")
         if ts:
-            header_parts.append(f"— *{ts}*")
+            header_parts.append(
+                f'<span style="color:{RP_MUTED}; font-size:0.85em;">— {ts}</span>'
+            )
 
-        # Use a colored container via border-left, but header as pure markdown
         st.markdown(
-            f'<div style="border-left: 4px solid {color}; padding-left: 12px; opacity: {opacity};">',
+            f'<div style="border-left:4px solid {color}; padding-left:12px; '
+            f'opacity:{opacity}; margin-bottom:2px;">'
+            f'<p style="margin:4px 0;">{"&nbsp;&nbsp;".join(header_parts)}</p>'
+            f"</div>",
             unsafe_allow_html=True,
         )
-        st.markdown(" &nbsp; ".join(header_parts))
 
         # Content
         if role == "system":
@@ -406,7 +482,7 @@ def render_message_card(msg: dict, idx: int, task_name: str = ""):
         else:
             st.markdown(content)
 
-        # --- Post-turn info (inline, not in expander) ---
+        # --- Post-turn info (visually distinct box) ---
         if msg.get("post_turn_logs"):
             _render_post_turn(msg["post_turn_logs"], task_name)
 
@@ -419,13 +495,11 @@ def render_message_card(msg: dict, idx: int, task_name: str = ""):
                 elif inj["type"] == "analysis_addendum_added":
                     st.caption("Analysis addendum added to system prompt")
 
-        # Close the border div
-        st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("---")
 
 
 def _render_post_turn(post_turn_logs: list[dict], task_name: str):
-    """Render post-turn processing info inline (compact)."""
+    """Render post-turn processing info in a visually distinct box."""
     # Collect the pieces
     verification = None
     evaluation = None
@@ -443,20 +517,37 @@ def _render_post_turn(post_turn_logs: list[dict], task_name: str):
         elif lt == "edit_decision":
             edit_decision = log_entry["data"]
 
+    # Open a visually distinct container
+    st.markdown(
+        f'<div style="background:{RP_OVERLAY}; border:1px solid {RP_MUTED}40; '
+        f'border-radius:6px; padding:8px 12px; margin:6px 0; font-size:0.9em;">',
+        unsafe_allow_html=True,
+    )
+
     # Line 1: categorization + evaluation on a single line
     if verification:
         resp_type = verification.get("response_type", "unknown")
         label = RESPONSE_TYPE_LABELS.get(resp_type, resp_type)
 
-        line = f"**{label}**"
+        parts = [f'<span style="color:{RP_FOAM};">{label}</span>']
         if evaluation:
             is_correct = evaluation.get("is_correct", False)
-            eval_icon = "correct" if is_correct else "incorrect"
-            line += f" — evaluation: **{eval_icon}**"
+            eval_color = RP_PINE if is_correct else RP_LOVE
+            eval_text = "correct" if is_correct else "incorrect"
+            parts.append(
+                f'(evaluation: <span style="color:{eval_color}; font-weight:600;">'
+                f"{eval_text}</span>)"
+            )
 
-        st.markdown(line)
+        st.markdown(
+            f'<p style="margin:2px 0;">{"&nbsp;".join(parts)}</p>',
+            unsafe_allow_html=True,
+        )
 
-    # Line 2: extracted answer
+    # Close the box before extracted answer / analysis (they use st components)
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    # Extracted answer (outside the HTML div so st components work)
     if evaluation:
         extracted = evaluation.get("extracted_answer")
         if extracted:
@@ -596,7 +687,6 @@ def render_conversation_info_tab(
         f"- **Timestamp:** {trace_file.get('timestamp', 'N/A')}",
     ]
 
-    # Models inline
     models = trace_file.get("models", {})
     if models:
         model_parts = [f"**{r.title()}:** {m}" for r, m in models.items()]
@@ -667,7 +757,12 @@ def render_memory_tab(
     result: Optional[dict],
     config: Optional[dict],
 ):
-    """Tab 4: Memory."""
+    """Tab 4: Memory.
+
+    Memory content comes from two sources depending on memory_target:
+    - assistant/system target: <cheatsheet> tags embedded in the system message
+    - analyzer target: loaded from cfg.memory.save_path (not in trace messages)
+    """
     trace = trace_file.get("trace", {})
     logs = trace.get("logs", [])
     exp_type = trace_file.get("experiment_type", "")
@@ -679,41 +774,63 @@ def render_memory_tab(
         st.info("No memory was used in this run.")
         return
 
+    # --- Memory configuration ---
+    memory_target = None
+    memory_save_path = None
+    if config:
+        strategy_cfg = config.get("experiment", {}).get("strategy", {})
+        memory_cfg = config.get("memory", {})
+        memory_target = (
+            strategy_cfg.get("memory_target")
+            or memory_cfg.get("target")
+        )
+        memory_save_path = memory_cfg.get("save_path")
+
+    st.subheader("Memory Configuration")
+
+    if memory_target:
+        if memory_target in ("assistant", "system"):
+            injection_loc = "System prompt (prepended to assistant's system message)"
+        elif memory_target == "analyzer":
+            injection_loc = "Comparison prompt (injected into analyzer's context)"
+        else:
+            injection_loc = f"Unknown: {memory_target}"
+        st.markdown(
+            f"- **Target:** `{memory_target}` · **Injection:** {injection_loc}"
+        )
+    if memory_save_path:
+        st.markdown(f"- **Save path:** `{memory_save_path}`")
+
     if memory_logs:
-        st.subheader("Memory Injection Events")
         for ml in memory_logs:
-            target = ml["data"].get("target", "unknown")
             ts = ml.get("timestamp", "")
+            target = ml["data"].get("target", "?")
+            st.caption(f"Injected at {ts} (target: {target})")
 
-            if target in ("assistant", "system"):
-                injection_loc = "System prompt (prepended to assistant's system message)"
-            elif target == "analyzer":
-                injection_loc = "Comparison prompt (injected into analyzer's context)"
-            else:
-                injection_loc = f"Unknown target: {target}"
+    # --- Cheatsheet content ---
+    cheatsheet = _get_cheatsheet_content(trace, config)
 
-            st.markdown(
-                f"- **Target component:** `{target}` · **Injection location:** {injection_loc}"
-                + (f" · {ts}" if ts else "")
-            )
+    if cheatsheet:
+        st.subheader("Cheatsheet Content")
+        st.code(cheatsheet, language=None)
+    else:
+        st.info(
+            "Cheatsheet content not found. "
+            "For analyzer-target runs, content is only available if "
+            "memory.save_path points to an existing cheatsheet JSON file."
+        )
 
-    if config and config.get("experiment", {}).get("strategy", {}).get("use_memory"):
-        st.subheader("Memory Configuration")
-        strategy_cfg = config["experiment"]["strategy"]
-        st.markdown(f"**Memory target:** `{strategy_cfg.get('memory_target', 'N/A')}`")
-
-    # Look for cheatsheet content in messages
-    messages = trace.get("messages", [])
-    for msg in messages:
-        content = msg.get("content", "")
-        if "<cheatsheet>" in content:
-            start = content.find("<cheatsheet>")
-            end = content.find("</cheatsheet>")
-            if start != -1 and end != -1:
-                cheatsheet_content = content[start + len("<cheatsheet>"):end].strip()
-                st.subheader("Cheatsheet Content")
-                st.code(cheatsheet_content, language=None)
-                break
+    # --- Cheatsheet history (if loading from file) ---
+    if memory_save_path and os.path.exists(memory_save_path):
+        cs_data = load_cheatsheet_file(memory_save_path)
+        if cs_data:
+            version = cs_data.get("version", 0)
+            history = cs_data.get("history", [])
+            st.subheader(f"Cheatsheet Version History (v{version})")
+            if history:
+                for i, old_content in enumerate(history):
+                    with st.expander(f"Version {i}", expanded=False):
+                        st.code(old_content, language=None)
 
 
 # ---------------------------------------------------------------------------
@@ -755,11 +872,9 @@ def main():
             st.warning("Enter at least one run directory above.")
             st.stop()
 
-        # Resolve paths
         for r in runs:
             r["resolved"] = resolve_path(r["path"])
 
-        # Run selector
         run_options = {r["label"]: r for r in runs}
         selected_label = st.selectbox(
             "Select Run",
@@ -769,7 +884,6 @@ def main():
         selected_run = run_options[selected_label]
         run_dir = selected_run["resolved"]
 
-        # Copy button for current run dir
         st.code(run_dir, language=None)
 
         if not os.path.isdir(run_dir):
@@ -788,9 +902,9 @@ def main():
         metrics = load_metrics(run_dir)
         error_analysis = load_error_analysis(run_dir)
 
-        # --- Run statistics ---
+        # --- Run statistics (short label) ---
         if metrics:
-            exp_name = metrics.get("experiment_name", "unknown")
+            exp_name = _short_exp_name(metrics.get("experiment_name", "unknown"))
             correct = metrics.get("correct", 0)
             total = metrics.get("total_attempted", metrics.get("total_samples", 0))
             acc = metrics.get("accuracy", 0)
@@ -833,7 +947,6 @@ def main():
         # --- Sample selector ---
         st.subheader("Sample Selector")
 
-        # Build display labels
         sample_labels = []
         for i, t in enumerate(trace_index):
             data = load_trace(t["path"])
@@ -842,7 +955,6 @@ def main():
             label = f"[{icon}] {t['sample_id']}"
             sample_labels.append(label)
 
-        # Session state for navigation
         if "sample_idx" not in st.session_state:
             st.session_state.sample_idx = 0
 
@@ -850,7 +962,6 @@ def main():
             0, min(st.session_state.sample_idx, len(trace_index) - 1)
         )
 
-        # Prev / Next buttons
         col_prev, col_next, col_count = st.columns([1, 1, 1])
         with col_prev:
             if st.button("Prev", disabled=st.session_state.sample_idx == 0):
@@ -886,13 +997,11 @@ def main():
     # Main area
     # -----------------------------------------------------------------------
 
-    # Load trace data
     trace_file = load_trace(selected_trace_info["path"])
     sample_id = trace_file.get("sample_id", "N/A")
     result = find_result_for_sample(results_list, sample_id)
     error_entry = find_error_for_sample(error_analysis, sample_id)
 
-    # Try to load sample data for shards/full_spec_q
     sample = None
     if config:
         data_file = config.get("task", {}).get("data_file", "")
@@ -907,19 +1016,16 @@ def main():
                 "ground_truth_a": meta.get("ground_truth_a", ""),
             }
 
-    # Title
     is_correct = trace_file.get("is_correct", False)
     result_icon = "+" if is_correct else "-"
     st.title(f"[{result_icon}] {sample_id}")
 
-    # Check if memory tab should be shown
     trace = trace_file.get("trace", {})
     exp_type = trace_file.get("experiment_type", "")
     has_memory = any(
         l.get("type") == "memory_injected" for l in trace.get("logs", [])
     ) or "memory" in exp_type.lower()
 
-    # Tabs
     tab_names = ["Question Info", "Conversation Info", "Conversation"]
     if has_memory:
         tab_names.append("Memory")
