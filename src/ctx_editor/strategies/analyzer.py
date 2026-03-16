@@ -174,12 +174,16 @@ class ConversationAnalyzer:
         # Include ALL user messages across resets (deduplicated) so the task spec
         # query always builds from the complete set of user information.
         user_messages_str = trace.get_user_messages_string(all_unique=True)
+        system_message_str = trace.system_message.content if trace.system_message else ""
         conversation_str = trace.get_conversation_string(skip_system=False)
         conversation_str = self._strip_edit_notes(conversation_str)
 
-        # Query 1: Build task spec from user messages only
+        # Query 1: Build task spec from user messages + system message context
         spec_prompt = self._task_spec_template.format_map(
-            defaultdict(str, {"user_messages": user_messages_str})
+            defaultdict(str, {
+                "user_messages": user_messages_str,
+                "system_message": system_message_str,
+            })
         )
         spec_output = await self._generate(spec_prompt, model_client)
 
