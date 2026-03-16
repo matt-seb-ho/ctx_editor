@@ -33,9 +33,9 @@ RP_FOAM = "#9ccfd8"  # light cyan
 RP_IRIS = "#c4a7e7"  # purple
 
 ROLE_COLORS = {
-    "system": RP_MUTED,
+    "system": RP_SUBTLE,
     "user": RP_FOAM,
-    "assistant": RP_PINE,
+    "assistant": RP_LOVE,
     "compacted conversation": RP_IRIS,
     "analysis": RP_GOLD,
     "analyst": RP_GOLD,
@@ -278,6 +278,59 @@ def _get_cheatsheet_content(
             if cs_data and cs_data.get("content"):
                 return cs_data["content"]
 
+    return None
+
+
+def _build_batch_table(cs_data: dict) -> list[dict[str, Any]]:
+    """Build the batch/version table from cheatsheet metadata.
+
+    Returns a list of rows: [{batch, samples, version_used, version_after}, ...]
+    """
+    metadata = cs_data.get("metadata", {})
+    rows = []
+
+    # Collect batch entries sorted by key
+    batch_keys = sorted(
+        [k for k in metadata if k.startswith("batch_update_") or k.startswith("update_")],
+        key=lambda k: int("".join(c for c in k if c.isdigit()) or "0"),
+    )
+
+    for i, key in enumerate(batch_keys):
+        entry = metadata[key]
+        batch_num = int("".join(c for c in key if c.isdigit()) or str(i + 1))
+
+        if "sample_ids" in entry:
+            sample_ids = entry["sample_ids"]
+        elif "sample_id" in entry:
+            sample_ids = [entry["sample_id"]]
+        else:
+            sample_ids = []
+
+        # Shorten sample IDs for display
+        short_ids = [sid.split("/")[-1] if "/" in sid else sid for sid in sample_ids]
+
+        rows.append(
+            {
+                "batch": batch_num,
+                "samples": sample_ids,
+                "short_ids": ", ".join(short_ids),
+                "num_samples": len(sample_ids),
+                "version_used": batch_num - 1,
+                "version_after": batch_num,
+            }
+        )
+
+    return rows
+
+
+def _find_sample_version(
+    batch_table: list[dict], sample_id: str
+) -> Optional[int]:
+    """Find which cheatsheet version was used for a given sample_id."""
+    normalized = sample_id.replace("_", "/")
+    for row in batch_table:
+        if normalized in row["samples"] or sample_id in row["samples"]:
+            return row["version_used"]
     return None
 
 
@@ -529,10 +582,10 @@ def _render_post_turn(post_turn_logs: list[dict], task_name: str):
         resp_type = verification.get("response_type", "unknown")
         label = RESPONSE_TYPE_LABELS.get(resp_type, resp_type)
 
-        parts = [f'<span style="color:{RP_FOAM};">{label}</span>']
+        parts = [f'<span style="color:{RP_IRIS};">{label}</span>']
         if evaluation:
             is_correct = evaluation.get("is_correct", False)
-            eval_color = RP_PINE if is_correct else RP_LOVE
+            eval_color = RP_FOAM if is_correct else RP_LOVE
             eval_text = "correct" if is_correct else "incorrect"
             parts.append(
                 f'(evaluation: <span style="color:{eval_color}; font-weight:600;">'
@@ -738,6 +791,125 @@ def render_conversation_info_tab(
         st.json(provenance)
 
 
+def render_run_info_tab(
+    run_dir: str,
+    config: Optional[dict],
+    metrics: Optional[dict],
+    results_list: Optional[list[dict]],
+    trace_index: list[dict],
+):
+    """Tab: Run-level information (cross-conversation)."""
+
+    # --- Run config summary ---
+    st.subheader("Run Configuration")
+    if config:
+        exp_cfg = config.get("experiment", {})
+        model_cfg = config.get("model", {})
+        task_cfg = config.get("task", {})
+        info = [
+            f"- **Experiment:** {exp_cfg.get('name', 'N/A')}",
+            f"- **Task:** {task_cfg.get('name', 'N/A')} · **Data:** `{task_cfg.get('data_file', 'N/A')}`",
+        ]
+        if model_cfg.get("name"):
+            info.append(f"- **Model:** {model_cfg['name']}")
+        strategy = exp_cfg.get("strategy", {})
+        if strategy:
+            strat_type = strategy.get("_target_", "").rsplit(".", 1)[-1]
+            strat_parts = [f"**Strategy:** {strat_type}"]
+            for k in ["min_turns", "max_resets", "use_memory", "memory_target",
+                       "analyzer_model"]:
+                if k in strategy:
+                    strat_parts.append(f"{k}={strategy[k]}")
+            info.append(f"- {' · '.join(strat_parts)}")
+        st.markdown("\n".join(info))
+
+    # --- Metrics summary ---
+    if metrics:
+        st.subheader("Metrics")
+        correct = metrics.get("correct", 0)
+        total = metrics.get("total_attempted", 0)
+        acc = metrics.get("accuracy", 0)
+        cost = metrics.get("total_cost_usd", 0)
+        avg_turns = metrics.get("average_turns", 0)
+
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Accuracy", f"{acc:.0%}", f"{correct}/{total}")
+        col2.metric("Avg Turns", f"{avg_turns:.1f}")
+        col3.metric("Total Cost", f"${cost:.2f}")
+        col4.metric("Samples", str(total))
+
+    # --- Per-sample results table ---
+    if results_list:
+        st.subheader("Per-Sample Results")
+        rows = []
+        for r in results_list:
+            rows.append({
+                "Sample": r.get("sample_id", "?"),
+                "Correct": "Y" if r.get("is_correct") else "N",
+                "Score": r.get("score", ""),
+                "Turns": r.get("num_turns", ""),
+                "Cost": f"${r.get('total_cost_usd', 0):.4f}",
+                "Answer": (r.get("extracted_answer") or "")[:60],
+            })
+        st.dataframe(rows, use_container_width=True, hide_index=True)
+
+    # --- Memory batch table ---
+    memory_save_path = None
+    if config:
+        memory_save_path = config.get("memory", {}).get("save_path")
+
+    if memory_save_path and os.path.exists(memory_save_path):
+        cs_data = load_cheatsheet_file(memory_save_path)
+        if cs_data:
+            batch_table = _build_batch_table(cs_data)
+            if batch_table:
+                st.subheader("Memory Batch Schedule")
+                st.markdown(
+                    "Each batch runs with the cheatsheet version shown, "
+                    "then updates it for the next batch."
+                )
+
+                table_rows = []
+                for row in batch_table:
+                    # Mark correct/incorrect per sample
+                    sample_results = []
+                    for sid in row["samples"]:
+                        r = find_result_for_sample(results_list, sid)
+                        if r:
+                            mark = "+" if r.get("is_correct") else "-"
+                            short = sid.split("/")[-1] if "/" in sid else sid
+                            sample_results.append(f"[{mark}] {short}")
+                        else:
+                            short = sid.split("/")[-1] if "/" in sid else sid
+                            sample_results.append(short)
+
+                    table_rows.append({
+                        "Batch": row["batch"],
+                        "Version Used": f"v{row['version_used']}",
+                        "Version After": f"v{row['version_after']}",
+                        "Samples": ", ".join(sample_results),
+                    })
+
+                st.dataframe(table_rows, use_container_width=True, hide_index=True)
+
+    # --- Error attribution summary ---
+    error_analysis = load_error_analysis(run_dir)
+    if error_analysis:
+        st.subheader("Error Attribution Summary")
+        summary = error_analysis.get("summary", {})
+        by_cat = summary.get("by_category", {})
+        if by_cat:
+            cat_rows = []
+            for cat, count in sorted(by_cat.items(), key=lambda x: -x[1]):
+                label = ERROR_CATEGORY_LABELS.get(cat, cat)
+                cat_rows.append({"Category": label, "Count": count})
+            st.dataframe(cat_rows, use_container_width=True, hide_index=True)
+
+        fn = summary.get("false_negatives")
+        if fn is not None:
+            st.markdown(f"**Estimated false negatives:** {fn}")
+
+
 def render_conversation_tab(trace_file: dict):
     """Tab 3: Conversation Viewer."""
     trace = trace_file.get("trace", {})
@@ -807,30 +979,68 @@ def render_memory_tab(
             target = ml["data"].get("target", "?")
             st.caption(f"Injected at {ts} (target: {target})")
 
-    # --- Cheatsheet content ---
-    cheatsheet = _get_cheatsheet_content(trace, config)
-
-    if cheatsheet:
-        st.subheader("Cheatsheet Content")
-        st.code(cheatsheet, language=None)
-    else:
-        st.info(
-            "Cheatsheet content not found. "
-            "For analyzer-target runs, content is only available if "
-            "memory.save_path points to an existing cheatsheet JSON file."
-        )
-
-    # --- Cheatsheet history (if loading from file) ---
+    # --- Load cheatsheet data and determine version used ---
+    cs_data = None
     if memory_save_path and os.path.exists(memory_save_path):
         cs_data = load_cheatsheet_file(memory_save_path)
-        if cs_data:
-            version = cs_data.get("version", 0)
-            history = cs_data.get("history", [])
-            st.subheader(f"Cheatsheet Version History (v{version})")
-            if history:
-                for i, old_content in enumerate(history):
-                    with st.expander(f"Version {i}", expanded=False):
-                        st.code(old_content, language=None)
+
+    batch_table = _build_batch_table(cs_data) if cs_data else []
+    sample_id = trace_file.get("sample_id", "")
+    sample_version = _find_sample_version(batch_table, sample_id) if batch_table else None
+
+    # --- Cheatsheet content for this sample ---
+    st.subheader("Cheatsheet Content")
+
+    if sample_version is not None:
+        st.markdown(f"**Version used for this sample:** v{sample_version}")
+        # Get the content at that version
+        history = cs_data.get("history", []) if cs_data else []
+        if sample_version == 0:
+            version_content = history[0] if history else ""
+        elif sample_version < len(history):
+            version_content = history[sample_version]
+        else:
+            version_content = cs_data.get("content", "") if cs_data else ""
+
+        if version_content:
+            st.code(version_content, language=None)
+        else:
+            st.info("v0 — empty cheatsheet (no prior learning)")
+    else:
+        # Fall back to extracting from trace or showing final version
+        cheatsheet = _get_cheatsheet_content(trace, config)
+        if cheatsheet:
+            st.code(cheatsheet, language=None)
+        else:
+            st.info(
+                "Cheatsheet content not found. "
+                "For analyzer-target runs, content is only available if "
+                "memory.save_path points to an existing cheatsheet JSON file."
+            )
+
+    # --- All versions (expandable) ---
+    if cs_data:
+        history = cs_data.get("history", [])
+        final_version = cs_data.get("version", 0)
+        st.subheader("All Versions")
+        for i in range(final_version + 1):
+            if i < len(history):
+                content = history[i]
+            elif i == final_version:
+                content = cs_data.get("content", "")
+            else:
+                content = ""
+            is_current = (sample_version == i) if sample_version is not None else False
+            label = f"v{i}"
+            if is_current:
+                label += " (used for this sample)"
+            if not content:
+                label += " (empty)"
+            with st.expander(label, expanded=is_current):
+                if content:
+                    st.code(content, language=None)
+                else:
+                    st.caption("Empty — no cheatsheet content at this version.")
 
 
 # ---------------------------------------------------------------------------
@@ -1026,7 +1236,7 @@ def main():
         l.get("type") == "memory_injected" for l in trace.get("logs", [])
     ) or "memory" in exp_type.lower()
 
-    tab_names = ["Question Info", "Conversation Info", "Conversation"]
+    tab_names = ["Question Info", "Conversation Info", "Conversation", "Run Info"]
     if has_memory:
         tab_names.append("Memory")
 
@@ -1041,8 +1251,11 @@ def main():
     with tabs[2]:
         render_conversation_tab(trace_file)
 
-    if has_memory and len(tabs) > 3:
-        with tabs[3]:
+    with tabs[3]:
+        render_run_info_tab(run_dir, config, metrics, results_list, trace_index)
+
+    if has_memory and len(tabs) > 4:
+        with tabs[4]:
             render_memory_tab(trace_file, result, config)
 
 
