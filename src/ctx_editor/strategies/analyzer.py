@@ -182,9 +182,11 @@ class ConversationAnalyzer:
         prev_spec_section = ""
         if prev_spec:
             prev_spec_section = (
-                "\n\nFor reference, here is the task specification produced by a previous "
-                "analysis pass. It may be incomplete or contain errors — use the user's "
-                "messages above as the primary source of truth.\n\n"
+                "\n\nFor reference, here is a task specification from an earlier point in "
+                "the conversation, when fewer user messages were available. It may be "
+                "missing details from later messages or contain interpretations that newer "
+                "messages have since clarified or corrected. Use it as a starting point "
+                "but verify against the full set of user messages above.\n\n"
                 f"<previous_task_spec>\n{prev_spec}\n</previous_task_spec>"
             )
 
