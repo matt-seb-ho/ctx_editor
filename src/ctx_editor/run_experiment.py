@@ -13,7 +13,7 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
 from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, SystemAgent, UserAgent
-from ctx_editor.core import ConversationSimulator, ConversationTrace, ModelConfig, SimulatorConfig
+from ctx_editor.core import ConversationSimulator, ConversationTrace, ModelConfig, SimulationResult, SimulatorConfig
 from ctx_editor.identify_false_negatives import (
     FalseNegativeResult,
     analyze_sample_inline,
@@ -410,8 +410,13 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     # with any execution mode (parallel, batched, sequential).
     replay_source = cfg.execution.get("replay_source")
     replay_traces = None
+    user_sim_skip_results: list[SimulationResult] = []  # Results for skipped user-sim-induced samples
     if replay_source:
-        from ctx_editor.execution.replay import load_baseline_traces, build_replay_trace
+        from ctx_editor.execution.replay import (
+            load_baseline_traces,
+            build_replay_trace,
+            load_user_sim_induced_ids,
+        )
 
         replay_turns = cfg.execution.get("replay_turns", 1)
         replay_traces = load_baseline_traces(replay_source)
@@ -428,6 +433,39 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
                 f"Replay: {original_count - len(samples)} samples skipped "
                 f"(no matching baseline trace)"
             )
+
+        # Skip samples with user-simulator-induced errors (pre-computed)
+        user_sim_induced_ids = load_user_sim_induced_ids(replay_source)
+        if user_sim_induced_ids:
+            skipped_samples = [
+                s for s in samples if s.get("task_id", "unknown") in user_sim_induced_ids
+            ]
+            samples = [
+                s for s in samples if s.get("task_id", "unknown") not in user_sim_induced_ids
+            ]
+            logger.info(
+                f"Replay: skipping {len(skipped_samples)} user-sim-induced samples: "
+                f"{[s.get('task_id') for s in skipped_samples]}"
+            )
+            # Create skip results so they appear in output as user-sim-induced
+            for s in skipped_samples:
+                skip_result = SimulationResult(
+                    sample_id=s.get("task_id", "unknown"),
+                    task_name=s.get("task", "unknown"),
+                    is_correct=False,
+                    score=0.0,
+                    num_turns=0,
+                    total_cost_usd=0.0,
+                    trace={"messages": [], "logs": [], "num_resets": 0},
+                    metadata={
+                        "skipped": True,
+                        "skip_reason": "user_sim_induced",
+                        "replay_mode": True,
+                    },
+                )
+                user_sim_skip_results.append(skip_result)
+                save_result_incrementally(skip_result)
+
         pbar.total = len(samples)
         pbar.refresh()
 
@@ -482,6 +520,13 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     # Separate valid results from error results (exceptions during conversation)
     valid_results = [r for r in results if "error" not in r.metadata]
     error_results = [r for r in results if "error" in r.metadata]
+
+    # Log user-sim-induced skips (excluded from accuracy denominator entirely)
+    num_user_sim_skipped = len(user_sim_skip_results)
+    if num_user_sim_skipped:
+        logger.info(
+            f"{num_user_sim_skipped} samples excluded (user-sim-induced errors in baseline traces)"
+        )
 
     def _user_output_tokens(r) -> int:
         """Extract user agent output tokens from a result."""
@@ -543,6 +588,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         "total_samples": total,
         "total_attempted": total_attempted,
         "errors": num_errors,
+        "user_sim_skipped": num_user_sim_skipped,
         "correct": correct,
         "accuracy": correct / total if total > 0 else 0,
         "average_score": avg_score,
@@ -560,8 +606,13 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         }
 
     # Log overall metrics
-    error_suffix = f" ({num_errors} errors excluded)" if num_errors > 0 else ""
-    logger.info(f"Results: {correct}/{total} correct ({metrics['accuracy']:.2%}){error_suffix}")
+    suffixes = []
+    if num_errors > 0:
+        suffixes.append(f"{num_errors} errors excluded")
+    if num_user_sim_skipped > 0:
+        suffixes.append(f"{num_user_sim_skipped} user-sim-induced skipped")
+    suffix_str = f" ({', '.join(suffixes)})" if suffixes else ""
+    logger.info(f"Results: {correct}/{total} correct ({metrics['accuracy']:.2%}){suffix_str}")
     logger.info(f"Average score: {avg_score:.3f}")
     logger.info(f"Total cost: ${total_cost:.4f}")
 
@@ -680,10 +731,16 @@ def main(cfg: DictConfig) -> None:
     summary_lines.append(f"Experiment: {cfg.experiment_name}")
 
     num_errors = metrics.get("errors", 0)
-    error_note = f"  ({num_errors} errors excluded)" if num_errors > 0 else ""
+    num_skipped = metrics.get("user_sim_skipped", 0)
+    notes = []
+    if num_errors > 0:
+        notes.append(f"{num_errors} errors excluded")
+    if num_skipped > 0:
+        notes.append(f"{num_skipped} user-sim-induced skipped")
+    note_str = f"  ({', '.join(notes)})" if notes else ""
     summary_lines.append(
         f"Accuracy: {metrics['accuracy']:.2%} "
-        f"({metrics['correct']}/{metrics['total_samples']}){error_note}"
+        f"({metrics['correct']}/{metrics['total_samples']}){note_str}"
     )
     if "adjusted_accuracy" in metrics:
         adj_note = (

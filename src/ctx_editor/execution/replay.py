@@ -18,6 +18,44 @@ from ..memory.base import MemoryModule
 from ..utils.logging import get_logger
 
 
+def load_user_sim_induced_ids(trace_source: str) -> set[str]:
+    """Load sample IDs flagged as user-simulator-induced errors.
+
+    Looks for a false_negatives.json file alongside the trace source
+    (same directory, or parent directory for file sources). These are
+    pre-computed by running `identify_false_negatives` on the baseline traces.
+
+    Returns:
+        Set of sample_id strings that should be skipped during replay.
+    """
+    logger = get_logger("replay")
+    source = Path(trace_source)
+
+    # Look for false_negatives.json in the trace source directory
+    candidates = []
+    if source.is_dir():
+        # e.g. data/baseline_traces_v2/math/ -> look for math_false_negatives.json
+        # in parent, or false_negatives.json in the dir itself
+        candidates.append(source / "false_negatives.json")
+        candidates.append(source.parent / f"{source.name}_false_negatives.json")
+    elif source.is_file():
+        candidates.append(source.parent / "false_negatives.json")
+
+    for fn_path in candidates:
+        if fn_path.exists():
+            with open(fn_path) as f:
+                fn_data = json.load(f)
+            ids = set(fn_data.get("summary", {}).get("user_sim_induced_ids", []))
+            if ids:
+                logger.info(
+                    f"Loaded {len(ids)} user-sim-induced IDs from {fn_path} "
+                    f"(will skip during replay)"
+                )
+            return ids
+
+    return set()
+
+
 def load_baseline_traces(
     trace_source: str,
 ) -> dict[str, dict[str, Any]]:
