@@ -177,25 +177,9 @@ class ConversationAnalyzer:
         conversation_str = trace.get_conversation_string(skip_system=False)
         conversation_str = self._strip_edit_notes(conversation_str)
 
-        # If there was a previous reset, include the prior task spec as reference
-        prev_spec = trace.previous_task_spec
-        prev_spec_section = ""
-        if prev_spec:
-            prev_spec_section = (
-                "\n\nFor reference, here is a task specification from an earlier point in "
-                "the conversation, when fewer user messages were available. It may be "
-                "missing details from later messages or contain interpretations that newer "
-                "messages have since clarified or corrected. Use it as a starting point "
-                "but verify against the full set of user messages above.\n\n"
-                f"<previous_task_spec>\n{prev_spec}\n</previous_task_spec>"
-            )
-
         # Query 1: Build task spec from user messages only
         spec_prompt = self._task_spec_template.format_map(
-            defaultdict(str, {
-                "user_messages": user_messages_str,
-                "previous_task_spec_section": prev_spec_section,
-            })
+            defaultdict(str, {"user_messages": user_messages_str})
         )
         spec_output = await self._generate(spec_prompt, model_client)
 
