@@ -459,7 +459,6 @@ def render_message_card(msg: dict, idx: int, task_name: str = ""):
     content = msg.get("content", "")
 
     color = ROLE_COLORS.get(role, RP_SUBTLE)
-    opacity = "1.0" if visible else "0.5"
 
     # Role label
     if role == "compacted conversation":
@@ -516,7 +515,7 @@ def render_message_card(msg: dict, idx: int, task_name: str = ""):
 
         st.markdown(
             f'<div style="border-left:4px solid {color}; padding-left:12px; '
-            f'opacity:{opacity}; margin-bottom:2px;">'
+            f'margin-bottom:2px;">'
             f'<p style="margin:4px 0;">{"&nbsp;&nbsp;".join(header_parts)}</p>'
             f"</div>",
             unsafe_allow_html=True,
@@ -552,8 +551,11 @@ def render_message_card(msg: dict, idx: int, task_name: str = ""):
 
 
 def _render_post_turn(post_turn_logs: list[dict], task_name: str):
-    """Render post-turn processing info in a visually distinct box."""
-    # Collect the pieces
+    """Render post-turn processing as an expander.
+
+    Header: categorization + evaluation result (e.g. "Answer Attempt (correct)")
+    Body: extracted answer, conversation analysis, edit decision
+    """
     verification = None
     evaluation = None
     analysis_logs = []
@@ -570,53 +572,43 @@ def _render_post_turn(post_turn_logs: list[dict], task_name: str):
         elif lt == "edit_decision":
             edit_decision = log_entry["data"]
 
-    # Open a visually distinct container
-    st.markdown(
-        f'<div style="background:{RP_OVERLAY}; border:1px solid {RP_MUTED}40; '
-        f'border-radius:6px; padding:8px 12px; margin:6px 0; font-size:0.9em;">',
-        unsafe_allow_html=True,
-    )
-
-    # Line 1: categorization + evaluation on a single line
+    # Build expander header
+    header = ""
     if verification:
         resp_type = verification.get("response_type", "unknown")
-        label = RESPONSE_TYPE_LABELS.get(resp_type, resp_type)
-
-        parts = [f'<span style="color:{RP_IRIS};">{label}</span>']
+        header = RESPONSE_TYPE_LABELS.get(resp_type, resp_type)
         if evaluation:
             is_correct = evaluation.get("is_correct", False)
-            eval_color = RP_FOAM if is_correct else RP_LOVE
-            eval_text = "correct" if is_correct else "incorrect"
-            parts.append(
-                f'(evaluation: <span style="color:{eval_color}; font-weight:600;">'
-                f"{eval_text}</span>)"
-            )
+            header += f" ({'correct' if is_correct else 'incorrect'})"
 
-        st.markdown(
-            f'<p style="margin:2px 0;">{"&nbsp;".join(parts)}</p>',
-            unsafe_allow_html=True,
-        )
+    if not header:
+        header = "Post-turn Processing"
 
-    # Close the box before extracted answer / analysis (they use st components)
-    st.markdown("</div>", unsafe_allow_html=True)
+    # Determine if there's body content worth expanding
+    has_body = bool(
+        (evaluation and evaluation.get("extracted_answer"))
+        or analysis_logs
+        or edit_decision
+    )
 
-    # Extracted answer (outside the HTML div so st components work)
-    if evaluation:
-        extracted = evaluation.get("extracted_answer")
-        if extracted:
-            if task_name in CODE_BLOCK_TASKS:
-                lang = {"code": "python", "database": "sql"}.get(task_name, None)
-                if task_name == "code":
-                    with st.expander("Extracted Answer", expanded=False):
-                        st.code(extracted, language=lang)
-                else:
+    if not has_body:
+        # Just show the header as a caption, no expander needed
+        st.caption(header)
+        return
+
+    with st.expander(header, expanded=False):
+        # Extracted answer
+        if evaluation:
+            extracted = evaluation.get("extracted_answer")
+            if extracted:
+                if task_name in CODE_BLOCK_TASKS:
+                    lang = {"code": "python", "database": "sql"}.get(task_name, None)
                     st.code(extracted, language=lang)
-            else:
-                st.markdown(f"Extracted: `{extracted}`")
+                else:
+                    st.markdown(f"Extracted: `{extracted}`")
 
-    # Conversation analysis (for S1/S2) — collapsed
-    if analysis_logs:
-        with st.expander("Conversation Analysis", expanded=False):
+        # Conversation analysis (for S1/S2)
+        if analysis_logs:
             for data in analysis_logs:
                 if data.get("user_intent"):
                     st.markdown("*User Intent:*")
@@ -631,9 +623,9 @@ def _render_post_turn(post_turn_logs: list[dict], task_name: str):
                 if needs is not None:
                     st.markdown(f"**Needs Edit:** {'Yes' if needs else 'No'}")
 
-    if edit_decision:
-        should = edit_decision.get("should_edit", False)
-        st.markdown(f"**Edit Decision:** {'Edit' if should else 'Pass'}")
+        if edit_decision:
+            should = edit_decision.get("should_edit", False)
+            st.markdown(f"**Edit Decision:** {'Edit' if should else 'Pass'}")
 
 
 # ---------------------------------------------------------------------------
