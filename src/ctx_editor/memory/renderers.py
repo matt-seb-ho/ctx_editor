@@ -12,16 +12,14 @@ if TYPE_CHECKING:
 
 
 # Regex to strip S1's embedded <conversation_analysis> blocks from user messages
-_ANALYSIS_TAG_RE = re.compile(
-    r"\n*<conversation_analysis>.*?</conversation_analysis>", re.DOTALL
-)
+_ANALYSIS_TAG_RE = re.compile(r"\n*<conversation_analysis>.*?</conversation_analysis>", re.DOTALL)
 
 
 def _format_analysis_block(log_data: dict) -> str:
     """Format a conversation_analysis log entry as a readable block."""
     parts = []
     if log_data.get("user_intent"):
-        parts.append(f"# Task Spec\n{log_data['user_intent']}")
+        parts.append(f"# User Task Specification (So Far)\n{log_data['user_intent']}")
     if log_data.get("aligned"):
         parts.append(f"# What Looks Right\n{log_data['aligned']}")
     if log_data.get("issues") and log_data.get("needs_edit"):
@@ -96,7 +94,9 @@ def render_for_edit_decision(trajectory: "SimulationResult") -> str:
     messages = trajectory.trace.get("messages", [])
     final_outcome = "Success" if trajectory.is_correct else "Failure"
 
-    parts = [f"Final outcome: {final_outcome} (score: {trajectory.score}, turns: {trajectory.num_turns})"]
+    parts = [
+        f"Final outcome: {final_outcome} (score: {trajectory.score}, turns: {trajectory.num_turns})"
+    ]
 
     decision_logs = [l for l in logs if l["type"] == "edit_decision"]
 
@@ -182,9 +182,7 @@ def render_for_analyzer(trajectory: "SimulationResult") -> str:
             if role == "compacted conversation":
                 reset_count += 1
                 parts.append(
-                    f"\n{'=' * 50}\n"
-                    f"NEW CONVERSATION (Reset #{reset_count})\n"
-                    f"{'=' * 50}"
+                    f"\n{'=' * 50}\n" f"NEW CONVERSATION (Reset #{reset_count})\n" f"{'=' * 50}"
                 )
                 parts.append(f"[compacted conversation]\n{content}")
                 continue

@@ -24,13 +24,17 @@ if TYPE_CHECKING:
 # Appended to system message once to explain the analysis block
 ANALYSIS_SYSTEM_ADDENDUM = """
 
-Note: Before the latest user message, an independent model analyzed the conversation. \
-Its analysis appears in <conversation_analysis> tags in the conversation. Use it as \
-helpful context — it may identify errors in your previous approach that you should \
-address. Do not reference the analysis directly in your response."""
+Note: An independent reviewer may analyze the conversation between turns. \
+These analyses appear as [conversation analysis] messages. They summarize what the user \
+has specified so far and identify which parts of your approach are consistent with the \
+specifications and which parts may be erroneous. Consider this analysis when preparing \
+your next response, but do not reference it directly."""
 
-ANALYSIS_BLOCK_TEMPLATE = (
-    "\n\n<conversation_analysis>\n{analysis}\n</conversation_analysis>"
+ANALYSIS_PREAMBLE = (
+    "An independent reviewer analyzed the conversation so far. It summarizes what the user "
+    "has specified and identifies which parts of your approach are consistent with the "
+    "specifications and which parts may need to change. Consider this analysis when "
+    "preparing your next response."
 )
 
 
@@ -113,18 +117,29 @@ class AppendAnalysisStrategy(BaseStrategy):
             },
         )
 
-        # Build analysis text to append
-        parts = []
+        # Build analysis text
+        parts = [ANALYSIS_PREAMBLE]
         if result.user_intent:
-            parts.append(f"# Task Spec\n{result.user_intent}")
+            parts.append(f"# User Task Specification (So Far)\n{result.user_intent}")
         if result.aligned:
             parts.append(f"# What Looks Right So Far\n{result.aligned}")
         if result.issues and result.needs_edit:
             parts.append(f"# What Needs to Change\n{result.issues}")
         analysis_text = "\n\n".join(parts)
 
-        if analysis_text:
-            analysis_block = ANALYSIS_BLOCK_TEMPLATE.format(analysis=analysis_text.strip())
-            trace.append_to_last_user_message(analysis_block)
+        # Insert analysis as a separate message before the last user message
+        messages = trace.get_active_messages()
+        if analysis_text and len(messages) >= 1:
+            analysis_msg = Message(role="conversation analysis", content=analysis_text)
+            # Find last user message and insert analysis before it
+            last_user_idx = None
+            for i in range(len(messages) - 1, -1, -1):
+                if messages[i].role == "user":
+                    last_user_idx = i
+                    break
+            if last_user_idx is not None:
+                messages.insert(last_user_idx, analysis_msg)
+            else:
+                messages.append(analysis_msg)
 
-        return trace.get_active_messages()
+        return messages

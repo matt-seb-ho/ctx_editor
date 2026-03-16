@@ -34,7 +34,10 @@ _PROMPT_DIR = Path(__file__).parent / "prompts"
 
 MEMORY_SECTION_TEMPLATE = """\
 <cheatsheet>
-Use this cheatsheet to guide your analysis — it contains lessons learned from similar tasks:
+The following cheatsheet contains strategies, common pitfalls, and lessons learned from \
+previous similar tasks. Use your discretion to decide which points are relevant — not all \
+will apply.
+
 {memory_content}
 </cheatsheet>
 """
@@ -132,16 +135,14 @@ class ConversationAnalyzer:
         self.reasoning_effort = reasoning_effort
         self.prompt_version = prompt_version
 
-        if prompt_version in ("v6", "v7"):
+        if prompt_version in ("v6", "v7", "v8"):
             self._task_spec_template = _load_prompt(f"analyzer_{prompt_version}_task_spec")
             self._compare_template = _load_prompt(f"analyzer_{prompt_version}_compare")
         else:
             # Single-query prompt (v4, v5)
             self._prompt_template = _load_prompt(f"analyzer_{prompt_version}")
 
-    async def _generate(
-        self, prompt: str, model_client: "ModelClient"
-    ) -> str:
+    async def _generate(self, prompt: str, model_client: "ModelClient") -> str:
         """Run a single LLM generation."""
         generate_kwargs: dict = {
             "messages": [{"role": "user", "content": prompt}],
@@ -193,16 +194,17 @@ class ConversationAnalyzer:
         # Query 2: Compare task spec against full conversation
         memory_section = ""
         if memory and memory.content:
-            memory_section = MEMORY_SECTION_TEMPLATE.format(
-                memory_content=memory.content
-            )
+            memory_section = MEMORY_SECTION_TEMPLATE.format(memory_content=memory.content)
 
         compare_prompt = self._compare_template.format_map(
-            defaultdict(str, {
-                "task_spec": task_spec,
-                "conversation": conversation_str,
-                "memory_section": memory_section,
-            })
+            defaultdict(
+                str,
+                {
+                    "task_spec": task_spec,
+                    "conversation": conversation_str,
+                    "memory_section": memory_section,
+                },
+            )
         )
         compare_output = await self._generate(compare_prompt, model_client)
 
@@ -245,16 +247,17 @@ class ConversationAnalyzer:
 
         memory_section = ""
         if memory and memory.content:
-            memory_section = MEMORY_SECTION_TEMPLATE.format(
-                memory_content=memory.content
-            )
+            memory_section = MEMORY_SECTION_TEMPLATE.format(memory_content=memory.content)
 
         prompt = self._prompt_template.format_map(
-            defaultdict(str, {
-                "conversation": conversation_str,
-                "user_messages": user_messages_str,
-                "memory_section": memory_section,
-            })
+            defaultdict(
+                str,
+                {
+                    "conversation": conversation_str,
+                    "user_messages": user_messages_str,
+                    "memory_section": memory_section,
+                },
+            )
         )
         output = await self._generate(prompt, model_client)
         return self._parse_single_output(output)
@@ -290,9 +293,7 @@ class ConversationAnalyzer:
         action_match = re.search(r"<edit_action>(.*?)</edit_action>", text, re.DOTALL)
 
         # Try tagged assessment sections
-        assess_match = re.search(
-            r"<context_assessment>(.*?)</context_assessment>", text, re.DOTALL
-        )
+        assess_match = re.search(r"<context_assessment>(.*?)</context_assessment>", text, re.DOTALL)
         if not assess_match:
             assess_match = re.search(
                 r"<approach_evaluation>(.*?)</approach_evaluation>", text, re.DOTALL
@@ -314,9 +315,7 @@ class ConversationAnalyzer:
             else:
                 action_str = "none"
         else:
-            pivot_match = re.search(
-                r"<pivot_decision>(.*?)</pivot_decision>", text, re.DOTALL
-            )
+            pivot_match = re.search(r"<pivot_decision>(.*?)</pivot_decision>", text, re.DOTALL)
             if pivot_match:
                 pivot_str = pivot_match.group(1).strip().lower()
                 action_str = "major" if pivot_str.startswith("yes") else "none"

@@ -81,9 +81,14 @@ class ContextEditV2Strategy(BaseStrategy):
         if system_msg:
             new_messages.append(Message(role="system", content=system_msg.content))
 
-        # Compacted conversation: task spec + aligned content
+        # Compacted conversation: preamble + task spec + aligned content
         task_spec = result.user_intent if result.user_intent else result.raw_output
-        compact_parts = [f"# Task Spec\n{task_spec}"]
+        compact_parts = [
+            "The conversation history has been compacted. Below is a summary of the "
+            "user's full specification and the work completed so far that is consistent "
+            "with it.",
+            f"# User Task Specification (So Far)\n{task_spec}",
+        ]
         if result.aligned:
             compact_parts.append(f"# What Looks Right So Far\n{result.aligned}")
 
