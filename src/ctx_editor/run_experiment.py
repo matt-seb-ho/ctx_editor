@@ -14,10 +14,12 @@ from tqdm import tqdm
 
 from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, SystemAgent, UserAgent
 from ctx_editor.core import ConversationSimulator, ConversationTrace, ModelConfig, SimulatorConfig
-from ctx_editor.error_analysis import (
-    analyze_simulation_result,
-    print_summary,
-    save_results as save_error_results,
+from ctx_editor.identify_false_negatives import (
+    FalseNegativeResult,
+    analyze_sample_inline,
+    compute_adjusted_accuracy,
+    print_fn_summary,
+    save_fn_results,
 )
 from ctx_editor.memory import CheatsheetMemory, CheatsheetUpdater, MemoryModule
 from ctx_editor.execution import (
@@ -299,27 +301,29 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         pbar.n = completed
         pbar.refresh()
 
-    # Error attribution setup
-    ea_enabled = cfg.get("error_attribution", {}).get("enabled", False)
-    ea_mode = cfg.get("error_attribution", {}).get("mode", "batch")
-    ea_model = cfg.get("error_attribution", {}).get("model", "gpt-4o-mini")
-    error_attribution_results = []  # Collect for batch mode or immediate results
+    # False negative analysis setup
+    fna_cfg = cfg.get("false_negative_analysis", {})
+    fna_enabled = fna_cfg.get("enabled", False)
+    fna_mode = fna_cfg.get("mode", "batch")
+    fna_model = fna_cfg.get("model", "gpt-5-mini")
+    fna_exclude_non_answer = fna_cfg.get("exclude_non_answer_attempts", False)
+    fn_results: list[FalseNegativeResult] = []
 
     # Incremental result saving - save each result as it completes so
     # progress is not lost if the experiment hangs or is interrupted.
     partial_results_path = output_dir / "results_partial.jsonl"
 
-    async def _run_immediate_error_attribution(result: "SimulationResult") -> None:
-        """Run error attribution immediately after a conversation completes."""
-        if not ea_enabled or ea_mode != "immediate":
+    async def _run_immediate_fn_analysis(result: "SimulationResult") -> None:
+        """Run false negative analysis immediately after a conversation completes."""
+        if not fna_enabled or fna_mode != "immediate":
             return
         try:
             result_dict = result.to_dict()
-            ea_result = await analyze_simulation_result(result_dict, model_client, ea_model)
-            if ea_result:
-                error_attribution_results.append(ea_result)
+            fn_result = await analyze_sample_inline(result_dict, model_client, fna_model)
+            if fn_result:
+                fn_results.append(fn_result)
         except Exception as e:
-            logger.warning(f"Error attribution failed for {result.sample_id}: {e}")
+            logger.warning(f"False negative analysis failed for {result.sample_id}: {e}")
 
     def save_result_incrementally(result: "SimulationResult") -> None:
         """Save a single result to disk immediately upon completion."""
@@ -339,9 +343,9 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             assistant_model=cfg.model.assistant.model,
         )
 
-        # Immediate error attribution (fire-and-forget via event loop)
-        if ea_enabled and ea_mode == "immediate":
-            asyncio.ensure_future(_run_immediate_error_attribution(result))
+        # Immediate false negative analysis (fire-and-forget via event loop)
+        if fna_enabled and fna_mode == "immediate":
+            asyncio.ensure_future(_run_immediate_fn_analysis(result))
 
     # Create memory updater with grounding config and target
     memory_updater = CheatsheetUpdater(
@@ -610,27 +614,39 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         },
     )
 
-    # Run batch error attribution if enabled
-    if ea_enabled and ea_mode == "batch":
+    # Run batch false negative analysis if enabled
+    if fna_enabled and fna_mode == "batch":
         incorrect_results = [r for r in valid_results if not r.is_correct]
         if incorrect_results:
             logger.info(
-                f"Running batch error attribution on {len(incorrect_results)} incorrect samples..."
+                f"Running false negative analysis on {len(incorrect_results)} incorrect samples..."
             )
-            for r in tqdm(incorrect_results, desc="Error attribution", unit="sample"):
+            for r in tqdm(incorrect_results, desc="False negative analysis", unit="sample"):
                 try:
-                    ea_result = await analyze_simulation_result(r.to_dict(), model_client, ea_model)
-                    if ea_result:
-                        error_attribution_results.append(ea_result)
+                    fn_result = await analyze_sample_inline(r.to_dict(), model_client, fna_model)
+                    if fn_result:
+                        fn_results.append(fn_result)
                 except Exception as e:
-                    logger.warning(f"Error attribution failed for {r.sample_id}: {e}")
+                    logger.warning(f"False negative analysis failed for {r.sample_id}: {e}")
 
-    # Save error attribution results if any
-    if error_attribution_results:
-        ea_output_path = str(output_dir / "error_analysis.json")
-        save_error_results(error_attribution_results, ea_output_path)
-        print_summary(error_attribution_results)
-        logger.info(f"Error attribution: {len(error_attribution_results)} samples analyzed")
+    # Save false negative results and report adjusted accuracy
+    if fn_results:
+        fn_output_path = str(output_dir / "false_negatives.json")
+        save_fn_results(fn_results, fn_output_path)
+        print_fn_summary(fn_results, correct, total, fna_exclude_non_answer)
+
+        # Compute and log adjusted accuracy
+        adj = compute_adjusted_accuracy(correct, total, fn_results, fna_exclude_non_answer)
+        metrics["adjusted_accuracy"] = adj["adjusted_accuracy"]
+        metrics["adjusted_total"] = adj["adjusted_total"]
+        metrics["user_sim_induced"] = adj["user_sim_induced"]
+        metrics["non_answer_attempts"] = adj["non_answer_attempts"]
+        logger.info(
+            f"Adjusted accuracy: {adj['adjusted_correct']}/{adj['adjusted_total']} "
+            f"({adj['adjusted_accuracy']:.2%}) "
+            f"[{adj['user_sim_induced']} user-sim-induced, "
+            f"{adj['non_answer_attempts']} non-answer-attempts excluded={fna_exclude_non_answer}]"
+        )
 
     # Save final memory
     if memory and cfg.memory.get("save_path"):
@@ -669,6 +685,15 @@ def main(cfg: DictConfig) -> None:
         f"Accuracy: {metrics['accuracy']:.2%} "
         f"({metrics['correct']}/{metrics['total_samples']}){error_note}"
     )
+    if "adjusted_accuracy" in metrics:
+        adj_note = (
+            f"  [{metrics['user_sim_induced']} user-sim-induced excluded"
+            f", {metrics['non_answer_attempts']} non-answer-attempts]"
+        )
+        summary_lines.append(
+            f"Adjusted Accuracy: {metrics['adjusted_accuracy']:.2%} "
+            f"({metrics['correct']}/{metrics['adjusted_total']}){adj_note}"
+        )
     summary_lines.append(f"Average Score: {metrics['average_score']:.3f}")
     summary_lines.append(f"Total Cost: ${metrics['total_cost_usd']:.4f}")
     summary_lines.append(f"Average Turns: {metrics['average_turns']:.1f}")
