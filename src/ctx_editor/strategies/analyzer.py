@@ -171,9 +171,11 @@ class ConversationAnalyzer:
         Query 1: User messages only → task spec (no assistant contamination)
         Query 2: Task spec + full conversation → critical comparison
         """
-        # Include compacted conversation content (from prior S2 resets) so the
-        # task spec query sees the previously-extracted task spec + new user messages.
-        user_messages_str = trace.get_user_messages_string(include_compacted=True)
+        # Include ALL user messages across resets (deduplicated) so the task spec
+        # query always builds from the complete set of user information. This avoids
+        # losing details that were in pre-reset messages and prevents bias from
+        # a previous compacted task spec.
+        user_messages_str = trace.get_user_messages_string(all_unique=True)
         conversation_str = trace.get_conversation_string(skip_system=False)
         conversation_str = self._strip_edit_notes(conversation_str)
 

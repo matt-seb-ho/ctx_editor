@@ -255,7 +255,10 @@ class ConversationTrace:
         return result
 
     def get_user_messages_string(
-        self, active_only: bool = True, include_compacted: bool = False
+        self,
+        active_only: bool = True,
+        include_compacted: bool = False,
+        all_unique: bool = False,
     ) -> str:
         """Get only user messages as a formatted string, numbered by turn.
 
@@ -265,7 +268,29 @@ class ConversationTrace:
                 This is important for S2 (context edit) — after a reset, the compacted
                 conversation contains the previous task spec and should be included
                 when the analyzer builds a new task spec.
+            all_unique: If True, include ALL user messages (visible and hidden),
+                deduplicated by content. This ensures the task spec query sees
+                every user message across all resets, without the bias of a
+                previous compacted task spec. Overrides active_only and
+                include_compacted when set.
         """
+        if all_unique:
+            # Get all user messages across resets, deduplicated
+            all_msgs = self.to_messages(include_system=False, active_only=False)
+            user_msgs = [msg for msg in all_msgs if msg.role == "user"]
+            # Deduplicate by content (preserves order, keeps first occurrence)
+            seen: set[str] = set()
+            unique_msgs = []
+            for msg in user_msgs:
+                content = msg.content.strip()
+                if content not in seen:
+                    seen.add(content)
+                    unique_msgs.append(msg)
+            parts = []
+            for i, msg in enumerate(unique_msgs, 1):
+                parts.append(f"[Message {i}]\n{msg.content}")
+            return "\n\n".join(parts)
+
         messages = self.to_messages(include_system=False, active_only=active_only)
         relevant_roles = {"user"}
         if include_compacted:
