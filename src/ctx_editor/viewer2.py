@@ -122,16 +122,22 @@ def parse_run_input(text: str) -> list[dict[str, str]]:
     return [{"label": os.path.basename(line.rstrip("/")), "path": line} for line in lines]
 
 
-def resolve_path(p: str) -> str:
-    """Resolve a path that may be relative to OUTPUTS_ROOT or absolute."""
+def resolve_path(p: str, prefix: str = "") -> str:
+    """Resolve a path that may be relative to OUTPUTS_ROOT or absolute.
+
+    If prefix is given, it is prepended to the outputs root
+    (e.g. prefix="remote_outputs" → "remote_outputs/outputs/...").
+    """
+    outputs_root = os.path.join(prefix, OUTPUTS_ROOT) if prefix else OUTPUTS_ROOT
+
     if os.path.isabs(p) and os.path.exists(p):
         return p
-    candidate = os.path.join(OUTPUTS_ROOT, p)
+    candidate = os.path.join(outputs_root, p)
     if os.path.exists(candidate):
         return candidate
     if os.path.exists(p):
         return p
-    return p
+    return candidate  # Return the prefixed candidate even if missing (better error msg)
 
 
 def list_trace_files(run_dir: str) -> list[dict[str, Any]]:
@@ -249,8 +255,24 @@ def load_sample_data(data_file: str, task_id: str) -> Optional[dict]:
     return None
 
 
+def _resolve_memory_path(save_path: str, prefix: str = "") -> str:
+    """Resolve a memory/cheatsheet save_path, applying prefix if needed.
+
+    The save_path in config is relative to the server working dir (e.g.
+    "outputs/dev_memories/..."). When viewing from a local rsync mirror
+    with a prefix, we prepend the prefix.
+    """
+    if os.path.exists(save_path):
+        return save_path
+    if prefix:
+        prefixed = os.path.join(prefix, save_path)
+        if os.path.exists(prefixed):
+            return prefixed
+    return save_path
+
+
 def _get_cheatsheet_content(
-    trace_data: dict, config: Optional[dict]
+    trace_data: dict, config: Optional[dict], prefix: str = ""
 ) -> Optional[str]:
     """Extract cheatsheet content from either trace messages or the save file.
 
@@ -273,10 +295,12 @@ def _get_cheatsheet_content(
     # 2) Fall back to loading from save_path (analyzer-target)
     if config:
         save_path = config.get("memory", {}).get("save_path")
-        if save_path and os.path.exists(save_path):
-            cs_data = load_cheatsheet_file(save_path)
-            if cs_data and cs_data.get("content"):
-                return cs_data["content"]
+        if save_path:
+            resolved = _resolve_memory_path(save_path, prefix)
+            if os.path.exists(resolved):
+                cs_data = load_cheatsheet_file(resolved)
+                if cs_data and cs_data.get("content"):
+                    return cs_data["content"]
 
     return None
 
@@ -580,6 +604,9 @@ def _render_post_turn(post_turn_logs: list[dict], task_name: str):
         if evaluation:
             is_correct = evaluation.get("is_correct", False)
             header += f" ({'correct' if is_correct else 'incorrect'})"
+        if edit_decision:
+            should = edit_decision.get("should_edit", False)
+            header += f" | edit: {'yes' if should else 'no'}"
 
     if not header:
         header = "Post-turn Processing"
@@ -789,6 +816,7 @@ def render_run_info_tab(
     metrics: Optional[dict],
     results_list: Optional[list[dict]],
     trace_index: list[dict],
+    prefix: str = "",
 ):
     """Tab: Run-level information (cross-conversation)."""
 
@@ -848,7 +876,9 @@ def render_run_info_tab(
     # --- Memory batch table ---
     memory_save_path = None
     if config:
-        memory_save_path = config.get("memory", {}).get("save_path")
+        raw_save_path = config.get("memory", {}).get("save_path")
+        if raw_save_path:
+            memory_save_path = _resolve_memory_path(raw_save_path, prefix)
 
     if memory_save_path and os.path.exists(memory_save_path):
         cs_data = load_cheatsheet_file(memory_save_path)
@@ -920,6 +950,7 @@ def render_memory_tab(
     trace_file: dict,
     result: Optional[dict],
     config: Optional[dict],
+    prefix: str = "",
 ):
     """Tab 4: Memory.
 
@@ -948,7 +979,9 @@ def render_memory_tab(
             strategy_cfg.get("memory_target")
             or memory_cfg.get("target")
         )
-        memory_save_path = memory_cfg.get("save_path")
+        raw_save_path = memory_cfg.get("save_path")
+        if raw_save_path:
+            memory_save_path = _resolve_memory_path(raw_save_path, prefix)
 
     st.subheader("Memory Configuration")
 
@@ -1053,6 +1086,15 @@ def main():
     with st.sidebar:
         st.title("Context Editor Viewer")
 
+        # --- Path prefix (for rsync mirrors) ---
+        path_prefix = st.text_input(
+            "Path prefix (for rsync mirrors):",
+            value="",
+            placeholder="e.g. remote_outputs",
+            key="path_prefix",
+        )
+        path_prefix = path_prefix.strip()
+
         # --- Run selector ---
         st.subheader("Run Directory")
         run_input = st.text_area(
@@ -1075,7 +1117,7 @@ def main():
             st.stop()
 
         for r in runs:
-            r["resolved"] = resolve_path(r["path"])
+            r["resolved"] = resolve_path(r["path"], prefix=path_prefix)
 
         run_options = {r["label"]: r for r in runs}
         selected_label = st.selectbox(
@@ -1244,11 +1286,12 @@ def main():
         render_conversation_tab(trace_file)
 
     with tabs[3]:
-        render_run_info_tab(run_dir, config, metrics, results_list, trace_index)
+        render_run_info_tab(run_dir, config, metrics, results_list, trace_index,
+                            prefix=path_prefix)
 
     if has_memory and len(tabs) > 4:
         with tabs[4]:
-            render_memory_tab(trace_file, result, config)
+            render_memory_tab(trace_file, result, config, prefix=path_prefix)
 
 
 if __name__ == "__main__":
