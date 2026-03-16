@@ -2,12 +2,11 @@
 Context Editor Trace Viewer v2
 
 Usage:
-    streamlit run viewer2.py
+    streamlit run src/ctx_editor/viewer2.py
 """
 
 import json
 import os
-from pathlib import Path
 from typing import Any, Optional
 
 import streamlit as st
@@ -31,14 +30,14 @@ ROLE_COLORS = {
 }
 
 ROLE_ICONS = {
-    "system": "⚙️",
-    "user": "👤",
-    "assistant": "🤖",
-    "compacted conversation": "📋",
-    "analysis": "🔍",
-    "analyst": "🔍",
-    "context_edit_output": "✏️",
-    "reset_marker": "🔄",
+    "system": "gear",
+    "user": "person",
+    "assistant": "robot",
+    "compacted conversation": "clipboard",
+    "analysis": "search",
+    "analyst": "search",
+    "context_edit_output": "pencil",
+    "reset_marker": "arrow-repeat",
 }
 
 RESPONSE_TYPE_LABELS = {
@@ -46,6 +45,18 @@ RESPONSE_TYPE_LABELS = {
     "interrogation": "Interrogation",
     "discussion": "Discussion",
     "partial_answer": "Partial Answer",
+    "other": "Other",
+}
+
+# Tasks where extracted answer should be shown as a code block
+CODE_BLOCK_TASKS = {"code", "database", "actions"}
+
+# Error attribution category display labels
+ERROR_CATEGORY_LABELS = {
+    "assistant_error": "Assistant Error",
+    "extraction_failure": "Extraction Failure",
+    "strict_comparison": "Strict Comparison",
+    "user_simulator_error": "User Simulator Error",
     "other": "Other",
 }
 
@@ -82,14 +93,12 @@ def resolve_path(p: str) -> str:
     """Resolve a path that may be relative to OUTPUTS_ROOT or absolute."""
     if os.path.isabs(p) and os.path.exists(p):
         return p
-    # Try as relative to outputs root
     candidate = os.path.join(OUTPUTS_ROOT, p)
     if os.path.exists(candidate):
         return candidate
-    # Try as-is
     if os.path.exists(p):
         return p
-    return p  # Return as-is, will error later
+    return p
 
 
 def list_trace_files(run_dir: str) -> list[dict[str, Any]]:
@@ -157,15 +166,37 @@ def load_results_json(run_dir: str) -> Optional[list[dict]]:
     return None
 
 
+@st.cache_data
+def load_error_analysis(run_dir: str) -> Optional[dict]:
+    """Load error_analysis.json from a run directory."""
+    path = os.path.join(run_dir, "error_analysis.json")
+    if os.path.exists(path):
+        with open(path, "r") as f:
+            return json.load(f)
+    return None
+
+
 def find_result_for_sample(
     results: Optional[list[dict]], sample_id: str
 ) -> Optional[dict]:
     """Find the result entry for a given sample_id in results.json."""
     if not results:
         return None
-    # sample_id in trace files uses _ instead of /
     normalized = sample_id.replace("_", "/")
     for r in results:
+        if r.get("sample_id") == normalized or r.get("sample_id") == sample_id:
+            return r
+    return None
+
+
+def find_error_for_sample(
+    error_analysis: Optional[dict], sample_id: str
+) -> Optional[dict]:
+    """Find the error attribution entry for a given sample_id."""
+    if not error_analysis:
+        return None
+    normalized = sample_id.replace("_", "/")
+    for r in error_analysis.get("results", []):
         if r.get("sample_id") == normalized or r.get("sample_id") == sample_id:
             return r
     return None
@@ -198,11 +229,7 @@ def build_display_messages(trace_data: dict) -> list[dict[str, Any]]:
     messages = trace_data.get("messages", [])
     logs = trace_data.get("logs", [])
 
-    # Build a timeline: each entry has a timestamp and content
     display = []
-
-    # Track which logs to interleave after each assistant message
-    # Strategy: associate logs with the assistant turn they follow
     log_idx = 0
 
     for msg_idx, msg in enumerate(messages):
@@ -210,9 +237,7 @@ def build_display_messages(trace_data: dict) -> list[dict[str, Any]]:
         visible = msg.get("visible", True)
 
         # For S2: insert analysis + reset marker before compacted conversation
-        # when preceded by system message that starts a new reset cycle
         if role == "system" and msg_idx > 0 and not messages[msg_idx - 1].get("visible", True):
-            # Check if there's a context_edit_output log to show before this reset
             while log_idx < len(logs):
                 log = logs[log_idx]
                 if log["type"] == "context_edit_output":
@@ -244,11 +269,7 @@ def build_display_messages(trace_data: dict) -> list[dict[str, Any]]:
                     )
                     log_idx += 1
                     break
-                elif log["type"] in (
-                    "conversation_analysis",
-                    "edit_decision",
-                ):
-                    # Skip — these are pre-reset analysis steps
+                elif log["type"] in ("conversation_analysis", "edit_decision"):
                     log_idx += 1
                     continue
                 else:
@@ -271,46 +292,18 @@ def build_display_messages(trace_data: dict) -> list[dict[str, Any]]:
             while log_idx < len(logs):
                 log = logs[log_idx]
                 if log["type"] == "shard_revealed":
-                    # This belongs to the *next* user turn, stop
                     break
-                elif log["type"] == "verification":
+                elif log["type"] in ("verification", "answer_evaluation",
+                                     "conversation_analysis", "edit_decision"):
                     post_turn_logs.append(
                         {
-                            "log_type": "verification",
-                            "data": log["data"],
-                            "timestamp": log.get("timestamp", ""),
-                        }
-                    )
-                    log_idx += 1
-                elif log["type"] == "answer_evaluation":
-                    post_turn_logs.append(
-                        {
-                            "log_type": "answer_evaluation",
-                            "data": log["data"],
-                            "timestamp": log.get("timestamp", ""),
-                        }
-                    )
-                    log_idx += 1
-                elif log["type"] == "conversation_analysis":
-                    post_turn_logs.append(
-                        {
-                            "log_type": "conversation_analysis",
-                            "data": log["data"],
-                            "timestamp": log.get("timestamp", ""),
-                        }
-                    )
-                    log_idx += 1
-                elif log["type"] == "edit_decision":
-                    post_turn_logs.append(
-                        {
-                            "log_type": "edit_decision",
+                            "log_type": log["type"],
                             "data": log["data"],
                             "timestamp": log.get("timestamp", ""),
                         }
                     )
                     log_idx += 1
                 elif log["type"] in ("context_edit_output", "conversation_reset"):
-                    # These will be consumed before the next system message
                     break
                 else:
                     log_idx += 1
@@ -325,7 +318,6 @@ def build_display_messages(trace_data: dict) -> list[dict[str, Any]]:
                 display[-1].setdefault("shard_ids", []).append(shard_id)
                 log_idx += 1
 
-            # Also consume memory_injected, analysis_addendum_added
             while log_idx < len(logs) and logs[log_idx]["type"] in (
                 "memory_injected",
                 "analysis_addendum_added",
@@ -341,24 +333,25 @@ def build_display_messages(trace_data: dict) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def render_message_card(msg: dict, idx: int):
+def render_message_card(msg: dict, idx: int, task_name: str = ""):
     """Render a single message as a styled card."""
     role = msg["role"]
     visible = msg.get("visible", True)
     content = msg.get("content", "")
 
     color = ROLE_COLORS.get(role, "#333")
-    icon = ROLE_ICONS.get(role, "💬")
+    icon = ROLE_ICONS.get(role, "chat-dots")
     opacity = "1.0" if visible else "0.5"
 
     # Role label
-    role_label = role.title()
     if role == "compacted conversation":
         role_label = "Compacted Conversation"
     elif role == "reset_marker":
-        role_label = content  # Use content as label for reset markers
+        role_label = content
     elif role == "analysis":
         role_label = "Analyzer Output"
+    else:
+        role_label = role.title()
 
     # Shard tag
     shard_tag = ""
@@ -367,21 +360,7 @@ def render_message_card(msg: dict, idx: int):
         shard_tag = " · ".join(shard_strs)
 
     # Visibility tag
-    vis_tag = ""
-    if not visible:
-        vis_tag = " (hidden — pre-reset)"
-
-    # Build header
-    header = f"{icon} **{role_label}**"
-    if shard_tag:
-        header += f" &nbsp;`{shard_tag}`"
-    if vis_tag:
-        header += f" &nbsp;*{vis_tag}*"
-
-    # Timestamp
-    ts = msg.get("timestamp", "")
-    if ts:
-        header += f" &nbsp;—&nbsp; *{ts}*"
+    vis_tag = "(hidden — pre-reset)" if not visible else ""
 
     if role == "reset_marker":
         st.divider()
@@ -395,15 +374,24 @@ def render_message_card(msg: dict, idx: int):
         st.divider()
         return
 
-    # Render card
+    # --- Render card ---
     with st.container():
+        # Build header parts as separate elements to avoid markdown-in-html issues
+        header_parts = [f":{icon}: **{role_label}**"]
+        if shard_tag:
+            header_parts.append(f"`{shard_tag}`")
+        if vis_tag:
+            header_parts.append(f"*{vis_tag}*")
+        ts = msg.get("timestamp", "")
+        if ts:
+            header_parts.append(f"— *{ts}*")
+
+        # Use a colored container via border-left, but header as pure markdown
         st.markdown(
-            f"""<div style="border-left:4px solid {color}; padding:4px 0 0 12px;
-            opacity:{opacity}; margin-bottom:4px;">
-            <span style="font-size:0.9em;">{header}</span>
-            </div>""",
+            f'<div style="border-left: 4px solid {color}; padding-left: 12px; opacity: {opacity};">',
             unsafe_allow_html=True,
         )
+        st.markdown(" &nbsp; ".join(header_parts))
 
         # Content
         if role == "system":
@@ -418,63 +406,90 @@ def render_message_card(msg: dict, idx: int):
         else:
             st.markdown(content)
 
-        # Post-turn logs (for assistant messages)
+        # --- Post-turn info (inline, not in expander) ---
         if msg.get("post_turn_logs"):
-            with st.expander("Post-turn Processing", expanded=False):
-                for log_entry in msg["post_turn_logs"]:
-                    lt = log_entry["log_type"]
-                    data = log_entry["data"]
-                    if lt == "verification":
-                        resp_type = data.get("response_type", "unknown")
-                        label = RESPONSE_TYPE_LABELS.get(resp_type, resp_type)
-                        is_answer = data.get("is_answer_attempt", False)
-                        st.markdown(
-                            f"**Turn Category:** {label}"
-                            + (" ✅" if is_answer else "")
-                        )
-                    elif lt == "answer_evaluation":
-                        extracted = data.get("extracted_answer", "N/A")
-                        is_correct = data.get("is_correct", False)
-                        score = data.get("score", 0)
-                        icon_eval = "✅" if is_correct else "❌"
-                        st.markdown(
-                            f"**Extracted Answer:** `{extracted}`\n\n"
-                            f"**Evaluation:** {icon_eval} "
-                            f"{'Correct' if is_correct else 'Incorrect'} "
-                            f"(score: {score})"
-                        )
-                    elif lt == "conversation_analysis":
-                        st.markdown("**Conversation Analysis:**")
-                        if data.get("user_intent"):
-                            st.markdown("*User Intent:*")
-                            st.code(data["user_intent"], language=None)
-                        if data.get("aligned"):
-                            st.markdown("*Aligned:*")
-                            st.code(data["aligned"], language=None)
-                        if data.get("issues"):
-                            st.markdown("*Issues:*")
-                            st.code(data["issues"], language=None)
-                        needs = data.get("needs_edit")
-                        if needs is not None:
-                            st.markdown(
-                                f"**Needs Edit:** {'Yes' if needs else 'No'}"
-                            )
-                    elif lt == "edit_decision":
-                        should = data.get("should_edit", False)
-                        st.markdown(
-                            f"**Edit Decision:** {'✏️ Edit' if should else '➡️ Pass'}"
-                        )
+            _render_post_turn(msg["post_turn_logs"], task_name)
 
         # Injection indicators
         if msg.get("injections"):
             for inj in msg["injections"]:
                 if inj["type"] == "memory_injected":
                     target = inj["data"].get("target", "?")
-                    st.caption(f"💾 Memory injected (target: {target})")
+                    st.caption(f"Memory injected (target: {target})")
                 elif inj["type"] == "analysis_addendum_added":
-                    st.caption("📝 Analysis addendum added to system prompt")
+                    st.caption("Analysis addendum added to system prompt")
 
+        # Close the border div
+        st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("---")
+
+
+def _render_post_turn(post_turn_logs: list[dict], task_name: str):
+    """Render post-turn processing info inline (compact)."""
+    # Collect the pieces
+    verification = None
+    evaluation = None
+    analysis_logs = []
+    edit_decision = None
+
+    for log_entry in post_turn_logs:
+        lt = log_entry["log_type"]
+        if lt == "verification":
+            verification = log_entry["data"]
+        elif lt == "answer_evaluation":
+            evaluation = log_entry["data"]
+        elif lt == "conversation_analysis":
+            analysis_logs.append(log_entry["data"])
+        elif lt == "edit_decision":
+            edit_decision = log_entry["data"]
+
+    # Line 1: categorization + evaluation on a single line
+    if verification:
+        resp_type = verification.get("response_type", "unknown")
+        label = RESPONSE_TYPE_LABELS.get(resp_type, resp_type)
+
+        line = f"**{label}**"
+        if evaluation:
+            is_correct = evaluation.get("is_correct", False)
+            eval_icon = "correct" if is_correct else "incorrect"
+            line += f" — evaluation: **{eval_icon}**"
+
+        st.markdown(line)
+
+    # Line 2: extracted answer
+    if evaluation:
+        extracted = evaluation.get("extracted_answer")
+        if extracted:
+            if task_name in CODE_BLOCK_TASKS:
+                lang = {"code": "python", "database": "sql"}.get(task_name, None)
+                if task_name == "code":
+                    with st.expander("Extracted Answer", expanded=False):
+                        st.code(extracted, language=lang)
+                else:
+                    st.code(extracted, language=lang)
+            else:
+                st.markdown(f"Extracted: `{extracted}`")
+
+    # Conversation analysis (for S1/S2) — collapsed
+    if analysis_logs:
+        with st.expander("Conversation Analysis", expanded=False):
+            for data in analysis_logs:
+                if data.get("user_intent"):
+                    st.markdown("*User Intent:*")
+                    st.code(data["user_intent"], language=None)
+                if data.get("aligned"):
+                    st.markdown("*Aligned:*")
+                    st.code(data["aligned"], language=None)
+                if data.get("issues"):
+                    st.markdown("*Issues:*")
+                    st.code(data["issues"], language=None)
+                needs = data.get("needs_edit")
+                if needs is not None:
+                    st.markdown(f"**Needs Edit:** {'Yes' if needs else 'No'}")
+
+    if edit_decision:
+        should = edit_decision.get("should_edit", False)
+        st.markdown(f"**Edit Decision:** {'Edit' if should else 'Pass'}")
 
 
 # ---------------------------------------------------------------------------
@@ -489,7 +504,6 @@ def render_question_tab(
 ):
     """Tab 1: Question Information."""
     st.subheader("System Prompt")
-    # Get system prompt from trace messages
     messages = trace_file.get("trace", {}).get("messages", [])
     system_msgs = [m for m in messages if m.get("role") == "system" and m.get("visible", True)]
     if system_msgs:
@@ -498,29 +512,36 @@ def render_question_tab(
         st.info("No system prompt found.")
 
     st.subheader("Full Specification Question")
+    full_spec = None
     if sample and sample.get("full_spec_q"):
-        st.markdown(sample["full_spec_q"])
+        full_spec = sample["full_spec_q"]
     elif sample and sample.get("question"):
-        st.markdown(sample["question"])
+        full_spec = sample["question"]
     else:
-        # Try metadata from results
         meta = trace_file.get("metadata", {})
         if isinstance(meta, dict) and meta.get("full_spec_q"):
-            st.markdown(meta["full_spec_q"])
-        else:
-            st.info("Full spec question not available.")
+            full_spec = meta["full_spec_q"]
+
+    if full_spec:
+        st.markdown(full_spec)
+    else:
+        st.info("Full spec question not available.")
 
     st.subheader("Ground Truth Answer")
+    gt = None
     if sample and sample.get("ground_truth_a"):
-        st.code(sample["ground_truth_a"], language=None)
+        gt = sample["ground_truth_a"]
     elif sample and sample.get("answer"):
-        st.code(sample["answer"], language=None)
+        gt = sample["answer"]
     else:
         meta = trace_file.get("metadata", {})
         if isinstance(meta, dict) and meta.get("ground_truth_a"):
-            st.code(meta["ground_truth_a"], language=None)
-        else:
-            st.info("Ground truth answer not available.")
+            gt = meta["ground_truth_a"]
+
+    if gt:
+        st.code(gt, language=None)
+    else:
+        st.info("Ground truth answer not available.")
 
     st.subheader("Shards")
     if sample and sample.get("shards"):
@@ -536,30 +557,25 @@ def render_conversation_info_tab(
     trace_file: dict,
     result: Optional[dict],
     config: Optional[dict],
+    error_entry: Optional[dict],
 ):
     """Tab 2: Conversation Information."""
     sample_id = trace_file.get("sample_id", "N/A")
+
+    # --- Overview section ---
+    st.subheader("Overview")
 
     col1, col2 = st.columns([3, 1])
     with col1:
         st.code(sample_id, language=None)
     with col2:
-        # Copy button via st.button (clipboard API not directly available, show code)
-        if st.button("📋 Copy Sample ID", key="copy_sample_id"):
+        if st.button("Copy Sample ID", key="copy_sample_id"):
             st.toast(f"Sample ID: {sample_id}")
-
-    st.markdown(f"**Task:** {trace_file.get('task_name', 'N/A')}")
-    st.markdown(f"**Experiment:** {trace_file.get('experiment_type', 'N/A')}")
-    st.markdown(
-        f"**Correct:** {'✅' if trace_file.get('is_correct') else '❌'} "
-        f"(score: {trace_file.get('score', 'N/A')})"
-    )
 
     trace = trace_file.get("trace", {})
     messages = trace.get("messages", [])
     num_resets = trace.get("num_resets", 0)
 
-    # Count turns
     user_turns = sum(1 for m in messages if m.get("role") == "user")
     asst_turns = sum(1 for m in messages if m.get("role") == "assistant")
     visible_user = sum(
@@ -569,20 +585,26 @@ def render_conversation_info_tab(
         1 for m in messages if m.get("role") == "assistant" and m.get("visible", True)
     )
 
-    st.markdown(f"**Total User Turns:** {user_turns} (visible: {visible_user})")
-    st.markdown(f"**Total Assistant Turns:** {asst_turns} (visible: {visible_asst})")
-    st.markdown(f"**Context Resets:** {num_resets}")
+    is_correct = trace_file.get("is_correct", False)
+    score = trace_file.get("score", "N/A")
+    result_str = "Correct" if is_correct else "Incorrect"
 
-    st.markdown(f"**Timestamp:** {trace_file.get('timestamp', 'N/A')}")
+    info_lines = [
+        f"- **Task:** {trace_file.get('task_name', 'N/A')} · **Experiment:** {trace_file.get('experiment_type', 'N/A')}",
+        f"- **Result:** {result_str} (score: {score})",
+        f"- **User turns:** {user_turns} (visible: {visible_user}) · **Assistant turns:** {asst_turns} (visible: {visible_asst}) · **Resets:** {num_resets}",
+        f"- **Timestamp:** {trace_file.get('timestamp', 'N/A')}",
+    ]
 
-    # Models
+    # Models inline
     models = trace_file.get("models", {})
     if models:
-        st.subheader("Models")
-        for role, model in models.items():
-            st.markdown(f"**{role.title()}:** {model}")
+        model_parts = [f"**{r.title()}:** {m}" for r, m in models.items()]
+        info_lines.append(f"- {' · '.join(model_parts)}")
 
-    # Cost / usage
+    st.markdown("\n".join(info_lines))
+
+    # --- Usage Stats section ---
     if result and result.get("usage_stats"):
         st.subheader("Usage Stats")
         stats = result["usage_stats"]
@@ -592,25 +614,34 @@ def render_conversation_info_tab(
         for role_name in ["user", "assistant", "system", "ctx_editor"]:
             role_stats = stats.get(role_name, {})
             if role_stats and role_stats.get("num_requests", 0) > 0:
-                with st.expander(f"{role_name.title()} Usage"):
-                    st.markdown(f"- Requests: {role_stats.get('num_requests', 0)}")
-                    st.markdown(
-                        f"- Input tokens: {role_stats.get('input_tokens', 0):,}"
-                    )
-                    st.markdown(
-                        f"- Output tokens: {role_stats.get('output_tokens', 0):,}"
-                    )
-                    if role_stats.get("reasoning_tokens"):
-                        st.markdown(
-                            f"- Reasoning tokens: {role_stats['reasoning_tokens']:,}"
-                        )
-                    if role_stats.get("cached_tokens"):
-                        st.markdown(
-                            f"- Cached tokens: {role_stats['cached_tokens']:,}"
-                        )
-                    st.markdown(f"- Cost: ${role_stats.get('cost_usd', 0):.4f}")
+                parts = [f"Requests: {role_stats.get('num_requests', 0)}"]
+                parts.append(f"In: {role_stats.get('input_tokens', 0):,}")
+                parts.append(f"Out: {role_stats.get('output_tokens', 0):,}")
+                if role_stats.get("reasoning_tokens"):
+                    parts.append(f"Reasoning: {role_stats['reasoning_tokens']:,}")
+                if role_stats.get("cached_tokens"):
+                    parts.append(f"Cached: {role_stats['cached_tokens']:,}")
+                parts.append(f"${role_stats.get('cost_usd', 0):.4f}")
+                st.markdown(f"- **{role_name.title()}:** {' · '.join(parts)}")
 
-    # Replay provenance
+    # --- Error Attribution section ---
+    if error_entry:
+        st.subheader("Error Attribution")
+        category = error_entry.get("category", "unknown")
+        category_label = ERROR_CATEGORY_LABELS.get(category, category)
+        correct_present = error_entry.get("correct_answer_present", False)
+
+        st.markdown(
+            f"- **Category:** {category_label}\n"
+            f"- **Correct answer present in response:** {'Yes' if correct_present else 'No'}"
+        )
+
+        explanation = error_entry.get("explanation", "")
+        if explanation:
+            with st.expander("Attribution Detail (LLM output)", expanded=False):
+                st.markdown(explanation)
+
+    # --- Replay Provenance section ---
     provenance = trace.get("provenance")
     if provenance:
         st.subheader("Replay Provenance")
@@ -620,6 +651,7 @@ def render_conversation_info_tab(
 def render_conversation_tab(trace_file: dict):
     """Tab 3: Conversation Viewer."""
     trace = trace_file.get("trace", {})
+    task_name = trace_file.get("task_name", "")
     display_messages = build_display_messages(trace)
 
     if not display_messages:
@@ -627,7 +659,7 @@ def render_conversation_tab(trace_file: dict):
         return
 
     for idx, msg in enumerate(display_messages):
-        render_message_card(msg, idx)
+        render_message_card(msg, idx, task_name=task_name)
 
 
 def render_memory_tab(
@@ -640,16 +672,13 @@ def render_memory_tab(
     logs = trace.get("logs", [])
     exp_type = trace_file.get("experiment_type", "")
 
-    # Check if memory was used
     memory_logs = [l for l in logs if l.get("type") == "memory_injected"]
-
     has_memory = bool(memory_logs) or "memory" in exp_type.lower()
 
     if not has_memory:
         st.info("No memory was used in this run.")
         return
 
-    # Show memory injection info
     if memory_logs:
         st.subheader("Memory Injection Events")
         for ml in memory_logs:
@@ -663,19 +692,15 @@ def render_memory_tab(
             else:
                 injection_loc = f"Unknown target: {target}"
 
-            st.markdown(f"**Target component:** `{target}`")
-            st.markdown(f"**Injection location:** {injection_loc}")
-            if ts:
-                st.markdown(f"**Timestamp:** {ts}")
-            st.divider()
+            st.markdown(
+                f"- **Target component:** `{target}` · **Injection location:** {injection_loc}"
+                + (f" · {ts}" if ts else "")
+            )
 
-    # Try to find memory content in the system message or config
     if config and config.get("experiment", {}).get("strategy", {}).get("use_memory"):
         st.subheader("Memory Configuration")
         strategy_cfg = config["experiment"]["strategy"]
-        st.markdown(
-            f"**Memory target:** `{strategy_cfg.get('memory_target', 'N/A')}`"
-        )
+        st.markdown(f"**Memory target:** `{strategy_cfg.get('memory_target', 'N/A')}`")
 
     # Look for cheatsheet content in messages
     messages = trace.get("messages", [])
@@ -685,9 +710,7 @@ def render_memory_tab(
             start = content.find("<cheatsheet>")
             end = content.find("</cheatsheet>")
             if start != -1 and end != -1:
-                cheatsheet_content = content[
-                    start + len("<cheatsheet>") : end
-                ].strip()
+                cheatsheet_content = content[start + len("<cheatsheet>"):end].strip()
                 st.subheader("Cheatsheet Content")
                 st.code(cheatsheet_content, language=None)
                 break
@@ -759,9 +782,19 @@ def main():
             st.error(f"No traces found in {run_dir}/traces/")
             st.stop()
 
-        # Load results.json for metadata
+        # Load run-level data
         results_list = load_results_json(run_dir)
         config = load_config(run_dir)
+        metrics = load_metrics(run_dir)
+        error_analysis = load_error_analysis(run_dir)
+
+        # --- Run statistics ---
+        if metrics:
+            exp_name = metrics.get("experiment_name", "unknown")
+            correct = metrics.get("correct", 0)
+            total = metrics.get("total_attempted", metrics.get("total_samples", 0))
+            acc = metrics.get("accuracy", 0)
+            st.markdown(f"**{exp_name}**, {correct}/{total} = {acc:.0%}")
 
         # --- Task filter ---
         tasks = sorted(set(t["task"] for t in trace_index))
@@ -803,18 +836,16 @@ def main():
         # Build display labels
         sample_labels = []
         for i, t in enumerate(trace_index):
-            # Quick peek at correctness
             data = load_trace(t["path"])
             correct = data.get("is_correct", False)
-            icon = "✅" if correct else "❌"
-            label = f"{icon} {t['sample_id']}"
+            icon = "+" if correct else "-"
+            label = f"[{icon}] {t['sample_id']}"
             sample_labels.append(label)
 
         # Session state for navigation
         if "sample_idx" not in st.session_state:
             st.session_state.sample_idx = 0
 
-        # Clamp
         st.session_state.sample_idx = max(
             0, min(st.session_state.sample_idx, len(trace_index) - 1)
         )
@@ -822,12 +853,12 @@ def main():
         # Prev / Next buttons
         col_prev, col_next, col_count = st.columns([1, 1, 1])
         with col_prev:
-            if st.button("◀ Prev", disabled=st.session_state.sample_idx == 0):
+            if st.button("Prev", disabled=st.session_state.sample_idx == 0):
                 st.session_state.sample_idx -= 1
                 st.rerun()
         with col_next:
             if st.button(
-                "Next ▶",
+                "Next",
                 disabled=st.session_state.sample_idx >= len(trace_index) - 1,
             ):
                 st.session_state.sample_idx += 1
@@ -837,7 +868,6 @@ def main():
                 f"**{st.session_state.sample_idx + 1}** / {len(trace_index)}"
             )
 
-        # Selectbox (synced with session state)
         selected_sample_label = st.selectbox(
             "Sample",
             options=sample_labels,
@@ -845,7 +875,6 @@ def main():
             key="sample_select",
         )
 
-        # Sync selectbox back to session state
         new_idx = sample_labels.index(selected_sample_label)
         if new_idx != st.session_state.sample_idx:
             st.session_state.sample_idx = new_idx
@@ -859,19 +888,18 @@ def main():
 
     # Load trace data
     trace_file = load_trace(selected_trace_info["path"])
-    result = find_result_for_sample(results_list, trace_file.get("sample_id", ""))
+    sample_id = trace_file.get("sample_id", "N/A")
+    result = find_result_for_sample(results_list, sample_id)
+    error_entry = find_error_for_sample(error_analysis, sample_id)
 
     # Try to load sample data for shards/full_spec_q
     sample = None
     if config:
         data_file = config.get("task", {}).get("data_file", "")
         if data_file:
-            sample_id = trace_file.get("sample_id", "")
             sample = load_sample_data(data_file, sample_id)
 
-    # Also try getting metadata from result
     if result and not sample:
-        # Build a pseudo-sample from result metadata
         meta = result.get("metadata", {})
         if meta:
             sample = {
@@ -880,11 +908,9 @@ def main():
             }
 
     # Title
-    sample_id = trace_file.get("sample_id", "N/A")
     is_correct = trace_file.get("is_correct", False)
-    st.title(
-        f"{'✅' if is_correct else '❌'} {sample_id}"
-    )
+    result_icon = "+" if is_correct else "-"
+    st.title(f"[{result_icon}] {sample_id}")
 
     # Check if memory tab should be shown
     trace = trace_file.get("trace", {})
@@ -904,7 +930,7 @@ def main():
         render_question_tab(trace_file, sample, config)
 
     with tabs[1]:
-        render_conversation_info_tab(trace_file, result, config)
+        render_conversation_info_tab(trace_file, result, config, error_entry)
 
     with tabs[2]:
         render_conversation_tab(trace_file)
