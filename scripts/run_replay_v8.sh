@@ -15,7 +15,6 @@ LOG_DIR="outputs/replay_logs/${TIMESTAMP}"
 mkdir -p "$MEMORY_DIR" "$LOG_DIR"
 
 COMMON="model=gpt5_mini execution.max_concurrent=8 execution.replay_turns=1 logging.verbose=true metadata.branch=newleaf2"
-V8="experiment.strategy.analyzer_prompt_version=v8"
 
 # Trace sources per task
 declare -A TRACE_SOURCES
@@ -80,7 +79,7 @@ for task in "${TASKS[@]}"; do
     label="S1_nomem_${task}"
     trace_src="${TRACE_SOURCES[$task]}"
     run_experiment "append_analysis" "${task}" "${label}" \
-        "execution.replay_source=${trace_src} ${V8}"
+        "execution.replay_source=${trace_src}"
 done
 
 # --- S1 + memory (v8 prompts) ---
@@ -89,7 +88,7 @@ for task in "${TASKS[@]}"; do
     trace_src="${TRACE_SOURCES[$task]}"
     mem_path="${MEMORY_DIR}/${label}_cheatsheet.json"
     run_experiment "append_analysis_memory" "${task}" "${label}" \
-        "execution.replay_source=${trace_src} ${V8} execution.mode=batched execution.batch_size=5 memory.enabled=true memory.source=continual memory.target=analyzer memory.save_path=${mem_path} memory.include_full_spec_q=true memory.include_ground_truth_a=true"
+        "execution.replay_source=${trace_src} execution.mode=batched execution.batch_size=5 memory.enabled=true memory.source=continual memory.target=analyzer memory.save_path=${mem_path} memory.include_full_spec_q=true memory.include_ground_truth_a=true"
 done
 
 # --- S2 no-memory (v8 prompts) ---
@@ -97,7 +96,7 @@ for task in "${TASKS[@]}"; do
     label="S2_nomem_${task}"
     trace_src="${TRACE_SOURCES[$task]}"
     run_experiment "context_edit_v2" "${task}" "${label}" \
-        "execution.replay_source=${trace_src} ${V8}"
+        "execution.replay_source=${trace_src}"
 done
 
 # --- S2 + memory (v8 prompts) ---
@@ -106,7 +105,7 @@ for task in "${TASKS[@]}"; do
     trace_src="${TRACE_SOURCES[$task]}"
     mem_path="${MEMORY_DIR}/${label}_cheatsheet.json"
     run_experiment "context_edit_v2_memory" "${task}" "${label}" \
-        "execution.replay_source=${trace_src} ${V8} execution.mode=batched execution.batch_size=5 memory.enabled=true memory.source=continual memory.target=analyzer memory.save_path=${mem_path} memory.include_full_spec_q=true memory.include_ground_truth_a=true"
+        "execution.replay_source=${trace_src} execution.mode=batched execution.batch_size=5 memory.enabled=true memory.source=continual memory.target=analyzer memory.save_path=${mem_path} memory.include_full_spec_q=true memory.include_ground_truth_a=true"
 done
 
 echo ""

@@ -35,7 +35,7 @@ class ContextEditV2Strategy(BaseStrategy):
         analyzer_timeout: int = 60,
         analyzer_max_tokens: Optional[int] = None,
         analyzer_reasoning_effort: Optional[str] = None,
-        analyzer_prompt_version: str = "v6",
+        analyzer_prompt_version: str = "v8",
         min_turns: int = 3,
         max_resets: int = 3,
         use_memory: bool = False,

@@ -127,7 +127,7 @@ class ConversationAnalyzer:
         timeout: int = 60,
         max_tokens: Optional[int] = None,
         reasoning_effort: Optional[str] = None,
-        prompt_version: str = "v6",
+        prompt_version: str = "v8",
     ):
         self.model = model
         self.timeout = timeout
