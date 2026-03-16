@@ -274,7 +274,7 @@ class ConversationAnalyzer:
 
         Dispatches to v6 (two-query) or single-query based on prompt_version.
         """
-        if self.prompt_version in ("v6", "v7"):
+        if self.prompt_version in ("v6", "v7", "v8"):
             return await self._analyze_v6(trace, model_client, memory)
         return await self._analyze_single(trace, model_client, memory)
 
