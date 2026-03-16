@@ -1,0 +1,446 @@
+{
+  "sample_id": "sharded-livecodebench/2756",
+  "task_name": "code",
+  "experiment_type": "baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "gpt-5-mini",
+    "user": "unknown",
+    "system": "unknown"
+  },
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions. The only other top-level statements allowed are import statements.\n- [Arguments] The function must accept inputs as function arguments, not by reading from stdin.\n- [Code fence] Always wrap your final code in a markdown Python code fence: ```python\\n<your code here>\\n```\n",
+        "timestamp": "2026-03-15 01:09:52",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "how much money is left after buying two chocolates?",
+        "timestamp": "2026-03-15 01:09:52",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef money_left_after_two_chocolates(money, price_per_chocolate):\n    \"\"\"\n    Calculate how much money is left after buying two chocolates.\n\n    Args:\n        money: The amount of money you have (int or float).\n        price_per_chocolate: The price of one chocolate (int or float).\n\n    Returns:\n        The remaining amount of money after purchasing two chocolates.\n        Returns an int if both inputs are ints and the result is whole, otherwise a float\n        rounded to 2 decimal places.\n\n    Raises:\n        TypeError: If the inputs cannot be interpreted as numbers.\n    \"\"\"\n    try:\n        m = float(money)\n        p = float(price_per_chocolate)\n    except Exception:\n        raise TypeError(\"Both money and price_per_chocolate must be numbers\") from None\n\n    remaining = m - 2 * p\n\n    # If both original inputs were ints and the result is an integer value, return int\n    if isinstance(money, int) and isinstance(price_per_chocolate, int):\n        if remaining.is_integer():\n            return int(remaining)\n\n    # Return rounded float to represent currency sensibly\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:10:03",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0019615
+        }
+      },
+      {
+        "role": "user",
+        "content": "I need to buy exactly two chocolates and can't end up with negative money.",
+        "timestamp": "2026-03-15 01:10:04",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00017864999999999998
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef money_left_after_two_chocolates(money, price_per_chocolate):\n    \"\"\"\n    Calculate how much money is left after buying exactly two chocolates,\n    ensuring the result is not negative.\n\n    Args:\n        money: The amount of money you have (int or float).\n        price_per_chocolate: The price of one chocolate (int or float).\n\n    Returns:\n        The remaining amount of money after purchasing two chocolates.\n        - Returns an int if both inputs were ints and the remaining amount is a whole number.\n        - Otherwise returns a float rounded to 2 decimal places.\n\n    Raises:\n        TypeError: If the inputs cannot be interpreted as numbers.\n        ValueError: If buying two chocolates would leave you with negative money\n                    (i.e., insufficient funds).\n    \"\"\"\n    try:\n        m = float(money)\n        p = float(price_per_chocolate)\n    except Exception:\n        raise TypeError(\"Both money and price_per_chocolate must be numbers\") from None\n\n    remaining = m - 2 * p\n\n    # Treat very small rounding errors as zero\n    eps = 1e-9\n    if remaining < -eps:\n        raise ValueError(\"Insufficient funds to buy two chocolates (would result in negative money)\")\n\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # If both original inputs were ints and the result is an integer value, return int\n    if isinstance(money, int) and isinstance(price_per_chocolate, int):\n        if float(remaining).is_integer():\n            return int(round(remaining))\n\n    # Return rounded float to represent currency sensibly\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:10:13",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00185225
+        }
+      },
+      {
+        "role": "user",
+        "content": "I have to minimize the cost of the two chocolates.",
+        "timestamp": "2026-03-15 01:10:14",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00023205
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nimport heapq\n\ndef money_left_after_two_chocolates(money, prices, allow_same=True):\n    \"\"\"\n    Calculate how much money is left after buying exactly two chocolates while\n    minimizing the total cost of those two chocolates. Buying two of the same\n    chocolate is allowed by default (allow_same=True). If allow_same=False,\n    two distinct items (by list entry) must be chosen.\n\n    Args:\n        money: The amount of money you have (int or float).\n        prices: An iterable of prices (each int or float) available for chocolates.\n                If allow_same is True and only one price is provided, buying two\n                of that price is considered (cost = price * 2).\n        allow_same: If True, you may buy two chocolates of the same price even\n                    if the prices list has only one entry. If False, you must\n                    pick two distinct entries from prices.\n\n    Returns:\n        The remaining amount of money after purchasing the two cheapest possible\n        chocolates under the constraints.\n        - Returns an int if all inputs (money and every price in prices) were ints\n          and the remaining amount is an integer.\n        - Otherwise returns a float rounded to 2 decimal places.\n\n    Raises:\n        TypeError: If money or any price cannot be interpreted as a number.\n        ValueError: If it's impossible to buy exactly two chocolates without\n                    ending up with negative money (insufficient funds), or if\n                    allow_same is False and fewer than two price entries are provided.\n    \"\"\"\n    # Validate and convert money\n    try:\n        m = float(money)\n    except Exception:\n        raise TypeError(\"money must be a number\") from None\n\n    # Convert prices iterable to list and validate\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            # treat Python ints only; numeric types like numpy.int64 are not considered here\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(money, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        # If there's only one price in the list, buying two of that price is allowed\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            # get two smallest values (indices don't matter when allow_same True)\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        # must pick two distinct entries from the list (list length must be >= 2)\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    # Ensure not negative after purchase (allow a tiny epsilon for floating error)\n    eps = 1e-9\n    remaining = m - total_cost\n    if remaining < -eps:\n        raise ValueError(\"Insufficient funds to buy two chocolates (would result in negative money)\")\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:10:41",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00472
+        }
+      },
+      {
+        "role": "user",
+        "content": "if I can't buy two chocolates without going negative, just give me back the money I started with.",
+        "timestamp": "2026-03-15 01:10:44",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00036629999999999996
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nimport heapq\n\ndef money_left_after_two_chocolates(money, prices, allow_same=True):\n    \"\"\"\n    Calculate how much money is left after buying exactly two chocolates while\n    minimizing the total cost of those two chocolates. If it's impossible to\n    buy two chocolates without going negative, return the original money\n    (instead of raising an error).\n\n    Args:\n        money: The amount of money you have (int or float).\n        prices: An iterable of prices (each int or float) available for chocolates.\n                If allow_same is True and only one price is provided, buying two\n                of that price is considered (cost = price * 2).\n        allow_same: If True, you may buy two chocolates of the same price even\n                    if the prices list has only one entry. If False, you must\n                    pick two distinct entries from prices.\n\n    Returns:\n        The remaining amount of money after purchasing the two cheapest possible\n        chocolates under the constraints.\n        - Returns an int if all original numeric inputs (money and every price in\n          prices) were ints and the remaining amount is an integer.\n        - Otherwise returns a float rounded to 2 decimal places.\n\n        If you cannot buy two chocolates without going negative, returns the\n        original money (formatted as above).\n\n    Raises:\n        TypeError: If money or any price cannot be interpreted as a number.\n        ValueError: If prices is empty, or if allow_same is False and fewer than\n                    two price entries are provided.\n    \"\"\"\n    # Validate and convert money\n    try:\n        m = float(money)\n    except Exception:\n        raise TypeError(\"money must be a number\") from None\n\n    # Convert prices iterable to list and validate\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(money, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = m - total_cost\n\n    # If buying would make you negative, return the original money instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(money)\n        return round(m, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:11:04",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.003797
+        }
+      },
+      {
+        "role": "user",
+        "content": "I've got an array of chocolate prices to work with.",
+        "timestamp": "2026-03-15 01:11:06",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00040560000000000005
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nimport heapq\n\ndef money_left_after_two_chocolates(money, prices, allow_same=True):\n    \"\"\"\n    Given an amount of money and an iterable/array of chocolate prices, buy exactly\n    two chocolates with the minimum possible total cost (subject to allow_same).\n    If buying two chocolates would make you go negative, return the original money.\n\n    Args:\n        money: numeric (int or float) amount of money available.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same price (including when\n                    only one price is provided). If False, you must pick two\n                    distinct entries from prices.\n\n    Returns:\n        The remaining money after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original money (formatted as above).\n\n    Raises:\n        TypeError: if money or any price cannot be interpreted as a number.\n        ValueError: if prices is empty, or if allow_same is False and fewer\n                    than two price entries are provided.\n    \"\"\"\n    # Validate and convert money\n    try:\n        m = float(money)\n    except Exception:\n        raise TypeError(\"money must be a number\") from None\n\n    # Convert prices iterable to list (works for lists, tuples, numpy arrays, etc.)\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(money, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = m - total_cost\n\n    # If buying would make you negative, return the original money instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(money)\n        return round(m, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:11:21",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00328925
+        }
+      },
+      {
+        "role": "user",
+        "content": "There's also an initial amount of cash I start with.",
+        "timestamp": "2026-03-15 01:11:23",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0005974499999999999
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nimport heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices, allow_same=True):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost (subject to\n    allow_same). If buying two chocolates would make you go negative, return the\n    original initial_cash.\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same price (including when\n                    only one price is provided). If False, you must pick two\n                    distinct entries from prices.\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if prices is empty, or if allow_same is False and fewer\n                    than two price entries are provided.\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    # Convert prices iterable to list (works for lists, tuples, numpy arrays, etc.)\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:11:37",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0030998
+        }
+      },
+      {
+        "role": "user",
+        "content": "For example, if the prices are [1, 2, 2] and I've got 3 cash, I end up with 0 leftover.",
+        "timestamp": "2026-03-15 01:11:39",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00072615
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nimport heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices, allow_same=True):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost (subject to\n    allow_same). If buying two chocolates would make you go negative, return the\n    original initial_cash.\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same price (including when\n                    only one price is provided). If False, you must pick two\n                    distinct entries from prices.\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if prices is empty, or if allow_same is False and fewer\n                    than two price entries are provided.\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    # Convert prices iterable to list (works for lists, tuples, numpy arrays, etc.)\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:11:51",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0028129
+        }
+      },
+      {
+        "role": "user",
+        "content": "The number of chocolate prices I can use is between 2 and 50.",
+        "timestamp": "2026-03-15 01:11:52",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0006064499999999999
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nimport heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices, allow_same=True):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost (subject to\n    allow_same). If buying two chocolates would make you go negative, return the\n    original initial_cash.\n\n    Constraints:\n      - The number of prices provided must be between 2 and 50 (inclusive).\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same price (including when\n                    the same price appears multiple times). If False, you must\n                    pick two distinct entries from prices.\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if the number of prices is not between 2 and 50 (inclusive).\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    # Convert prices iterable to list (works for lists, tuples, numpy arrays, etc.)\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    n = len(price_list)\n    if n < 2 or n > 50:\n        raise ValueError(\"prices must contain between 2 and 50 entries (inclusive)\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    # Since we require at least 2 prices, we can always take two smallest entries.\n    if allow_same:\n        # allow_same affects only whether buying two identical prices is permitted;\n        # with >=2 prices, picking the two smallest entries (which may be equal)\n        # is correct.\n        p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        # must pick two distinct entries from the list (list length is >= 2 by check above)\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:12:06",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00326625
+        }
+      },
+      {
+        "role": "user",
+        "content": "Also, each of the chocolate prices is between 1 and 100.",
+        "timestamp": "2026-03-15 01:12:08",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0006447
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nimport heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices, allow_same=True):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost (subject to\n    allow_same). If buying two chocolates would make you go negative, return the\n    original initial_cash.\n\n    Constraints:\n      - The number of prices provided must be between 2 and 50 (inclusive).\n      - Each price must be between 1 and 100 (inclusive).\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same entry value (when the\n                    list contains two entries of that value). If False, you\n                    must pick two distinct entries from prices. (With the\n                    requirement that len(prices) >= 2 this is satisfied by\n                    selecting two smallest entries.)\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if the number of prices is not between 2 and 50 (inclusive),\n                    or if any price is outside the [1, 100] range.\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    # Convert prices iterable to list\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    n = len(price_list)\n    if n < 2 or n > 50:\n        raise ValueError(\"prices must contain between 2 and 50 entries (inclusive)\")\n\n    # Validate each price can be converted to float and is within [1, 100],\n    # and track whether all original price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        if not (1 <= pf <= 100):\n            raise ValueError(\"each price must be between 1 and 100 inclusive\")\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Select two cheapest entries (since n >= 2). allow_same doesn't change selection\n    # because we always pick two distinct list entries (they may have equal values).\n    p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:12:26",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00425275
+        }
+      },
+      {
+        "role": "user",
+        "content": "The starting amount of money I have is also between 1 and 100.",
+        "timestamp": "2026-03-15 01:12:27",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00070395
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nimport heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost. If buying\n    two chocolates would make you go negative, return the original initial_cash.\n\n    Constraints:\n      - initial_cash must be a number between 1 and 100 (inclusive).\n      - prices must be an iterable containing between 2 and 50 numeric entries.\n      - each price must be between 1 and 100 (inclusive).\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if initial_cash is outside [1, 100], if the number of prices\n                    is not between 2 and 50 (inclusive), or if any price is\n                    outside the [1, 100] range.\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    if not (1 <= cash <= 100):\n        raise ValueError(\"initial_cash must be between 1 and 100 inclusive\")\n\n    # Convert prices iterable to list\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    n = len(price_list)\n    if n < 2 or n > 50:\n        raise ValueError(\"prices must contain between 2 and 50 entries (inclusive)\")\n\n    # Validate each price can be converted to float and is within [1, 100],\n    # and track whether all original price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        if not (1 <= pf <= 100):\n            raise ValueError(\"each price must be between 1 and 100 inclusive\")\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Select two cheapest entries (since n >= 2)\n    p1, p2 = heapq.nsmallest(2, float_prices)\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)\n```",
+        "timestamp": "2026-03-15 01:12:44",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00350435
+        }
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        },
+        "timestamp": "2026-03-15 01:09:52"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:10:03"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def money_left_after_two_chocolates(money, price_per_chocolate):\n    \"\"\"\n    Calculate how much money is left after buying two chocolates.\n\n    Args:\n        money: The amount of money you have (int or float).\n        price_per_chocolate: The price of one chocolate (int or float).\n\n    Returns:\n        The remaining amount of money after purchasing two chocolates.\n        Returns an int if both inputs are ints and the result is whole, otherwise a float\n        rounded to 2 decimal places.\n\n    Raises:\n        TypeError: If the inputs cannot be interpreted as numbers.\n    \"\"\"\n    try:\n        m = float(money)\n        p = float(price_per_chocolate)\n    except Exception:\n        raise TypeError(\"Both money and price_per_chocolate must be numbers\") from None\n\n    remaining = m - 2 * p\n\n    # If both original inputs were ints and the result is an integer value, return int\n    if isinstance(money, int) and isinstance(price_per_chocolate, int):\n        if remaining.is_integer():\n            return int(remaining)\n\n    # Return rounded float to represent currency sensibly\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:10:03"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        },
+        "timestamp": "2026-03-15 01:10:04"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:10:14"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def money_left_after_two_chocolates(money, price_per_chocolate):\n    \"\"\"\n    Calculate how much money is left after buying exactly two chocolates,\n    ensuring the result is not negative.\n\n    Args:\n        money: The amount of money you have (int or float).\n        price_per_chocolate: The price of one chocolate (int or float).\n\n    Returns:\n        The remaining amount of money after purchasing two chocolates.\n        - Returns an int if both inputs were ints and the remaining amount is a whole number.\n        - Otherwise returns a float rounded to 2 decimal places.\n\n    Raises:\n        TypeError: If the inputs cannot be interpreted as numbers.\n        ValueError: If buying two chocolates would leave you with negative money\n                    (i.e., insufficient funds).\n    \"\"\"\n    try:\n        m = float(money)\n        p = float(price_per_chocolate)\n    except Exception:\n        raise TypeError(\"Both money and price_per_chocolate must be numbers\") from None\n\n    remaining = m - 2 * p\n\n    # Treat very small rounding errors as zero\n    eps = 1e-9\n    if remaining < -eps:\n        raise ValueError(\"Insufficient funds to buy two chocolates (would result in negative money)\")\n\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # If both original inputs were ints and the result is an integer value, return int\n    if isinstance(money, int) and isinstance(price_per_chocolate, int):\n        if float(remaining).is_integer():\n            return int(round(remaining))\n\n    # Return rounded float to represent currency sensibly\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:10:14"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        },
+        "timestamp": "2026-03-15 01:10:14"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:10:43"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef money_left_after_two_chocolates(money, prices, allow_same=True):\n    \"\"\"\n    Calculate how much money is left after buying exactly two chocolates while\n    minimizing the total cost of those two chocolates. Buying two of the same\n    chocolate is allowed by default (allow_same=True). If allow_same=False,\n    two distinct items (by list entry) must be chosen.\n\n    Args:\n        money: The amount of money you have (int or float).\n        prices: An iterable of prices (each int or float) available for chocolates.\n                If allow_same is True and only one price is provided, buying two\n                of that price is considered (cost = price * 2).\n        allow_same: If True, you may buy two chocolates of the same price even\n                    if the prices list has only one entry. If False, you must\n                    pick two distinct entries from prices.\n\n    Returns:\n        The remaining amount of money after purchasing the two cheapest possible\n        chocolates under the constraints.\n        - Returns an int if all inputs (money and every price in prices) were ints\n          and the remaining amount is an integer.\n        - Otherwise returns a float rounded to 2 decimal places.\n\n    Raises:\n        TypeError: If money or any price cannot be interpreted as a number.\n        ValueError: If it's impossible to buy exactly two chocolates without\n                    ending up with negative money (insufficient funds), or if\n                    allow_same is False and fewer than two price entries are provided.\n    \"\"\"\n    # Validate and convert money\n    try:\n        m = float(money)\n    except Exception:\n        raise TypeError(\"money must be a number\") from None\n\n    # Convert prices iterable to list and validate\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            # treat Python ints only; numeric types like numpy.int64 are not considered here\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(money, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        # If there's only one price in the list, buying two of that price is allowed\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            # get two smallest values (indices don't matter when allow_same True)\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        # must pick two distinct entries from the list (list length must be >= 2)\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    # Ensure not negative after purchase (allow a tiny epsilon for floating error)\n    eps = 1e-9\n    remaining = m - total_cost\n    if remaining < -eps:\n        raise ValueError(\"Insufficient funds to buy two chocolates (would result in negative money)\")\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:10:43"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        },
+        "timestamp": "2026-03-15 01:10:44"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:11:05"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef money_left_after_two_chocolates(money, prices, allow_same=True):\n    \"\"\"\n    Calculate how much money is left after buying exactly two chocolates while\n    minimizing the total cost of those two chocolates. If it's impossible to\n    buy two chocolates without going negative, return the original money\n    (instead of raising an error).\n\n    Args:\n        money: The amount of money you have (int or float).\n        prices: An iterable of prices (each int or float) available for chocolates.\n                If allow_same is True and only one price is provided, buying two\n                of that price is considered (cost = price * 2).\n        allow_same: If True, you may buy two chocolates of the same price even\n                    if the prices list has only one entry. If False, you must\n                    pick two distinct entries from prices.\n\n    Returns:\n        The remaining amount of money after purchasing the two cheapest possible\n        chocolates under the constraints.\n        - Returns an int if all original numeric inputs (money and every price in\n          prices) were ints and the remaining amount is an integer.\n        - Otherwise returns a float rounded to 2 decimal places.\n\n        If you cannot buy two chocolates without going negative, returns the\n        original money (formatted as above).\n\n    Raises:\n        TypeError: If money or any price cannot be interpreted as a number.\n        ValueError: If prices is empty, or if allow_same is False and fewer than\n                    two price entries are provided.\n    \"\"\"\n    # Validate and convert money\n    try:\n        m = float(money)\n    except Exception:\n        raise TypeError(\"money must be a number\") from None\n\n    # Convert prices iterable to list and validate\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(money, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = m - total_cost\n\n    # If buying would make you negative, return the original money instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(money)\n        return round(m, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:11:05"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        },
+        "timestamp": "2026-03-15 01:11:06"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:11:21"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef money_left_after_two_chocolates(money, prices, allow_same=True):\n    \"\"\"\n    Given an amount of money and an iterable/array of chocolate prices, buy exactly\n    two chocolates with the minimum possible total cost (subject to allow_same).\n    If buying two chocolates would make you go negative, return the original money.\n\n    Args:\n        money: numeric (int or float) amount of money available.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same price (including when\n                    only one price is provided). If False, you must pick two\n                    distinct entries from prices.\n\n    Returns:\n        The remaining money after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original money (formatted as above).\n\n    Raises:\n        TypeError: if money or any price cannot be interpreted as a number.\n        ValueError: if prices is empty, or if allow_same is False and fewer\n                    than two price entries are provided.\n    \"\"\"\n    # Validate and convert money\n    try:\n        m = float(money)\n    except Exception:\n        raise TypeError(\"money must be a number\") from None\n\n    # Convert prices iterable to list (works for lists, tuples, numpy arrays, etc.)\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(money, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = m - total_cost\n\n    # If buying would make you negative, return the original money instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(money)\n        return round(m, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:11:21"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        },
+        "timestamp": "2026-03-15 01:11:23"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:11:37"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices, allow_same=True):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost (subject to\n    allow_same). If buying two chocolates would make you go negative, return the\n    original initial_cash.\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same price (including when\n                    only one price is provided). If False, you must pick two\n                    distinct entries from prices.\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if prices is empty, or if allow_same is False and fewer\n                    than two price entries are provided.\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    # Convert prices iterable to list (works for lists, tuples, numpy arrays, etc.)\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:11:37"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        },
+        "timestamp": "2026-03-15 01:11:39"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:11:51"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices, allow_same=True):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost (subject to\n    allow_same). If buying two chocolates would make you go negative, return the\n    original initial_cash.\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same price (including when\n                    only one price is provided). If False, you must pick two\n                    distinct entries from prices.\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if prices is empty, or if allow_same is False and fewer\n                    than two price entries are provided.\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    # Convert prices iterable to list (works for lists, tuples, numpy arrays, etc.)\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    if len(price_list) == 0:\n        raise ValueError(\"prices must contain at least one price\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    if allow_same:\n        if len(float_prices) == 1:\n            p1 = p2 = float_prices[0]\n        else:\n            p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        if len(float_prices) < 2:\n            raise ValueError(\"Need at least two price entries to pick two distinct chocolates when allow_same=False\")\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:11:51"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        },
+        "timestamp": "2026-03-15 01:11:52"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:12:07"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices, allow_same=True):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost (subject to\n    allow_same). If buying two chocolates would make you go negative, return the\n    original initial_cash.\n\n    Constraints:\n      - The number of prices provided must be between 2 and 50 (inclusive).\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same price (including when\n                    the same price appears multiple times). If False, you must\n                    pick two distinct entries from prices.\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if the number of prices is not between 2 and 50 (inclusive).\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    # Convert prices iterable to list (works for lists, tuples, numpy arrays, etc.)\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    n = len(price_list)\n    if n < 2 or n > 50:\n        raise ValueError(\"prices must contain between 2 and 50 entries (inclusive)\")\n\n    # Validate each price can be converted to float and track whether all original\n    # price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Choose two cheapest prices according to allow_same\n    # Since we require at least 2 prices, we can always take two smallest entries.\n    if allow_same:\n        # allow_same affects only whether buying two identical prices is permitted;\n        # with >=2 prices, picking the two smallest entries (which may be equal)\n        # is correct.\n        p1, p2 = heapq.nsmallest(2, float_prices)\n    else:\n        # must pick two distinct entries from the list (list length is >= 2 by check above)\n        p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:12:07"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 9
+        },
+        "timestamp": "2026-03-15 01:12:08"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:12:26"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices, allow_same=True):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost (subject to\n    allow_same). If buying two chocolates would make you go negative, return the\n    original initial_cash.\n\n    Constraints:\n      - The number of prices provided must be between 2 and 50 (inclusive).\n      - Each price must be between 1 and 100 (inclusive).\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n        allow_same: if True, you may buy two of the same entry value (when the\n                    list contains two entries of that value). If False, you\n                    must pick two distinct entries from prices. (With the\n                    requirement that len(prices) >= 2 this is satisfied by\n                    selecting two smallest entries.)\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if the number of prices is not between 2 and 50 (inclusive),\n                    or if any price is outside the [1, 100] range.\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    # Convert prices iterable to list\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    n = len(price_list)\n    if n < 2 or n > 50:\n        raise ValueError(\"prices must contain between 2 and 50 entries (inclusive)\")\n\n    # Validate each price can be converted to float and is within [1, 100],\n    # and track whether all original price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        if not (1 <= pf <= 100):\n            raise ValueError(\"each price must be between 1 and 100 inclusive\")\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Select two cheapest entries (since n >= 2). allow_same doesn't change selection\n    # because we always pick two distinct list entries (they may have equal values).\n    p1, p2 = heapq.nsmallest(2, float_prices)\n\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:12:26"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 10
+        },
+        "timestamp": "2026-03-15 01:12:27"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:12:45"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef money_left_after_two_chocolates(initial_cash, prices):\n    \"\"\"\n    Given an initial amount of cash and an iterable/array of chocolate prices,\n    buy exactly two chocolates with the minimum possible total cost. If buying\n    two chocolates would make you go negative, return the original initial_cash.\n\n    Constraints:\n      - initial_cash must be a number between 1 and 100 (inclusive).\n      - prices must be an iterable containing between 2 and 50 numeric entries.\n      - each price must be between 1 and 100 (inclusive).\n\n    Args:\n        initial_cash: numeric (int or float) starting amount of cash.\n        prices: iterable (list, tuple, array, etc.) of numeric prices.\n\n    Returns:\n        The remaining cash after buying the two cheapest possible chocolates,\n        formatted as:\n          - int if all original numeric inputs were Python ints and the result\n            is a whole number;\n          - otherwise a float rounded to 2 decimal places.\n\n        If it's impossible to buy two chocolates without going negative, returns\n        the original initial_cash (formatted as above).\n\n    Raises:\n        TypeError: if initial_cash or any price cannot be interpreted as a number.\n        ValueError: if initial_cash is outside [1, 100], if the number of prices\n                    is not between 2 and 50 (inclusive), or if any price is\n                    outside the [1, 100] range.\n    \"\"\"\n    # Validate and convert initial_cash\n    try:\n        cash = float(initial_cash)\n    except Exception:\n        raise TypeError(\"initial_cash must be a number\") from None\n\n    if not (1 <= cash <= 100):\n        raise ValueError(\"initial_cash must be between 1 and 100 inclusive\")\n\n    # Convert prices iterable to list\n    try:\n        price_list = list(prices)\n    except Exception:\n        raise TypeError(\"prices must be an iterable of numbers\") from None\n\n    n = len(price_list)\n    if n < 2 or n > 50:\n        raise ValueError(\"prices must contain between 2 and 50 entries (inclusive)\")\n\n    # Validate each price can be converted to float and is within [1, 100],\n    # and track whether all original price inputs were Python ints.\n    float_prices = []\n    all_prices_ints = True\n    for p in price_list:\n        try:\n            pf = float(p)\n        except Exception:\n            raise TypeError(\"each price must be a number\") from None\n        if not (1 <= pf <= 100):\n            raise ValueError(\"each price must be between 1 and 100 inclusive\")\n        float_prices.append(pf)\n        if not isinstance(p, int):\n            all_prices_ints = False\n\n    all_inputs_ints = isinstance(initial_cash, int) and all_prices_ints\n\n    # Select two cheapest entries (since n >= 2)\n    p1, p2 = heapq.nsmallest(2, float_prices)\n    total_cost = p1 + p2\n\n    eps = 1e-9\n    remaining = cash - total_cost\n\n    # If buying would make you negative, return the original initial_cash instead of error\n    if remaining < -eps:\n        if all_inputs_ints:\n            return int(initial_cash)\n        return round(cash, 2)\n\n    # Treat very small near-zero as zero\n    if abs(remaining) < eps:\n        remaining = 0.0\n\n    # Return int if all original numeric inputs were Python ints and remaining is whole\n    if all_inputs_ints and float(remaining).is_integer():\n        return int(round(remaining))\n\n    return round(remaining, 2)",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:12:45"
+      }
+    ],
+    "num_resets": 0
+  },
+  "timestamp": "2026-03-15 01:12:45"
+}
