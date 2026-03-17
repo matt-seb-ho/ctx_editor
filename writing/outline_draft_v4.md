@@ -10,7 +10,9 @@ Large language models suffer systematic performance degradation in multi-turn co
 
 ## 1. Introduction
 
-[Same motivational framing as v3: multi-turn degradation, LiC findings, executive function analogy. Updated to reflect two-problem decomposition.]
+The deployment of large language models increasingly involves multi-turn conversations. Users rarely specify complete requirements upfront; instead, they iteratively clarify, correct, and extend their requests across multiple exchanges. This conversational pattern is natural for humans but creates a fundamental problem for LLMs: once the model commits to an interpretation in an early turn, the resulting reasoning persists in context and anchors all subsequent generation, even when later user messages contradict the initial assumptions.
+
+Laban et al. (2025) quantified this through the "Lost in Conversation" (LiC) framework, a large-scale simulation across 15 LLMs and 6 task domains. Their core finding is striking: the performance gap between single-turn and multi-turn settings is driven primarily by *unreliability* (112% increase), not reduced *aptitude* (only 16% decrease). The capability is preserved, but the model fails to access it reliably. We call this degradation mechanism *context contamination*: earlier assistant outputs introduce errors, incorrect assumptions, and speculative content that propagate across turns, anchoring future generation on flawed foundations.
 
 We identify two distinct mechanisms driving context contamination:
 
@@ -22,13 +24,45 @@ These two problems require different solutions. Intent fragmentation is addresse
 
 Both solutions require designing the data flow around executive dysfunction: the analyzer model itself cannot reliably ignore assistant messages even when instructed to, so we physically exclude them from the stage that extracts user intent. We show that this separation is load-bearing — without it, even an external analyzer model falls prey to the same anchoring phenomenon, producing analysis that reflects the assistant's errors rather than correcting them.
 
-[Executive function framing: monitoring, inhibition, flexible updating, meta-cognition. Same structure as v3 but updated with two-problem language.]
+This pattern has a direct analogue in cognitive psychology. When humans face situations with distracting, contradictory, or outdated information, they rely on *executive function*: the set of higher-order cognitive processes that manage attention, inhibit prepotent but incorrect responses, and flexibly update working memory representations (Miyake et al., 2000; Diamond, 2013). Current LLMs lack this regulatory capacity — they have no mechanism to step outside the conversation, evaluate whether their own prior outputs are helping or harming, and selectively suppress contaminating content.
+
+We introduce a framework of test-time methods centered on the idea of *executive function for LLM conversations*. Rather than fine-tuning models to resist context contamination, we invest additional inference-time compute in an external executive layer that monitors, diagnoses, and corrects the conversation trajectory. This executive layer operates through three capacities that mirror the core components of human executive function:
+
+- **Monitoring and intent extraction.** A conversation analyzer extracts a clean task specification from user messages alone, reconstructing fragmented user intent without contamination from the assistant's prior reasoning.
+
+- **Inhibition and context editing.** When the analyzer identifies harmful content in the assistant's responses, the context is surgically rewritten: erroneous content is removed while correct progress is preserved. This prevents contaminating content from anchoring future generation.
+
+- **Meta-cognitive learning.** A Dynamic Cheatsheet mechanism accumulates transferable editing principles across problem instances, partially amortizing the cost of test-time intervention through cross-instance learning.
 
 ---
 
 ## 2. Related Work
 
-[Same structure as v3. Add CollabLLM description when available.]
+### 2.1 Lost in Conversation
+
+Laban et al. (2025) introduced the Lost in Conversation (LiC) framework, demonstrating that LLMs suffer systematic performance degradation in multi-turn, underspecified conversations. Their methodology takes single-turn problems (where models achieve high accuracy) and "shards" them: the complete specification is split into pieces that are revealed incrementally by a simulated user across multiple turns. The key findings are: (1) performance drops 39% on average compared to single-turn, (2) the degradation is primarily unreliability (+112%) rather than reduced aptitude (-16%), (3) all 15 tested models exhibit similarly high multi-turn unreliability, and (4) interventions within the same conversation context fail to close the gap — only starting a new conversation with consolidated information recovers performance.
+
+We adopt the LiC simulation framework as our primary evaluation setting because it provides controlled, reproducible multi-turn scenarios with known ground truth.
+
+### 2.2 ERGO: Entropy-Guided Context Resetting
+
+Khalid et al. (2025) proposed ERGO, which monitors token-level Shannon entropy at each turn and triggers a context reset when the entropy delta exceeds a calibrated threshold. Upon reset, all prior user messages are summarized into a single prompt and all assistant messages are discarded. ERGO achieves a 56.6% average performance gain on LiC. However, it requires logprob access (which many API providers limit), its reset discards all assistant messages entirely (recovering the single-turn baseline), and the entropy threshold is calibrated per-model. Our approach differs in using the LLM itself to decide when and how to intervene (requiring only black-box API access) and preserving edited assistant content rather than discarding it.
+
+### 2.3 Do LLMs Benefit from Their Own Words?
+
+Huang et al. (2026) investigated whether prior assistant responses help or hurt in multi-turn conversations. They found that omitting all prior assistant responses frequently does not hurt, and sometimes improves, response quality — terming this "context pollution." Their key insight that one-sentence summaries outperform both full context and full omission directly supports our thesis: intelligent compression beats both extremes. However, their approach makes a binary per-turn choice (keep all or omit all) and requires model-specific training.
+
+### 2.4 CollabLLM
+
+[TODO: CollabLLM paper description.]
+
+### 2.5 Test-Time Scaling and Inference-Time Compute
+
+The broader test-time scaling literature investigates how additional inference-time compute can improve model performance without parameter updates, including chain-of-thought reasoning (Wei et al., 2022), self-consistency (Wang et al., 2023), tree-of-thought search (Yao et al., 2024), and verifier-guided search (Cobbe et al., 2021). These methods focus on single-turn settings, scaling compute within a single generation. Our work extends test-time scaling to the *multi-turn* setting, where the challenge is not generating a better single response but managing accumulated context across turns.
+
+### 2.6 Dynamic Cheatsheet
+
+Suzgun et al. (2025) introduced the Dynamic Cheatsheet, a mutable text document that accumulates task-relevant knowledge across problem instances at test time without gradient updates. We adapt this for context editing, targeting the cheatsheet at the analyzer rather than the assistant itself.
 
 ---
 
@@ -36,7 +70,15 @@ Both solutions require designing the data flow around executive dysfunction: the
 
 ### 3.1 Problem Setting
 
-[Same as v3: LiC simulation framework, sharding, agents.]
+We adopt the LiC simulation framework. A single evaluation instance consists of:
+
+- A **task** with a fully-specified question $q$ and ground truth answer $a$
+- A **sharding** of $q$ into $k$ shards $\{s_1, \ldots, s_k\}$ that partition the specification
+- A **simulated user** that reveals shards incrementally across turns, paraphrasing and reordering
+- An **assistant** (the model under evaluation) that must gather information and produce a correct answer
+- A **system agent** that classifies each assistant response and evaluates correctness
+
+The conversation proceeds for up to $T$ turns. At each turn: the user reveals a shard, the context strategy prepares the message history, the assistant generates a response, and the system agent evaluates.
 
 ### 3.2 Conversation Analyzer: Two-Query Architecture
 
@@ -60,9 +102,15 @@ Four strategies use the analyzer's output differently:
 
 **Gated Reset.** Like Always-Reset, but the context is only replaced when the analyzer detects substantive issues. When no issues are found, the conversation passes through unchanged.
 
-### 3.4 Memory-Based Learning
+### 3.4 Memory-Based Learning (Meta-Cognitive Layer)
 
-[Same as v3 Section 3.5: Dynamic Cheatsheet, reflect-then-unify, content discipline. Updated to note memory targets Query 2 only.]
+The Dynamic Cheatsheet accumulates editing principles across problem instances, injected into the analyzer's Query 2 prompt. Memory is not used in Query 1 (task specification extraction must remain uncontaminated).
+
+**Update Mechanism: Reflect-then-Unify.** After processing a batch of problems: (1) *Reflect* — for each trajectory, an LLM generates generalizable takeaways from the outcome, with access to the current cheatsheet, the rendered trajectory, and optionally ground truth; (2) *Unify* — a single LLM call merges new takeaways with the current cheatsheet, deduplicating and resolving contradictions.
+
+**Memory Target.** For strategies with an analyzer (Append Analysis, Context Edit), memory is targeted at the analyzer's comparison query. For the baseline, memory is injected into the assistant's system message. Targeting the executive layer is more effective than targeting the assistant directly.
+
+**Content Discipline.** The *type* of knowledge matters more than the update mechanism. Meta-level principles transfer well ("verify output format matches user specification," "reject assistant assumptions not grounded in user messages"). Task-specific content (algorithmic recipes, code snippets) causes the executive layer to anchor on stale patterns — recreating the failure mode we are correcting. We cap cheatsheet length at 1500 words.
 
 ---
 
@@ -268,7 +316,17 @@ These results suggest a progression: for simple tasks, a clean task specificatio
 
 ## References
 
-[Same as v3, plus any new references.]
+- Laban, P., et al. (2025). Lost in Conversation: A Large-Scale Simulation of Multi-Turn Problem-Solving Conversations with LLMs. *arXiv*.
+- Khalid, M., et al. (2025). ERGO: Entropy-Guided Context Resetting for Multi-Turn Conversations. *arXiv*.
+- Huang, X., et al. (2026). Do LLMs Benefit from Their Own Words? Understanding Context Pollution in Multi-Turn Conversations. *arXiv*.
+- Suzgun, M., et al. (2025). Dynamic Cheatsheet: Test-Time Learning with Mutable Memory. *arXiv*.
+- Miyake, A., et al. (2000). The Unity and Diversity of Executive Functions. *Cognitive Psychology*.
+- Diamond, A. (2013). Executive Functions. *Annual Review of Psychology*.
+- Wei, J., et al. (2022). Chain-of-Thought Prompting Elicits Reasoning in Large Language Models. *NeurIPS*.
+- Wang, X., et al. (2023). Self-Consistency Improves Chain of Thought Reasoning in Language Models. *ICLR*.
+- Yao, S., et al. (2024). Tree of Thoughts: Deliberate Problem Solving with Large Language Models. *NeurIPS*.
+- Cobbe, K., et al. (2021). Training Verifiers to Solve Math Word Problems. *arXiv*.
+- [TODO: CollabLLM reference]
 
 ---
 
