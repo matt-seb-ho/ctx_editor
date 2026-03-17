@@ -243,6 +243,84 @@ The core issue is not with the cheatsheet content but with **compliance** — th
 
 ---
 
+## Experiment: Fixing S1.5+mem Regressions
+
+Two approaches were tested to address the S1.5+mem regressions:
+
+### Approach A: Post-Processing Sanitization (`--sanitize`)
+
+Strip clarification-seeking patterns from the analysis before building S1.5's compacted context. Uses existing S1+mem traces — no re-running required.
+
+Regex removes: "ask the user", "if unclear", "open questions", "do not assume answers", "clarification needed from the user", and related patterns from both `user_intent` and `issues` fields.
+
+### Approach B: Compliance Rules in Analyzer Prompt (`enforce_compliance`)
+
+Append explicit anti-clarification and anti-overspecification rules after the memory section in the comparison query prompt. Three rules:
+1. NEVER suggest asking for clarification
+2. Only include user-stated requirements (no hallucinated columns)
+3. Describe WHAT is wrong, not HOW to fix it (avoid prescribing SQL forms)
+
+Requires re-running S1+mem with the new prompt, producing new traces.
+
+### Results
+
+#### S1 Results (analysis-time)
+
+| Config | Math (n=20) | Code (n≈19) | Database (n=25) |
+|--------|:-----------:|:-----------:|:---------------:|
+| S1 (no mem) | 16/20 (80%) | 10/18 (56%) | 8/25 (32%) |
+| **S1+mem** | **18/20 (90%)** | **13/19 (68%)** | **11/25 (44%)** |
+| S1+mem+compliant (B) | 15/20 (75%) | 13/19 (68%) | 7/25 (28%) |
+
+**Approach B hurts S1.** The compliance rules over-constrain the analyzer:
+- Math drops 90% → 75%: the "don't prescribe" rule makes the analysis too vague for math where specific error identification helps.
+- Database drops 44% → 28%: the "don't add columns" rule may make the analyzer too conservative, and "don't prescribe SQL forms" removes guidance that database tasks benefit from.
+- Code is unchanged at 68%.
+
+#### S1.5 Results (context-reset)
+
+| Config | Math (n≈20) | Code (n≈19) | Database (n=25) |
+|--------|:-----------:|:-----------:|:---------------:|
+| S1.5 (no mem) | 16/20 (80%) | 11/16† (69%) | 10/25 (40%) |
+| S1.5+mem | 17/20 (85%) | 12/17† (71%) | 9/25 (36%) |
+| **S1.5+mem+sanitize (A)** | **17/20 (85%)** | **13/19 (68%)** | **11/25 (44%)** |
+| S1.5+compliant (B) | 15/20‡ (75%) | 13/19‡ (68%) | 9/25 (36%) |
+| S1.5+compliant+sanitize (A+B) | 15/20‡ (75%) | 12/17‡ (71%) | 10/25 (40%) |
+
+†Reduced denominators due to timeouts. ‡Uses approach B traces (already degraded at S1 level).
+
+### Analysis of Results
+
+**Approach A (sanitization) is the winner.** It keeps S1 unchanged (uses the same traces) and improves S1.5+mem:
+- Database: 36% → **44%** (recovered from below-baseline to matching S1+mem)
+- Math: 85% → 85% (unchanged, no clarification patterns in math)
+- Code: 71% → 68% (comparable, denominator difference due to timeouts)
+
+S1.5+mem+sanitize is the **first configuration where memory uniformly helps S1.5** across all tasks (vs S1.5 no-mem: math 85%≥80%, code 68%≈69%, database 44%>40%).
+
+**Approach B (compliance rules) is harmful.** It degrades S1 quality on math (-15pp) and database (-16pp), and those degraded traces cascade into S1.5. The compliance rules are too blunt — they prevent valid analysis behaviors alongside the problematic ones.
+
+**Approach A+B combined** doesn't help beyond A alone since the damage is done at analysis time in approach B.
+
+### Why Approach A Works and B Doesn't
+
+The key insight: **the anti-patterns are in the analysis output, not the analysis prompt.** The cheatsheet already contains the right rules ("do not recommend asking the user for clarification"). The analyzer just doesn't always comply. Adding more rules to the prompt (approach B) doesn't fix non-compliance — it adds more rules to potentially not comply with, while constraining the analyzer's useful behaviors.
+
+Post-processing (approach A) is more surgical: it fixes the output directly, removing only the specific anti-patterns that cause S1.5 regressions, without touching the analysis process that S1 benefits from.
+
+### Recommendation
+
+Use **Approach A (sanitization)** for S1.5+mem runs:
+- Add `--sanitize` flag when running `scripts/run_s15_experiment.py` with memory traces
+- Do NOT use `enforce_compliance` — it harms S1 and provides no additional S1.5 benefit
+- The sanitization is transparent and reversible (just a flag, traces unchanged)
+
+### Remaining Gaps
+
+Sanitization fixed 1/4 database regressions directly (val-389, the purest clarification-seeking case). The other 3 involved hallucinated columns (val-932), alternative SQL forms (val-498), and a subtler clarification pattern (val-401 with GROUP_CONCAT vs per-row). The net effect is still positive because sanitization also enables memory's benefits to flow through — the 3 new solves from S1+mem (val-498 in S1, val-555, val-75) are preserved while the regressions are partially mitigated.
+
+---
+
 ## Run Directories
 
 | Run | Dir |
@@ -251,12 +329,18 @@ The core issue is not with the cheatsheet content but with **compliance** — th
 | S1+mem math | `outputs/2026-03-16/20-33-21` |
 | S1 code | `outputs/2026-03-16/20-12-21` |
 | S1+mem code | `outputs/2026-03-16/20-42-35` |
-| S1 database | `outputs/2026-03-16/20-25-10` |
-| S1+mem database | `outputs/2026-03-16/20-52-21` |
+| S1 database | `outputs/2026-03-16/20-25-09` |
+| S1+mem database | `outputs/2026-03-16/20-52-20` |
 | S1.5 math | `outputs/2026-03-17/01-21-21` |
 | S1.5+mem math | `outputs/2026-03-17/01-28-32` |
 | S1.5 code | `outputs/2026-03-17/01-22-15` |
 | S1.5+mem code | `outputs/2026-03-17/01-29-56` |
 | S1.5 database | `outputs/2026-03-17/01-27-14` |
 | S1.5+mem database | `outputs/2026-03-17/01-34-55` |
-| Memory checkpoints | `outputs/replay_memories/2026-03-16_19-13-12/` |
+| S1.5+mem+sanitize | `outputs/2026-03-17/08-13-54` (math/code), `outputs/2026-03-17/08-19-23` (database) |
+| S1+mem+compliant math | `outputs/2026-03-17/08-20-09` |
+| S1+mem+compliant code | `outputs/2026-03-17/08-29-02` |
+| S1+mem+compliant database | `outputs/2026-03-17/08-39-22` |
+| S1.5+compliant | `outputs/2026-03-17/08-57-15` |
+| Memory checkpoints (v8) | `outputs/replay_memories/2026-03-16_19-13-12/` |
+| Memory checkpoints (compliant) | `outputs/replay_memories/compliant_2026-03-17_08-20-08/` |
