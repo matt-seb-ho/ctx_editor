@@ -58,6 +58,7 @@ class AppendAnalysisStrategy(BaseStrategy):
         memory_target_query: str = "compare",
         enforce_compliance: bool = False,
         spec_only: bool = False,
+        analysis_after_last_user: bool = False,
     ):
         self.analyzer = ConversationAnalyzer(
             model=analyzer_model,
@@ -77,6 +78,9 @@ class AppendAnalysisStrategy(BaseStrategy):
         self.enforce_compliance = enforce_compliance
         # spec_only: only append the task spec, skip aligned/issues (and Query 2)
         self.spec_only = spec_only
+        # analysis_after_last_user: if True, insert analysis AFTER last user message
+        # (default False = before, for backward compat)
+        self.analysis_after_last_user = analysis_after_last_user
 
     def _is_analysis_addendum_added(self, trace: "ConversationTrace") -> bool:
         return any(log["type"] == "analysis_addendum_added" for log in trace.logs)
@@ -141,18 +145,23 @@ class AppendAnalysisStrategy(BaseStrategy):
                 parts.append(f"# What Needs to Change\n{result.issues}")
         analysis_text = "\n\n".join(parts)
 
-        # Insert analysis as a separate message before the last user message
+        # Insert analysis as a separate message relative to the last user message
         messages = trace.get_active_messages()
         if analysis_text and len(messages) >= 1:
             analysis_msg = Message(role="conversation analysis", content=analysis_text)
-            # Find last user message and insert analysis before it
+            # Find last user message
             last_user_idx = None
             for i in range(len(messages) - 1, -1, -1):
                 if messages[i].role == "user":
                     last_user_idx = i
                     break
             if last_user_idx is not None:
-                messages.insert(last_user_idx, analysis_msg)
+                if self.analysis_after_last_user:
+                    # Insert after the last user message (analysis incorporates it)
+                    messages.insert(last_user_idx + 1, analysis_msg)
+                else:
+                    # Insert before the last user message (legacy behavior)
+                    messages.insert(last_user_idx, analysis_msg)
             else:
                 messages.append(analysis_msg)
 
