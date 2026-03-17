@@ -14,7 +14,7 @@ MEMORY_DIR="outputs/replay_memories/${TIMESTAMP}"
 LOG_DIR="outputs/replay_logs/${TIMESTAMP}"
 mkdir -p "$MEMORY_DIR" "$LOG_DIR"
 
-COMMON="model=gpt5_mini execution.max_concurrent=8 execution.replay_turns=2 logging.verbose=true metadata.branch=newleaf2"
+COMMON="model=gpt5_mini load_balancer=multi_endpoint execution.max_concurrent=8 execution.replay_turns=2 logging.verbose=true metadata.branch=newleaf2"
 
 # Trace sources per task
 declare -A TRACE_SOURCES
