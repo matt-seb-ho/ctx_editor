@@ -47,9 +47,12 @@ S1.5 takes S1's pre-computed analysis and always does a context reset (like S2),
 | | | | | |
 | **S1+mem** | **18/20 (90%)** | **13/19 (68%)** | **11/25 (44%)** | 2/23 (9%) |
 | **S1.5+mem** | 17/20 (85%) | 12/17† (71%) | 9/25 (36%) | 7/23 (30%) |
+| **S1.5+mem+sanitize** | **17/20 (85%)** | **13/19 (68%)** | **11/25 (44%)** | — |
 | **S2+mem** | 15/20 (75%) | 13/19 (68%) | 9/25 (36%) | 3/23 (13%) |
 
 †Code S1.5 had 9 timeout errors (denominator 16); S1.5+mem had 8 (denominator 17). Percentages are inflated relative to S1/S2 denominators.
+
+S1.5+mem+sanitize applies post-processing to strip clarification-seeking patterns from the analysis before building the compacted context (`--sanitize` flag). See "Memory Deep Dive" section below.
 
 ### V8 vs V6 Comparison (Best Per Task)
 
@@ -74,9 +77,11 @@ S2 underperforms S1 on math (75% vs 80%) because of false negatives: the analyze
 
 S1.5 (always reset, no gate) performs between S1 and S2 on most tasks, confirming that context removal provides modest incremental benefit but the gate's false negatives are costly.
 
-### 3. Memory Helps S1 But Hurts S2
+### 3. Memory Helps S1, Can Be Made to Help S1.5, Hurts S2
 
-S1+mem is the best configuration on math (90%) and code (68%). Memory learning works well when it's additive — the cheatsheet helps the analyzer produce better analysis on later batches.
+S1+mem is the best configuration on math (90%) and code (68%), with +8 new solves and **zero regressions** across math/code/database. Memory learning works well when additive — the cheatsheet helps the analyzer produce better analysis on later batches.
+
+S1.5+mem initially showed regressions on database (36% vs 40% no-mem). Error analysis (see "Memory Deep Dive" below) traced this to the analyzer producing clarification-seeking language that the assistant follows literally in the compacted context. Post-processing sanitization (`--sanitize`) fixes this, making memory a consistent positive for S1.5 as well (database recovers to 44%).
 
 S2+mem consistently underperforms S2 no-mem. The ~1000-word cheatsheet dilutes the analyzer's attention, causing it to miss issues that the no-memory analyzer catches. In 3/4 analyzed regressions, the memory-equipped analyzer returned empty issues where the no-memory analyzer found clear problems.
 
@@ -192,22 +197,78 @@ python scripts/run_s15_experiment.py \
 | S1.5+mem code | 12/17† (71%) | `outputs/2026-03-17/01-29-56` |
 | S1.5+mem database | 9/25 (36%) | `outputs/2026-03-17/01-34-55` |
 | S1.5+mem actions | 7/23 (30%) | `outputs/2026-03-17/01-35-29` |
+| S1.5+mem+sanitize math | 17/20 (85%) | `outputs/2026-03-17/08-13-54` |
+| S1.5+mem+sanitize code | 13/19 (68%) | `outputs/2026-03-17/08-13-54` |
+| S1.5+mem+sanitize database | **11/25 (44%)** | `outputs/2026-03-17/08-19-23` |
+| S1+spec_mem math | 14/20 (70%) | `outputs/2026-03-17/05-57-32` |
+| S1+spec_mem code | 13/19 (68%) | `outputs/2026-03-17/06-08-37` |
+| S1+spec_mem database | 10/25 (40%) | `outputs/2026-03-17/06-19-08` |
 
-## Open Questions for Parallel Branches
+## Memory Deep Dive
 
-### Branch 1: Improve Memory Gains
-- Memory helps S1 (80→90% math, 56→68% code, 32→44% database) but hurts S2 and is inconsistent with S1.5
-- The cheatsheet (~1000 words) dilutes analyzer attention in S2/S1.5 where the analysis drives a binary decision
-- Potential directions: cap at ~500 words, restructure to be more concise, separate memory targets for task spec vs comparison queries, or only apply memory to the task spec query (not comparison)
+Detailed sample-level error analysis of memory's effect. Full report: `docs/reports/memory_error_analysis.md`.
 
-### Branch 2: Single-Query Analysis Ablation
-- Current v8 uses two queries: (1) task spec from user messages + system message, (2) comparison of task spec against conversation
-- Question: can a single query that combines both steps match or exceed two-query performance?
-- The two-query approach costs 2x LLM calls per turn — if a single query matches, it halves the cost
-- The task spec is clearly the highest-leverage component; does the comparison query add enough value to justify the second call?
+### S1+mem: How Memory Helps (Zero Regressions)
+
+Sample-by-sample comparison shows **+8 new solves, 0 regressions** across math/code/database:
+
+| Task | New solves | Regressions | Key mechanism |
+|------|:---------:|:-----------:|---------------|
+| Math (+2) | GSM8K/1190, GSM8K/144 | 0 | Shorter, more decisive specs — commit to one interpretation instead of branching |
+| Code (+3) | livecodebench/2812*, 2881, 2979 | 0 | Concrete failing examples, semantic error detection, removal of unnecessary validation |
+| Database (+3) | spider-val-498, val-555, val-75 | 0 | Exact column matching, single-row semantics (LIMIT 1), suppress clarification-seeking |
+
+*2812 was a timeout artifact; 2 genuine flips for code.
+
+Memory's primary effect is making the analyzer produce **more actionable analysis**: shorter task specs that commit to single interpretations (math), concrete test cases that expose algorithmic errors (code), and precise constraint-checking that catches column aliasing and missing LIMIT (database).
+
+### S1.5+mem: Why Memory Initially Hurt, and the Fix
+
+S1.5+mem showed 4 regressions on database (net -1 vs no-mem). Root cause: **in S1.5 the analysis IS the sole context** — there's no full conversation to fall back on. Three anti-patterns in memory-influenced analysis:
+
+1. **Clarification-seeking leakage** (val-389, val-401): Analyzer writes "ask the user if unclear" despite the cheatsheet saying not to. In S1 the assistant ignores this (it sees the real messages). In S1.5 the assistant follows it literally and asks questions instead of answering.
+
+2. **Hallucinated requirements** (val-932): Analyzer adds a `treatment_count` column the user never requested (confused a filter condition for a projection). S1 assistant checks real messages; S1.5 trusts the spec blindly.
+
+3. **Over-prescriptive style** (val-498): Analyzer over-constrains SQL form, steering toward semantically-correct but evaluator-incompatible EXISTS pattern.
+
+**Fix: Post-processing sanitization** (`--sanitize` flag on `scripts/run_s15_experiment.py`). Strips clarification-seeking language from the analysis before building the compacted context. This is transparent (traces unchanged) and recovers database from 36% → 44%.
+
+An alternative approach — adding explicit compliance rules to the analyzer prompt (`enforce_compliance`) — was tested and **hurts S1** (math drops 90%→75%, database 44%→28%). The rules over-constrain the analyzer's useful behaviors. Post-processing is strictly better: it fixes S1.5 without touching S1.
+
+### Memory Effect Summary (Best Configs)
+
+| Config | Math | Code | Database | Δ vs no-mem |
+|--------|:----:|:----:|:--------:|:-----------:|
+| S1 | 80% | 56% | 32% | — |
+| **S1+mem** | **90%** | **68%** | **44%** | **+10, +12, +12** |
+| S1.5 | 80% | 69%† | 40% | — |
+| **S1.5+mem+sanitize** | **85%** | **68%** | **44%** | **+5, ~0, +4** |
+
+Memory provides consistent directional uplift for both S1 (large gains) and S1.5 (moderate gains, with sanitization).
+
+### Spec-Targeted Memory Ablation
+
+Tested injecting memory into Query 1 (task spec) instead of Query 2 (comparison). Config: `append_analysis_spec_mem`.
+
+| Config | Math | Code | Database |
+|--------|:----:|:----:|:--------:|
+| S1+mem (compare) | **90%** | 68% | **44%** |
+| S1+mem (spec) | 70% | 68% | 40% |
+
+Spec-targeted memory matches on code but drops badly on math (-20pp). The comparison query is where memory adds value for math (where explicit error identification matters). For code/database, the task spec is already the primary mechanism so memory location matters less. The default (compare-targeted) remains the best overall choice.
+
+## Open Questions
+
+### Remaining Memory Gaps
+- Memory hurts S2 — the cheatsheet dilutes the binary edit/no-edit decision. Could a more concise cheatsheet (<500 words) or separate memory targets (spec vs compare) help S2?
+- Actions memory (S1+mem actions: 9% vs S1 22%) — the accumulation structural failure mode dominates; memory can't fix it. Likely needs task-specific handling.
+- The sanitization fixes 1/4 database regressions directly (clarification-seeking). Hallucinated requirements and over-prescription require deeper fixes (e.g., cross-validating spec columns against actual user messages).
+
+### Single-Query Analysis Ablation (Completed)
+See `docs/reports/ablations/single_query_hard_attention.md`. Key finding: the task spec alone (S1-speconly) matches or beats full S1 on code/database at half the LLM cost. The comparison query only helps on math. Hard attention (user messages only in Query 1) is load-bearing — removing it collapses performance to baseline.
 
 ## Git State
 
 Branch: `newleaf2`
-Latest commit: `5c04385` (S1.5 evaluation fixes)
 All experimental changes committed.
