@@ -112,10 +112,14 @@ class AnalysisResult:
 class ConversationAnalyzer:
     """Generates structured analysis of multi-turn conversations.
 
-    v6 (default): Two-query architecture for hard attention separation.
+    v6/v7/v8: Two-query architecture for hard attention separation.
       Query 1 — only sees user messages, produces clean task spec.
       Query 2 — compares task spec against full conversation.
       The edit decision is implicit: substantive content in <issues> = edit needed.
+
+    v8_single: Single-query ablation — combines task spec + comparison in one
+      prompt. The model sees the full conversation (including assistant messages)
+      when building the task spec. Tests whether two-query hard attention matters.
 
     Older versions (v4, v5) use a single query and are supported for
     backward compatibility.
@@ -138,6 +142,10 @@ class ConversationAnalyzer:
         if prompt_version in ("v6", "v7", "v8"):
             self._task_spec_template = _load_prompt(f"analyzer_{prompt_version}_task_spec")
             self._compare_template = _load_prompt(f"analyzer_{prompt_version}_compare")
+        elif prompt_version == "v8_single":
+            # Single-query ablation: combined task spec + comparison in one prompt.
+            # Tests whether the two-query "hard attention" separation matters.
+            self._single_combined_template = _load_prompt("analyzer_v8_single")
         else:
             # Single-query prompt (v4, v5)
             self._prompt_template = _load_prompt(f"analyzer_{prompt_version}")
@@ -236,6 +244,65 @@ class ConversationAnalyzer:
             raw_output=f"--- TASK SPEC ---\n{spec_output}\n\n--- COMPARISON ---\n{compare_output}",
         )
 
+    # --- v8_single: single-query ablation ---
+
+    async def _analyze_v8_single(
+        self,
+        trace: "ConversationTrace",
+        model_client: "ModelClient",
+        memory: Optional["MemoryModule"] = None,
+    ) -> AnalysisResult:
+        """Single-query analysis ablation for v8.
+
+        Combines task spec construction and comparison into one prompt.
+        The model sees the full conversation (including assistant messages)
+        when building the task spec — no hard attention separation.
+        """
+        system_message_str = trace.system_message.content if trace.system_message else ""
+        conversation_str = trace.get_conversation_string(skip_system=False)
+        conversation_str = self._strip_edit_notes(conversation_str)
+
+        memory_section = ""
+        if memory and memory.content:
+            memory_section = MEMORY_SECTION_TEMPLATE.format(memory_content=memory.content)
+
+        prompt = self._single_combined_template.format_map(
+            defaultdict(
+                str,
+                {
+                    "system_message": system_message_str,
+                    "conversation": conversation_str,
+                    "memory_section": memory_section,
+                },
+            )
+        )
+        output = await self._generate(prompt, model_client)
+
+        task_spec = self._extract_tag(output, "task_spec")
+        aligned = self._extract_tag(output, "aligned")
+        issues = self._extract_tag(output, "issues")
+
+        if not task_spec:
+            logger.warning(
+                "v8_single: <task_spec> tag not found. "
+                f"Output preview: {output[:150]!r}"
+            )
+
+        # Fallback for aligned/issues
+        if not aligned and not issues:
+            logger.warning(
+                "v8_single: <aligned>/<issues> tags not found, "
+                f"trying section-header fallback. Output preview: {output[:150]!r}"
+            )
+            aligned, issues = self._parse_numbered_comparison(output)
+
+        return AnalysisResult(
+            user_intent=task_spec,
+            aligned=aligned,
+            issues=issues,
+            raw_output=f"--- SINGLE QUERY ---\n{output}",
+        )
+
     # --- single-query flow (v4, v5) ---
 
     async def _analyze_single(
@@ -280,6 +347,8 @@ class ConversationAnalyzer:
         """
         if self.prompt_version in ("v6", "v7", "v8"):
             return await self._analyze_v6(trace, model_client, memory)
+        if self.prompt_version == "v8_single":
+            return await self._analyze_v8_single(trace, model_client, memory)
         return await self._analyze_single(trace, model_client, memory)
 
     # --- parsing helpers ---
