@@ -354,6 +354,8 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         timeout=cfg.model.ctx_editor.get("timeout", 60),
         include_full_spec_q=cfg.memory.get("include_full_spec_q", False),
         include_ground_truth_a=cfg.memory.get("include_ground_truth_a", False),
+        include_oracle_spec=cfg.memory.get("include_oracle_spec", False),
+        oracle_spec_path=cfg.memory.get("oracle_spec_path", None),
     )
 
     # Offline learning mode — learn memory from saved trajectories, no new simulations

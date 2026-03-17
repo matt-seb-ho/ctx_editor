@@ -213,10 +213,15 @@ def render_for_analyzer(trajectory: "SimulationResult") -> str:
     return "\n\n".join(parts)
 
 
+# spec_curation uses the same renderer as analyzer — the full conversation timeline
+# is needed so the reflector can identify where assistant contamination enters the spec.
+render_for_spec_curation = render_for_analyzer
+
 # Registry mapping target name → renderer function
 RENDERERS: dict[str, Callable[["SimulationResult"], str]] = {
     "assistant": render_for_assistant,
     "context_editor": render_for_context_editor,
     "edit_decision": render_for_edit_decision,
     "analyzer": render_for_analyzer,
+    "spec_curation": render_for_spec_curation,
 }
