@@ -179,6 +179,7 @@ class ConversationAnalyzer:
         model_client: "ModelClient",
         memory: Optional["MemoryModule"] = None,
         spec_only: bool = False,
+        memory_target_query: str = "compare",
     ) -> AnalysisResult:
         """Two-query analysis with hard attention separation.
 
@@ -186,6 +187,11 @@ class ConversationAnalyzer:
         Query 2: Task spec + full conversation → critical comparison
 
         If spec_only=True, only runs Query 1 and returns empty aligned/issues.
+
+        memory_target_query controls where memory is injected:
+          "compare" (default) — Query 2 only (original behavior)
+          "spec" — Query 1 only
+          "both" — both queries
         """
         # Include ALL user messages across resets (deduplicated) so the task spec
         # query always builds from the complete set of user information.
@@ -194,11 +200,19 @@ class ConversationAnalyzer:
         conversation_str = trace.get_conversation_string(skip_system=False)
         conversation_str = self._strip_edit_notes(conversation_str)
 
+        # Memory for Query 1 (task spec)
+        spec_memory_section = ""
+        if memory and memory.content and memory_target_query in ("spec", "both"):
+            spec_memory_section = MEMORY_SECTION_TEMPLATE.format(
+                memory_content=memory.content
+            )
+
         # Query 1: Build task spec from user messages + system message context
         spec_prompt = self._task_spec_template.format_map(
             defaultdict(str, {
                 "user_messages": user_messages_str,
                 "system_message": system_message_str,
+                "memory_section": spec_memory_section,
             })
         )
         spec_output = await self._generate(spec_prompt, model_client)
@@ -220,9 +234,9 @@ class ConversationAnalyzer:
                 raw_output=f"--- TASK SPEC (spec_only) ---\n{spec_output}",
             )
 
-        # Query 2: Compare task spec against full conversation
+        # Memory for Query 2 (comparison)
         memory_section = ""
-        if memory and memory.content:
+        if memory and memory.content and memory_target_query in ("compare", "both"):
             memory_section = MEMORY_SECTION_TEMPLATE.format(memory_content=memory.content)
 
         compare_prompt = self._compare_template.format_map(
@@ -427,14 +441,19 @@ class ConversationAnalyzer:
         model_client: "ModelClient",
         memory: Optional["MemoryModule"] = None,
         spec_only: bool = False,
+        memory_target_query: str = "compare",
     ) -> AnalysisResult:
         """Analyze the current conversation state.
 
         Dispatches to v6 (two-query) or single-query based on prompt_version.
         If spec_only=True, only runs Query 1 (task spec) and skips Query 2.
+        memory_target_query: "compare" (default), "spec", or "both".
         """
         if self.prompt_version in ("v6", "v7", "v8"):
-            return await self._analyze_v6(trace, model_client, memory, spec_only=spec_only)
+            return await self._analyze_v6(
+                trace, model_client, memory, spec_only=spec_only,
+                memory_target_query=memory_target_query,
+            )
         if self.prompt_version == "v8_soft":
             return await self._analyze_v8_soft(trace, model_client, memory)
         if self.prompt_version == "v8_single":

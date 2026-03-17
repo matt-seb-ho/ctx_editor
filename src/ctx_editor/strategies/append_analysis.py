@@ -55,6 +55,7 @@ class AppendAnalysisStrategy(BaseStrategy):
         min_turns: int = 3,
         use_memory: bool = False,
         memory_target: str = "analyzer",
+        memory_target_query: str = "compare",
         spec_only: bool = False,
     ):
         self.analyzer = ConversationAnalyzer(
@@ -69,6 +70,8 @@ class AppendAnalysisStrategy(BaseStrategy):
         self.min_turns = min_turns if isinstance(min_turns, int) else 3
         self.use_memory = use_memory
         self.memory_target = memory_target
+        # Which query receives memory: "compare" (default), "spec", or "both"
+        self.memory_target_query = memory_target_query
         # spec_only: only append the task spec, skip aligned/issues (and Query 2)
         self.spec_only = spec_only
 
@@ -109,6 +112,7 @@ class AppendAnalysisStrategy(BaseStrategy):
         analysis_memory = memory if (self.use_memory and self.memory_target == "analyzer") else None
         result = await self.analyzer.analyze(
             trace, model_client, memory=analysis_memory, spec_only=self.spec_only,
+            memory_target_query=self.memory_target_query,
         )
 
         trace.add_log(
