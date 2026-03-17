@@ -101,7 +101,7 @@ async def run_collabllm_experiment(cfg: DictConfig) -> dict[str, Any]:
     # Load data dynamically from HuggingFace
     dataset_name = cfg.task.get("dataset_name", "math-hard")
     limit = cfg.task.get("limit")
-    split = cfg.task.get("split", "test")
+    split = cfg.task.get("split", None)
     samples = load_collabllm_dataset(dataset_name, limit=limit, split=split)
     logger.info(f"Loaded {len(samples)} samples from {dataset_name} ({split} split)")
 

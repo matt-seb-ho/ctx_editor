@@ -5,6 +5,7 @@ from .analyzer import ConversationAnalyzer
 from .append_analysis import AppendAnalysisStrategy
 from .base import ContextStrategy
 from .baseline import BaselineStrategy
+from .context_compaction import ContextCompactionStrategy
 from .context_edit import ContextEditStrategy
 from .context_edit_v2 import ContextEditV2Strategy
 from .reflection import ReflectionStrategy
@@ -14,6 +15,7 @@ __all__ = [
     "BaselineStrategy",
     "ContextEditStrategy",
     "ContextEditV2Strategy",
+    "ContextCompactionStrategy",
     "AgenticEditStrategy",
     "ReflectionStrategy",
     "AppendAnalysisStrategy",
