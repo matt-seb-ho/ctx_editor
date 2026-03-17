@@ -178,11 +178,14 @@ class ConversationAnalyzer:
         trace: "ConversationTrace",
         model_client: "ModelClient",
         memory: Optional["MemoryModule"] = None,
+        spec_only: bool = False,
     ) -> AnalysisResult:
         """Two-query analysis with hard attention separation.
 
         Query 1: User messages only → task spec (no assistant contamination)
         Query 2: Task spec + full conversation → critical comparison
+
+        If spec_only=True, only runs Query 1 and returns empty aligned/issues.
         """
         # Include ALL user messages across resets (deduplicated) so the task spec
         # query always builds from the complete set of user information.
@@ -207,6 +210,15 @@ class ConversationAnalyzer:
                 f"Output preview: {spec_output[:150]!r}"
             )
             task_spec = spec_output.strip()
+
+        # spec_only: skip Query 2, return task spec with empty comparison
+        if spec_only:
+            return AnalysisResult(
+                user_intent=task_spec,
+                aligned="",
+                issues="",
+                raw_output=f"--- TASK SPEC (spec_only) ---\n{spec_output}",
+            )
 
         # Query 2: Compare task spec against full conversation
         memory_section = ""
@@ -414,13 +426,15 @@ class ConversationAnalyzer:
         trace: "ConversationTrace",
         model_client: "ModelClient",
         memory: Optional["MemoryModule"] = None,
+        spec_only: bool = False,
     ) -> AnalysisResult:
         """Analyze the current conversation state.
 
         Dispatches to v6 (two-query) or single-query based on prompt_version.
+        If spec_only=True, only runs Query 1 (task spec) and skips Query 2.
         """
         if self.prompt_version in ("v6", "v7", "v8"):
-            return await self._analyze_v6(trace, model_client, memory)
+            return await self._analyze_v6(trace, model_client, memory, spec_only=spec_only)
         if self.prompt_version == "v8_soft":
             return await self._analyze_v8_soft(trace, model_client, memory)
         if self.prompt_version == "v8_single":

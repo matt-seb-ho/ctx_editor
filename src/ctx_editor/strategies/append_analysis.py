@@ -55,6 +55,7 @@ class AppendAnalysisStrategy(BaseStrategy):
         min_turns: int = 3,
         use_memory: bool = False,
         memory_target: str = "analyzer",
+        spec_only: bool = False,
     ):
         self.analyzer = ConversationAnalyzer(
             model=analyzer_model,
@@ -68,6 +69,8 @@ class AppendAnalysisStrategy(BaseStrategy):
         self.min_turns = min_turns if isinstance(min_turns, int) else 3
         self.use_memory = use_memory
         self.memory_target = memory_target
+        # spec_only: only append the task spec, skip aligned/issues (and Query 2)
+        self.spec_only = spec_only
 
     def _is_analysis_addendum_added(self, trace: "ConversationTrace") -> bool:
         return any(log["type"] == "analysis_addendum_added" for log in trace.logs)
@@ -104,7 +107,9 @@ class AppendAnalysisStrategy(BaseStrategy):
 
         # Generate analysis — pass memory only if targeting analyzer
         analysis_memory = memory if (self.use_memory and self.memory_target == "analyzer") else None
-        result = await self.analyzer.analyze(trace, model_client, memory=analysis_memory)
+        result = await self.analyzer.analyze(
+            trace, model_client, memory=analysis_memory, spec_only=self.spec_only,
+        )
 
         trace.add_log(
             "conversation_analysis",
@@ -121,10 +126,11 @@ class AppendAnalysisStrategy(BaseStrategy):
         parts = [ANALYSIS_PREAMBLE]
         if result.user_intent:
             parts.append(f"# User Task Specification (So Far)\n{result.user_intent}")
-        if result.aligned:
-            parts.append(f"# What Looks Right So Far\n{result.aligned}")
-        if result.issues and result.needs_edit:
-            parts.append(f"# What Needs to Change\n{result.issues}")
+        if not self.spec_only:
+            if result.aligned:
+                parts.append(f"# What Looks Right So Far\n{result.aligned}")
+            if result.issues and result.needs_edit:
+                parts.append(f"# What Needs to Change\n{result.issues}")
         analysis_text = "\n\n".join(parts)
 
         # Insert analysis as a separate message before the last user message
