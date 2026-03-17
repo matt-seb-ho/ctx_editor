@@ -142,6 +142,11 @@ class ConversationAnalyzer:
         if prompt_version in ("v6", "v7", "v8"):
             self._task_spec_template = _load_prompt(f"analyzer_{prompt_version}_task_spec")
             self._compare_template = _load_prompt(f"analyzer_{prompt_version}_compare")
+        elif prompt_version == "v8_soft":
+            # Soft attention ablation: two queries, but Query 1 sees full conversation
+            # (user + assistant messages) instead of user messages only.
+            self._task_spec_template = _load_prompt("analyzer_v8_soft_spec")
+            self._compare_template = _load_prompt("analyzer_v8_compare")
         elif prompt_version == "v8_single":
             # Single-query ablation: combined task spec + comparison in one prompt.
             # Tests whether the two-query "hard attention" separation matters.
@@ -242,6 +247,75 @@ class ConversationAnalyzer:
             aligned=aligned,
             issues=issues,
             raw_output=f"--- TASK SPEC ---\n{spec_output}\n\n--- COMPARISON ---\n{compare_output}",
+        )
+
+    # --- v8_soft: two-query, but Query 1 sees full conversation ---
+
+    async def _analyze_v8_soft(
+        self,
+        trace: "ConversationTrace",
+        model_client: "ModelClient",
+        memory: Optional["MemoryModule"] = None,
+    ) -> AnalysisResult:
+        """Two-query analysis WITHOUT hard attention separation.
+
+        Same as _analyze_v6 except Query 1 sees the full conversation
+        (user + assistant messages) instead of user messages only.
+        Isolates the effect of hiding assistant messages from the spec query.
+        """
+        system_message_str = trace.system_message.content if trace.system_message else ""
+        conversation_str = trace.get_conversation_string(skip_system=False)
+        conversation_str = self._strip_edit_notes(conversation_str)
+
+        # Query 1: Build task spec from FULL conversation (soft attention)
+        spec_prompt = self._task_spec_template.format_map(
+            defaultdict(str, {
+                "conversation": conversation_str,
+                "system_message": system_message_str,
+            })
+        )
+        spec_output = await self._generate(spec_prompt, model_client)
+
+        task_spec = self._extract_tag(spec_output, "task_spec")
+        if not task_spec:
+            logger.warning(
+                "v8_soft task spec extraction: <task_spec> tag not found, using raw output. "
+                f"Output preview: {spec_output[:150]!r}"
+            )
+            task_spec = spec_output.strip()
+
+        # Query 2: Compare task spec against full conversation (same as v6/v8)
+        memory_section = ""
+        if memory and memory.content:
+            memory_section = MEMORY_SECTION_TEMPLATE.format(memory_content=memory.content)
+
+        compare_prompt = self._compare_template.format_map(
+            defaultdict(
+                str,
+                {
+                    "task_spec": task_spec,
+                    "conversation": conversation_str,
+                    "memory_section": memory_section,
+                },
+            )
+        )
+        compare_output = await self._generate(compare_prompt, model_client)
+
+        aligned = self._extract_tag(compare_output, "aligned")
+        issues = self._extract_tag(compare_output, "issues")
+
+        if not aligned and not issues:
+            logger.warning(
+                "v8_soft comparison extraction: <aligned>/<issues> tags not found, "
+                f"trying section-header fallback. Output preview: {compare_output[:150]!r}"
+            )
+            aligned, issues = self._parse_numbered_comparison(compare_output)
+
+        return AnalysisResult(
+            user_intent=task_spec,
+            aligned=aligned,
+            issues=issues,
+            raw_output=f"--- TASK SPEC (soft) ---\n{spec_output}\n\n--- COMPARISON ---\n{compare_output}",
         )
 
     # --- v8_single: single-query ablation ---
@@ -347,6 +421,8 @@ class ConversationAnalyzer:
         """
         if self.prompt_version in ("v6", "v7", "v8"):
             return await self._analyze_v6(trace, model_client, memory)
+        if self.prompt_version == "v8_soft":
+            return await self._analyze_v8_soft(trace, model_client, memory)
         if self.prompt_version == "v8_single":
             return await self._analyze_v8_single(trace, model_client, memory)
         return await self._analyze_single(trace, model_client, memory)
