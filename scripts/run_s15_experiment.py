@@ -1,22 +1,29 @@
 #!/usr/bin/env python3
-"""S1.5 experiment: Always reset context using S1's pre-computed analysis.
+"""S1.5 / S3 experiment: Reset context using S1's pre-computed analysis.
 
-Takes S1 output traces (which contain conversation_analysis logs), builds
-compacted context (like S2 does on reset), and replays the final assistant
-turn on this clean context. Tests whether removing bad context helps
-beyond what S1's appended analysis already provides.
+S1.5: Programmatic compaction — templates analysis fields into compacted context.
+S3:   LLM compaction — an LLM reads the full conversation + analysis and writes
+      optimized compacted context.
+
+Both modes take S1 output traces (which contain conversation_analysis logs),
+build compacted context, and replay the final assistant turn.
 
 Usage:
+    # S1.5 (programmatic compaction)
     python scripts/run_s15_experiment.py \
         --s1-dir outputs/2026-03-16/20-08-42 \
-        --task math \
-        --model gpt-5-mini \
-        --label S15_nomem_math
+        --task math --model gpt-5-mini --label S15_nomem_math
+
+    # S3 (LLM compaction)
+    python scripts/run_s15_experiment.py --mode s3 \
+        --s1-dir outputs/2026-03-17/03-02-33 \
+        --task math --model gpt-5-mini --label S3_single_math
 """
 
 import argparse
 import asyncio
 import json
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -31,6 +38,10 @@ from ctx_editor.utils.logging import setup_logging, get_logger
 
 
 logger = get_logger("s15_experiment")
+
+_COMPACTION_PROMPT_PATH = (
+    Path(__file__).parent.parent / "src" / "ctx_editor" / "strategies" / "prompts" / "context_compaction.txt"
+)
 
 
 def load_s1_traces(s1_dir: str) -> list[dict]:
@@ -168,6 +179,82 @@ def build_compacted_messages(
     return messages
 
 
+def get_conversation_string(trace_data: dict) -> str:
+    """Reconstruct the full conversation as a formatted string from trace messages."""
+    messages = trace_data.get("trace", {}).get("messages", [])
+    parts = []
+    for msg in messages:
+        if not msg.get("visible", True):
+            continue
+        role = msg.get("role", "unknown")
+        content = msg.get("content", "")
+        parts.append(f"[{role}] {content}")
+    return "\n\n".join(parts)
+
+
+async def build_compacted_messages_s3(
+    system_message: str,
+    analysis: dict,
+    last_user_message: str,
+    conversation: str,
+    model_client,
+    model: str,
+) -> list[dict]:
+    """Build compacted context via LLM compaction (S3).
+
+    An LLM reads the full conversation + analysis output and writes
+    optimized compacted context, controlling task spec presentation.
+    """
+    prompt_template = _COMPACTION_PROMPT_PATH.read_text()
+    prompt = prompt_template.format(
+        conversation=conversation,
+        analysis_user_intent=analysis.get("user_intent", ""),
+        analysis_aligned=analysis.get("aligned", ""),
+        analysis_issues=analysis.get("issues", ""),
+    )
+
+    response = await model_client.generate(
+        messages=[{"role": "user", "content": prompt}],
+        model=model,
+        temperature=0.0,
+        timeout=60,
+    )
+    compaction_output = response.content
+
+    # Parse tagged sections
+    task_spec_match = re.search(r"<task_spec>(.*?)</task_spec>", compaction_output, re.DOTALL)
+    work_match = re.search(r"<work_so_far>(.*?)</work_so_far>", compaction_output, re.DOTALL)
+
+    task_spec = task_spec_match.group(1).strip() if task_spec_match else ""
+    work_so_far = work_match.group(1).strip() if work_match else ""
+
+    if not task_spec:
+        logger.warning("S3 compaction: <task_spec> tag not found, falling back to raw output")
+        task_spec = compaction_output.strip()
+
+    # Build messages in same format as S1.5
+    messages = []
+    if system_message:
+        messages.append({"role": "system", "content": system_message})
+
+    compact_parts = [
+        "The conversation history has been compacted. Below is a summary of the "
+        "user's full specification and the work completed so far that is consistent "
+        "with it.",
+        f"# User Task Specification (So Far)\n{task_spec}",
+    ]
+    if work_so_far and work_so_far.lower() != "none":
+        compact_parts.append(f"# What Looks Right So Far\n{work_so_far}")
+
+    messages.append({"role": "user", "content": "\n\n".join(compact_parts)})
+
+    if last_user_message:
+        messages.append({"role": "assistant", "content": "I'll work on this now based on the updated specification."})
+        messages.append({"role": "user", "content": last_user_message})
+
+    return messages, compaction_output
+
+
 async def run_experiment(
     s1_dir: str,
     task_filter: str,
@@ -175,8 +262,9 @@ async def run_experiment(
     label: str,
     max_concurrent: int = 8,
     sanitize: bool = False,
+    mode: str = "s15",
 ):
-    """Run S1.5 experiment on S1 traces."""
+    """Run S1.5 or S3 experiment on S1 traces."""
     # Load traces
     traces = load_s1_traces(s1_dir)
     if task_filter:
@@ -188,11 +276,11 @@ async def run_experiment(
     timestamp = datetime.now().strftime("%Y-%m-%d/%H-%M-%S")
     output_dir = Path(f"outputs/{timestamp}")
     output_dir.mkdir(parents=True, exist_ok=True)
-    traces_out_dir = output_dir / "traces" / task_filter / "s15"
+    traces_out_dir = output_dir / "traces" / task_filter / mode
     traces_out_dir.mkdir(parents=True, exist_ok=True)
 
     setup_logging(str(output_dir), level=20)
-    logger.info(f"S1.5 experiment: {label}")
+    logger.info(f"{mode.upper()} experiment: {label}")
     logger.info(f"Output directory: {output_dir}")
 
     model_client = get_model_client(model)
@@ -270,7 +358,15 @@ async def run_experiment(
             # Build compacted context
             system_msg = get_system_message(trace_data)
             last_user_msg = get_last_user_message(trace_data)
-            messages = build_compacted_messages(system_msg, analysis, last_user_msg)
+            compaction_output = None
+
+            if mode == "s3":
+                conversation = get_conversation_string(trace_data)
+                messages, compaction_output = await build_compacted_messages_s3(
+                    system_msg, analysis, last_user_msg, conversation, model_client, model,
+                )
+            else:
+                messages = build_compacted_messages(system_msg, analysis, last_user_msg)
 
             # Generate assistant response
             try:
@@ -325,6 +421,7 @@ async def run_experiment(
             result = {
                 "sample_id": sample_id,
                 "task_name": task_name,
+                "mode": mode,
                 "is_correct": is_correct,
                 "score": score,
                 "extracted_answer": str(extracted) if extracted else "",
@@ -337,6 +434,8 @@ async def run_experiment(
                 },
                 "messages_sent": messages,
             }
+            if compaction_output:
+                result["compaction_output"] = compaction_output
 
             trace_file = traces_out_dir / f"{sample_id.replace('/', '_')}.json"
             with open(trace_file, "w") as f:
@@ -366,6 +465,7 @@ async def run_experiment(
     # Save summary
     summary = {
         "label": label,
+        "mode": mode,
         "s1_source": s1_dir,
         "task": task_filter,
         "model": model,
@@ -380,7 +480,7 @@ async def run_experiment(
         json.dump(summary, f, indent=2)
 
     print(f"\n{'='*60}")
-    print(f"S1.5 EXPERIMENT: {label}")
+    print(f"{mode.upper()} EXPERIMENT: {label}")
     print(f"{'='*60}")
     print(f"Source: {s1_dir}")
     print(f"Results: {correct}/{total} ({accuracy:.2%}){skip_note}{error_note}")
@@ -391,12 +491,16 @@ async def run_experiment(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="S1.5 experiment: always-reset with S1 analysis")
+    parser = argparse.ArgumentParser(description="S1.5/S3 experiment: reset context with S1 analysis")
     parser.add_argument("--s1-dir", required=True, help="S1 output directory with traces")
     parser.add_argument("--task", required=True, help="Task filter (math, code, database, actions)")
     parser.add_argument("--model", default="gpt-5-mini", help="Model for assistant generation")
     parser.add_argument("--label", default="s15", help="Experiment label")
     parser.add_argument("--max-concurrent", type=int, default=8)
+    parser.add_argument(
+        "--mode", choices=["s15", "s3"], default="s15",
+        help="Compaction mode: s15 (programmatic) or s3 (LLM-based)",
+    )
     parser.add_argument(
         "--sanitize", action="store_true",
         help="Sanitize analysis to remove clarification-seeking patterns before context building",
@@ -410,6 +514,7 @@ def main():
         label=args.label,
         max_concurrent=args.max_concurrent,
         sanitize=args.sanitize,
+        mode=args.mode,
     ))
 
 
