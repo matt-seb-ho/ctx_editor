@@ -56,6 +56,7 @@ class AppendAnalysisStrategy(BaseStrategy):
         use_memory: bool = False,
         memory_target: str = "analyzer",
         memory_target_query: str = "compare",
+        enforce_compliance: bool = False,
         spec_only: bool = False,
     ):
         self.analyzer = ConversationAnalyzer(
@@ -72,6 +73,8 @@ class AppendAnalysisStrategy(BaseStrategy):
         self.memory_target = memory_target
         # Which query receives memory: "compare" (default), "spec", or "both"
         self.memory_target_query = memory_target_query
+        # Append compliance rules to Query 2 to prevent clarification-seeking
+        self.enforce_compliance = enforce_compliance
         # spec_only: only append the task spec, skip aligned/issues (and Query 2)
         self.spec_only = spec_only
 
@@ -113,6 +116,7 @@ class AppendAnalysisStrategy(BaseStrategy):
         result = await self.analyzer.analyze(
             trace, model_client, memory=analysis_memory, spec_only=self.spec_only,
             memory_target_query=self.memory_target_query,
+            enforce_compliance=self.enforce_compliance,
         )
 
         trace.add_log(

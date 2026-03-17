@@ -42,6 +42,22 @@ will apply.
 </cheatsheet>
 """
 
+# Compliance rules appended after the memory section to reinforce key constraints.
+# These address observed anti-patterns where the analyzer contradicts its own cheatsheet.
+COMPLIANCE_RULES = """\
+<compliance_rules>
+Critical rules for your analysis output — violations of these will degrade downstream quality:
+1. NEVER suggest or recommend that the assistant ask the user for clarification, confirmation, \
+or disambiguation. The user cannot be asked questions in this environment. If there are \
+ambiguities, apply deterministic defaults and document them as "assumed."
+2. The user_intent/task_spec must contain ONLY requirements explicitly stated by the user. \
+Do not add columns, fields, or deliverables that the user did not request. A filtering \
+condition (e.g., "with 2+ treatments") is NOT a projection requirement.
+3. In <issues>, describe WHAT is wrong and the minimal fix. Do not prescribe specific \
+implementation patterns (e.g., specific SQL forms) — let the assistant choose HOW to fix it.
+</compliance_rules>
+"""
+
 # Trivial issues content that means "no edit needed"
 _NO_ISSUES_PATTERNS = re.compile(
     r"^(none\.?|no issues\.?|nothing\.?|n/a\.?|no problems\.?|no concerns\.?)$",
@@ -180,6 +196,7 @@ class ConversationAnalyzer:
         memory: Optional["MemoryModule"] = None,
         spec_only: bool = False,
         memory_target_query: str = "compare",
+        enforce_compliance: bool = False,
     ) -> AnalysisResult:
         """Two-query analysis with hard attention separation.
 
@@ -192,6 +209,9 @@ class ConversationAnalyzer:
           "compare" (default) — Query 2 only (original behavior)
           "spec" — Query 1 only
           "both" — both queries
+
+        enforce_compliance: if True, append compliance rules after memory section
+          in Query 2 to prevent clarification-seeking and over-specification.
         """
         # Include ALL user messages across resets (deduplicated) so the task spec
         # query always builds from the complete set of user information.
@@ -238,6 +258,8 @@ class ConversationAnalyzer:
         memory_section = ""
         if memory and memory.content and memory_target_query in ("compare", "both"):
             memory_section = MEMORY_SECTION_TEMPLATE.format(memory_content=memory.content)
+        if enforce_compliance:
+            memory_section += "\n" + COMPLIANCE_RULES
 
         compare_prompt = self._compare_template.format_map(
             defaultdict(
@@ -442,17 +464,20 @@ class ConversationAnalyzer:
         memory: Optional["MemoryModule"] = None,
         spec_only: bool = False,
         memory_target_query: str = "compare",
+        enforce_compliance: bool = False,
     ) -> AnalysisResult:
         """Analyze the current conversation state.
 
         Dispatches to v6 (two-query) or single-query based on prompt_version.
         If spec_only=True, only runs Query 1 (task spec) and skips Query 2.
         memory_target_query: "compare" (default), "spec", or "both".
+        enforce_compliance: if True, append compliance rules to Query 2 prompt.
         """
         if self.prompt_version in ("v6", "v7", "v8"):
             return await self._analyze_v6(
                 trace, model_client, memory, spec_only=spec_only,
                 memory_target_query=memory_target_query,
+                enforce_compliance=enforce_compliance,
             )
         if self.prompt_version == "v8_soft":
             return await self._analyze_v8_soft(trace, model_client, memory)

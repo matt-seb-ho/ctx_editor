@@ -70,6 +70,63 @@ def get_last_user_message(trace_data: dict) -> str:
     return ""
 
 
+def sanitize_analysis(analysis: dict) -> dict:
+    """Remove clarification-seeking and over-specification patterns from analysis.
+
+    Targets the three anti-patterns identified in memory error analysis:
+    1. Clarification-seeking leakage ("ask the user", "if unclear", "open questions")
+    2. Invitation to not answer ("do not assume answers", "before producing")
+    3. Over-hedging ("if anything above is unclear")
+
+    Returns a new dict with sanitized user_intent and issues.
+    """
+    import re
+
+    # Patterns that invite clarification-seeking behavior
+    CLARIFICATION_PATTERNS = [
+        # Direct invitations to ask
+        re.compile(
+            r"[^.]*(?:ask the user|ask (?:the )?user|ask before|"
+            r"clarif(?:y|ication)|if (?:anything )?(?:above )?is unclear|"
+            r"open question|do not assume answer|"
+            r"needed from the user|check with the user)[^.]*\.?\s*",
+            re.IGNORECASE,
+        ),
+        # Bullet points / list items that invite clarification
+        re.compile(
+            r"^[ \t]*[-•*]\s*[^\n]*(?:ask the user|clarif|if unclear|"
+            r"open question|needed from the user|do not assume)[^\n]*\n?",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+        # Numbered items that invite clarification
+        re.compile(
+            r"^[ \t]*\d+[\.\)]\s*[^\n]*(?:ask the user|clarif|if unclear|"
+            r"open question|needed from the user|do not assume)[^\n]*\n?",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+        # Sections headers about open questions
+        re.compile(
+            r"^#+\s*(?:open question|clarification|ambiguit)[^\n]*\n(?:[^\n#]+\n)*",
+            re.IGNORECASE | re.MULTILINE,
+        ),
+    ]
+
+    def _sanitize_text(text: str) -> str:
+        if not text:
+            return text
+        result = text
+        for pattern in CLARIFICATION_PATTERNS:
+            result = pattern.sub("", result)
+        # Clean up double blank lines left by removals
+        result = re.sub(r"\n{3,}", "\n\n", result)
+        return result.strip()
+
+    sanitized = dict(analysis)
+    sanitized["user_intent"] = _sanitize_text(analysis.get("user_intent", ""))
+    sanitized["issues"] = _sanitize_text(analysis.get("issues", ""))
+    return sanitized
+
+
 def build_compacted_messages(
     system_message: str,
     analysis: dict,
@@ -117,6 +174,7 @@ async def run_experiment(
     model: str,
     label: str,
     max_concurrent: int = 8,
+    sanitize: bool = False,
 ):
     """Run S1.5 experiment on S1 traces."""
     # Load traces
@@ -204,6 +262,10 @@ async def run_experiment(
                     "score": 0.0,
                     "error": "no_analysis",
                 }
+
+            # Optionally sanitize analysis to remove clarification-seeking patterns
+            if sanitize:
+                analysis = sanitize_analysis(analysis)
 
             # Build compacted context
             system_msg = get_system_message(trace_data)
@@ -335,6 +397,10 @@ def main():
     parser.add_argument("--model", default="gpt-5-mini", help="Model for assistant generation")
     parser.add_argument("--label", default="s15", help="Experiment label")
     parser.add_argument("--max-concurrent", type=int, default=8)
+    parser.add_argument(
+        "--sanitize", action="store_true",
+        help="Sanitize analysis to remove clarification-seeking patterns before context building",
+    )
 
     args = parser.parse_args()
     asyncio.run(run_experiment(
@@ -343,6 +409,7 @@ def main():
         model=args.model,
         label=args.label,
         max_concurrent=args.max_concurrent,
+        sanitize=args.sanitize,
     ))
 
 
