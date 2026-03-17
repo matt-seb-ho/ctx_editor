@@ -140,20 +140,39 @@ async def run_experiment(
     model_client = get_model_client(model)
     semaphore = asyncio.Semaphore(max_concurrent)
 
-    # Load task evaluators
-    evaluators = {}
+    # Load ground truth from data files
+    from ctx_editor.identify_false_negatives import load_task_metadata
+    task_metadata = load_task_metadata()
+
+    # Load task evaluator and original samples
+    evaluator = None
+    original_samples = {}
     if task_filter == "math":
         from lic.tasks.math.task_math_v2 import TaskMathV2
-        evaluators["math"] = TaskMathV2()
+        evaluator = TaskMathV2()
     elif task_filter == "code":
         from lic.tasks.code.task_code_v2 import TaskCodeV2
-        evaluators["code"] = TaskCodeV2()
+        evaluator = TaskCodeV2()
     elif task_filter == "database":
         from lic.tasks.database.task_database_v2 import TaskDatabaseV2
-        evaluators["database"] = TaskDatabaseV2()
+        evaluator = TaskDatabaseV2()
     elif task_filter == "actions":
         from lic.tasks.actions.task_actions import TaskActions
-        evaluators["actions"] = TaskActions()
+        evaluator = TaskActions()
+
+    # Load original samples from dev subset data files
+    dev_data_files = {
+        "math": "data/dev_math_subset.json",
+        "code": "data/dev_code_subset.json",
+        "database": "data/dev_database_subset.json",
+        "actions": "data/dev_actions_subset.json",
+    }
+    data_file = dev_data_files.get(task_filter)
+    if data_file and Path(data_file).exists():
+        with open(data_file) as f:
+            for sample in json.load(f):
+                original_samples[sample.get("task_id", "")] = sample
+        logger.info(f"Loaded {len(original_samples)} original samples from {data_file}")
 
     results = []
 
@@ -211,18 +230,29 @@ async def run_experiment(
                 }
 
             # Evaluate
-            evaluator = evaluators.get(task_name)
             if evaluator:
-                ground_truth = trace_data.get("metadata", {}).get("ground_truth_a", "")
-                if not ground_truth:
-                    # Try to get from the original trace evaluation
-                    for log in trace_data.get("trace", {}).get("logs", []):
-                        if log.get("type") == "answer_evaluation":
-                            ground_truth = log.get("data", {}).get("ground_truth", "")
-                            break
-
-                extracted = evaluator.extract_answer(assistant_response)
-                is_correct = evaluator.evaluate(extracted, ground_truth) if extracted and ground_truth else False
+                orig_sample = original_samples.get(sample_id, {})
+                if task_name == "actions":
+                    # Actions: evaluator_function takes raw response + sample
+                    if orig_sample:
+                        eval_result = evaluator.evaluator_function(assistant_response, orig_sample)
+                        is_correct = eval_result.get("is_correct", False)
+                    else:
+                        is_correct = False
+                    extracted = assistant_response[:200]
+                else:
+                    # Math/code/database: extract_answer + evaluator_function
+                    extracted = evaluator.extract_answer(assistant_response)
+                    if extracted and orig_sample:
+                        eval_result = evaluator.evaluator_function(extracted, orig_sample)
+                        if isinstance(eval_result, bool):
+                            is_correct = eval_result
+                        elif isinstance(eval_result, dict):
+                            is_correct = eval_result.get("is_correct", eval_result.get("score", 0) >= 1.0)
+                        else:
+                            is_correct = False
+                    else:
+                        is_correct = False
                 score = 1.0 if is_correct else 0.0
             else:
                 is_correct = False
