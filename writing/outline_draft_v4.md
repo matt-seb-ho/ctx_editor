@@ -4,7 +4,7 @@
 
 ## Abstract
 
-Large language models suffer systematic performance degradation in multi-turn conversations: when task specifications are revealed incrementally, models overcommit to early incorrect assumptions and cannot self-correct because flawed reasoning persists in context. We term this *context contamination* and show it operates through two mechanisms: (1) user intent becomes fragmented across turns, and (2) the assistant's prior incorrect reasoning anchors future generation. We introduce an *executive function* framework that addresses both: an LLM-as-analyzer extracts a clean task specification from user messages alone (addressing intent fragmentation) and identifies correct versus harmful content in the assistant's responses (addressing reasoning contamination). A key architectural insight is *hard attention*: the analyzer must be physically prevented from seeing the assistant's prior responses when extracting user intent, because even an external analyzer model is susceptible to the same anchoring it is trying to correct. On the Lost in Conversation benchmark, our methods improve accuracy from 60% to 90% on math, 16% to 72% on code, 4% to 44% on database, and 9% to 30% on actions. Ablation studies confirm that hard attention is load-bearing (removing it collapses gains to zero) and that context removal provides additional benefit beyond analysis alone, particularly on multi-output tasks.
+Large language models suffer systematic performance degradation in multi-turn conversations: when task specifications are revealed incrementally, models overcommit to early incorrect assumptions and cannot self-correct because flawed reasoning persists in context. We term this *context contamination* and show it operates through two mechanisms: (1) user intent becomes fragmented across turns, and (2) the assistant's prior incorrect reasoning anchors future generation. We introduce an *executive function* framework that addresses both: an LLM-as-analyzer extracts a clean task specification from user messages alone (addressing intent fragmentation) and identifies correct versus harmful content in the assistant's responses (addressing reasoning contamination). A key finding is that executive dysfunction is pervasive: even an external analyzer model is susceptible to the same anchoring when exposed to assistant messages, so the data flow must be designed to physically exclude them during intent extraction. On the Lost in Conversation benchmark, our methods improve accuracy from 60% to 90% on math, 16% to 72% on code, 4% to 44% on database, and 9% to 30% on actions. Ablation studies confirm that shielding the analyzer from assistant messages is load-bearing (removing it collapses gains to zero) and that context removal provides additional benefit beyond analysis alone, particularly on multi-output tasks.
 
 ---
 
@@ -20,7 +20,7 @@ We identify two distinct mechanisms driving context contamination:
 
 These two problems require different solutions. Intent fragmentation is addressed by *task specification reconstruction*: an independent extraction of what the user wants from their messages alone, free from the assistant's interpretive lens. Reasoning contamination is addressed by *context editing*: surgically removing harmful content while preserving correct progress.
 
-Both solutions depend on a shared architectural principle we call *hard attention*: physically excluding the assistant's prior responses from the analysis stage that extracts user intent. We show that this separation is load-bearing — without it, even an external analyzer model falls prey to the same anchoring phenomenon, producing analysis that reflects the assistant's errors rather than correcting them.
+Both solutions require designing the data flow around executive dysfunction: the analyzer model itself cannot reliably ignore assistant messages even when instructed to, so we physically exclude them from the stage that extracts user intent. We show that this separation is load-bearing — without it, even an external analyzer model falls prey to the same anchoring phenomenon, producing analysis that reflects the assistant's errors rather than correcting them.
 
 [Executive function framing: monitoring, inhibition, flexible updating, meta-cognition. Same structure as v3 but updated with two-problem language.]
 
@@ -40,13 +40,13 @@ Both solutions depend on a shared architectural principle we call *hard attentio
 
 ### 3.2 Conversation Analyzer: Two-Query Architecture
 
-The analyzer is the core component, shared by all intervention strategies. It uses a two-query architecture that enforces hard attention separation.
+The analyzer is the core component, shared by all intervention strategies. It uses a two-query design that accommodates executive dysfunction by controlling what the model sees at each step.
 
 **Query 1 (Task Specification).** Sees the system message and all user messages. No assistant responses. Produces a consolidated task specification — a clean restatement of what the user is asking for. The system message grounds the specification in the correct output format (e.g., SQL against a specific schema, function calls with specific signatures), preventing over-elaboration.
 
 **Query 2 (Comparison).** Sees the task specification from Query 1 plus the full conversation history, and optionally a memory cheatsheet. Produces an assessment of what the assistant got right (`aligned`) and what contradicts the specification (`issues`).
 
-The critical design choice is that Query 1 never sees assistant messages. This enforces a clean separation: user intent is extracted without contamination, then used as an independent reference point to evaluate the full conversation. We show in Section 5.2 that relaxing this separation collapses the system's effectiveness.
+The reason for splitting the analysis into two queries is that the model cannot reliably extract user intent when assistant messages are present — it anchors on the assistant's framing even when instructed to focus on user messages. By physically excluding assistant messages from Query 1, we design around this limitation rather than attempting to prompt through it. We show in Section 5.2 that including assistant messages in Query 1 collapses the system's effectiveness to baseline or worse.
 
 ### 3.3 Context Strategies
 
@@ -113,7 +113,18 @@ The sharded disclosure format occasionally produces user messages that distort t
 
 ### 5.1 Main Results
 
-**Table 1: Accuracy across tasks and intervention strategies (replay-last-turn, v8 prompts)**
+We present the main results in two parts: the effect of intervention strategy (Table 1), and the effect of adding memory (Table 2).
+
+**Table 1: Effect of intervention strategy (no memory)**
+
+| Strategy | Math | Code | Database | Actions |
+|----------|:----:|:----:|:--------:|:-------:|
+| Baseline | 60% | 16% | 4% | 9% |
+| Append Analysis | 80% | 56% | 32% | 22% |
+| Context Edit | 80% | 69% | 40% | **30%** |
+| Gated Context Edit | 75% | **72%** | **44%** | 13% |
+
+**Table 2: Effect of adding memory**
 
 | Strategy | Math | Code | Database | Actions |
 |----------|:----:|:----:|:--------:|:-------:|
@@ -121,78 +132,79 @@ The sharded disclosure format occasionally produces user messages that distort t
 | Baseline + Memory | 55% | 21% | 4% | 9% |
 | Append Analysis | 80% | 56% | 32% | 22% |
 | Append Analysis + Memory | **90%** | **68%** | **44%** | 9% |
-| Always-Reset | 80% | 69% | 40% | **30%** |
-| Always-Reset + Memory | 85% | 68% | **44%** | **30%** |
-| Gated Reset | 75% | 72% | **44%** | 13% |
+| Context Edit | 80% | 69% | 40% | 30% |
+| Context Edit + Memory | 85% | 68% | **44%** | **30%** |
 
-Note: Code Append Analysis and Gated Reset had 1 timeout error each; Always-Reset had 9 timeout errors reducing its effective sample size. See Appendix for per-condition sample counts.
+Note: Some conditions had timeout errors reducing effective sample sizes. See Appendix B for per-condition sample counts.
 
-#### The task specification is the primary mechanism
+#### Analysis alone captures the majority of gains (Table 1)
 
-The largest jump is from Baseline to Append Analysis: +20pp on math, +40pp on code, +28pp on database, +13pp on actions. This gain comes primarily from the task specification — a clean, consolidated restatement of user intent extracted from user messages alone. Further evidence comes from the spec-only ablation (Section 5.2), which shows the task specification alone captures most of the improvement.
+The largest jump is from Baseline to Append Analysis: +20pp on math, +40pp on code, +28pp on database, +13pp on actions. This gain comes primarily from the task specification — a clean, consolidated restatement of user intent extracted from user messages alone, without the assistant's prior responses. Further evidence comes from the spec-only ablation (Section 5.2), which shows the task specification alone captures most of the improvement.
 
-#### Context removal provides additional benefit
+#### Context editing provides additional benefit on complex tasks (Table 1)
 
-Always-Reset outperforms Append Analysis on database (+8pp), actions (+8pp), and code (+13pp). Both strategies use identical analysis; the only difference is whether the assistant sees the full conversation history or a compacted version. The improvement demonstrates that reasoning contamination — the assistant anchoring on its prior incorrect responses — is a real and measurable problem beyond intent fragmentation.
+Context Edit outperforms Append Analysis on database (+8pp), actions (+8pp), and code (+13pp). Both strategies use identical analysis; the only difference is whether the assistant sees the full conversation history or a compacted version. The improvement demonstrates that reasoning contamination — the assistant anchoring on its prior incorrect responses — is a real and measurable problem beyond intent fragmentation.
 
 The gap is largest on actions, the most structurally complex task (requiring multiple simultaneous function calls). This suggests context removal matters most when the assistant must coordinate multiple outputs, where prior partial/incorrect attempts create stronger anchoring.
 
-#### Memory amplifies analysis quality
+#### Gated Context Edit is unreliable
+
+Gated Context Edit adds a decision step: only edit when the analyzer detects issues, otherwise pass the conversation through unchanged. This is worse than always editing on math (-5pp) and actions (-17pp). The gate's false negatives are costly: when the analyzer decides no edit is needed but the assistant is actually wrong, the assistant receives no corrective signal at all. Always editing avoids this by consistently providing the clean task specification.
+
+#### Memory amplifies analysis quality (Table 2)
 
 Append Analysis + Memory is the strongest overall configuration, achieving the best results on math (90%), code (68%), and database (44%). Sample-level comparison shows +8 new correct answers and zero regressions across these three tasks. Memory helps the analyzer produce more decisive task specifications and more concrete error identification.
 
-Memory cannot overcome structural barriers: on actions, where the primary failure mode is the user simulator revealing function calls one at a time (an accumulation problem, not an analysis problem), memory provides no benefit.
+On single-output tasks, memory closes the gap between Append Analysis and Context Edit: Append Analysis + Memory matches or exceeds Context Edit on math (90% vs 80%), code (68% vs 69%), and database (44% vs 40%). This suggests that for tasks where rederivation is cheap, better analysis quality can substitute for context removal.
 
-#### Gated Reset underperforms Always-Reset
+Memory cannot overcome structural barriers: on actions, where the primary failure mode is the user simulator revealing function calls one at a time (an accumulation problem, not an analysis problem), memory provides no benefit. Context Edit remains the only strategy that improves on actions beyond the no-memory Append Analysis baseline.
 
-Gated Reset is worse than Always-Reset on math (-5pp) and actions (-17pp). The gate's false negatives are costly: when the analyzer decides no edit is needed but the assistant is actually wrong, the assistant receives no corrective signal at all. Always-Reset avoids this by always providing the clean task specification.
+### 5.2 Ablation: Does the Analyzer Need to Be Shielded from Assistant Messages?
 
-### 5.2 Hard Attention Ablation
+The two-query architecture omits assistant messages from the task specification query. Is this separation necessary, or can the analyzer extract user intent reliably from the full conversation?
 
-The two-query architecture enforces *hard attention*: the task specification query never sees assistant messages. Is this separation necessary?
+We test four configurations varying two axes: (1) whether the task specification query sees only user messages (*assistant-omitted*) or the full conversation (*full-conversation*), and (2) whether the system uses one query (spec only) or two (spec + comparison).
 
-We test four configurations varying two axes: (1) whether the task specification query sees only user messages (hard attention) or the full conversation (soft attention), and (2) whether the system uses one query or two.
-
-**Table 2: Hard attention ablation (Append Analysis, no memory)**
+**Table 3: Analyzer input ablation (Append Analysis, no memory)**
 
 | Configuration | Math | Code | Database |
 |---------------|:----:|:----:|:--------:|
-| Hard attention, spec only (1 query) | 70% | 63% | 40% |
-| Hard attention, full analysis (2 queries) | **80%** | 56% | 32% |
-| Soft attention, combined (1 query) | 55% | 21% | 4% |
-| Soft attention, full analysis (2 queries) | 40% | 11% | 8% |
+| Assistant-omitted, spec only (1 query) | 70% | 63% | 40% |
+| Assistant-omitted, spec + comparison (2 queries) | **80%** | 56% | 32% |
+| Full-conversation, combined (1 query) | 55% | 21% | 4% |
+| Full-conversation, spec + comparison (2 queries) | 40% | 11% | 8% |
 | Baseline (no analysis) | 60% | 16% | 4% |
 
-#### Hard attention is load-bearing
+#### Shielding the analyzer from assistant messages is load-bearing
 
-Removing hard attention collapses the system to baseline or worse. Both soft-attention variants — where the analyzer sees assistant messages when building the task specification — produce analysis that is not just unhelpful but *actively harmful*. The soft two-query variant performs below baseline on math (40% vs 60%) and code (11% vs 16%).
+When the analyzer sees assistant messages during task specification construction, the resulting analysis collapses to baseline or worse. Both full-conversation variants produce analysis that is not just unhelpful but *actively harmful*: the full-conversation two-query variant performs below baseline on math (40% vs 60%) and code (11% vs 16%).
 
-This result extends the anchoring phenomenon documented by Laban et al. (2025). They showed that the conversational assistant cannot un-anchor from its own prior reasoning. We show that even an *external* model tasked with analyzing the conversation is susceptible to the same contamination when it reads the assistant's messages during intent extraction.
+This is evidence that executive dysfunction is pervasive: it extends beyond the conversational assistant to any model processing the conversation. Even an external model explicitly tasked with critical analysis anchors on the assistant's reasoning when exposed to it. The two-query design is not an arbitrary architectural choice — it is the minimal accommodation for a demonstrated cognitive limitation of current LLMs.
 
 #### Contamination amplifies through chained queries
 
-The soft two-query variant (40% math, 11% code) underperforms the soft single-query variant (55% math, 21% code). When Query 1 produces a contaminated task specification and passes it to Query 2 as authoritative ground truth, the contamination compounds. Each pipeline stage inherits and amplifies errors from the prior stage. This contamination amplification is a failure mode specific to chained LLM calls and suggests caution when designing multi-stage inference pipelines.
+The full-conversation two-query variant (40% math, 11% code) underperforms the full-conversation single-query variant (55% math, 21% code). When Query 1 produces a contaminated task specification and passes it to Query 2 as authoritative ground truth, the contamination compounds. Each pipeline stage inherits and amplifies errors from the prior stage. This contamination amplification is a failure mode specific to chained LLM calls and suggests caution when designing multi-stage inference pipelines.
 
 #### The task specification alone is surprisingly effective
 
-The hard-attention spec-only variant (one query, no comparison) matches or exceeds the full two-query system on code (63% vs 56%) and database (40% vs 32%) at half the LLM cost. The comparison query adds value on math (+10pp) but introduces noise on structured-output tasks. This suggests a task-adaptive approach: spec-only for tasks with well-defined output formats, full analysis for tasks requiring nuanced error identification.
+The assistant-omitted spec-only variant (one query, no comparison) matches or exceeds the full two-query system on code (63% vs 56%) and database (40% vs 32%) at half the LLM cost. The comparison query adds value on math (+10pp) but introduces noise on structured-output tasks. This suggests a task-adaptive approach: spec-only for tasks with well-defined output formats, full analysis for tasks requiring nuanced error identification.
 
-### 5.3 Can Context Editing Rescue Contaminated Analysis?
+### 5.3 Ablation: Can Context Editing Rescue Contaminated Analysis?
 
-If the analysis is contaminated (soft attention), can we still extract value by removing the bad conversation context? We test Always-Reset and an LLM-based compaction variant on top of the soft-attention analysis from Section 5.2.
+If the analysis is contaminated (built from the full conversation including assistant messages), can we still extract value by removing the bad conversation context and presenting only the analysis? We test Context Edit and an LLM-based compaction variant on top of the full-conversation analysis from Section 5.2.
 
-**Table 3: Context editing with contaminated analysis**
+**Table 4: Context editing with contaminated vs. clean analysis**
 
 | Strategy | Math | Code | Database |
 |----------|:----:|:----:|:--------:|
 | Baseline | 60% | 16% | 4% |
-| Soft analysis, appended | 55% | 21% | 4% |
-| Soft analysis, always-reset | 55% | 26% | 4% |
-| Soft analysis, LLM compaction | 55% | 22% | 12% |
-| Hard analysis, appended | **80%** | **56%** | **32%** |
-| Hard analysis, always-reset | **80%** | **69%** | **40%** |
+| Full-conversation analysis, appended | 55% | 21% | 4% |
+| Full-conversation analysis, context edit | 55% | 26% | 4% |
+| Full-conversation analysis, LLM compaction | 55% | 22% | 12% |
+| Assistant-omitted analysis, appended | **80%** | **56%** | **32%** |
+| Assistant-omitted analysis, context edit | **80%** | **69%** | **40%** |
 
-Context editing cannot rescue contaminated analysis. The bottleneck is analysis quality, not delivery mechanism. Context editing is a *force multiplier* on analysis quality: with clean analysis it provides +8–13pp over appending; with contaminated analysis it provides nothing. This confirms that hard attention is the foundational architectural requirement, not an optional optimization.
+Context editing cannot rescue contaminated analysis. The bottleneck is analysis quality, not delivery mechanism. Context editing is a *force multiplier* on analysis quality: with clean analysis it provides +8–13pp over appending; with contaminated analysis it provides nothing. This confirms that omitting assistant messages from the analyzer is the foundational architectural requirement, not an optional optimization.
 
 ### 5.4 CollabLLM Setting
 
@@ -212,13 +224,13 @@ Our results reveal that multi-turn performance degradation operates through two 
 
 This decomposition has implications for benchmark design. LiC was constructed around simple, single-answer tasks to isolate the anchoring phenomenon. Our results suggest that more complex benchmarks — requiring multi-step reasoning, iterative artifact construction, or coordination across outputs — would show a larger role for context editing relative to task specification, because rederivation becomes expensive or impossible.
 
-### 6.2 Hard Attention as an Architectural Principle
+### 6.2 Executive Dysfunction Extends to External Analyzers
 
-The hard attention finding is our most practically consequential result. It implies that multi-stage LLM pipelines must carefully control information flow between stages: allowing a downstream model to see content it is supposed to evaluate objectively will contaminate its judgment.
+The assistant-omission finding has implications beyond our specific setting. LiC demonstrated that the conversational assistant cannot un-anchor from its own prior reasoning. We show that this executive dysfunction is not specific to the assistant role — it is a general property of how LLMs process multi-party conversation context. An external model tasked with *analyzing* the conversation exhibits the same anchoring when exposed to the assistant's responses, even when explicitly instructed to focus on user messages.
 
-This has implications beyond our setting. Any system that uses an LLM to evaluate, critique, or improve another LLM's output faces the same risk: the evaluator model will be influenced by the content it evaluates, even when instructed to be critical. Architectural separation — physically controlling what each stage sees — is more reliable than prompting the model to "ignore" certain content.
+This means that multi-stage LLM pipelines cannot rely on prompting to achieve selective attention. Designing the data flow to exclude contaminating content — rather than instructing the model to ignore it — is the reliable approach. Any system that uses an LLM to evaluate, critique, or improve another LLM's output faces this risk.
 
-The limitation of our hard attention approach is that it exploits a property specific to LiC: user messages alone fully specify the task. In realistic multi-turn settings (iterative design, multi-step reasoning, tool-use agents), the task specification may depend on prior assistant work. Extending hard attention to these settings — perhaps through hybrid approaches that separate user-specified constraints from assistant-generated state — is an important direction.
+The limitation of our approach is that it exploits a property specific to LiC: user messages alone fully specify the task. In realistic multi-turn settings (iterative design, multi-step reasoning, tool-use agents), the task specification may depend on prior assistant work. Extending assistant-omission to these settings — perhaps through hybrid approaches that separate user-specified constraints from assistant-generated state — is an important direction.
 
 ### 6.3 The Role of Memory
 
@@ -242,9 +254,9 @@ For Append Analysis, analysis quality matters but imperfect analysis is still us
 
 We present an executive function framework for recovering from context contamination in multi-turn LLM conversations. Our key findings:
 
-1. **Task specification reconstruction is the primary mechanism** for LiC-style benchmarks where rederivation is cheap. A clean, hard-attention extraction of user intent from user messages alone recovers most of the single-turn performance.
+1. **Task specification reconstruction is the primary mechanism** for LiC-style benchmarks where rederivation is cheap. Extracting user intent from user messages alone — without the assistant's prior responses — recovers most of the single-turn performance.
 
-2. **Hard attention is the load-bearing architectural principle.** Without physically separating user intent extraction from the assistant's prior reasoning, even an external analyzer is contaminated by the same anchoring it tries to correct. This is a general caution for multi-stage LLM pipelines.
+2. **Executive dysfunction extends to external analyzers.** Without physically excluding assistant messages from the intent extraction step, even an external analyzer is contaminated by the same anchoring it tries to correct. Designing data flows around this limitation — rather than prompting through it — is essential.
 
 3. **Context removal provides measurable additional benefit,** particularly on complex multi-output tasks. This motivates context editing for settings where tasks are stateful and rederivation is expensive.
 
