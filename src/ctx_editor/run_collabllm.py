@@ -117,9 +117,11 @@ async def run_collabllm_experiment(cfg: DictConfig) -> dict[str, Any]:
 
     # Evaluator config
     eval_model = cfg.model.get("system", {}).get("model", "gpt-4o-mini")
+    eval_method = dataset_info.get("eval_method", "llm_judge")
     evaluator = CollabLLMEvaluator(
         model=eval_model,
         extract_type=extract_type,
+        eval_method=eval_method,
     )
 
     # Simulator factory

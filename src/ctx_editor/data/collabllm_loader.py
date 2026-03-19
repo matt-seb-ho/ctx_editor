@@ -74,6 +74,7 @@ def load_collabllm_bigcodebench(
         task_id = row.get("task_id", f"bigcodebench/{i}")
         # Use instruct_prompt as the problem statement (what CollabLLM uses)
         prompt = row.get("instruct_prompt", "") or row.get("complete_prompt", "")
+        code_prompt = row.get("code_prompt", "")
         solution = row.get("canonical_solution", "")
 
         samples.append(
@@ -82,9 +83,16 @@ def load_collabllm_bigcodebench(
                 "task": "collabllm_code",
                 "task_desc": "coding",
                 "single_turn_prompt": prompt,
-                "single_turn_completion": solution,
+                "single_turn_completion": code_prompt + solution,
                 "single_turn_metadata": {
                     "source": "bigcodebench",
+                    "entry_point": row.get("entry_point", ""),
+                    "test": row.get("test", ""),
+                    "extraction_requirement": (
+                        "Your extraction should be executable code without any "
+                        "the need of processing. You should start with the "
+                        f"following code:\n\n{code_prompt}\n"
+                    ),
                 },
             }
         )
@@ -106,7 +114,8 @@ COLLABLLM_DATASETS = {
     "bigcodebench": {
         "loader": load_collabllm_bigcodebench,
         "task_desc": "coding",
-        "extract_type": "code",
+        "extract_type": "runnable code",
+        "eval_method": "pass_rate",
         "default_split": "v0.1.2",
     },
 }

@@ -133,19 +133,28 @@ async def extract_completion(
     model: str,
     max_tokens: int = 4000,
     max_retries: int = 3,
+    metadata: dict | None = None,
 ) -> str | None:
     """Extract the final answer/document from a multi-turn conversation.
 
     Uses CollabLLM's extraction prompt to pull out the final artifact.
 
+    Args:
+        metadata: Optional sample metadata. If it contains 'extraction_requirement',
+            this is passed to the extraction prompt (used by BigCodeBench to
+            ensure extracted code starts with the required code prefix).
+
     Returns:
         The extracted completion string, or None if extraction fails.
     """
     chat_history = _format_messages_for_prompt(messages)
+    extraction_req = ""
+    if metadata and metadata.get("extraction_requirement"):
+        extraction_req = "Addtional requirement:\n" + metadata["extraction_requirement"]
     prompt = EXTRACT_COMPLETION_PROMPT.format(
         extract_type=extract_type,
         chat_history=chat_history,
-        extraction_requirement="",
+        extraction_requirement=extraction_req,
     )
 
     for attempt in range(max_retries):
@@ -254,6 +263,52 @@ async def judge_interactivity(
     return -1.0, None
 
 
+def judge_pass_rate(
+    completion: str,
+    metadata: dict[str, Any],
+) -> float:
+    """Judge code correctness by executing against test cases.
+
+    Uses BigCodeBench's untrusted_check to run the extracted code against
+    the problem's test suite. This matches CollabLLM's evaluation for code tasks.
+
+    Args:
+        completion: Extracted code string.
+        metadata: Must contain 'test' (unittest code) and 'entry_point' (function name).
+
+    Returns:
+        1.0 if all tests pass, 0.0 otherwise.
+    """
+    from bigcodebench.eval import untrusted_check
+
+    test_code = metadata.get("test", "")
+    entry_point = metadata.get("entry_point", "")
+
+    if not test_code or not entry_point:
+        logger.error("judge_pass_rate: missing 'test' or 'entry_point' in metadata")
+        return -1.0
+
+    try:
+        res = untrusted_check(
+            completion,
+            test_code,
+            entry_point,
+            max_as_limit=300 * 1024,
+            max_data_limit=300 * 1024,
+            max_stack_limit=300 * 1024,
+            min_time_limit=60,
+            gt_time_limit=60,
+        )
+        passed = res[0] == "pass"
+        info = res[1] if len(res) > 1 else ""
+        if not passed:
+            logger.info(f"judge_pass_rate: test failed for {entry_point}: {str(info)[:200]}")
+        return float(passed)
+    except Exception as e:
+        logger.error(f"judge_pass_rate: execution error: {e}")
+        return 0.0
+
+
 def count_assistant_tokens(messages: list[dict[str, str]]) -> int:
     """Count approximate token count of assistant messages.
 
@@ -284,10 +339,15 @@ class CollabLLMEvaluator:
     """Runs CollabLLM-style evaluation on a completed conversation.
 
     Extracts final answer, then judges accuracy and interactivity.
+
+    eval_method controls how accuracy is judged:
+    - "llm_judge" (default): LLM compares extracted answer vs ground truth
+    - "pass_rate": Execute extracted code against test cases (for BigCodeBench)
     """
 
     model: str = "gpt-4o-mini"
     extract_type: str = "answer"
+    eval_method: str = "llm_judge"
     max_tokens: int = 4000
 
     async def evaluate(
@@ -296,6 +356,7 @@ class CollabLLMEvaluator:
         single_turn_prompt: str,
         single_turn_completion: str,
         model_client: "ModelClient",
+        metadata: dict[str, Any] | None = None,
     ) -> CollabLLMEvalResult:
         """Run full evaluation on a conversation.
 
@@ -304,6 +365,7 @@ class CollabLLMEvaluator:
             single_turn_prompt: Original problem/question.
             single_turn_completion: Ground truth answer.
             model_client: Model client for LLM calls.
+            metadata: Sample metadata (contains test cases, entry_point for code).
 
         Returns:
             CollabLLMEvalResult with all metrics.
@@ -311,13 +373,14 @@ class CollabLLMEvaluator:
         result = CollabLLMEvalResult()
         result.assistant_tokens = count_assistant_tokens(messages)
 
-        # Extract final completion
+        # Extract final completion (pass metadata for extraction_requirement)
         extracted, extract_resp = await extract_completion(
             messages=messages,
             extract_type=self.extract_type,
             model_client=model_client,
             model=self.model,
             max_tokens=self.max_tokens,
+            metadata=metadata,
         )
         if extract_resp:
             result.eval_cost_usd += extract_resp.total_usd
@@ -325,16 +388,22 @@ class CollabLLMEvaluator:
 
         # Judge accuracy (only if extraction succeeded)
         if extracted:
-            accuracy, acc_resp = await judge_accuracy(
-                single_turn_prompt=single_turn_prompt,
-                groundtruth=single_turn_completion,
-                completion=extracted,
-                model_client=model_client,
-                model=self.model,
-            )
-            if acc_resp:
-                result.eval_cost_usd += acc_resp.total_usd
-            result.accuracy = accuracy
+            if self.eval_method == "pass_rate" and metadata:
+                # Code evaluation: run against test cases
+                accuracy = judge_pass_rate(extracted, metadata)
+                result.accuracy = accuracy
+            else:
+                # LLM judge (default, used for math/QA)
+                accuracy, acc_resp = await judge_accuracy(
+                    single_turn_prompt=single_turn_prompt,
+                    groundtruth=single_turn_completion,
+                    completion=extracted,
+                    model_client=model_client,
+                    model=self.model,
+                )
+                if acc_resp:
+                    result.eval_cost_usd += acc_resp.total_usd
+                result.accuracy = accuracy
 
         # Judge interactivity
         interactivity, itr_resp = await judge_interactivity(

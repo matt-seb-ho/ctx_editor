@@ -219,6 +219,7 @@ class CollabLLMSimulator:
             single_turn_prompt=self.sample["single_turn_prompt"],
             single_turn_completion=self.sample["single_turn_completion"],
             model_client=self.model_client,
+            metadata=self.sample.get("single_turn_metadata"),
         )
 
         # Track eval cost in system usage
