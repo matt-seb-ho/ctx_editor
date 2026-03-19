@@ -116,8 +116,10 @@ class CollabLLMSimulator:
         termination_reason = "max_turns_reached"
 
         # Each "turn" is a user message + assistant response pair
-        # max_turns counts user messages (matching CollabLLM's convention)
-        while not terminated and self.trace.num_user_turns < self.config.max_turns:
+        # max_turns counts TOTAL user messages (including across context resets)
+        # Using total_user_turns prevents context-resetting strategies from
+        # bypassing the turn limit by hiding previous messages.
+        while not terminated and self.trace.total_user_turns < self.config.max_turns:
             # --- USER TURN ---
             user_response = await self.user_agent.generate_response(
                 trace=self.trace,
