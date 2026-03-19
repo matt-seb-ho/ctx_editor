@@ -111,7 +111,34 @@ The ground truth asks for a function `task_func(s1, s2)` that compares store sal
 - **Turn 2 (assistant)**: Produces `compare_store_sales()` with full implementation.
 - **Turns 3-14**: User asks about CSV formatting, testing, error handling. Conversation drifts to practical usage rather than spec refinement.
 
-The extracted code is a working function that does what the user asked for, but with different naming, extra parameters, and a more elaborate API. The LLM judge scores it 0.
+The extracted code is a working function that does what the user asked for, but with different naming, extra parameters, and a more elaborate API.
+
+### Code eval iteration: LLM judge -> test-case execution -> extraction model upgrade
+
+We iterated through three attempts to fix the 0% code accuracy:
+
+**Attempt 1: LLM-as-judge (original)** -- 0% accuracy. The LLM judge compared extracted code textually against ground truth and scored everything 0 due to naming/structural differences.
+
+**Attempt 2: Test-case execution with gpt-4o-mini extraction** (commit `43c8971`) -- 0% accuracy. Implemented `bigcodebench.eval.untrusted_check()` matching CollabLLM's eval protocol. However, ~60% of extractions didn't produce the required `task_func` function name. The `extraction_requirement` prompt (telling the extractor to use the required code prefix) was being ignored by gpt-4o-mini.
+
+**Attempt 3: Test-case execution with gpt-4o extraction** -- 0% accuracy. Re-evaluated existing traces using gpt-4o as the extraction model (via `reeval_collabllm.py`). gpt-4o produced `task_func` in ~50% of cases (up from ~40% with gpt-4o-mini), but the 50% that did have the right name still failed all tests due to wrong logic, missing imports, or signature mismatches.
+
+Note: CollabLLM uses Claude 3.5 Sonnet for extraction (`eval_generation_kwargs: {"model": "claude-3-5-sonnet-latest"}`).
+
+**Root cause analysis**: The 0% pass rate is not purely an extraction problem. The assistant (gpt-5-mini low) produces code through vague, incremental multi-turn conversation that structurally diverges from what BigCodeBench tests expect. The tests call `task_func(specific_args)` with specific return type expectations. The assistant builds elaborate, differently-structured functions because the user simulator never conveys the exact spec. Even perfect extraction can't fix fundamentally wrong code logic. The CollabLLM paper's nonzero results came from models fine-tuned specifically for multi-turn collaboration.
+
+### Differences from CollabLLM's pipeline
+
+| Component | CollabLLM | Our implementation |
+|---|---|---|
+| Assistant input format | Standard multi-turn messages | Option 2 (conversation packed into single user msg) |
+| System prompt | Optional (`add_system_prompt_ratio`, default 0.0 for base) | Always prepended |
+| Assistant temperature | 0.8 (code), 0.6 (math) | 1.0 (forced by gpt-5-mini) |
+| Extraction model | Claude 3.5 Sonnet | gpt-4o-mini (original), gpt-4o (re-eval) |
+| User simulator | gpt-4o | gpt-4o-mini |
+| Code evaluation | `bigcodebench.eval.untrusted_check()` | Same (after fix) |
+
+The Option 2 rendering is the most significant architectural difference. It's required for our context editing strategies but means the assistant sees a fundamentally different input format than in CollabLLM's setup. Prompts (user sim, extraction, system) are otherwise identical (verified by diff).
 
 ### Bug found and fixed: turn counter bypass
 
@@ -125,9 +152,13 @@ Pre-fix compaction results (for reference, not valid):
 
 ## Next Steps
 
-1. **Implement test-case execution for BigCodeBench**: The CollabLLM paper uses pass rate (code execution against test cases), not LLM-as-judge. We need to extract the code, wrap it with the expected function signature if needed, and run against BigCodeBench's test suite. This is required to get comparable numbers.
+1. **Fix code evaluation pipeline**: The 0% on BigCodeBench needs further investigation. Options:
+   - Use Claude Sonnet for extraction (matching CollabLLM)
+   - Use gpt-4o as user simulator (matching CollabLLM, currently gpt-4o-mini)
+   - Test with standard multi-turn messages instead of Option 2 for baseline
+   - Try higher reasoning effort for assistant
 
-2. **Scale up sample size**: 20 samples per task is a pilot. Need 100+ for statistically meaningful comparisons.
+2. **Scale up math sample size**: 20 samples is a pilot. The +5pp math result (45% vs 40%) needs 100+ samples for statistical significance.
 
 3. **Compare against CollabLLM paper baselines**: The paper reports results with Llama-3-8B. Our gpt-5-mini (low) results should be compared against those.
 
@@ -140,8 +171,12 @@ Pre-fix compaction results (for reference, not valid):
 - `src/ctx_editor/config/experiment/collabllm_compaction.yaml` -- Experiment config for S3
 
 ### Modified files
-- `src/ctx_editor/data/collabllm_loader.py` -- Added BigCodeBench loader, random subsampling, dataset-specific default splits
+- `src/ctx_editor/data/collabllm_loader.py` -- Added BigCodeBench loader with entry_point/test/extraction_requirement metadata, random subsampling, dataset-specific default splits
+- `src/ctx_editor/evaluation/collabllm_metrics.py` -- Added judge_pass_rate() using bigcodebench.eval.untrusted_check(); extraction_requirement passthrough; eval_method support
 - `src/ctx_editor/config/collabllm.yaml` -- Updated defaults to gpt5_mini_low + multi_endpoint_full
 - `src/ctx_editor/strategies/__init__.py` -- Export ContextCompactionStrategy
-- `src/ctx_editor/run_collabllm.py` -- Fixed split handling for non-standard datasets
-- `src/ctx_editor/core/collabllm_simulator.py` -- Fixed turn counter to use total_user_turns
+- `src/ctx_editor/run_collabllm.py` -- Fixed split handling, eval_method from dataset registry
+- `src/ctx_editor/core/collabllm_simulator.py` -- Fixed turn counter to use total_user_turns; pass metadata to evaluator
+
+### New utilities
+- `src/ctx_editor/reeval_collabllm.py` -- Re-evaluate saved traces with different extraction/eval models without re-running conversations
