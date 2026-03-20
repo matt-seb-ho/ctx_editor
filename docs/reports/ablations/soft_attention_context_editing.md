@@ -57,7 +57,6 @@ For contrast, here is what context editing achieves when the analysis is *clean*
 | **Database** | 1/25 (4%) | 8/25 (32%) | 10/25 (40%) | 11/25 (44%) |
 
 †Denominator reduced by timeout errors.
-
 With clean analysis, S1.5 and S2 provide +8–16pp over S1 on code and database. With contaminated analysis, context editing provides 0pp.
 
 ## Key Findings

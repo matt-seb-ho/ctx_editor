@@ -163,6 +163,12 @@ class ConversationAnalyzer:
             # (user + assistant messages) instead of user messages only.
             self._task_spec_template = _load_prompt("analyzer_v8_soft_spec")
             self._compare_template = _load_prompt("analyzer_v8_compare")
+        elif prompt_version == "v8_soft_cot":
+            # Soft attention with explicit CoT for decontamination.
+            # Query 1 sees full conversation but uses chain-of-thought to separate
+            # user requirements from assistant assumptions before writing the spec.
+            self._task_spec_template = _load_prompt("analyzer_v8_soft_spec_cot")
+            self._compare_template = _load_prompt("analyzer_v8_compare")
         elif prompt_version == "v8_single":
             # Single-query ablation: combined task spec + comparison in one prompt.
             # Tests whether the two-query "hard attention" separation matters.
@@ -304,22 +310,34 @@ class ConversationAnalyzer:
         trace: "ConversationTrace",
         model_client: "ModelClient",
         memory: Optional["MemoryModule"] = None,
+        spec_only: bool = False,
+        memory_target_query: str = "compare",
     ) -> AnalysisResult:
         """Two-query analysis WITHOUT hard attention separation.
 
         Same as _analyze_v6 except Query 1 sees the full conversation
         (user + assistant messages) instead of user messages only.
         Isolates the effect of hiding assistant messages from the spec query.
+
+        Also used by v8_soft_cot (CoT decontamination variant).
         """
         system_message_str = trace.system_message.content if trace.system_message else ""
         conversation_str = trace.get_conversation_string(skip_system=False)
         conversation_str = self._strip_edit_notes(conversation_str)
+
+        # Memory for Query 1 (task spec) — enabled for spec_curation memory experiments
+        spec_memory_section = ""
+        if memory and memory.content and memory_target_query in ("spec", "both"):
+            spec_memory_section = MEMORY_SECTION_TEMPLATE.format(
+                memory_content=memory.content
+            )
 
         # Query 1: Build task spec from FULL conversation (soft attention)
         spec_prompt = self._task_spec_template.format_map(
             defaultdict(str, {
                 "conversation": conversation_str,
                 "system_message": system_message_str,
+                "memory_section": spec_memory_section,
             })
         )
         spec_output = await self._generate(spec_prompt, model_client)
@@ -332,9 +350,19 @@ class ConversationAnalyzer:
             )
             task_spec = spec_output.strip()
 
+        # spec_only: skip Query 2, return task spec with empty comparison
+        if spec_only:
+            label = "soft_cot" if self.prompt_version == "v8_soft_cot" else "soft"
+            return AnalysisResult(
+                user_intent=task_spec,
+                aligned="",
+                issues="",
+                raw_output=f"--- TASK SPEC ({label}, spec_only) ---\n{spec_output}",
+            )
+
         # Query 2: Compare task spec against full conversation (same as v6/v8)
         memory_section = ""
-        if memory and memory.content:
+        if memory and memory.content and memory_target_query in ("compare", "both"):
             memory_section = MEMORY_SECTION_TEMPLATE.format(memory_content=memory.content)
 
         compare_prompt = self._compare_template.format_map(
@@ -359,11 +387,12 @@ class ConversationAnalyzer:
             )
             aligned, issues = self._parse_numbered_comparison(compare_output)
 
+        label = "soft_cot" if self.prompt_version == "v8_soft_cot" else "soft"
         return AnalysisResult(
             user_intent=task_spec,
             aligned=aligned,
             issues=issues,
-            raw_output=f"--- TASK SPEC (soft) ---\n{spec_output}\n\n--- COMPARISON ---\n{compare_output}",
+            raw_output=f"--- TASK SPEC ({label}) ---\n{spec_output}\n\n--- COMPARISON ---\n{compare_output}",
         )
 
     # --- v8_single: single-query ablation ---
@@ -479,8 +508,11 @@ class ConversationAnalyzer:
                 memory_target_query=memory_target_query,
                 enforce_compliance=enforce_compliance,
             )
-        if self.prompt_version == "v8_soft":
-            return await self._analyze_v8_soft(trace, model_client, memory)
+        if self.prompt_version in ("v8_soft", "v8_soft_cot"):
+            return await self._analyze_v8_soft(
+                trace, model_client, memory, spec_only=spec_only,
+                memory_target_query=memory_target_query,
+            )
         if self.prompt_version == "v8_single":
             return await self._analyze_v8_single(trace, model_client, memory)
         return await self._analyze_single(trace, model_client, memory)

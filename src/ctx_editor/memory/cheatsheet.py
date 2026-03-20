@@ -27,6 +27,7 @@ _DEFAULT_PROMPT_FILES: dict[str, Path] = {
     "context_editor": _PROMPTS_DIR / "context_editor_reflection.txt",
     "edit_decision": _PROMPTS_DIR / "edit_decision_reflection.txt",
     "analyzer": _PROMPTS_DIR / "analyzer_reflection.txt",
+    "spec_curation": _PROMPTS_DIR / "spec_curation_reflection.txt",
 }
 
 # Map target → takeaway-only reflection prompt file (for batch Step 1)
@@ -35,6 +36,7 @@ _DEFAULT_TAKEAWAY_PROMPT_FILES: dict[str, Path] = {
     "context_editor": _PROMPTS_DIR / "context_editor_reflect_takeaways.txt",
     "edit_decision": _PROMPTS_DIR / "edit_decision_reflect_takeaways.txt",
     "analyzer": _PROMPTS_DIR / "analyzer_reflect_takeaways.txt",
+    "spec_curation": _PROMPTS_DIR / "spec_curation_reflect_takeaways.txt",
 }
 
 # Unify prompt (for batch Step 2) — shared across all targets
@@ -149,7 +151,7 @@ class CheatsheetMemory(MemoryModule):
         return f"CheatsheetMemory(v{self._version}, {len(self._content)} chars): {preview}"
 
 
-VALID_TARGETS = frozenset({"assistant", "context_editor", "edit_decision", "analyzer"})
+VALID_TARGETS = frozenset({"assistant", "context_editor", "edit_decision", "analyzer", "spec_curation"})
 
 
 class CheatsheetUpdater(MemoryUpdater):
@@ -170,13 +172,15 @@ class CheatsheetUpdater(MemoryUpdater):
         update_on_failure: bool = True,
         include_full_spec_q: bool = False,
         include_ground_truth_a: bool = False,
+        include_oracle_spec: bool = False,
+        oracle_spec_path: Optional[str] = None,
     ):
         """Initialize the updater.
 
         Args:
             target: What component to improve — "assistant", "context_editor",
-                or "edit_decision". Controls the reflection prompt and trajectory
-                rendering used during updates.
+                "edit_decision", "analyzer", or "spec_curation". Controls the
+                reflection prompt and trajectory rendering used during updates.
             reflection_prompt: Custom prompt override (overrides target default).
             reflection_prompt_file: Path to a prompt file (overrides target default).
             model: Model to use for reflection.
@@ -186,6 +190,10 @@ class CheatsheetUpdater(MemoryUpdater):
                 in cheatsheet update prompts for grounding.
             include_ground_truth_a: Whether to include the ground truth answer
                 in cheatsheet update prompts for grounding.
+            include_oracle_spec: Whether to include the oracle hard-attention
+                task spec in cheatsheet update prompts for grounding.
+            oracle_spec_path: Path to JSON file mapping sample_id → oracle spec.
+                Required when include_oracle_spec is True.
         """
         if target not in VALID_TARGETS:
             raise ValueError(f"Invalid target {target!r}. Must be one of {sorted(VALID_TARGETS)}")
@@ -210,6 +218,19 @@ class CheatsheetUpdater(MemoryUpdater):
         self.update_on_failure = update_on_failure
         self.include_full_spec_q = include_full_spec_q
         self.include_ground_truth_a = include_ground_truth_a
+        self.include_oracle_spec = include_oracle_spec
+
+        # Load oracle specs if enabled
+        self._oracle_specs: dict[str, str] = {}
+        if include_oracle_spec and oracle_spec_path:
+            import json as _json
+            self._oracle_specs = _json.loads(Path(oracle_spec_path).read_text())
+        elif include_oracle_spec:
+            # Default path
+            default_path = Path("data/oracle_specs/all_oracle_specs.json")
+            if default_path.exists():
+                import json as _json
+                self._oracle_specs = _json.loads(default_path.read_text())
 
     def _render_trajectory(self, trajectory: "SimulationResult") -> str:
         """Render trajectory conversation using the target-specific renderer."""
@@ -234,8 +255,35 @@ The ground truth answer:
 {metadata["ground_truth_a"]}
 </ground_truth>""")
 
+        if self.include_oracle_spec:
+            sample_id = trajectory.sample_id
+            oracle_spec = self._oracle_specs.get(sample_id, "")
+            if oracle_spec:
+                # Also extract the soft-attention spec from this trajectory's analysis log
+                soft_spec = self._extract_soft_spec(trajectory)
+                parts.append(f"""
+<oracle_spec>
+The clean task specification produced by hard attention (user messages only — this is the target):
+{oracle_spec}
+</oracle_spec>""")
+                if soft_spec:
+                    parts.append(f"""
+<soft_attention_spec>
+The task specification this trajectory's analyzer actually produced (seeing the full conversation):
+{soft_spec}
+</soft_attention_spec>""")
+
         if parts:
             return "\n" + "\n".join(parts)
+        return ""
+
+    @staticmethod
+    def _extract_soft_spec(trajectory: "SimulationResult") -> str:
+        """Extract the soft-attention task spec from a trajectory's analysis logs."""
+        logs = trajectory.trace.get("logs", [])
+        for log in reversed(logs):
+            if log["type"] == "conversation_analysis":
+                return log["data"].get("user_intent", "")
         return ""
 
     async def update_from_trajectory(
