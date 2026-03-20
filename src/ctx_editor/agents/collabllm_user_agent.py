@@ -42,7 +42,8 @@ def _format_chat_history(messages: list[dict[str, str]]) -> str:
     """Format messages as CollabLLM-style chat history.
 
     Produces **Role**: content lines, matching CollabLLM's parse_messages.
-    Strips system messages.
+    Strips system messages. Renders "compacted conversation" as an
+    assistant summary so the user sim sees a natural-looking conversation.
     """
     parts = []
     for msg in messages:
@@ -50,7 +51,12 @@ def _format_chat_history(messages: list[dict[str, str]]) -> str:
         if role == "system":
             continue
         content = msg.get("content", "")
-        parts.append(f"**{role.capitalize()}**: {content}")
+        if role == "compacted conversation":
+            # Present as an assistant summary -- from the user's perspective,
+            # the assistant is summarizing the conversation state
+            parts.append(f"**Assistant**: [Conversation summary] {content}")
+        else:
+            parts.append(f"**{role.capitalize()}**: {content}")
     return "\n".join(parts)
 
 
@@ -122,13 +128,34 @@ class CollabLLMUserAgent:
         Returns:
             CollabLLMUserResponse with the user's message.
         """
-        # Format active messages as chat history string
+        # Build chat history that includes:
+        # 1. Prior user messages from before any resets (so user sim doesn't repeat)
+        # 2. Active messages (compacted conversation + current exchange)
         active_messages = trace.get_active_messages()
-        chat_history_dicts = [
-            {"role": msg.role, "content": msg.content}
-            for msg in active_messages
-        ]
-        chat_history_str = _format_chat_history(chat_history_dicts)
+
+        chat_history_msgs = []
+        if trace.num_resets > 0:
+            # Collect unique prior user messages (hidden by resets)
+            all_msgs = trace.to_messages(include_system=False, active_only=False)
+            active_set = set(id(m) for m in active_messages)
+            seen_content: set[str] = set()
+
+            for msg in all_msgs:
+                if msg.role == "user" and id(msg) not in active_set:
+                    content = msg.content.strip()
+                    if content not in seen_content:
+                        seen_content.add(content)
+                        chat_history_msgs.append(
+                            {"role": "user", "content": msg.content}
+                        )
+
+        # Add active messages (system filtered out by _format_chat_history)
+        for msg in active_messages:
+            chat_history_msgs.append(
+                {"role": msg.role, "content": msg.content}
+            )
+
+        chat_history_str = _format_chat_history(chat_history_msgs)
 
         # Build the user simulator prompt
         prompt = USER_SIMULATOR_PROMPT.format(
