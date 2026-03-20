@@ -45,7 +45,7 @@ class ContextCompactionStrategy(BaseStrategy):
     def __init__(
         self,
         compaction_model: str = "gpt-5-mini",
-        compaction_timeout: int = 60,
+        compaction_timeout: int = 300,
         compaction_max_tokens: Optional[int] = None,
         compaction_reasoning_effort: Optional[str] = None,
         min_turns: int = 4,

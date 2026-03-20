@@ -115,7 +115,7 @@ class OpenAIModelClient(BaseModelClient):
         model: str = "gpt-4o-mini",
         temperature: float = 1.0,
         max_tokens: Optional[int] = None,
-        timeout: int = 30,
+        timeout: int = 300,
         max_retries: int = 3,
         variables: Optional[dict[str, str]] = None,
         is_json: bool = False,

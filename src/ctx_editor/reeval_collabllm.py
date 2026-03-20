@@ -63,6 +63,7 @@ async def reeval(
     dataset_name: str,
     eval_method: str | None = None,
     lb_config_path: str | None = None,
+    max_concurrent: int = 1,
 ) -> dict[str, Any]:
     """Re-evaluate all traces in a directory with a new model."""
     trace_path = Path(trace_dir)
@@ -111,14 +112,13 @@ async def reeval(
     logger.info(f"Loaded {len(traces)} traces from {trace_path}")
     logger.info(f"Re-evaluating with model={eval_model}, method={eval_method}")
 
-    # Re-evaluate each trace
-    results = []
-    pbar = tqdm(traces, desc=f"Re-evaluating with {eval_model}")
-    for trace_entry in pbar:
+    # Prepare evaluation tasks
+    eval_tasks = []
+    for trace_entry in traces:
         sample_id = trace_entry["sample_id"]
         messages = get_messages_from_trace(trace_entry["trace"])
+        num_resets = trace_entry["trace"].get("trace", {}).get("num_resets", 0)
 
-        # Find matching sample metadata
         meta = None
         prompt = ""
         completion = ""
@@ -133,36 +133,57 @@ async def reeval(
             logger.warning(f"No metadata found for {sample_id}, skipping")
             continue
 
-        try:
-            eval_result = await evaluator.evaluate(
-                messages=messages,
-                single_turn_prompt=prompt,
-                single_turn_completion=completion,
-                model_client=model_client,
-                metadata=meta,
-            )
+        eval_tasks.append({
+            "sample_id": sample_id,
+            "messages": messages,
+            "meta": meta,
+            "prompt": prompt,
+            "completion": completion,
+            "num_resets": num_resets,
+        })
 
-            results.append({
-                "sample_id": sample_id,
-                "accuracy": eval_result.accuracy,
-                "interactivity": eval_result.interactivity,
-                "assistant_tokens": eval_result.assistant_tokens,
-                "extracted_answer": eval_result.extracted_answer,
-                "is_correct": eval_result.accuracy == 1.0,
-                "eval_cost_usd": eval_result.eval_cost_usd,
-            })
+    # Re-evaluate with concurrency
+    sem = asyncio.Semaphore(max_concurrent)
+    results = [None] * len(eval_tasks)
+    pbar = tqdm(total=len(eval_tasks), desc=f"Re-evaluating with {eval_model}")
 
-            status = "PASS" if eval_result.accuracy == 1.0 else "FAIL"
-            pbar.set_postfix(last=f"{sample_id}: {status}")
+    async def eval_one(idx: int, task: dict):
+        async with sem:
+            sample_id = task["sample_id"]
+            try:
+                eval_result = await evaluator.evaluate(
+                    messages=task["messages"],
+                    single_turn_prompt=task["prompt"],
+                    single_turn_completion=task["completion"],
+                    model_client=model_client,
+                    metadata=task["meta"],
+                )
+                results[idx] = {
+                    "sample_id": sample_id,
+                    "accuracy": eval_result.accuracy,
+                    "interactivity": eval_result.interactivity,
+                    "assistant_tokens": eval_result.assistant_tokens,
+                    "extracted_answer": eval_result.extracted_answer,
+                    "is_correct": eval_result.accuracy == 1.0,
+                    "eval_cost_usd": eval_result.eval_cost_usd,
+                    "num_resets": task["num_resets"],
+                }
+                status = "PASS" if eval_result.accuracy == 1.0 else "FAIL"
+                pbar.set_postfix(last=f"{sample_id}: {status}")
+            except Exception as e:
+                logger.error(f"Error re-evaluating {sample_id}: {e}")
+                results[idx] = {
+                    "sample_id": sample_id,
+                    "accuracy": -1.0,
+                    "error": str(e),
+                    "is_correct": False,
+                    "num_resets": task["num_resets"],
+                }
+            pbar.update(1)
 
-        except Exception as e:
-            logger.error(f"Error re-evaluating {sample_id}: {e}")
-            results.append({
-                "sample_id": sample_id,
-                "accuracy": -1.0,
-                "error": str(e),
-                "is_correct": False,
-            })
+    await asyncio.gather(*[eval_one(i, t) for i, t in enumerate(eval_tasks)])
+    pbar.close()
+    results = [r for r in results if r is not None]
 
     # Compute metrics
     valid = [r for r in results if r.get("accuracy", -1) >= 0]
@@ -182,7 +203,8 @@ async def reeval(
     }
 
     # Save results
-    output_dir = trace_path / f"reeval_{eval_model.replace('/', '_')}"
+    method_suffix = f"_{eval_method}" if eval_method else ""
+    output_dir = trace_path / f"reeval_{eval_model.replace('/', '_')}{method_suffix}"
     output_dir.mkdir(exist_ok=True)
 
     with open(output_dir / "results.json", "w") as f:
@@ -213,6 +235,7 @@ def main():
         default="src/ctx_editor/config/load_balancer/multi_endpoint_full.yaml",
         help="Load balancer config path",
     )
+    parser.add_argument("--max_concurrent", type=int, default=1, help="Max concurrent evaluations")
     args = parser.parse_args()
 
     logging.basicConfig(level=logging.INFO)
@@ -222,6 +245,7 @@ def main():
         dataset_name=args.dataset_name,
         eval_method=args.eval_method,
         lb_config_path=args.lb_config,
+        max_concurrent=args.max_concurrent,
     ))
 
 
