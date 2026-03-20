@@ -168,9 +168,21 @@ async def run_collabllm_experiment(cfg: DictConfig) -> dict[str, Any]:
 
     partial_results_path = output_dir / "results_partial.jsonl"
 
+    # Build a lookup from sample_id to sample data for trace metadata
+    sample_lookup = {s["task_id"]: s for s in samples}
+
     def save_result_incrementally(result):
         with open(partial_results_path, "a") as f:
             f.write(json.dumps(result.to_dict(include_trace=False)) + "\n")
+
+        # Include the original question and ground truth in trace metadata
+        sample_data = sample_lookup.get(result.sample_id, {})
+        trace_metadata = {
+            "single_turn_prompt": sample_data.get("single_turn_prompt", ""),
+            "single_turn_completion": sample_data.get("single_turn_completion", ""),
+            "task_desc": sample_data.get("task_desc", ""),
+        }
+
         log_conversation(
             experiment_type=cfg.experiment.name,
             task_name=result.task_name,
@@ -180,6 +192,7 @@ async def run_collabllm_experiment(cfg: DictConfig) -> dict[str, Any]:
             score=result.score,
             output_dir=str(output_dir),
             assistant_model=cfg.model.assistant.model,
+            metadata=trace_metadata,
         )
 
     # Memory updater for batched mode

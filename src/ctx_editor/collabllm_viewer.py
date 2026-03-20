@@ -406,30 +406,99 @@ def render_message_card(msg: dict, task_name: str = ""):
 # ---------------------------------------------------------------------------
 
 
-def render_question_tab(trace_data: dict, config: Optional[dict], sample_result: Optional[dict]):
+def _get_question_from_trace(trace_data: dict) -> tuple[str, str, str]:
+    """Extract single_turn_prompt, single_turn_completion, task_desc from trace metadata."""
+    metadata = trace_data.get("metadata", {})
+    prompt = metadata.get("single_turn_prompt", "")
+    completion = metadata.get("single_turn_completion", "")
+    task_desc = metadata.get("task_desc", "")
+    return prompt, completion, task_desc
+
+
+@st.cache_data
+def _load_dataset_for_lookup(dataset_name: str) -> dict[str, dict]:
+    """Load dataset and build a lookup by task_id (fallback for old traces)."""
+    try:
+        from ctx_editor.data.collabllm_loader import load_collabllm_dataset
+        samples = load_collabllm_dataset(dataset_name)
+        lookup = {}
+        for s in samples:
+            # Key by multiple forms of the task_id
+            tid = s["task_id"]
+            lookup[tid] = s
+            lookup[tid.replace("/", "_")] = s
+            # Also key by the last part (e.g., "BigCodeBench_1034")
+            parts = tid.split("/")
+            if len(parts) > 1:
+                lookup[parts[-1]] = s
+                lookup["_".join(parts[-2:])] = s
+        return lookup
+    except Exception:
+        return {}
+
+
+def _find_question_for_sample(sample_id: str, dataset_name: str) -> tuple[str, str]:
+    """Look up the original question from the dataset (fallback for old traces)."""
+    lookup = _load_dataset_for_lookup(dataset_name)
+    # Try various key forms
+    for key in [sample_id, sample_id.replace("bigcodebench_", "bigcodebench/"),
+                sample_id.replace("math-hard_", "math-hard/")]:
+        if key in lookup:
+            s = lookup[key]
+            return s.get("single_turn_prompt", ""), s.get("single_turn_completion", "")
+    # Try substring match
+    for key, s in lookup.items():
+        if sample_id in key or key in sample_id:
+            return s.get("single_turn_prompt", ""), s.get("single_turn_completion", "")
+    return "", ""
+
+
+def render_question_tab(
+    trace_data: dict, config: Optional[dict], sample_result: Optional[dict], sample_id: str = ""
+):
     """Tab: Original question and ground truth."""
-    # Try to find the original prompt from config or trace
     logs = trace_data.get("trace", {}).get("logs", [])
+    dataset_name = config.get("task", {}).get("dataset_name", "unknown") if config else "unknown"
 
-    st.subheader("Original Question (single_turn_prompt)")
-    st.caption("This is the full problem specification that the user simulator has access to. "
-               "The user simulator is instructed to be vague and not copy this directly.")
+    # Get the original question -- from trace metadata first, then dataset fallback
+    prompt, completion, task_desc = _get_question_from_trace(trace_data)
+    if not prompt:
+        prompt, completion = _find_question_for_sample(sample_id, dataset_name)
 
-    # We don't store single_turn_prompt in traces, but we can show what the user sim saw
-    # by looking at the first user message or config
+    # Sample info
     if config:
-        dataset = config.get("task", {}).get("dataset_name", "unknown")
-        st.markdown(f"**Dataset:** `{dataset}`")
-        st.markdown(f"**Max Turns:** `{config.get('task', {}).get('max_turns', '?')}`")
+        st.markdown(f"**Dataset:** `{dataset_name}` | **Max Turns:** `{config.get('task', {}).get('max_turns', '?')}`")
 
     if sample_result:
-        st.markdown(f"**Sample ID:** `{sample_result.get('sample_id', '?')}`")
-        st.markdown(f"**Correct:** {'Yes' if sample_result.get('is_correct') else 'No'}")
-        st.markdown(f"**Score:** `{sample_result.get('score', '?')}`")
-        st.markdown(f"**Turns:** `{sample_result.get('num_turns', '?')}`")
-        st.markdown(f"**Cost:** `${sample_result.get('total_cost_usd', 0):.4f}`")
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Correct", "Yes" if sample_result.get("is_correct") else "No")
+        col2.metric("Turns", sample_result.get("num_turns", "?"))
+        col3.metric("Cost", f"${sample_result.get('total_cost_usd', 0):.4f}")
+        acc = sample_result.get("metadata", {}).get("accuracy", -1)
+        col4.metric("Accuracy", f"{acc:.0%}" if acc >= 0 else "N/A")
 
-    # Show evaluation results from logs
+    # Original question
+    st.subheader("Original Question")
+    st.caption("This is the full problem specification that the user simulator has access to. "
+               "The user simulator is instructed to be vague and not copy this directly.")
+    if prompt:
+        if "```" in prompt or "def " in prompt:
+            st.code(prompt, language="python")
+        else:
+            st.markdown(prompt)
+    else:
+        st.warning("Original question not available in trace. "
+                    "Re-run the experiment to store it, or check dataset manually.")
+
+    # Ground truth
+    if completion:
+        st.subheader("Ground Truth Solution")
+        if "def " in completion or "import " in completion:
+            st.code(completion, language="python")
+        else:
+            st.markdown(completion)
+
+    # Evaluation results
     eval_log = next((l for l in logs if l["type"] == "collabllm_evaluation"), None)
     if eval_log:
         data = eval_log["data"]
@@ -444,7 +513,10 @@ def render_question_tab(trace_data: dict, config: Optional[dict], sample_result:
         extracted = data.get("extracted_answer", "")
         if extracted:
             st.subheader("Extracted Answer")
-            st.code(extracted, language="python")
+            if "def " in extracted or "import " in extracted:
+                st.code(extracted, language="python")
+            else:
+                st.code(extracted, language=None)
 
 
 def render_conversation_tab(trace_data: dict, task_name: str = "", show_hidden: bool = True):
@@ -767,7 +839,7 @@ def main():
         render_interventions_tab(trace_data)
 
     with tabs[2]:
-        render_question_tab(trace_data, load_config(run_dir), sample_result)
+        render_question_tab(trace_data, load_config(run_dir), sample_result, sample_id=tf["sample_id"])
 
     with tabs[3]:
         render_run_info_tab(run_dir, metrics, results)
