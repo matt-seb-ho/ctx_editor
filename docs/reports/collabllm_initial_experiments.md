@@ -125,7 +125,29 @@ We iterated through three attempts to fix the 0% code accuracy:
 
 Note: CollabLLM uses Claude 3.5 Sonnet for extraction (`eval_generation_kwargs: {"model": "claude-3-5-sonnet-latest"}`).
 
-**Root cause analysis**: The 0% pass rate is not purely an extraction problem. The assistant (gpt-5-mini low) produces code through vague, incremental multi-turn conversation that structurally diverges from what BigCodeBench tests expect. The tests call `task_func(specific_args)` with specific return type expectations. The assistant builds elaborate, differently-structured functions because the user simulator never conveys the exact spec. Even perfect extraction can't fix fundamentally wrong code logic. The CollabLLM paper's nonzero results came from models fine-tuned specifically for multi-turn collaboration.
+**Root cause analysis**: The 0% pass rate is not purely an extraction problem. We tested 8 configurations (see table below) and all scored 0/20:
+
+| Run | User Sim | Extraction | Accuracy | Turns |
+|-----|----------|------------|----------|-------|
+| Baseline | gpt-4o-mini | gpt-4o-mini | 0/20 | 12.3 |
+| Baseline | gpt-4o-mini | gpt-4o (re-eval) | 0/20 | -- |
+| Compaction | gpt-4o-mini | gpt-4o-mini | 0/20 | 11.9 |
+| Compaction | gpt-4o-mini | gpt-4o (re-eval) | 0/20 | -- |
+| Baseline | gpt-4o | gpt-4o-mini | 0/20 | 5.5 |
+| Baseline | gpt-4o | gpt-4o (re-eval) | 0/20 | -- |
+| Compaction | gpt-4o | gpt-4o-mini | 0/20 | 6.8 |
+| Compaction | gpt-4o | gpt-4o (re-eval) | 0/20 | -- |
+
+Failure categories (from gpt-4o extraction runs):
+- ~50% `NameError: task_func not defined` -- extraction didn't produce the required function name
+- ~25% syntax errors or missing imports in extracted code
+- ~25% code runs but produces wrong output (AssertionError, TypeError)
+
+The assistant (gpt-5-mini low) produces code through vague, incremental multi-turn conversation that structurally diverges from what BigCodeBench tests expect. The tests call `task_func(specific_args)` with specific return type expectations. The assistant builds elaborate, differently-structured functions because the user simulator never conveys the exact spec. Even with the `extraction_requirement` prompt telling the extractor to use `def task_func(...)`, both gpt-4o-mini and gpt-4o only follow this ~50% of the time.
+
+Notable: gpt-4o as user sim caused much shorter conversations (5.5-6.8 turns vs 12-13 with gpt-4o-mini) because gpt-4o terminates conversations faster.
+
+The CollabLLM paper's nonzero results came from models fine-tuned specifically for multi-turn collaboration.
 
 ### Differences from CollabLLM's pipeline
 
@@ -134,8 +156,8 @@ Note: CollabLLM uses Claude 3.5 Sonnet for extraction (`eval_generation_kwargs: 
 | Assistant input format | Standard multi-turn messages | Option 2 (conversation packed into single user msg) |
 | System prompt | Optional (`add_system_prompt_ratio`, default 0.0 for base) | Always prepended |
 | Assistant temperature | 0.8 (code), 0.6 (math) | 1.0 (forced by gpt-5-mini) |
-| Extraction model | Claude 3.5 Sonnet | gpt-4o-mini (original), gpt-4o (re-eval) |
-| User simulator | gpt-4o | gpt-4o-mini |
+| Extraction model | Claude 3.5 Sonnet | gpt-4o-mini, gpt-4o (tested both) |
+| User simulator | gpt-4o | gpt-4o-mini, gpt-4o (tested both) |
 | Code evaluation | `bigcodebench.eval.untrusted_check()` | Same (after fix) |
 
 The Option 2 rendering is the most significant architectural difference. It's required for our context editing strategies but means the assistant sees a fundamentally different input format than in CollabLLM's setup. Prompts (user sim, extraction, system) are otherwise identical (verified by diff).
