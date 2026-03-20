@@ -144,7 +144,7 @@ class ConversationAnalyzer:
     def __init__(
         self,
         model: str = "gpt-4o-mini",
-        timeout: int = 60,
+        timeout: int = 300,
         max_tokens: Optional[int] = None,
         reasoning_effort: Optional[str] = None,
         prompt_version: str = "v8",
