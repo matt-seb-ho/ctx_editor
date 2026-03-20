@@ -20,6 +20,7 @@ _PROMPTS_DIR = Path(__file__).parent.parent / "prompts" / "collabllm"
 EXTRACT_COMPLETION_PROMPT = (_PROMPTS_DIR / "extract_completion.txt").read_text()
 ACCURACY_JUDGE_PROMPT = (_PROMPTS_DIR / "accuracy_judge.txt").read_text()
 INTERACTIVITY_JUDGE_PROMPT = (_PROMPTS_DIR / "interactivity_judge.txt").read_text()
+CONVERSATION_JUDGE_PROMPT = (_PROMPTS_DIR / "conversation_judge.txt").read_text()
 
 
 def _parse_json_response(text: str) -> dict | None:
@@ -263,6 +264,49 @@ async def judge_interactivity(
     return -1.0, None
 
 
+async def judge_conversation_accuracy(
+    messages: list[dict[str, str]],
+    extracted_code: str,
+    model_client: "ModelClient",
+    model: str,
+    max_retries: int = 3,
+) -> tuple[float, Any]:
+    """Judge code accuracy based on what the user actually asked for in the conversation.
+
+    Unlike judge_accuracy (which compares against ground truth) or judge_pass_rate
+    (which runs test cases), this evaluates whether the assistant's code fulfills
+    the user's actual requests as stated in the conversation.
+
+    Returns:
+        Tuple of (accuracy_score, model_response). Score is 1.0, 0.5, or 0.0.
+    """
+    chat_history = _format_messages_for_prompt(messages)
+    prompt = CONVERSATION_JUDGE_PROMPT.format(
+        chat_history=chat_history,
+        extracted_code=extracted_code.strip() if extracted_code else "(no code extracted)",
+    )
+
+    for attempt in range(max_retries):
+        try:
+            response = await model_client.generate(
+                messages=[{"role": "user", "content": prompt}],
+                model=model,
+                temperature=0.0,
+                max_tokens=1500,
+            )
+            parsed = _parse_json_response(response.content)
+            if parsed and "accuracy" in parsed:
+                score = float(parsed["accuracy"])
+                # Clamp to valid range
+                score = max(0.0, min(1.0, score))
+                return score, response
+        except Exception as e:
+            logger.warning(f"judge_conversation_accuracy attempt {attempt + 1} failed: {e}")
+
+    logger.error("judge_conversation_accuracy failed after all retries")
+    return -1.0, None
+
+
 def judge_pass_rate(
     completion: str,
     metadata: dict[str, Any],
@@ -391,6 +435,17 @@ class CollabLLMEvaluator:
             if self.eval_method == "pass_rate" and metadata:
                 # Code evaluation: run against test cases
                 accuracy = judge_pass_rate(extracted, metadata)
+                result.accuracy = accuracy
+            elif self.eval_method == "conversation_judge":
+                # Judge based on what user actually asked for in conversation
+                accuracy, acc_resp = await judge_conversation_accuracy(
+                    messages=messages,
+                    extracted_code=extracted,
+                    model_client=model_client,
+                    model=self.model,
+                )
+                if acc_resp:
+                    result.eval_cost_usd += acc_resp.total_usd
                 result.accuracy = accuracy
             else:
                 # LLM judge (default, used for math/QA)
