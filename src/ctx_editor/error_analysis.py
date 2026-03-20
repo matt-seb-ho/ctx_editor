@@ -186,6 +186,30 @@ async def analyze_conversation(
     )
 
 
+async def analyze_simulation_result(
+    result_dict: dict[str, Any],
+    model_client: Any,
+    model: str = "gpt-4o-mini",
+) -> Optional[AnalysisResult]:
+    """Analyze a single SimulationResult dict immediately after simulation.
+
+    Only analyzes incorrect results. Returns None for correct results.
+    This is the entry point for 'immediate' error attribution mode.
+
+    Args:
+        result_dict: Output of SimulationResult.to_dict().
+        model_client: Existing model client (avoids creating a new one).
+        model: Model to use for analysis.
+
+    Returns:
+        AnalysisResult if the result was incorrect, None if correct.
+    """
+    if result_dict.get("is_correct", True):
+        return None
+
+    return await analyze_conversation(result_dict, model_client, model)
+
+
 async def run_analysis(
     run_dir: str,
     model: str = "gpt-4o-mini",

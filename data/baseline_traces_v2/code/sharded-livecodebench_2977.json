@@ -1,0 +1,404 @@
+{
+  "sample_id": "sharded-livecodebench/2977",
+  "task_name": "code",
+  "experiment_type": "baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "gpt-5-mini",
+    "user": "unknown",
+    "system": "unknown"
+  },
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions. The only other top-level statements allowed are import statements.\n- [Arguments] The function must accept inputs as function arguments, not by reading from stdin.\n- [Code fence] Always wrap your final code in a markdown Python code fence: ```python\\n<your code here>\\n```\n",
+        "timestamp": "2026-03-15 01:13:34",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "can I form a specific acronym given words?",
+        "timestamp": "2026-03-15 01:13:34",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import List, Tuple, Optional, Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     mode: str = 'initial',\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> Tuple[bool, Optional[List[Tuple[int, int]]]]:\n    \"\"\"\n    Determine whether `acronym` can be formed from `words`.\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use to build the acronym (e.g. [\"National\", \"Aeronautics\", \"and\", \"Space\", \"Administration\"])\n    - mode: one of:\n        - 'initial'   : use the first letter of words (default)\n        - 'any'       : use any single letter from a word (one letter from at most one word per acronym letter)\n        - 'subsequence': treat the concatenation of words and find acronym as a subsequence across letters\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words (use a subset in order). If False, then\n        for 'initial' and 'any' modes the acronym must use exactly one letter from each word (so len(words) must equal len(acronym)).\n\n    Returns:\n    - (possible, mapping)\n      - possible: True if the acronym can be formed, False otherwise\n      - mapping: list of tuples (word_index, char_index) describing where each letter of `acronym` was taken from.\n                 If not possible, mapping is None.\n                 For 'initial', char_index will be 0 for matched words.\n                 For 'subsequence', mapping gives the exact (word_index, char_index) in that word.\n\n    Examples:\n    - can_form_acronym(\"NASA\", [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"]) -> (True, [(0,0),(1,0),(3,0),(4,0)]) with default settings.\n    - can_form_acronym(\"py\", [\"python\"]) in mode='subsequence' -> (True, [(0,0),(0,1)])\n\n    \"\"\"\n    if acronym is None:\n        return False, None\n    acronym = str(acronym)\n    words = list(words)\n\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words\n\n    n = len(words_cmp)\n    m = len(acronym_cmp)\n\n    # quick checks\n    if m == 0:\n        return True, []\n\n    if mode not in {'initial', 'any', 'subsequence'}:\n        raise ValueError(\"mode must be one of 'initial', 'any', or 'subsequence'\")\n\n    # Helper: ensure word is non-empty when we need a char from it\n    def word_has_char(i):\n        return len(words_cmp[i]) > 0\n\n    # Mode: initial (use first letters)\n    if mode == 'initial':\n        if not allow_skip_words:\n            # must be one-to-one mapping\n            if m != n:\n                return False, None\n            mapping = []\n            for i in range(m):\n                if not word_has_char(i):\n                    return False, None\n                if words_cmp[i][0] != acronym_cmp[i]:\n                    return False, None\n                mapping.append((i, 0))\n            return True, mapping\n        else:\n            mapping = []\n            ai = 0\n            for wi, w in enumerate(words_cmp):\n                if ai >= m:\n                    break\n                if not w:\n                    continue\n                if w[0] == acronym_cmp[ai]:\n                    mapping.append((wi, 0))\n                    ai += 1\n            if ai == m:\n                return True, mapping\n            return False, None\n\n    # Mode: any (use one letter from a word)\n    if mode == 'any':\n        if not allow_skip_words:\n            # must use exactly one letter from each word\n            if m != n:\n                return False, None\n            mapping = []\n            for i in range(n):\n                w = words_cmp[i]\n                if not w:\n                    return False, None\n                ch = acronym_cmp[i]\n                try:\n                    idx = w.index(ch)\n                except ValueError:\n                    return False, None\n                mapping.append((i, idx))\n            return True, mapping\n        else:\n            mapping = []\n            ai = 0\n            for wi, w in enumerate(words_cmp):\n                if ai >= m:\n                    break\n                if not w:\n                    continue\n                ch = acronym_cmp[ai]\n                # find first occurrence of ch in w\n                try:\n                    idx = w.index(ch)\n                except ValueError:\n                    continue\n                mapping.append((wi, idx))\n                ai += 1\n            if ai == m:\n                return True, mapping\n            return False, None\n\n    # Mode: subsequence (concatenate all words and find acronym as subsequence)\n    if mode == 'subsequence':\n        mapping = []\n        ai = 0\n        for wi, w in enumerate(words_cmp):\n            if ai >= m:\n                break\n            for ci, c in enumerate(w):\n                if c == acronym_cmp[ai]:\n                    mapping.append((wi, ci))\n                    ai += 1\n                    if ai >= m:\n                        break\n        if ai == m:\n            return True, mapping\n        return False, None\n```",
+        "timestamp": "2026-03-15 01:14:04",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00600125
+        }
+      },
+      {
+        "role": "user",
+        "content": "the acronym needs to match the first letter of each word in order.",
+        "timestamp": "2026-03-15 01:14:05",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00031335
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import Sequence, List, Tuple, Optional\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> Tuple[bool, Optional[List[Tuple[int, int]]]]:\n    \"\"\"\n    Determine whether `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each letter of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words; i.e. use a subsequence of word initials.\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use (e.g. [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"])\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - (possible, mapping)\n      - possible: True if the acronym can be formed, False otherwise\n      - mapping: list of tuples (word_index, char_index) describing where each letter was taken from.\n                 For this function char_index will always be 0 when a letter is taken from a word.\n                 If not possible, mapping is None.\n\n    Examples:\n    - can_form_acronym(\"NASA\", [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"]) -> (True, [(0,0),(1,0),(3,0),(4,0)])\n    - can_form_acronym(\"py\", [\"python\"]) -> (False, None) unless allow_skip_words is used differently (here first letters are 'p' only).\n    \"\"\"\n    if acronym is None:\n        return False, None\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable with empty mapping\n    if m == 0:\n        return True, []\n\n    # If we must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False, None\n        mapping: List[Tuple[int, int]] = []\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:\n                return False, None  # can't take first letter from empty word\n            if w[0] != acronym_cmp[i]:\n                return False, None\n            mapping.append((i, 0))\n        return True, mapping\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    mapping = []\n    ai = 0\n    for wi, w in enumerate(words_cmp):\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            mapping.append((wi, 0))\n            ai += 1\n\n    if ai == m:\n        return True, mapping\n    return False, None\n```",
+        "timestamp": "2026-03-15 01:14:19",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00297675
+        }
+      },
+      {
+        "role": "user",
+        "content": "the function should return true if the acronym can be formed, or false if it can't.",
+        "timestamp": "2026-03-15 01:14:20",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0003519
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each letter of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use (e.g. [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"])\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:\n                return False  # can't take first letter from empty word\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m\n```",
+        "timestamp": "2026-03-15 01:14:33",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00245375
+        }
+      },
+      {
+        "role": "user",
+        "content": "I have a list of words and a target acronym to make.",
+        "timestamp": "2026-03-15 01:14:34",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0003609
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each letter of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use (e.g. [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"])\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:\n                return False  # can't take first letter from empty word\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m\n```",
+        "timestamp": "2026-03-15 01:14:42",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0017973
+        }
+      },
+      {
+        "role": "user",
+        "content": "The words can have up to 100 strings.",
+        "timestamp": "2026-03-15 01:14:44",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0005815500000000001
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each letter of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of up to ~100 words to use (e.g. [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"])\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:\n                return False  # can't take first letter from empty word\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m\n```",
+        "timestamp": "2026-03-15 01:14:55",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0020633
+        }
+      },
+      {
+        "role": "user",
+        "content": "each word can be up to 10 letters long",
+        "timestamp": "2026-03-15 01:14:56",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00049755
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each character of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use (each up to 10 characters; up to ~100 words)\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:  # empty word -> cannot take initial\n                return False\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m\n```",
+        "timestamp": "2026-03-15 01:15:04",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00195015
+        }
+      },
+      {
+        "role": "user",
+        "content": "Also, the target acronym can be up to 100 letters long.",
+        "timestamp": "2026-03-15 01:15:05",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00050985
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each character of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (may be up to ~100 characters)\n    - words: sequence of words to use (each up to ~10 characters; up to ~100 words)\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    # Prepare comparison forms\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [str(w).lower() for w in words]\n    else:\n        acronym_cmp = acronym\n        words_cmp = [str(w) for w in words]\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:  # empty word -> cannot take initial\n                return False\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m\n```",
+        "timestamp": "2026-03-15 01:15:17",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0027364
+        }
+      },
+      {
+        "role": "user",
+        "content": "Let\u2019s just say both the words and the target acronym are all lowercase letters.",
+        "timestamp": "2026-03-15 01:15:19",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0005231999999999999
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import Sequence\n\ndef can_form_acronym(acronym: str, words: Sequence[str], allow_skip_words: bool = True) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n    Assumes both `acronym` and every string in `words` consist of lowercase letters.\n\n    Rules:\n    - Each character of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form\n    - words: sequence of words to use (each word may be empty)\n    - allow_skip_words: whether words may be skipped\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    m = len(acronym)\n    words_list = list(words)\n    n = len(words_list)\n\n    if m == 0:\n        return True\n\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i, w in enumerate(words_list):\n            if not w:  # empty word, no initial available\n                return False\n            if w[0] != acronym[i]:\n                return False\n        return True\n\n    ai = 0\n    for w in words_list:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym[ai]:\n            ai += 1\n\n    return ai == m\n```",
+        "timestamp": "2026-03-15 01:15:29",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00201875
+        }
+      },
+      {
+        "role": "user",
+        "content": "For example, if the words are ['alice', 'bob', 'charlie'], and the target acronym is 'abc', then it should return true.",
+        "timestamp": "2026-03-15 01:15:45",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0007285499999999999
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\nfrom typing import Sequence\n\ndef can_form_acronym(acronym: str, words: Sequence[str], allow_skip_words: bool = True) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n    Assumes both `acronym` and every string in `words` consist of lowercase letters.\n\n    Rules:\n    - Each character of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Example:\n    - can_form_acronym('abc', ['alice', 'bob', 'charlie']) -> True\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    m = len(acronym)\n    words_list = list(words)\n    n = len(words_list)\n\n    if m == 0:\n        return True\n\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i, w in enumerate(words_list):\n            if not w:  # empty word, no initial available\n                return False\n            if w[0] != acronym[i]:\n                return False\n        return True\n\n    ai = 0\n    for w in words_list:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym[ai]:\n            ai += 1\n\n    return ai == m\n```",
+        "timestamp": "2026-03-15 01:16:20",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00180975
+        }
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        },
+        "timestamp": "2026-03-15 01:13:34"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:14:04"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import List, Tuple, Optional, Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     mode: str = 'initial',\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> Tuple[bool, Optional[List[Tuple[int, int]]]]:\n    \"\"\"\n    Determine whether `acronym` can be formed from `words`.\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use to build the acronym (e.g. [\"National\", \"Aeronautics\", \"and\", \"Space\", \"Administration\"])\n    - mode: one of:\n        - 'initial'   : use the first letter of words (default)\n        - 'any'       : use any single letter from a word (one letter from at most one word per acronym letter)\n        - 'subsequence': treat the concatenation of words and find acronym as a subsequence across letters\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words (use a subset in order). If False, then\n        for 'initial' and 'any' modes the acronym must use exactly one letter from each word (so len(words) must equal len(acronym)).\n\n    Returns:\n    - (possible, mapping)\n      - possible: True if the acronym can be formed, False otherwise\n      - mapping: list of tuples (word_index, char_index) describing where each letter of `acronym` was taken from.\n                 If not possible, mapping is None.\n                 For 'initial', char_index will be 0 for matched words.\n                 For 'subsequence', mapping gives the exact (word_index, char_index) in that word.\n\n    Examples:\n    - can_form_acronym(\"NASA\", [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"]) -> (True, [(0,0),(1,0),(3,0),(4,0)]) with default settings.\n    - can_form_acronym(\"py\", [\"python\"]) in mode='subsequence' -> (True, [(0,0),(0,1)])\n\n    \"\"\"\n    if acronym is None:\n        return False, None\n    acronym = str(acronym)\n    words = list(words)\n\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words\n\n    n = len(words_cmp)\n    m = len(acronym_cmp)\n\n    # quick checks\n    if m == 0:\n        return True, []\n\n    if mode not in {'initial', 'any', 'subsequence'}:\n        raise ValueError(\"mode must be one of 'initial', 'any', or 'subsequence'\")\n\n    # Helper: ensure word is non-empty when we need a char from it\n    def word_has_char(i):\n        return len(words_cmp[i]) > 0\n\n    # Mode: initial (use first letters)\n    if mode == 'initial':\n        if not allow_skip_words:\n            # must be one-to-one mapping\n            if m != n:\n                return False, None\n            mapping = []\n            for i in range(m):\n                if not word_has_char(i):\n                    return False, None\n                if words_cmp[i][0] != acronym_cmp[i]:\n                    return False, None\n                mapping.append((i, 0))\n            return True, mapping\n        else:\n            mapping = []\n            ai = 0\n            for wi, w in enumerate(words_cmp):\n                if ai >= m:\n                    break\n                if not w:\n                    continue\n                if w[0] == acronym_cmp[ai]:\n                    mapping.append((wi, 0))\n                    ai += 1\n            if ai == m:\n                return True, mapping\n            return False, None\n\n    # Mode: any (use one letter from a word)\n    if mode == 'any':\n        if not allow_skip_words:\n            # must use exactly one letter from each word\n            if m != n:\n                return False, None\n            mapping = []\n            for i in range(n):\n                w = words_cmp[i]\n                if not w:\n                    return False, None\n                ch = acronym_cmp[i]\n                try:\n                    idx = w.index(ch)\n                except ValueError:\n                    return False, None\n                mapping.append((i, idx))\n            return True, mapping\n        else:\n            mapping = []\n            ai = 0\n            for wi, w in enumerate(words_cmp):\n                if ai >= m:\n                    break\n                if not w:\n                    continue\n                ch = acronym_cmp[ai]\n                # find first occurrence of ch in w\n                try:\n                    idx = w.index(ch)\n                except ValueError:\n                    continue\n                mapping.append((wi, idx))\n                ai += 1\n            if ai == m:\n                return True, mapping\n            return False, None\n\n    # Mode: subsequence (concatenate all words and find acronym as subsequence)\n    if mode == 'subsequence':\n        mapping = []\n        ai = 0\n        for wi, w in enumerate(words_cmp):\n            if ai >= m:\n                break\n            for ci, c in enumerate(w):\n                if c == acronym_cmp[ai]:\n                    mapping.append((wi, ci))\n                    ai += 1\n                    if ai >= m:\n                        break\n        if ai == m:\n            return True, mapping\n        return False, None",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:14:04"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        },
+        "timestamp": "2026-03-15 01:14:05"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:14:19"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import Sequence, List, Tuple, Optional\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> Tuple[bool, Optional[List[Tuple[int, int]]]]:\n    \"\"\"\n    Determine whether `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each letter of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words; i.e. use a subsequence of word initials.\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use (e.g. [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"])\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - (possible, mapping)\n      - possible: True if the acronym can be formed, False otherwise\n      - mapping: list of tuples (word_index, char_index) describing where each letter was taken from.\n                 For this function char_index will always be 0 when a letter is taken from a word.\n                 If not possible, mapping is None.\n\n    Examples:\n    - can_form_acronym(\"NASA\", [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"]) -> (True, [(0,0),(1,0),(3,0),(4,0)])\n    - can_form_acronym(\"py\", [\"python\"]) -> (False, None) unless allow_skip_words is used differently (here first letters are 'p' only).\n    \"\"\"\n    if acronym is None:\n        return False, None\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable with empty mapping\n    if m == 0:\n        return True, []\n\n    # If we must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False, None\n        mapping: List[Tuple[int, int]] = []\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:\n                return False, None  # can't take first letter from empty word\n            if w[0] != acronym_cmp[i]:\n                return False, None\n            mapping.append((i, 0))\n        return True, mapping\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    mapping = []\n    ai = 0\n    for wi, w in enumerate(words_cmp):\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            mapping.append((wi, 0))\n            ai += 1\n\n    if ai == m:\n        return True, mapping\n    return False, None",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:14:19"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        },
+        "timestamp": "2026-03-15 01:14:20"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:14:33"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each letter of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use (e.g. [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"])\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:\n                return False  # can't take first letter from empty word\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:14:33"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        },
+        "timestamp": "2026-03-15 01:14:34"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:14:43"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each letter of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use (e.g. [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"])\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:\n                return False  # can't take first letter from empty word\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:14:43"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        },
+        "timestamp": "2026-03-15 01:14:44"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:14:55"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each letter of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of up to ~100 words to use (e.g. [\"National\",\"Aeronautics\",\"and\",\"Space\",\"Administration\"])\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:\n                return False  # can't take first letter from empty word\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:14:55"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        },
+        "timestamp": "2026-03-15 01:14:56"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:15:04"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each character of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (e.g. \"NASA\")\n    - words: sequence of words to use (each up to 10 characters; up to ~100 words)\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    words_list = list(words)\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [w.lower() for w in words_list]\n    else:\n        acronym_cmp = acronym\n        words_cmp = words_list\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:  # empty word -> cannot take initial\n                return False\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:15:05"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        },
+        "timestamp": "2026-03-15 01:15:05"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:15:18"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import Sequence\n\ndef can_form_acronym(acronym: str,\n                     words: Sequence[str],\n                     case_sensitive: bool = False,\n                     allow_skip_words: bool = True\n                     ) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n\n    Rules:\n    - Each character of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form (may be up to ~100 characters)\n    - words: sequence of words to use (each up to ~10 characters; up to ~100 words)\n    - case_sensitive: if False (default) matching is case-insensitive\n    - allow_skip_words: if True (default) you may skip words\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    # Prepare comparison forms\n    if not case_sensitive:\n        acronym_cmp = acronym.lower()\n        words_cmp = [str(w).lower() for w in words]\n    else:\n        acronym_cmp = acronym\n        words_cmp = [str(w) for w in words]\n\n    m = len(acronym_cmp)\n    n = len(words_cmp)\n\n    # empty acronym is always formable\n    if m == 0:\n        return True\n\n    # must use exactly one initial per word\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i in range(n):\n            w = words_cmp[i]\n            if not w:  # empty word -> cannot take initial\n                return False\n            if w[0] != acronym_cmp[i]:\n                return False\n        return True\n\n    # allow skipping words: find acronym letters among first letters of words in order\n    ai = 0\n    for w in words_cmp:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym_cmp[ai]:\n            ai += 1\n\n    return ai == m",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:15:18"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        },
+        "timestamp": "2026-03-15 01:15:19"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:15:33"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import Sequence\n\ndef can_form_acronym(acronym: str, words: Sequence[str], allow_skip_words: bool = True) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n    Assumes both `acronym` and every string in `words` consist of lowercase letters.\n\n    Rules:\n    - Each character of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Parameters:\n    - acronym: target string to form\n    - words: sequence of words to use (each word may be empty)\n    - allow_skip_words: whether words may be skipped\n\n    Returns:\n    - True if the acronym can be formed, False otherwise.\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    m = len(acronym)\n    words_list = list(words)\n    n = len(words_list)\n\n    if m == 0:\n        return True\n\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i, w in enumerate(words_list):\n            if not w:  # empty word, no initial available\n                return False\n            if w[0] != acronym[i]:\n                return False\n        return True\n\n    ai = 0\n    for w in words_list:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym[ai]:\n            ai += 1\n\n    return ai == m",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:15:34"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 9
+        },
+        "timestamp": "2026-03-15 01:15:45"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:16:22"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import Sequence\n\ndef can_form_acronym(acronym: str, words: Sequence[str], allow_skip_words: bool = True) -> bool:\n    \"\"\"\n    Return True if `acronym` can be formed from the first letters of `words` in order.\n    Assumes both `acronym` and every string in `words` consist of lowercase letters.\n\n    Rules:\n    - Each character of `acronym` must match the first character of some word.\n    - Matches must respect word order.\n    - If allow_skip_words is True (default), you may skip words (use a subsequence of initials).\n    - If allow_skip_words is False, you must use exactly one initial from each word, so len(acronym) must equal len(words).\n\n    Example:\n    - can_form_acronym('abc', ['alice', 'bob', 'charlie']) -> True\n    \"\"\"\n    if acronym is None:\n        return False\n    acronym = str(acronym)\n\n    m = len(acronym)\n    words_list = list(words)\n    n = len(words_list)\n\n    if m == 0:\n        return True\n\n    if not allow_skip_words:\n        if m != n:\n            return False\n        for i, w in enumerate(words_list):\n            if not w:  # empty word, no initial available\n                return False\n            if w[0] != acronym[i]:\n                return False\n        return True\n\n    ai = 0\n    for w in words_list:\n        if ai >= m:\n            break\n        if not w:\n            continue\n        if w[0] == acronym[ai]:\n            ai += 1\n\n    return ai == m",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:16:25"
+      }
+    ],
+    "num_resets": 0
+  },
+  "timestamp": "2026-03-15 01:16:25"
+}

@@ -1,17 +1,17 @@
-"""Identify preliminary false negatives in incorrect conversation traces.
+"""Identify false negatives in incorrect conversation traces.
 
-General-purpose (task-agnostic) preliminary checks on every incorrect sample:
+Two focused checks on every incorrect sample:
 
-  Check 1 (programmatic): Did we fail to extract an answer? Is `extracted_answer`
-    null or empty? Also records the last assistant turn's classification
-    (answer_attempt, clarification, interrogation, discussion, hedge, refuse, missing).
+  1. User simulator sufficiency (LLM): Did the user simulator's messages, taken
+     together, convey all information needed to solve the problem? If not, this is
+     a user-simulator-induced error — the assistant never had a fair chance.
 
-  Check 2 (LLM): When combined, do the user simulator's messages convey all the
-    information present in the original single-turn question? If not, this is a
-    sharding distortion — the assistant never had a fair chance.
+  2. Answer attempt classification (programmatic): Is the last assistant turn
+     classified as an answer_attempt? If not, the evaluator automatically marks
+     it incorrect, which may or may not be fair depending on configuration.
 
-Task-specific checks can be registered via TASK_EXTRA_CHECKS and are run after the
-preliminary checks.
+Future work: branch detection — check if the assistant presented multiple answers
+for multiple interpretations, and whether any of them is correct.
 
 Usage:
     python -m ctx_editor.identify_false_negatives outputs/2026-01-30/04-56-38
@@ -23,9 +23,9 @@ Usage:
 import argparse
 import asyncio
 import json
+import logging
 import os
 from collections import Counter
-from collections.abc import Callable, Coroutine
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -39,11 +39,12 @@ from .paths import PROJECT_ROOT
 
 load_dotenv(PROJECT_ROOT / ".env")
 
+logger = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Data loading helpers
 # ---------------------------------------------------------------------------
 
-# Map task names to their data files
 TASK_DATA_FILES: dict[str, str] = {
     "math": "full_math_subset.json",
     "code": "full_code_subset.json",
@@ -53,10 +54,7 @@ TASK_DATA_FILES: dict[str, str] = {
 
 
 def load_task_metadata() -> dict[str, dict[str, str]]:
-    """Load full_spec_q and ground_truth_a from data files, keyed by task_id.
-
-    Returns dict mapping task_id -> {"full_spec_q": ..., "ground_truth_a": ...}
-    """
+    """Load full_spec_q and ground_truth_a from data files, keyed by task_id."""
     data_dir = PROJECT_ROOT / "data"
     metadata: dict[str, dict[str, str]] = {}
     for task_name, filename in TASK_DATA_FILES.items():
@@ -131,40 +129,39 @@ Respond with a JSON object:
 # ---------------------------------------------------------------------------
 
 @dataclass
-class PrelimFNResult:
+class FalseNegativeResult:
+    """Result of false-negative analysis for a single incorrect sample."""
+
     sample_id: str
     task_name: str
 
-    # Check 1: extraction / classification
-    has_extracted_answer: bool
-    extracted_answer: str = ""
-    last_turn_classification: str = ""  # e.g. "answer_attempt", "clarification", ...
-
-    # Check 1b: extraction failure analysis
-    extraction_failed: bool = False
-    v2_would_extract: bool = False
-    extraction_failure_reason: str = ""
-
-    # Check 2: user sim sufficiency (LLM)
+    # Check 1: user simulator sufficiency (LLM)
     user_sim_sufficient: bool = True
     missing_elements: list[str] = field(default_factory=list)
     sufficiency_explanation: str = ""
 
-    # Task-specific extras (populated by registered hooks)
-    task_extras: dict[str, Any] = field(default_factory=dict)
+    # Check 2: answer attempt classification (programmatic)
+    is_answer_attempt: bool = True
+    last_turn_classification: str = ""  # e.g. "answer_attempt", "clarification", ...
 
     # Misc
     ground_truth: str = ""
     error: str = ""  # non-empty if analysis itself failed
 
     @property
-    def is_preliminary_fn(self) -> bool:
-        """True if either preliminary check flags this as a likely false negative."""
-        return (
-            not self.has_extracted_answer
-            or not self.user_sim_sufficient
-            or self.extraction_failed
-        )
+    def exclusion_reason(self) -> Optional[str]:
+        """Why this sample should be excluded from the accuracy denominator.
+
+        Returns:
+            "user_sim_induced" if user simulator distorted the problem (always excluded),
+            "non_answer_attempt" if last turn wasn't an answer attempt (configurable),
+            None if the sample should be counted normally.
+        """
+        if not self.user_sim_sufficient:
+            return "user_sim_induced"
+        if not self.is_answer_attempt:
+            return "non_answer_attempt"
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -196,93 +193,6 @@ def get_active_messages(trace: dict) -> list[dict]:
     return [m for m in messages if m.get("visible", True) and m.get("role") != "log"]
 
 
-def get_extracted_answer(sample: dict) -> str:
-    """Try to find the extracted answer from the sample / trace logs."""
-    extracted = sample.get("extracted_answer", "")
-    if extracted:
-        return extracted
-    trace = sample.get("trace", {})
-    if isinstance(trace, dict):
-        logs = trace.get("logs", [])
-        for log in reversed(logs):
-            if log.get("type") == "answer_evaluation":
-                ans = log.get("data", {}).get("extracted_answer", "")
-                if ans:
-                    return ans
-    return ""
-
-
-def check_extraction_failure(sample: dict, task_name: str) -> dict[str, Any]:
-    """Check if the answer extractor failed to extract code that was present.
-
-    For code tasks, tries the V2 extractor (which fixes a bug where an `import`
-    inside a function body caused the V1 extractor to drop the function header).
-    Also checks if the assistant ever produced code but it was never extracted.
-
-    Returns dict with:
-        extraction_failed: True if code was present but not extracted
-        v2_would_extract: True if V2 extractor would succeed where V1 failed
-        failure_reason: description of why extraction failed
-    """
-    result = {
-        "extraction_failed": False,
-        "v2_would_extract": False,
-        "failure_reason": "",
-    }
-
-    if task_name != "code":
-        return result
-
-    try:
-        from lic.tasks.code.task_code import TaskCode
-        from lic.tasks.code.task_code_v2 import TaskCodeV2
-    except ImportError:
-        return result
-
-    task_v1 = TaskCode()
-    task_v2 = TaskCodeV2()
-
-    trace = sample.get("trace", {})
-    if not isinstance(trace, dict):
-        return result
-
-    messages = trace.get("messages", [])
-    assistant_msgs = [
-        m.get("content", "")
-        for m in messages
-        if isinstance(m, dict) and m.get("role") == "assistant"
-    ]
-
-    if not assistant_msgs:
-        return result
-
-    # Check: does any assistant message contain "def " (code was produced)?
-    has_code = any("def " in msg for msg in assistant_msgs)
-    if not has_code:
-        return result
-
-    # Check last assistant message with V1 vs V2
-    last_msg = assistant_msgs[-1]
-    v1_extracted = task_v1.extract_answer(last_msg)
-    v2_extracted = task_v2.extract_answer(last_msg)
-
-    if not v1_extracted and v2_extracted:
-        result["extraction_failed"] = True
-        result["v2_would_extract"] = True
-        result["failure_reason"] = (
-            "V1 extractor failed (import-inside-function bug) but V2 would succeed"
-        )
-    elif not v1_extracted and not v2_extracted:
-        # Neither extracted — check if code blocks are missing
-        if "```" not in last_msg and "def " in last_msg:
-            result["extraction_failed"] = True
-            result["failure_reason"] = (
-                "Assistant produced code without markdown fences and extractor could not parse it"
-            )
-
-    return result
-
-
 def get_last_turn_classification(sample: dict) -> str:
     """Get the response_type from the last verification log entry."""
     trace = sample.get("trace", {})
@@ -296,18 +206,6 @@ def get_last_turn_classification(sample: dict) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Task-specific extra checks (register per task)
-# ---------------------------------------------------------------------------
-
-# Signature: async (sample, model_client, model) -> dict[str, Any]
-TaskExtraCheck = Callable[[dict, Any, str], Coroutine[Any, Any, dict[str, Any]]]
-
-# Register task-specific checks here. They run AFTER the two preliminary checks.
-# Each returns a dict that gets merged into result.task_extras.
-TASK_EXTRA_CHECKS: dict[str, list[TaskExtraCheck]] = {}
-
-
-# ---------------------------------------------------------------------------
 # Core analysis
 # ---------------------------------------------------------------------------
 
@@ -315,8 +213,8 @@ async def analyze_sample(
     sample: dict,
     model_client: Any,
     model: str,
-) -> PrelimFNResult:
-    """Run preliminary false-negative checks on a single sample."""
+) -> FalseNegativeResult:
+    """Run false-negative checks on a single incorrect sample."""
     sample_id = sample.get("sample_id", "unknown")
     task_name = sample.get("task_name", "unknown")
     metadata = sample.get("metadata", {})
@@ -324,14 +222,7 @@ async def analyze_sample(
     ground_truth_a = metadata.get("ground_truth_a", "")
 
     # ------------------------------------------------------------------
-    # Check 1 (programmatic): extracted answer + last turn classification
-    # ------------------------------------------------------------------
-    extracted_answer = get_extracted_answer(sample)
-    has_extracted = bool(extracted_answer)
-    last_classification = get_last_turn_classification(sample)
-
-    # ------------------------------------------------------------------
-    # Check 2 (LLM): user sim sufficiency
+    # Check 1 (LLM): user simulator sufficiency
     # ------------------------------------------------------------------
     trace = sample.get("trace", {})
     messages = get_active_messages(trace) if isinstance(trace, dict) else []
@@ -357,34 +248,35 @@ async def analyze_sample(
     explanation = llm_result.get("explanation", "")
 
     # ------------------------------------------------------------------
-    # Check 1b (programmatic): extraction failure analysis
+    # Check 2 (programmatic): last turn classification
     # ------------------------------------------------------------------
-    extraction_info = check_extraction_failure(sample, task_name)
+    last_classification = get_last_turn_classification(sample)
+    is_answer_attempt = last_classification == "answer_attempt"
 
-    result = PrelimFNResult(
+    return FalseNegativeResult(
         sample_id=sample_id,
         task_name=task_name,
-        has_extracted_answer=has_extracted,
-        extracted_answer=extracted_answer,
-        last_turn_classification=last_classification,
-        extraction_failed=extraction_info["extraction_failed"],
-        v2_would_extract=extraction_info["v2_would_extract"],
-        extraction_failure_reason=extraction_info["failure_reason"],
         user_sim_sufficient=sufficient,
         missing_elements=missing_elements,
         sufficiency_explanation=explanation,
+        is_answer_attempt=is_answer_attempt,
+        last_turn_classification=last_classification,
         ground_truth=ground_truth_a,
     )
 
-    # ------------------------------------------------------------------
-    # Task-specific extras
-    # ------------------------------------------------------------------
-    extra_checks = TASK_EXTRA_CHECKS.get(task_name, [])
-    for check_fn in extra_checks:
-        extras = await check_fn(sample, model_client, model)
-        result.task_extras.update(extras)
 
-    return result
+async def analyze_sample_inline(
+    result_dict: dict[str, Any],
+    model_client: Any,
+    model: str,
+) -> Optional[FalseNegativeResult]:
+    """Analyze a single SimulationResult dict. Returns None for correct results.
+
+    This is the entry point for inline analysis from run_experiment.py.
+    """
+    if result_dict.get("is_correct", True):
+        return None
+    return await analyze_sample(result_dict, model_client, model)
 
 
 async def _analyze_with_semaphore(
@@ -393,7 +285,7 @@ async def _analyze_with_semaphore(
     model_client: Any,
     model: str,
     verbose: bool,
-) -> PrelimFNResult:
+) -> FalseNegativeResult:
     """Wrapper that respects a concurrency semaphore."""
     async with sem:
         sid = sample.get("sample_id", "unknown")
@@ -402,41 +294,40 @@ async def _analyze_with_semaphore(
         except Exception as e:
             if verbose:
                 print(f"  ERROR [{sid}]: {e}")
-            result = PrelimFNResult(
+            result = FalseNegativeResult(
                 sample_id=sid,
                 task_name=sample.get("task_name", "unknown"),
-                has_extracted_answer=False,
-                extracted_answer=get_extracted_answer(sample),
+                user_sim_sufficient=True,  # default to not excluding on error
+                is_answer_attempt=True,
                 ground_truth=sample.get("metadata", {}).get("ground_truth_a", ""),
                 error=str(e),
             )
         if verbose:
             flags = []
-            if not result.has_extracted_answer:
-                flags.append(f"no_answer({result.last_turn_classification})")
             if not result.user_sim_sufficient:
-                flags.append("sharding_distortion")
-            tag = " ".join(flags) if flags else "pass"
+                flags.append("user_sim_induced")
+            if not result.is_answer_attempt:
+                flags.append(f"non_answer({result.last_turn_classification})")
+            tag = " ".join(flags) if flags else "ok"
             print(f"  [{sid}] {tag}")
         return result
 
 
 async def run_analysis(
     run_dir: str,
-    model: str = "gpt-5.2",
+    model: str = "gpt-5-mini",
     concurrency: int = 5,
     max_samples: Optional[int] = None,
     task_filter: Optional[str] = None,
     verbose: bool = False,
     debug: bool = False,
-) -> list[PrelimFNResult]:
-    """Run preliminary false-negative checks on all incorrect samples in a run directory."""
+) -> list[FalseNegativeResult]:
+    """Run false-negative checks on all incorrect samples in a run directory."""
     run_path = Path(run_dir)
 
-    # Load task metadata (full_spec_q, ground_truth_a) from data files
     task_metadata = load_task_metadata()
 
-    # Load samples
+    # Load samples from traces/ or results.json
     samples: list[dict] = []
     traces_dir = run_path / "traces"
     if traces_dir.exists():
@@ -463,7 +354,6 @@ async def run_analysis(
             meta = task_metadata.get(sample_id, {})
             sample["metadata"] = meta
 
-    # Keep only incorrect samples
     incorrect = [s for s in samples if not s.get("is_correct", True)]
 
     if task_filter:
@@ -486,7 +376,6 @@ async def run_analysis(
         print(f"task_name:       {s.get('task_name')}")
         print(f"full_spec_q:     {bool(meta.get('full_spec_q'))}  {str(meta.get('full_spec_q',''))[:200]}")
         print(f"ground_truth_a:  {bool(meta.get('ground_truth_a'))}  {str(meta.get('ground_truth_a',''))[:200]}")
-        print(f"extracted_answer: {get_extracted_answer(s)!r}")
         print(f"last_classification: {get_last_turn_classification(s)!r}")
         print("=" * 60 + "\n")
 
@@ -498,8 +387,8 @@ async def run_analysis(
         for sample in incorrect
     ]
 
-    results: list[PrelimFNResult] = await tqdm_asyncio.gather(
-        *tasks, desc="Analyzing", disable=verbose
+    results: list[FalseNegativeResult] = await tqdm_asyncio.gather(
+        *tasks, desc="False negative analysis", disable=verbose
     )
 
     return results
@@ -509,112 +398,152 @@ async def run_analysis(
 # Reporting
 # ---------------------------------------------------------------------------
 
-def print_summary(results: list[PrelimFNResult]) -> None:
-    if not results:
-        print("No results to summarize.")
+def compute_adjusted_accuracy(
+    total_correct: int,
+    total_valid: int,
+    fn_results: list[FalseNegativeResult],
+    exclude_non_answer_attempts: bool = False,
+) -> dict[str, Any]:
+    """Compute adjusted accuracy metrics given false-negative analysis results.
+
+    Args:
+        total_correct: Number of correct results (from evaluation).
+        total_valid: Total non-errored results (denominator for raw accuracy).
+        fn_results: False-negative analysis results (only for incorrect samples).
+        exclude_non_answer_attempts: If True, also exclude non-answer-attempts
+            from the denominator.
+
+    Returns:
+        Dict with raw and adjusted accuracy info.
+    """
+    user_sim_induced = [r for r in fn_results if not r.user_sim_sufficient]
+    non_answer_attempts = [
+        r for r in fn_results
+        if r.user_sim_sufficient and not r.is_answer_attempt
+    ]
+
+    # Always exclude user_sim_induced from denominator
+    adjusted_denominator = total_valid - len(user_sim_induced)
+    if exclude_non_answer_attempts:
+        adjusted_denominator -= len(non_answer_attempts)
+
+    raw_accuracy = total_correct / total_valid if total_valid > 0 else 0
+    adjusted_accuracy = total_correct / adjusted_denominator if adjusted_denominator > 0 else 0
+
+    return {
+        "raw_correct": total_correct,
+        "raw_total": total_valid,
+        "raw_accuracy": raw_accuracy,
+        "adjusted_correct": total_correct,
+        "adjusted_total": adjusted_denominator,
+        "adjusted_accuracy": adjusted_accuracy,
+        "user_sim_induced": len(user_sim_induced),
+        "non_answer_attempts": len(non_answer_attempts),
+        "excluded_non_answer_attempts": exclude_non_answer_attempts,
+    }
+
+
+def print_fn_summary(
+    fn_results: list[FalseNegativeResult],
+    total_correct: int = 0,
+    total_valid: int = 0,
+    exclude_non_answer_attempts: bool = False,
+) -> None:
+    """Print a summary of false-negative analysis results."""
+    if not fn_results:
+        print("No incorrect samples to analyze for false negatives.")
         return
 
+    total_incorrect = len(fn_results)
+    errors = sum(1 for r in fn_results if r.error)
+
+    user_sim_induced = [r for r in fn_results if not r.user_sim_sufficient]
+    non_answer = [
+        r for r in fn_results
+        if r.user_sim_sufficient and not r.is_answer_attempt
+    ]
+
     print("\n" + "=" * 60)
-    print("PRELIMINARY FALSE NEGATIVE ANALYSIS")
+    print("FALSE NEGATIVE ANALYSIS")
     print("=" * 60)
 
-    total = len(results)
-    errors = sum(1 for r in results if r.error)
-
-    # Check 1 stats
-    no_answer = [r for r in results if not r.has_extracted_answer]
-    classification_counts = Counter(r.last_turn_classification for r in no_answer)
-
-    # Check 2 stats
-    distortions = [r for r in results if not r.user_sim_sufficient]
-
-    # Combined
-    prelim_fn = [r for r in results if r.is_preliminary_fn]
-
-    print(f"\nTotal incorrect samples analyzed: {total}")
+    print(f"\nTotal incorrect samples analyzed: {total_incorrect}")
     if errors:
         print(f"Analysis errors: {errors}")
 
-    # Check 1b stats
-    extraction_failures = [r for r in results if r.extraction_failed]
+    # User simulator induced
+    print(f"\n--- User Simulator Induced ({len(user_sim_induced)}) ---")
+    if user_sim_induced:
+        print("  These are ALWAYS excluded from the accuracy denominator.")
+        for r in user_sim_induced:
+            missing = "; ".join(r.missing_elements) if r.missing_elements else r.sufficiency_explanation
+            print(f"  [{r.sample_id}] {missing[:140]}")
+    else:
+        print("  None detected.")
 
-    print("\n--- Check 1: Answer Extraction ---")
-    print(f"Missing extracted answer: {len(no_answer)} / {total} ({len(no_answer)/total:.1%})")
-    if classification_counts:
-        print("  Last turn classifications for missing-answer cases:")
+    # Non-answer attempts
+    print(f"\n--- Non-Answer Attempts ({len(non_answer)}) ---")
+    excl_label = "EXCLUDED" if exclude_non_answer_attempts else "INCLUDED in denominator (configurable)"
+    print(f"  {excl_label}")
+    if non_answer:
+        classification_counts = Counter(r.last_turn_classification for r in non_answer)
         for cls, count in sorted(classification_counts.items(), key=lambda x: -x[1]):
             print(f"    {cls or '(empty)':<20} {count:3d}")
-    if extraction_failures:
-        print(f"\n--- Check 1b: Extraction Failures ---")
-        print(f"Extraction bug detected: {len(extraction_failures)} / {total} ({len(extraction_failures)/total:.1%})")
-        v2_fixable = sum(1 for r in extraction_failures if r.v2_would_extract)
-        print(f"  Fixable by V2 extractor: {v2_fixable}")
-        for r in extraction_failures[:5]:
-            print(f"    [{r.sample_id}] {r.extraction_failure_reason}")
+    else:
+        print("  None detected.")
 
-    print("\n--- Check 2: User Sim Sufficiency ---")
-    print(f"Sharding distortion: {len(distortions)} / {total} ({len(distortions)/total:.1%})")
-    if distortions:
-        print("  Examples (up to 5):")
-        for r in distortions[:5]:
-            missing = "; ".join(r.missing_elements) if r.missing_elements else r.sufficiency_explanation
-            print(f"    [{r.sample_id}] {missing[:140]}")
-
-    print("\n--- Summary ---")
-    print(f"Preliminary false negatives: {len(prelim_fn)} / {total} ({len(prelim_fn)/total:.1%})")
-    print(f"Likely true negatives: {total - len(prelim_fn) - errors} / {total}")
-
-    # Per-task breakdown
-    task_counts = Counter(r.task_name for r in results)
-    if len(task_counts) > 1:
-        print("\nPer-task breakdown:")
-        print("-" * 50)
-        for task, count in sorted(task_counts.items(), key=lambda x: -x[1]):
-            task_results = [r for r in results if r.task_name == task]
-            fn = sum(1 for r in task_results if r.is_preliminary_fn)
-            no_ans = sum(1 for r in task_results if not r.has_extracted_answer)
-            dist = sum(1 for r in task_results if not r.user_sim_sufficient)
-            print(f"  {task:<15} {count:3d} samples | {fn} prelim FN | {no_ans} no answer | {dist} distortion")
+    # Adjusted accuracy
+    if total_valid > 0:
+        adj = compute_adjusted_accuracy(
+            total_correct, total_valid, fn_results, exclude_non_answer_attempts
+        )
+        print(f"\n--- Accuracy ---")
+        print(f"  Raw:      {adj['raw_correct']}/{adj['raw_total']} ({adj['raw_accuracy']:.2%})")
+        print(f"  Adjusted: {adj['adjusted_correct']}/{adj['adjusted_total']} ({adj['adjusted_accuracy']:.2%})")
 
 
-def save_results(results: list[PrelimFNResult], output_path: str) -> None:
+def save_fn_results(fn_results: list[FalseNegativeResult], output_path: str) -> None:
+    """Save false-negative analysis results to a JSON file."""
     output_data = {
         "timestamp": datetime.now().isoformat(),
-        "total_analyzed": len(results),
+        "total_analyzed": len(fn_results),
         "summary": {
-            "preliminary_false_negatives": sum(1 for r in results if r.is_preliminary_fn),
-            "no_extracted_answer": sum(1 for r in results if not r.has_extracted_answer),
-            "sharding_distortion": sum(1 for r in results if not r.user_sim_sufficient),
-            "by_last_classification": dict(Counter(
-                r.last_turn_classification for r in results if not r.has_extracted_answer
+            "user_sim_induced": sum(1 for r in fn_results if not r.user_sim_sufficient),
+            "non_answer_attempts": sum(
+                1 for r in fn_results
+                if r.user_sim_sufficient and not r.is_answer_attempt
+            ),
+            "non_answer_classification_breakdown": dict(Counter(
+                r.last_turn_classification for r in fn_results
+                if r.user_sim_sufficient and not r.is_answer_attempt
             )),
+            "user_sim_induced_ids": [r.sample_id for r in fn_results if not r.user_sim_sufficient],
+            "non_answer_attempt_ids": [
+                r.sample_id for r in fn_results
+                if r.user_sim_sufficient and not r.is_answer_attempt
+            ],
         },
         "results": [
             {
                 "sample_id": r.sample_id,
                 "task_name": r.task_name,
-                "is_preliminary_fn": r.is_preliminary_fn,
-                "has_extracted_answer": r.has_extracted_answer,
-                "extracted_answer": r.extracted_answer,
-                "last_turn_classification": r.last_turn_classification,
-                "extraction_failed": r.extraction_failed,
-                "v2_would_extract": r.v2_would_extract,
-                "extraction_failure_reason": r.extraction_failure_reason,
+                "exclusion_reason": r.exclusion_reason,
                 "user_sim_sufficient": r.user_sim_sufficient,
                 "missing_elements": r.missing_elements,
                 "sufficiency_explanation": r.sufficiency_explanation,
-                "task_extras": r.task_extras,
+                "is_answer_attempt": r.is_answer_attempt,
+                "last_turn_classification": r.last_turn_classification,
                 "ground_truth": r.ground_truth,
                 "error": r.error,
             }
-            for r in results
+            for r in fn_results
         ],
     }
 
     with open(output_path, "w") as f:
         json.dump(output_data, f, indent=2)
 
-    print(f"\nResults saved to: {output_path}")
+    logger.info(f"False negative analysis saved to: {output_path}")
 
 
 # ---------------------------------------------------------------------------
@@ -623,7 +552,7 @@ def save_results(results: list[PrelimFNResult], output_path: str) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Preliminary false negative identification for incorrect conversation traces"
+        description="False negative identification for incorrect conversation traces"
     )
     parser.add_argument(
         "run_dir",
@@ -631,8 +560,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--model",
-        default="gpt-5.2",
-        help="Model to use for LLM checks (default: gpt-5.2)",
+        default="gpt-5-mini",
+        help="Model to use for LLM checks (default: gpt-5-mini)",
     )
     parser.add_argument(
         "--concurrency", "-c",
@@ -642,7 +571,7 @@ def main() -> None:
     )
     parser.add_argument(
         "--output", "-o",
-        help="Output JSON file path (default: {run_dir}/prelim_fn.json)",
+        help="Output JSON file path (default: {run_dir}/false_negatives.json)",
     )
     parser.add_argument(
         "--max-samples", "-n",
@@ -678,10 +607,10 @@ def main() -> None:
         )
     )
 
-    print_summary(results)
+    print_fn_summary(results)
 
-    output_path = args.output or os.path.join(args.run_dir, "prelim_fn.json")
-    save_results(results, output_path)
+    output_path = args.output or os.path.join(args.run_dir, "false_negatives.json")
+    save_fn_results(results, output_path)
 
 
 if __name__ == "__main__":

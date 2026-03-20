@@ -16,6 +16,7 @@ Usage:
 import argparse
 import json
 import os
+import re
 import sys
 from collections import defaultdict
 from datetime import datetime
@@ -25,6 +26,12 @@ from typing import Any, Optional
 import streamlit as st
 import tiktoken
 import yaml
+
+# Regex to strip S1's embedded <conversation_analysis> blocks from user messages
+_ANALYSIS_TAG_RE = re.compile(r"\n*<conversation_analysis>.*?</conversation_analysis>", re.DOTALL)
+
+# Regex to extract <cheatsheet> content from system messages
+_CHEATSHEET_RE = re.compile(r"<cheatsheet>(.*?)</cheatsheet>", re.DOTALL)
 
 
 @st.cache_resource
@@ -106,6 +113,23 @@ def load_sample_with_trace(run_dir: str, sample: dict, experiment_type: str) -> 
         # Also merge models info if present in trace file
         if "models" in trace_data and "models" not in merged:
             merged["models"] = trace_data["models"]
+
+        # Load error attribution if available
+        ea_path = os.path.join(run_dir, "error_analysis.json")
+        if os.path.exists(ea_path):
+            try:
+                ea_data = json.load(open(ea_path))
+                ea_results = ea_data.get("results", [])
+                sample_id = merged.get("sample_id", "")
+                for ea in ea_results:
+                    if ea.get("sample_id") == sample_id:
+                        if "metadata" not in merged:
+                            merged["metadata"] = {}
+                        merged["metadata"]["error_attribution"] = ea
+                        break
+            except Exception:
+                pass
+
         return merged
     except Exception:
         return sample
@@ -159,9 +183,43 @@ def load_data_file_indexed(data_file_path: str) -> dict[str, dict]:
     return indexed
 
 
-def get_original_problem_spec(
-    run_dir: str, task_id: str
-) -> tuple[Optional[str], Optional[str]]:
+def get_original_sample_data(run_dir: str, task_id: str) -> dict:
+    """Get the full original sample data (including shards) for a given task_id.
+
+    Args:
+        run_dir: Path to the run directory containing config.yaml
+        task_id: The task_id to look up
+
+    Returns:
+        Dict with full_spec_q, ground_truth_a, shards, etc. Empty dict if not found.
+    """
+    config = load_config_file(run_dir)
+    if not config:
+        return {}
+
+    data_file = config.get("task", {}).get("data_file")
+    if not data_file:
+        return {}
+
+    # Resolve data file path
+    if os.path.exists(data_file):
+        data_file_path = data_file
+    else:
+        script_dir = Path(__file__).parent.parent.parent
+        data_file_path = str(script_dir / data_file)
+        if not os.path.exists(data_file_path):
+            run_path = Path(run_dir)
+            for i in range(1, 5):
+                candidate = run_path.parents[i] / data_file if i < len(run_path.parents) else None
+                if candidate and candidate.exists():
+                    data_file_path = str(candidate)
+                    break
+
+    indexed_data = load_data_file_indexed(data_file_path)
+    return indexed_data.get(task_id, {})
+
+
+def get_original_problem_spec(run_dir: str, task_id: str) -> tuple[Optional[str], Optional[str]]:
     """Get the original problem specification for a given task_id.
 
     Args:
@@ -171,45 +229,7 @@ def get_original_problem_spec(
     Returns:
         Tuple of (full_spec_q, ground_truth_a), either can be None if not found
     """
-    # Load config to get data_file path
-    config = load_config_file(run_dir)
-    if not config:
-        return None, None
-
-    # Get data file path from config
-    data_file = config.get("task", {}).get("data_file")
-    if not data_file:
-        return None, None
-
-    # Resolve data file path relative to project root
-    # The data_file in config is relative to project root (e.g., "data/lic_eval_subset.json")
-    # We need to find the project root from run_dir
-    # run_dir is like: outputs/baseline_gpt-5-mini_all/2026-01-29_08-03-51
-    # Project root is 3 levels up from the new-style paths, but could vary
-
-    # Try to resolve from current working directory first
-    if os.path.exists(data_file):
-        data_file_path = data_file
-    else:
-        # Try relative to the script location
-        script_dir = Path(__file__).parent.parent.parent
-        data_file_path = str(script_dir / data_file)
-
-        if not os.path.exists(data_file_path):
-            # Try relative to run_dir by going up directories
-            run_path = Path(run_dir)
-            for i in range(1, 5):  # Try up to 4 levels up
-                candidate = run_path.parents[i] / data_file if i < len(run_path.parents) else None
-                if candidate and candidate.exists():
-                    data_file_path = str(candidate)
-                    break
-
-    # Load and index the data file
-    indexed_data = load_data_file_indexed(data_file_path)
-
-    # Look up the task
-    task_data = indexed_data.get(task_id, {})
-
+    task_data = get_original_sample_data(run_dir, task_id)
     return task_data.get("full_spec_q"), task_data.get("ground_truth_a")
 
 
@@ -259,7 +279,8 @@ def find_output_dirs(base_path: str = "outputs") -> list[dict]:
 
         # Check if it's a date directory (YYYY-MM-DD)
         import re
-        if not re.match(r'^\d{4}-\d{2}-\d{2}$', date_dir.name):
+
+        if not re.match(r"^\d{4}-\d{2}-\d{2}$", date_dir.name):
             continue
 
         for time_dir in date_dir.iterdir():
@@ -280,7 +301,9 @@ def find_output_dirs(base_path: str = "outputs") -> list[dict]:
                     if config_file.exists():
                         config = load_config_file(str(time_dir))
                         if config:
-                            run_info["strategy"] = config.get("experiment", {}).get("name", "unknown")
+                            run_info["strategy"] = config.get("experiment", {}).get(
+                                "name", "unknown"
+                            )
                             run_info["model"] = config.get("model", {}).get("name", "unknown")
                             run_info["task"] = config.get("task", {}).get("name", "unknown")
 
@@ -370,6 +393,81 @@ def get_logs_before_message(logs: list[dict], msg_timestamp: str) -> list[dict]:
                 continue
 
     return relevant_logs
+
+
+def build_shard_index(shards: list[dict]) -> dict[int, str]:
+    """Build a mapping from shard_id to shard text."""
+    return {s["shard_id"]: s["shard"] for s in shards}
+
+
+def build_turn_shard_map(logs: list[dict]) -> dict[int, int]:
+    """Build a mapping from user turn number (1-indexed) to shard_id revealed.
+
+    Counts shard_revealed events in order — the Nth shard_revealed corresponds
+    to the Nth user turn.
+    """
+    turn_map: dict[int, int] = {}
+    turn_num = 0
+    for log in logs:
+        if log.get("type") == "shard_revealed":
+            turn_num += 1
+            turn_map[turn_num] = log["data"]["shard_id"]
+    return turn_map
+
+
+def display_shard_comparison(user_content: str, shard_text: str, shard_id: int) -> None:
+    """Display side-by-side comparison of actual shard vs user simulator phrasing."""
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(
+            f'<div style="background-color: #1a2a3a; padding: 10px; border-radius: 5px; '
+            f'border-left: 4px solid #5a9fd4;">'
+            f'<strong style="color: #7ab3e0;">Actual Shard #{shard_id}</strong><br>'
+            f'<span style="color: #e0e0e0;">{shard_text}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+    with col2:
+        st.markdown(
+            f'<div style="background-color: #2a1a3a; padding: 10px; border-radius: 5px; '
+            f'border-left: 4px solid #9c5ad4;">'
+            f'<strong style="color: #c4a8e6;">User Simulator Phrasing</strong><br>'
+            f'<span style="color: #e0e0e0;">{user_content}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def display_shard_summary(full_spec_q: Optional[str], shards: list[dict]) -> None:
+    """Display the full spec question and all shards as bullet points."""
+    st.divider()
+    st.subheader("Shard Breakdown")
+
+    if full_spec_q:
+        st.markdown(
+            f'<div style="background-color: #1a2a3a; padding: 12px; border-radius: 5px; '
+            f'margin-bottom: 15px; border: 1px solid #3a5a7a;">'
+            f'<strong style="color: #7ab3e0;">Full Spec Question</strong><br><br>'
+            f'<span style="color: #e0e0e0;">{full_spec_q}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+    if shards:
+        shard_bullets = "".join(
+            f'<li style="margin-bottom: 6px;">'
+            f'<strong style="color: #7ab3e0;">Shard #{s["shard_id"]}:</strong> '
+            f'<span style="color: #e0e0e0;">{s["shard"]}</span></li>'
+            for s in shards
+        )
+        st.markdown(
+            f'<div style="background-color: #1a2a2a; padding: 12px; border-radius: 5px; '
+            f'border: 1px solid #3a5a5a;">'
+            f'<strong style="color: #5ad4a8;">All Shards</strong>'
+            f'<ul style="margin-top: 8px; margin-bottom: 0;">{shard_bullets}</ul>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
 
 
 def display_edit_decision(log: dict) -> None:
@@ -570,9 +668,7 @@ def display_original_problem(
     )
 
 
-def display_log_entry(
-    log: dict, show_verification: bool = True, task_name: str = ""
-) -> None:
+def display_log_entry(log: dict, show_verification: bool = True, task_name: str = "") -> None:
     """Display a log entry based on its type."""
     log_type = log.get("type", "unknown")
 
@@ -666,20 +762,145 @@ def display_history_snapshot(snapshot: dict, index: int) -> None:
                 st.markdown(f"**[system]** {content}")
 
 
-def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") -> None:
-    """Display a full conversation with all logs and context edits.
+def extract_memory_from_system(content: str) -> tuple[str, str]:
+    """Extract cheatsheet memory from system message content.
 
-    Args:
-        sample: The sample data containing trace, metadata, etc.
-        exp_type: The experiment type (e.g., "context_edit", "baseline")
-        run_dir: Path to the run directory (for loading original problem spec)
+    Returns:
+        Tuple of (system_content_without_memory, memory_content).
+        memory_content is empty string if no cheatsheet found.
     """
-    # Display original problem specification from data file
+    match = _CHEATSHEET_RE.search(content)
+    if not match:
+        return content, ""
+    memory_content = match.group(1).strip()
+    clean_content = _CHEATSHEET_RE.sub("", content).strip()
+    return clean_content, memory_content
+
+
+def display_memory_block(memory_content: str) -> None:
+    """Display memory/cheatsheet content in a collapsible block."""
+    if not memory_content:
+        return
+    with st.expander("Memory (Cheatsheet)", expanded=False):
+        st.markdown(
+            f'<div style="background-color: #2a2a1a; padding: 12px; border-radius: 5px; '
+            f'border-left: 4px solid #d4a017;">'
+            f'<span style="color: #e8d88a; white-space: pre-wrap;">{memory_content}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def display_analysis_block(log_data: dict) -> None:
+    """Display a conversation analysis log as an interleaved block."""
+    parts = []
+    if log_data.get("user_intent"):
+        parts.append(f"**Task Spec**\n{log_data['user_intent']}")
+    if log_data.get("aligned"):
+        parts.append(f"**What Looks Right**\n{log_data['aligned']}")
+    if log_data.get("issues") and log_data.get("needs_edit"):
+        parts.append(f"**What Needs to Change**\n{log_data['issues']}")
+    elif log_data.get("issues"):
+        parts.append(f"**Notes**\n{log_data['issues']}")
+
+    analyzer_model = log_data.get("analyzer_model", "")
+    model_str = (
+        f' <span style="font-size: 0.8em; color: #888;">({analyzer_model})</span>'
+        if analyzer_model
+        else ""
+    )
+
+    analysis_text = "\n\n".join(parts) if parts else "(no analysis content)"
+
+    with st.expander(
+        f"Conversation Analysis{' — issues found' if log_data.get('needs_edit') else ' — aligned'}",
+        expanded=log_data.get("needs_edit", False),
+    ):
+        st.markdown(
+            f'<div style="background-color: #1a2a3a; padding: 12px; border-radius: 5px; '
+            f'border-left: 4px solid #17a2b8;">'
+            f'<strong style="color: #7ab3e0;">Analyzer Output</strong>{model_str}'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(analysis_text)
+
+
+def display_edit_decision_inline(log_data: dict) -> None:
+    """Display an edit decision as an inline indicator."""
+    should_edit = log_data.get("should_edit", False)
+    if should_edit:
+        st.markdown(
+            '<div style="background-color: #2d4a3e; padding: 8px 12px; border-radius: 5px; '
+            'margin: 5px 0; border-left: 4px solid #28a745; text-align: center;">'
+            '<strong style="color: #7ae6a8;">Decision: EDIT</strong> — rewriting context'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+    else:
+        st.markdown(
+            '<div style="background-color: #2a2a2a; padding: 8px 12px; border-radius: 5px; '
+            'margin: 5px 0; border-left: 4px solid #6c757d; text-align: center;">'
+            '<strong style="color: #aaa;">Decision: NO EDIT</strong> — approach is aligned'
+            "</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def display_context_reset_boundary(reset_num: int) -> None:
+    """Display a visual boundary when context is reset (S2 edit)."""
+    st.markdown(
+        f'<div style="background-color: #3d2d4a; padding: 12px; border-radius: 5px; '
+        f'margin: 15px 0; border: 2px dashed #9c27b0; text-align: center;">'
+        f'<strong style="color: #d4a8e6; font-size: 1.1em;">'
+        f"--- NEW CONVERSATION (Reset #{reset_num}) ---</strong><br>"
+        f'<span style="font-size: 0.85em; color: #b8a8c8;">'
+        f"Context was rewritten. The assistant now sees compacted context below.</span>"
+        f"</div>",
+        unsafe_allow_html=True,
+    )
+
+
+def display_compacted_conversation(content: str) -> None:
+    """Display a compacted conversation message (from S2 context edit)."""
+    with st.expander("Compacted Context (what the assistant sees)", expanded=True):
+        st.markdown(
+            f'<div style="background-color: #1a1a2e; padding: 12px; border-radius: 5px; '
+            f'border-left: 4px solid #9c27b0;">'
+            f'<span style="color: #d4c4e6; white-space: pre-wrap;">{content}</span>'
+            f"</div>",
+            unsafe_allow_html=True,
+        )
+
+
+def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") -> None:
+    """Display a full conversation with interleaved analysis and context edits.
+
+    Renders the conversation timeline similar to render_for_analyzer() in renderers.py:
+    messages and analysis/edit logs are merged chronologically, showing exactly when
+    the external context module intervened.
+
+    Handles:
+    - S0 (baseline): Simple message display
+    - S1 (append_analysis): Strips embedded <conversation_analysis> tags from user
+      messages and shows analysis as separate interleaved blocks
+    - S2 (context_edit_v2): Shows analysis, edit decisions, and context reset
+      boundaries with compacted conversation blocks
+    - Memory: Extracts <cheatsheet> from system message and shows in collapsible
+    """
+    # Load original sample data (including shards) from data file
     task_id = sample.get("sample_id")
     task_name = sample.get("task_name", "")
+    original_data: dict = {}
     if run_dir and task_id:
-        full_spec_q, ground_truth_a = get_original_problem_spec(run_dir, task_id)
+        original_data = get_original_sample_data(run_dir, task_id)
+        full_spec_q = original_data.get("full_spec_q")
+        ground_truth_a = original_data.get("ground_truth_a")
         display_original_problem(full_spec_q, ground_truth_a, task_name=task_name)
+
+    # Prepare shard data for comparison
+    shards_list = original_data.get("shards", [])
+    shard_index = build_shard_index(shards_list) if shards_list else {}
 
     trace = sample.get("trace", {})
 
@@ -691,101 +912,150 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
 
     messages = get_messages_from_trace(trace)
     logs = get_logs_from_trace(trace)
-    history = get_history_from_trace(trace)
-
-    # Determine if this is a context_edit experiment (always edits after turn 1)
-    is_context_edit = "context_edit" in exp_type and "agentic" not in exp_type
-
-    # Show history snapshots if present (indicates context editing occurred)
-    if history:
-        st.subheader("Context Edit History")
-        st.info(f"This conversation has {len(history)} context snapshots from editing operations.")
-        for i, snapshot in enumerate(history):
-            display_history_snapshot(snapshot, i)
-        st.divider()
+    num_resets = trace.get("num_resets", 0)
 
     # Create a timeline of events (messages + logs)
     st.subheader("Conversation")
 
+    if num_resets > 0:
+        st.caption(f"Context was reset {num_resets} time(s) during this conversation.")
+
     # Show toggle for detailed logs
     show_verification = st.checkbox("Show verification logs", value=False)
     show_token_counts = st.checkbox("Show user token counts", value=True)
+    show_shard_comparison = st.checkbox("Show shard comparison", value=False) if shard_index else False
 
-    # Build a combined timeline of messages and logs
-    timeline = []
+    # Build a unified timeline of messages and logs, sorted by (timestamp, sequence)
+    # This mirrors render_for_analyzer() — interleaving analysis at decision points
+    events: list[tuple[str, int, str, dict]] = []
+    seq = 0
 
-    # Add messages to timeline
-    for i, msg in enumerate(messages):
-        msg_ts = msg.get("timestamp", "")
-        timeline.append(
-            {
-                "type": "message",
-                "timestamp": msg_ts,
-                "data": msg,
-                "index": i,
-            }
-        )
+    for msg in messages:
+        events.append((msg.get("timestamp", ""), seq, "msg", msg))
+        seq += 1
 
-    # Add logs to timeline
-    for i, log in enumerate(logs):
-        log_ts = log.get("timestamp", "")
-        timeline.append(
-            {
-                "type": "log",
-                "timestamp": log_ts,
-                "data": log,
-                "index": i,
-            }
-        )
+    for log_entry in logs:
+        events.append((log_entry.get("timestamp", ""), seq, "log", log_entry))
+        seq += 1
 
-    # Sort by timestamp
-    def parse_ts(item):
-        ts = item.get("timestamp", "")
-        if ts:
-            try:
-                return datetime.strptime(ts, "%Y-%m-%d %H:%M:%S")
-            except ValueError:
-                pass
-        return datetime.min
+    # Sort by (timestamp, seq) — ISO format strings sort chronologically
+    events.sort(key=lambda e: (e[0], e[1]))
 
-    timeline.sort(key=parse_ts)
+    # Build turn → shard_id mapping from logs
+    turn_shard_map = build_turn_shard_map(logs) if shard_index else {}
 
-    # Track assistant turn count for context_edit markers
-    assistant_turn_count = 0
+    # Render the timeline
+    system_content_shown: str | None = None
+    memory_content_shown = False
+    reset_count = 0
     user_turn_count = 0
-    last_was_user = False
 
-    for item in timeline:
-        if item["type"] == "message":
-            msg = item["data"]
-            role = msg.get("role", "")
+    for _, _, etype, data in events:
+        if etype == "msg":
+            role = data.get("role", "")
+            content = data.get("content", "")
+            timestamp = data.get("timestamp", "")
+            visible = data.get("visible", True)
 
-            # For context_edit strategy, show edit marker before assistant responses (after turn 1)
-            if is_context_edit and role == "assistant" and assistant_turn_count > 0:
-                display_context_edit_marker(assistant_turn_count + 1)
+            # Handle compacted conversation → show reset boundary + compacted content
+            if role == "compacted conversation":
+                reset_count += 1
+                display_context_reset_boundary(reset_count)
+                display_compacted_conversation(content)
+                continue
 
+            # Skip non-visible messages (archived by S2 resets) — they're the old
+            # conversation that was replaced. The compacted conversation above
+            # represents what the assistant sees instead.
+            if not visible:
+                continue
+
+            # Handle system message — extract memory, show once
+            if role == "system":
+                if system_content_shown is not None and content == system_content_shown:
+                    # Skip duplicate system message from reset
+                    continue
+                system_content_shown = content
+
+                # Extract and display memory separately
+                clean_content, memory_content = extract_memory_from_system(content)
+
+                if memory_content and not memory_content_shown:
+                    display_memory_block(memory_content)
+                    memory_content_shown = True
+
+                # Show system message in expander (like existing pattern)
+                with st.expander("System Message", expanded=False):
+                    st.markdown(
+                        f'<div style="background-color: #1e1e2e; padding: 10px; '
+                        f'border-radius: 5px; border-left: 4px solid #6c757d;">'
+                        f"{clean_content}</div>",
+                        unsafe_allow_html=True,
+                    )
+                continue
+
+            # Strip embedded <conversation_analysis> tags from user messages (S1 artifact)
+            if role == "user" and "<conversation_analysis>" in content:
+                content = _ANALYSIS_TAG_RE.sub("", content).rstrip()
+
+            # Display user/assistant messages
             if role == "user":
                 user_turn_count += 1
+                with st.chat_message("user"):
+                    st.markdown(content)
+                    caption_parts = []
+                    if timestamp:
+                        caption_parts.append(format_timestamp(timestamp))
+                    if show_token_counts:
+                        tok_count = count_tokens(content)
+                        caption_parts.append(f"Turn {user_turn_count}: {tok_count} tokens")
+                    if caption_parts:
+                        st.caption("_" + " | ".join(caption_parts) + "_")
 
-            display_message(
-                msg,
-                [],
-                show_logs=False,
-                show_token_counts=show_token_counts and role == "user",
-                user_turn_number=user_turn_count if role == "user" else None,
-            )
+                # Show shard comparison below the user message
+                if show_shard_comparison and user_turn_count in turn_shard_map:
+                    shard_id = turn_shard_map[user_turn_count]
+                    shard_text = shard_index.get(shard_id, "(shard text not found)")
+                    display_shard_comparison(content, shard_text, shard_id)
 
-            if role == "assistant":
-                assistant_turn_count += 1
-            last_was_user = role == "user"
+            elif role == "assistant":
+                with st.chat_message("assistant"):
+                    st.markdown(content)
+                    if timestamp:
+                        st.caption(f"_{format_timestamp(timestamp)}_")
 
-        elif item["type"] == "log":
-            log = item["data"]
-            display_log_entry(
-                log,
-                show_verification=show_verification,
-                task_name=sample.get("task_name", ""),
-            )
+        elif etype == "log":
+            log_type = data.get("type", "")
+            log_data = data.get("data", {})
+
+            if log_type == "conversation_analysis":
+                display_analysis_block(log_data)
+
+            elif log_type == "edit_decision":
+                display_edit_decision_inline(log_data)
+
+            elif log_type == "context_edit_output":
+                display_context_edit_output(data)
+
+            elif log_type == "shard_revealed":
+                display_shard_revealed(data)
+
+            elif log_type == "verification":
+                if show_verification:
+                    display_verification(data)
+
+            elif log_type == "answer_evaluation":
+                display_answer_evaluation(data, task_name=task_name)
+
+            elif log_type == "context_replaced":
+                display_context_replaced(data)
+
+            elif log_type == "reflection_generated":
+                display_reflection_generated(data)
+
+            elif log_type == "conversation_reset":
+                # Already handled by compacted conversation boundary
+                pass
 
     # Show total user tokens at the end of the conversation
     if show_token_counts:
@@ -798,6 +1068,10 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
             f"""across {len(user_messages)} turn(s)</div>""",
             unsafe_allow_html=True,
         )
+
+    # Show shard breakdown at the bottom
+    if shards_list:
+        display_shard_summary(original_data.get("full_spec_q"), shards_list)
 
     # Show reference answer and ground truth if available
     metadata = sample.get("metadata", {})
@@ -874,6 +1148,47 @@ def display_sidebar_info(sample: dict) -> None:
                 st.sidebar.write(f"**{role}:** {role_stats.get('num_requests', 0)} requests")
                 st.sidebar.write(f"  - Input: {role_stats.get('input_tokens', 0)} tokens")
                 st.sidebar.write(f"  - Output: {role_stats.get('output_tokens', 0)} tokens")
+
+    # Provenance (replay mode)
+    trace = sample.get("trace", {})
+    provenance = trace.get("provenance")
+    if provenance:
+        st.sidebar.subheader("Replay Provenance")
+        src_exp = provenance.get("source_experiment", "?")
+        src_correct = provenance.get("source_is_correct")
+        src_score = provenance.get("source_score")
+        st.sidebar.write(f"**Source:** {src_exp}")
+        if src_correct is not None:
+            result_str = f"{'Correct' if src_correct else 'Incorrect'} (score: {src_score})"
+            st.sidebar.write(f"**Source result:** {result_str}")
+        src_path = provenance.get("source_path", "")
+        if src_path:
+            st.sidebar.caption(f"From: {src_path}")
+
+    # Error attribution
+    metadata = sample.get("metadata", {})
+    error_attr = metadata.get("error_attribution")
+    if error_attr:
+        st.sidebar.subheader("Error Attribution")
+        category = error_attr.get("error_category", error_attr.get("category", "unknown"))
+        cat_colors = {
+            "assistant_error": "red",
+            "extraction_failure": "orange",
+            "sharding_distortion": "blue",
+            "strict_comparison": "violet",
+            "clarification_ignored": "orange",
+        }
+        color = cat_colors.get(category, "grey")
+        st.sidebar.markdown(f":{color}[**{category}**]")
+        explanation = error_attr.get("explanation", "")
+        if explanation:
+            with st.sidebar.expander("Details", expanded=False):
+                st.write(explanation)
+
+    # Branch info
+    branch = metadata.get("branch", "")
+    if branch:
+        st.sidebar.write(f"**Branch:** `{branch}`")
 
     # Extracted answer
     extracted = sample.get("extracted_answer")
@@ -963,7 +1278,9 @@ def main():
             selected_run = custom_path
             # Try to get experiment type and user mode from config
             config = load_config_file(custom_path)
-            selected_exp = config.get("experiment", {}).get("name", "unknown") if config else "unknown"
+            selected_exp = (
+                config.get("experiment", {}).get("name", "unknown") if config else "unknown"
+            )
             selected_user_mode = config.get("user_mode", {}).get("name") if config else None
             st.sidebar.success(f"Loaded: {os.path.basename(custom_path)}")
         else:
@@ -1131,15 +1448,26 @@ def main():
     sample_id = selected_sample_with_trace.get("sample_id", "unknown")
     st.header(f"Conversation: {sample_id}")
 
-    # Build strategy description
-    if "context_edit" in effective_exp_type and "agentic" not in effective_exp_type:
-        strategy_desc = "**Strategy:** Context Edit - Conversation is compressed before each assistant turn"
+    # Build strategy description — detect S0/S1/S2 and memory
+    has_memory = "memory" in effective_exp_type
+    memory_tag = " + Memory" if has_memory else ""
+
+    if "context_edit_v2" in effective_exp_type:
+        strategy_desc = f"**Strategy:** S2 — Context Edit{memory_tag} — Analyzer-driven context rewriting when issues found"
+    elif "context_edit" in effective_exp_type and "agentic" not in effective_exp_type:
+        strategy_desc = f"**Strategy:** S2 — Context Edit{memory_tag} — Conversation is compressed before each assistant turn"
+    elif "append_analysis" in effective_exp_type:
+        strategy_desc = f"**Strategy:** S1 — Append Analysis{memory_tag} — Analysis appended to context (no rewriting)"
     elif "agentic_edit" in effective_exp_type:
-        strategy_desc = "**Strategy:** Agentic Edit - Model decides when to compress context"
+        strategy_desc = (
+            f"**Strategy:** Agentic Edit{memory_tag} — Model decides when to compress context"
+        )
     elif "reflection" in effective_exp_type:
-        strategy_desc = "**Strategy:** Reflection - Reflection prompts added to context"
+        strategy_desc = (
+            f"**Strategy:** Reflection{memory_tag} — Reflection prompts added to context"
+        )
     elif "baseline" in effective_exp_type:
-        strategy_desc = "**Strategy:** Baseline - No context modifications"
+        strategy_desc = f"**Strategy:** S0 — Baseline{memory_tag} — No context modifications"
     else:
         strategy_desc = f"**Strategy:** {effective_exp_type}"
 
@@ -1156,7 +1484,9 @@ def main():
     st.info(strategy_desc)
 
     # Display the conversation
-    display_conversation(selected_sample_with_trace, exp_type=effective_exp_type, run_dir=selected_run)
+    display_conversation(
+        selected_sample_with_trace, exp_type=effective_exp_type, run_dir=selected_run
+    )
 
 
 if __name__ == "__main__":

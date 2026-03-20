@@ -12,9 +12,10 @@ Memory is a general mechanism. It can be targeted at different components:
 
 | Target | What it learns |
 |--------|---------------|
-| **Baseline assistant** | Strategies and pitfalls for the task domain |
-| **Context editor** | Which information to preserve vs. compress |
-| **Agentic decision-maker** | When to trigger a context edit |
+| **Baseline assistant** (S0) | Strategies and pitfalls for the task domain |
+| **Analyzer** (S1/S2) | Patterns for identifying harmful vs. useful assistant content during the comparison query (Q2) |
+
+Legacy targets `"context_editor"` and `"edit_decision"` still exist for backward compatibility with earlier strategies.
 
 ---
 
@@ -115,8 +116,8 @@ Controls two things automatically:
 | Target | Prompt focus | Rendering |
 |--------|-------------|-----------|
 | `assistant` | Response strategy, pitfalls, clarification patterns | Active messages only |
-| `context_editor` | What to preserve/remove, edit quality | All messages (visible + archived) with edit markers |
-| `edit_decision` | When to edit, false positives/negatives | Decision events + full active conversation |
+| `context_editor` | What to preserve/remove, edit quality (used by S1/S2 analyzer Q2) | All messages (visible + archived) with edit markers |
+| `edit_decision` | When to edit, false positives/negatives (legacy) | Decision events + full active conversation |
 
 A custom `reflection_prompt` or `reflection_prompt_file` overrides the target default entirely.
 
@@ -187,20 +188,14 @@ memory:
 - `source: "/path/to/file.json"` — load a frozen memory snapshot (no updates)
 - `source: "offline"` — learn memory from saved trajectories (no new simulations)
 
-A pre-built experiment config exists for the continual-learning case:
+Pre-built experiment configs exist for memory-enabled runs:
 
 ```yaml
-# experiment/context_edit_cheatsheet.yaml
-strategy:
-  _target_: ctx_editor.strategies.ContextEditStrategy
-  use_memory: true
-  memory_target: context_editor
-
-memory:
-  enabled: true
-  source: continual
-  target: context_editor
+# experiment/context_edit_v2_memory.yaml (S2 + memory)
+# experiment/append_analysis_memory.yaml (S1 + memory)
 ```
+
+Memory is injected into the analyzer's Q2 comparison prompt via the `{memory_section}` placeholder, where learned patterns about harmful vs. useful assistant content can guide the analysis.
 
 ### Initialization (`run_experiment.py: setup_memory`)
 
@@ -222,10 +217,12 @@ source=<path>  →  return CheatsheetMemory.load(source)
 
 | Strategy | `use_memory` effect |
 |----------|------------------------|
-| `BaselineStrategy` | Injects into system or user message once at turn 1 |
-| `ContextEditStrategy` | Provides memory to the context editor LLM in its prompt (as `{memory_section}`); or injects into the assistant's system message |
-| `AgenticEditStrategy` | Passes memory to both the decision-maker and the editor |
-| `ReflectionStrategy` | Includes memory content in the reflection generation prompt |
+| S0 (`BaselineStrategy`) | Injects into system or user message once at turn 1 |
+| S1 (`AppendAnalysisStrategy`) | Provides memory to the analyzer's Q2 (comparison) prompt via `{memory_section}` |
+| S2 (`ContextEditV2Strategy`) | Same as S1 — memory targets the analyzer's comparison query |
+| Legacy `ContextEditStrategy` | Provides memory to the editor LLM in its prompt |
+| Legacy `AgenticEditStrategy` | Passes memory to both the decision-maker and the editor |
+| Legacy `ReflectionStrategy` | Includes memory content in the reflection generation prompt |
 
 ### Execution modes and update cadence
 

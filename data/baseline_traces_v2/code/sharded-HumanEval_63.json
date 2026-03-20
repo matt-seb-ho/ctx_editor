@@ -1,0 +1,251 @@
+{
+  "sample_id": "sharded-HumanEval/63",
+  "task_name": "code",
+  "experiment_type": "baseline",
+  "is_correct": true,
+  "score": 1,
+  "models": {
+    "assistant": "gpt-5-mini",
+    "user": "unknown",
+    "system": "unknown"
+  },
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are helping a user write a Python function to solve a programming question. If something is not clear, you can ask the user to clarify what they need.\n\nFormat:\n- [Standalone] Your answer must contain exactly one top-level function definition. The only other top-level statements allowed are import statements \u2014 no helper functions, constants, or other top-level code.\n- [Arguments] The function must accept inputs as function arguments, not by reading from stdin.\n- [Code fence] Always wrap your final code in a markdown Python code fence: ```python\\n<your code here>\\n```\n",
+        "timestamp": "2026-03-15 01:08:59",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Find the n-th number in a sequence",
+        "timestamp": "2026-03-15 01:08:59",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef find_nth_in_sequence(n, sequence=None, rule=None, recurrence=None, init=None):\n    \"\"\"\n    Return the n-th term (1-based) of a sequence. Because \"sequence\" was not specified,\n    this function supports several ways to define the sequence; you must provide exactly\n    one of the following (except `init` is required when `recurrence` is used):\n\n    - sequence: a concrete iterable (like a list or tuple) of terms. The function returns sequence[n-1].\n    - rule: a callable f(k) that returns the k-th term when called with an integer k (1-based).\n    - recurrence and init: recurrence is a callable that takes a list of the previous len(init)\n      terms (in order from oldest to newest) and returns the next term; init is a list of initial\n      terms for indices 1..len(init).\n\n    Parameters\n    - n (int): 1-based index of the term to return.\n    - sequence (iterable, optional): concrete list/tuple of terms.\n    - rule (callable, optional): function f(k) -> k-th term.\n    - recurrence (callable, optional): function prev_terms -> next_term, where prev_terms is a list.\n    - init (list, optional): initial terms for recurrence (required if recurrence is given).\n\n    Returns\n    - The n-th term as produced by the chosen definition.\n\n    Raises\n    - ValueError if inputs are invalid or insufficient (e.g., multiple definitions provided,\n      missing init for recurrence, n out of range for a provided concrete sequence, etc.)\n\n    Examples:\n    - Concrete list:\n        find_nth_in_sequence(3, sequence=[2,4,6,8]) -> 6\n    - Rule:\n        find_nth_in_sequence(5, rule=lambda k: k*k) -> 25\n    - Recurrence (Fibonacci):\n        find_nth_in_sequence(7, recurrence=lambda prev: prev[-1] + prev[-2], init=[1,1]) -> 13\n\n    Note: This utility is intended to be flexible when the sequence rule is known. If you meant a\n    specific named sequence (e.g. \"the sequence 1,2,4,8,16,...\", or a puzzle-specific sequence),\n    tell me the exact rule or several initial terms and I can give a simpler dedicated implementation.\n    \"\"\"\n    # Validate n\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer (1-based index).\")\n\n    provided = sum(bool(x is not None) for x in (sequence, rule, recurrence))\n    if provided == 0:\n        raise ValueError(\"You must provide one of: sequence, rule, or recurrence (+ init).\")\n    if provided > 1:\n        raise ValueError(\"Provide exactly one of: sequence, rule, or recurrence (+ init).\")\n\n    if sequence is not None:\n        seq_list = list(sequence)\n        if n > len(seq_list):\n            raise ValueError(f\"Provided sequence has length {len(seq_list)}; cannot return term {n}.\")\n        return seq_list[n - 1]\n\n    if rule is not None:\n        if not callable(rule):\n            raise ValueError(\"rule must be callable: rule(k) -> k-th term.\")\n        return rule(n)\n\n    # recurrence is not None\n    if not callable(recurrence):\n        raise ValueError(\"recurrence must be callable: recurrence(prev_terms) -> next_term.\")\n    if init is None:\n        raise ValueError(\"When using recurrence, you must provide init (a list of initial terms).\")\n    if not isinstance(init, (list, tuple)):\n        raise ValueError(\"init must be a list or tuple of initial terms.\")\n    if len(init) == 0:\n        raise ValueError(\"init must contain at least one initial term.\")\n\n    init_list = list(init)\n    m = len(init_list)\n    if n <= m:\n        return init_list[n - 1]\n\n    # compute iteratively: at each step give recurrence the previous m terms (oldest->newest)\n    history = init_list[:]  # will maintain full list but only last m are passed\n    for k in range(m + 1, n + 1):\n        prev_terms = history[-m:]\n        next_term = recurrence(list(prev_terms))\n        history.append(next_term)\n    return history[-1]\n```",
+        "timestamp": "2026-03-15 01:09:15",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00345575
+        }
+      },
+      {
+        "role": "user",
+        "content": "we're looking at a sequence similar to Fibonacci numbers",
+        "timestamp": "2026-03-15 01:09:16",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00026325
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef fib_like(n, init=(1, 1), coeffs=None, modulus=None):\n    \"\"\"\n    Compute the n-th term (1-based) of a linear recurrence (a \"Fibonacci-like\" sequence).\n\n    Parameters\n    - n (int): 1-based index of the term to return (must be >= 1).\n    - init (sequence of length m): initial terms [a1, a2, ..., am].\n      Defaults to (1,1) (standard Fibonacci seeds).\n    - coeffs (sequence of length m, optional): coefficients [c1, c2, ..., cm] for the recurrence\n      a_k = c1*a_{k-1} + c2*a_{k-2} + ... + cm*a_{k-m}.\n      If omitted and len(init) == 2, defaults to [1, 1] (classic Fibonacci recurrence).\n      coeffs must be provided when len(init) != 2.\n    - modulus (int, optional): if given, compute values modulo this integer (useful for large n).\n\n    Returns\n    - int: the n-th term (possibly reduced modulo `modulus` if provided).\n\n    Notes:\n    - This function uses matrix exponentiation (O(m^3 log n)) to handle large n efficiently.\n    - Examples:\n        fib_like(7) -> 13  (Fibonacci: init=(1,1), coeffs=[1,1])\n        fib_like(5, init=[2,1], coeffs=[1,1]) -> 11  (Lucas-like with different seeds)\n        fib_like(6, init=[0,1,1], coeffs=[1,1,1]) -> computes a Tribonacci term\n    \"\"\"\n    # Validate n\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer (1-based).\")\n\n    # Normalize init to list\n    try:\n        m_init = list(init)\n    except Exception:\n        raise ValueError(\"init must be a sequence (list/tuple) of initial terms.\")\n    if len(m_init) == 0:\n        raise ValueError(\"init must contain at least one initial term.\")\n    m = len(m_init)\n\n    # Default coeffs for the common 2-term Fibonacci-like case\n    if coeffs is None:\n        if m == 2:\n            coeffs = [1, 1]\n        else:\n            raise ValueError(\"coeffs must be provided when init length != 2.\")\n    try:\n        c = list(coeffs)\n    except Exception:\n        raise ValueError(\"coeffs must be a sequence (list/tuple) of numbers.\")\n    if len(c) != m:\n        raise ValueError(\"Length of coeffs must equal length of init (order m of the recurrence).\")\n\n    if modulus is not None:\n        if not isinstance(modulus, int) or modulus <= 0:\n            raise ValueError(\"modulus must be a positive integer when provided.\")\n\n    # If n is within initial values, return directly\n    if n <= m:\n        val = m_init[n - 1]\n        return val % modulus if modulus is not None else val\n\n    # Build companion matrix M of size m x m:\n    # State vector is [a_{k-1}, a_{k-2}, ..., a_{k-m}]^T\n    # First row is [c1, c2, ..., cm], rows 2..m shift the identity.\n    M = [[0] * m for _ in range(m)]\n    for j in range(m):\n        M[0][j] = c[j] % modulus if modulus is not None else c[j]\n    for i in range(1, m):\n        M[i][i - 1] = 1\n\n    # Helper nested functions for matrix ops (use nested to respect single top-level function rule)\n    def mat_mult(A, B):\n        # multiply matrices A (r x s) and B (s x t) -> (r x t)\n        r, s = len(A), len(A[0])\n        s2, t = len(B), len(B[0])\n        if s != s2:\n            raise ValueError(\"Incompatible matrix sizes for multiplication.\")\n        # Initialize result\n        R = [[0] * t for _ in range(r)]\n        if modulus is None:\n            for i in range(r):\n                Ai = A[i]\n                Ri = R[i]\n                for k in range(s):\n                    aik = Ai[k]\n                    if aik == 0:\n                        continue\n                    Bk = B[k]\n                    for j in range(t):\n                        Ri[j] += aik * Bk[j]\n        else:\n            mod = modulus\n            for i in range(r):\n                Ai = A[i]\n                Ri = R[i]\n                for k in range(s):\n                    aik = Ai[k]\n                    if aik == 0:\n                        continue\n                    Bk = B[k]\n                    for j in range(t):\n                        Ri[j] = (Ri[j] + aik * Bk[j]) % mod\n        return R\n\n    def mat_pow(mat, exp):\n        # exponentiate square matrix mat to power exp (non-negative integer)\n        size = len(mat)\n        # Initialize result to identity\n        result = [[0] * size for _ in range(size)]\n        for i in range(size):\n            result[i][i] = 1\n        base = [row[:] for row in mat]\n        e = exp\n        while e > 0:\n            if e & 1:\n                result = mat_mult(result, base)\n            base = mat_mult(base, base)\n            e >>= 1\n        return result\n\n    def mat_vec_mult(mat, vec):\n        # multiply matrix (r x s) by vector of length s -> vector length r\n        r, s = len(mat), len(mat[0])\n        if len(vec) != s:\n            raise ValueError(\"Matrix and vector size mismatch.\")\n        out = [0] * r\n        if modulus is None:\n            for i in range(r):\n                ssum = 0\n                row = mat[i]\n                for j in range(s):\n                    ssum += row[j] * vec[j]\n                out[i] = ssum\n        else:\n            mod = modulus\n            for i in range(r):\n                ssum = 0\n                row = mat[i]\n                for j in range(s):\n                    ssum = (ssum + row[j] * vec[j]) % mod\n                out[i] = ssum\n        return out\n\n    # Prepare state vector: [a_m, a_{m-1}, ..., a_1]\n    state = [ (m_init[m - 1 - i] % modulus) if modulus is not None else m_init[m - 1 - i] for i in range(m) ]\n\n    # We need M^(n-m) * state, then take first element => a_n\n    power = n - m\n    Mpow = mat_pow(M, power)\n    res_vec = mat_vec_mult(Mpow, state)\n    ans = res_vec[0]\n    return ans % modulus if (modulus is not None) else ans\n```",
+        "timestamp": "2026-03-15 01:09:46",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0064065
+        }
+      },
+      {
+        "role": "user",
+        "content": "The sequence starts with fibfib(0) being 0 and fibfib(1) also being 0.",
+        "timestamp": "2026-03-15 01:09:48",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00050085
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef fibfib_help():\n    \"\"\"\n    Return a short clarification message about the sequence you described.\n\n    You said \"The sequence starts with fibfib(0) being 0 and fibfib(1) also being 0.\"\n    That's ambiguous because different \"fib-like\" definitions give different results:\n\n    - If you mean a linear recurrence like the Fibonacci recurrence\n        a(n) = a(n-1) + a(n-2)\n      then seeds a(0)=0, a(1)=0 force every term to be 0 (trivial sequence).\n\n    - If you mean a nested Fibonacci, e.g. a(n) = Fib(Fib(n)), using the standard\n      Fibonacci numbering Fib(0)=0, Fib(1)=1, then a(0)=Fib(Fib(0))=Fib(0)=0 but\n      a(1)=Fib(Fib(1))=Fib(1)=1 (so a(1) would be 1, not 0).\n\n    - There are other reasonable interpretations (e.g. a(n) = Fib(a(n-1)), or\n      a custom linear recurrence with different coefficients or higher order).\n\n    Please tell me which rule you intend (examples below are fine):\n      - \"It's the linear recurrence a(n)=a(n-1)+a(n-2) with a(0)=0, a(1)=0\" (I'll point out it is all zeros).\n      - \"It's a(n)=Fib(Fib(n)) (nested Fibonacci)\".\n      - \"It's a(n)=Fib(a(n-1))\" or another explicit formula or recurrence.\n      - Or give several initial terms beyond a(0) and a(1) so I can infer the rule.\n\n    Once you confirm the intended definition I will provide a function to compute the n-th term\n    (efficiently, if needed) and examples.\n    \"\"\"\n    return (\n        \"I need a bit more information. With a(0)=0 and a(1)=0: \"\n        \"if you mean the standard Fibonacci recurrence a(n)=a(n-1)+a(n-2), the sequence is \"\n        \"trivially all zeros. If you meant the nested definition a(n)=Fib(Fib(n)), then a(1)=1, \"\n        \"not 0. Please say which rule you mean (or give more terms), and I'll implement the function.\"\n    )\n```",
+        "timestamp": "2026-03-15 01:10:04",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0038655
+        }
+      },
+      {
+        "role": "user",
+        "content": "Also, fibfib(1) is 0.",
+        "timestamp": "2026-03-15 01:10:05",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00041025
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef fibfib_clarify():\n    \"\"\"\n    I need one more clarification before implementing code.\n\n    You say fibfib(0)=0 and fibfib(1)=0. That is consistent with some definitions but contradicts others:\n      - If you mean the linear Fibonacci recurrence a(n)=a(n-1)+a(n-2) with seeds a(0)=0,a(1)=0,\n        then every term is 0 (trivial).\n      - If you mean the nested definition a(n)=Fib(Fib(n)) (with standard Fib(0)=0,Fib(1)=1),\n        then a(1)=Fib(Fib(1))=Fib(1)=1 \u2014 so that would not give a(1)=0.\n      - If you mean a(n)=Fib(a(n-1)) and start with a(0)=0,a(1)=0, then a(2)=Fib(0)=0 and the sequence is all zeros.\n      - There are other possibilities (different recurrence order/coefficients, or a custom rule).\n\n    Please confirm which rule you intend (pick one or give extra initial terms):\n      1) \"linear recurrence a(n)=a(n-1)+a(n-2) with a(0)=0,a(1)=0\" (all zeros),\n      2) \"nested: a(n)=Fib(Fib(n))\",\n      3) \"self-referential: a(n)=Fib(a(n-1))\",\n      4) or paste the explicit recurrence or several initial terms beyond a(0),a(1).\n\n    Also tell me whether you want 0-based indexing (a(0) is first) \u2014 I will default to 0-based if you do not specify.\n    Once you confirm, I'll provide a function to compute the n-th term (efficiently if needed).\n    \"\"\"\n    return (\n        \"Please confirm which rule you mean (options listed in the docstring of this function), \"\n        \"or provide more terms/the explicit recurrence so I can implement the requested function.\"\n    )\n```",
+        "timestamp": "2026-03-15 01:10:15",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0024223
+        }
+      },
+      {
+        "role": "user",
+        "content": "Also, the next number in this sequence, fibfib(2), equals 1.",
+        "timestamp": "2026-03-15 01:10:16",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0004239
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef fibfib_clarify():\n    \"\"\"\n    Return a short explanatory message about the three terms you've given.\n\n    You said fibfib(0)=0, fibfib(1)=0 and fibfib(2)=1. I can't unambiguously infer the rule from\n    those three terms because they conflict with some common \"fib-like\" definitions:\n\n    - If you meant the 2-term linear recurrence a(n)=a(n-1)+a(n-2) (classic Fibonacci form),\n      seeds 0,0 force every term to be 0, so a(2) would be 0 (not 1).\n    - If you meant the nested definition a(n)=Fib(Fib(n)) (with Fib(0)=0,Fib(1)=1), then\n      a(0)=0 and a(1)=1, so that also doesn't match your a(1)=0.\n    - Other possibilities (that could match your three seeds) include higher-order linear\n      recurrences (e.g. Tribonacci a(n)=a(n-1)+a(n-2)+a(n-3) with given seeds), self-referential\n      rules like a(n)=Fib(a(n-1)), or some entirely different construction.\n\n    Please confirm which rule you intend (examples):\n      - \"It's the linear recurrence a(n)=a(n-1)+a(n-2) but with different seeds\" (if so, give the seeds),\n      - \"It's a(n)=Fib(Fib(n))\",\n      - \"It's a(n)=Fib(a(n-1))\",\n      - \"It's an order-3 recurrence a(n)=a(n-1)+a(n-2)+a(n-3)\",\n      - or paste the explicit recurrence or several more initial terms.\n\n    Also tell me whether you use 0-based indexing (a(0) is the first term). Once you confirm the rule\n    I will provide a function to compute the n-th term (efficiently, if needed) and sample outputs.\n    \"\"\"\n    return (\n        \"You gave fibfib(0)=0, fibfib(1)=0, fibfib(2)=1. That contradicts the 2-term Fibonacci recurrence \"\n        \"(which would give a(2)=0) and also doesn't match Fib(Fib(n)). Please tell me the exact rule \"\n        \"or provide more terms (or confirm a different recurrence like Tribonacci or a self-referential rule), \"\n        \"and whether indexing is 0-based. Then I'll implement the function to compute the n-th term.\"\n    )\n```",
+        "timestamp": "2026-03-15 01:10:33",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0037974000000000003
+        }
+      },
+      {
+        "role": "user",
+        "content": "Oh, and you should add the last three numbers to get the next one in the sequence.",
+        "timestamp": "2026-03-15 01:10:34",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0005085
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef fibfib(n, modulus=None):\n    \"\"\"\n    Compute fibfib(n) for the sequence defined by\n      fibfib(0) = 0, fibfib(1) = 0, fibfib(2) = 1,\n      fibfib(k) = fibfib(k-1) + fibfib(k-2) + fibfib(k-3) for k >= 3.\n\n    Indexing is 0-based (n is a non-negative integer). If `modulus` is provided (positive int),\n    results are returned modulo that value (useful for very large n).\n\n    Examples:\n      fibfib(0) -> 0\n      fibfib(1) -> 0\n      fibfib(2) -> 1\n      fibfib(3) -> 1  (1+0+0)\n      fibfib(4) -> 2  (1+1+0)\n      fibfib(5) -> 4  (2+1+1)\n\n    This implementation uses 3x3 matrix exponentiation to get O(log n) time.\n    \"\"\"\n    # Validate n\n    if not isinstance(n, int) or n < 0:\n        raise ValueError(\"n must be a non-negative integer (0-based index).\")\n    if modulus is not None:\n        if not isinstance(modulus, int) or modulus <= 0:\n            raise ValueError(\"modulus must be a positive integer when provided.\")\n\n    # Base cases\n    if n == 0 or n == 1:\n        return 0 if modulus is None else 0 % modulus\n    if n == 2:\n        return 1 if modulus is None else 1 % modulus\n\n    # Companion matrix for Tribonacci:\n    # state_k = [a_k, a_{k-1}, a_{k-2}]^T\n    # M * state_k = state_{k+1}, where first row is [1,1,1], then [1,0,0], [0,1,0]\n    mod = modulus\n    M = [\n        [1 % mod if mod is not None else 1, 1 % mod if mod is not None else 1, 1 % mod if mod is not None else 1],\n        [1 % mod if mod is not None else 1, 0, 0],\n        [0, 1 % mod if mod is not None else 1, 0],\n    ]\n\n    def mat_mult(A, B):\n        # multiply matrices A (r x s) and B (s x t) -> (r x t)\n        r, s = len(A), len(A[0])\n        s2, t = len(B), len(B[0])\n        if s != s2:\n            raise ValueError(\"Incompatible matrix sizes for multiplication.\")\n        R = [[0] * t for _ in range(r)]\n        if mod is None:\n            for i in range(r):\n                Ai = A[i]\n                Ri = R[i]\n                for k in range(s):\n                    aik = Ai[k]\n                    if aik == 0:\n                        continue\n                    Bk = B[k]\n                    for j in range(t):\n                        Ri[j] += aik * Bk[j]\n        else:\n            for i in range(r):\n                Ai = A[i]\n                Ri = R[i]\n                for k in range(s):\n                    aik = Ai[k]\n                    if aik == 0:\n                        continue\n                    Bk = B[k]\n                    for j in range(t):\n                        Ri[j] = (Ri[j] + aik * Bk[j]) % mod\n        return R\n\n    def mat_pow(mat, exp):\n        size = len(mat)\n        # identity\n        result = [[0] * size for _ in range(size)]\n        for i in range(size):\n            result[i][i] = 1\n        base = [row[:] for row in mat]\n        e = exp\n        while e > 0:\n            if e & 1:\n                result = mat_mult(result, base)\n            base = mat_mult(base, base)\n            e >>= 1\n        return result\n\n    def mat_vec_mult(mat, vec):\n        r, s = len(mat), len(mat[0])\n        if len(vec) != s:\n            raise ValueError(\"Matrix and vector size mismatch.\")\n        out = [0] * r\n        if mod is None:\n            for i in range(r):\n                ssum = 0\n                row = mat[i]\n                for j in range(s):\n                    ssum += row[j] * vec[j]\n                out[i] = ssum\n        else:\n            for i in range(r):\n                ssum = 0\n                row = mat[i]\n                for j in range(s):\n                    ssum = (ssum + row[j] * vec[j]) % mod\n                out[i] = ssum\n        return out\n\n    # We know state for k=2: [a2, a1, a0] = [1,0,0]. To get a_n (n>=2) we need M^(n-2) * state.\n    power = n - 2\n    Mpow = mat_pow(M, power)\n    state = [1 % mod if mod is not None else 1, 0, 0]\n    res_vec = mat_vec_mult(Mpow, state)\n    ans = res_vec[0]\n    return ans % mod if mod is not None else ans\n```",
+        "timestamp": "2026-03-15 01:10:54",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0046656499999999995
+        }
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        },
+        "timestamp": "2026-03-15 01:08:59"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:09:15"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def find_nth_in_sequence(n, sequence=None, rule=None, recurrence=None, init=None):\n    \"\"\"\n    Return the n-th term (1-based) of a sequence. Because \"sequence\" was not specified,\n    this function supports several ways to define the sequence; you must provide exactly\n    one of the following (except `init` is required when `recurrence` is used):\n\n    - sequence: a concrete iterable (like a list or tuple) of terms. The function returns sequence[n-1].\n    - rule: a callable f(k) that returns the k-th term when called with an integer k (1-based).\n    - recurrence and init: recurrence is a callable that takes a list of the previous len(init)\n      terms (in order from oldest to newest) and returns the next term; init is a list of initial\n      terms for indices 1..len(init).\n\n    Parameters\n    - n (int): 1-based index of the term to return.\n    - sequence (iterable, optional): concrete list/tuple of terms.\n    - rule (callable, optional): function f(k) -> k-th term.\n    - recurrence (callable, optional): function prev_terms -> next_term, where prev_terms is a list.\n    - init (list, optional): initial terms for recurrence (required if recurrence is given).\n\n    Returns\n    - The n-th term as produced by the chosen definition.\n\n    Raises\n    - ValueError if inputs are invalid or insufficient (e.g., multiple definitions provided,\n      missing init for recurrence, n out of range for a provided concrete sequence, etc.)\n\n    Examples:\n    - Concrete list:\n        find_nth_in_sequence(3, sequence=[2,4,6,8]) -> 6\n    - Rule:\n        find_nth_in_sequence(5, rule=lambda k: k*k) -> 25\n    - Recurrence (Fibonacci):\n        find_nth_in_sequence(7, recurrence=lambda prev: prev[-1] + prev[-2], init=[1,1]) -> 13\n\n    Note: This utility is intended to be flexible when the sequence rule is known. If you meant a\n    specific named sequence (e.g. \"the sequence 1,2,4,8,16,...\", or a puzzle-specific sequence),\n    tell me the exact rule or several initial terms and I can give a simpler dedicated implementation.\n    \"\"\"\n    # Validate n\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer (1-based index).\")\n\n    provided = sum(bool(x is not None) for x in (sequence, rule, recurrence))\n    if provided == 0:\n        raise ValueError(\"You must provide one of: sequence, rule, or recurrence (+ init).\")\n    if provided > 1:\n        raise ValueError(\"Provide exactly one of: sequence, rule, or recurrence (+ init).\")\n\n    if sequence is not None:\n        seq_list = list(sequence)\n        if n > len(seq_list):\n            raise ValueError(f\"Provided sequence has length {len(seq_list)}; cannot return term {n}.\")\n        return seq_list[n - 1]\n\n    if rule is not None:\n        if not callable(rule):\n            raise ValueError(\"rule must be callable: rule(k) -> k-th term.\")\n        return rule(n)\n\n    # recurrence is not None\n    if not callable(recurrence):\n        raise ValueError(\"recurrence must be callable: recurrence(prev_terms) -> next_term.\")\n    if init is None:\n        raise ValueError(\"When using recurrence, you must provide init (a list of initial terms).\")\n    if not isinstance(init, (list, tuple)):\n        raise ValueError(\"init must be a list or tuple of initial terms.\")\n    if len(init) == 0:\n        raise ValueError(\"init must contain at least one initial term.\")\n\n    init_list = list(init)\n    m = len(init_list)\n    if n <= m:\n        return init_list[n - 1]\n\n    # compute iteratively: at each step give recurrence the previous m terms (oldest->newest)\n    history = init_list[:]  # will maintain full list but only last m are passed\n    for k in range(m + 1, n + 1):\n        prev_terms = history[-m:]\n        next_term = recurrence(list(prev_terms))\n        history.append(next_term)\n    return history[-1]",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:09:16"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        },
+        "timestamp": "2026-03-15 01:09:16"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:09:46"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def fib_like(n, init=(1, 1), coeffs=None, modulus=None):\n    \"\"\"\n    Compute the n-th term (1-based) of a linear recurrence (a \"Fibonacci-like\" sequence).\n\n    Parameters\n    - n (int): 1-based index of the term to return (must be >= 1).\n    - init (sequence of length m): initial terms [a1, a2, ..., am].\n      Defaults to (1,1) (standard Fibonacci seeds).\n    - coeffs (sequence of length m, optional): coefficients [c1, c2, ..., cm] for the recurrence\n      a_k = c1*a_{k-1} + c2*a_{k-2} + ... + cm*a_{k-m}.\n      If omitted and len(init) == 2, defaults to [1, 1] (classic Fibonacci recurrence).\n      coeffs must be provided when len(init) != 2.\n    - modulus (int, optional): if given, compute values modulo this integer (useful for large n).\n\n    Returns\n    - int: the n-th term (possibly reduced modulo `modulus` if provided).\n\n    Notes:\n    - This function uses matrix exponentiation (O(m^3 log n)) to handle large n efficiently.\n    - Examples:\n        fib_like(7) -> 13  (Fibonacci: init=(1,1), coeffs=[1,1])\n        fib_like(5, init=[2,1], coeffs=[1,1]) -> 11  (Lucas-like with different seeds)\n        fib_like(6, init=[0,1,1], coeffs=[1,1,1]) -> computes a Tribonacci term\n    \"\"\"\n    # Validate n\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer (1-based).\")\n\n    # Normalize init to list\n    try:\n        m_init = list(init)\n    except Exception:\n        raise ValueError(\"init must be a sequence (list/tuple) of initial terms.\")\n    if len(m_init) == 0:\n        raise ValueError(\"init must contain at least one initial term.\")\n    m = len(m_init)\n\n    # Default coeffs for the common 2-term Fibonacci-like case\n    if coeffs is None:\n        if m == 2:\n            coeffs = [1, 1]\n        else:\n            raise ValueError(\"coeffs must be provided when init length != 2.\")\n    try:\n        c = list(coeffs)\n    except Exception:\n        raise ValueError(\"coeffs must be a sequence (list/tuple) of numbers.\")\n    if len(c) != m:\n        raise ValueError(\"Length of coeffs must equal length of init (order m of the recurrence).\")\n\n    if modulus is not None:\n        if not isinstance(modulus, int) or modulus <= 0:\n            raise ValueError(\"modulus must be a positive integer when provided.\")\n\n    # If n is within initial values, return directly\n    if n <= m:\n        val = m_init[n - 1]\n        return val % modulus if modulus is not None else val\n\n    # Build companion matrix M of size m x m:\n    # State vector is [a_{k-1}, a_{k-2}, ..., a_{k-m}]^T\n    # First row is [c1, c2, ..., cm], rows 2..m shift the identity.\n    M = [[0] * m for _ in range(m)]\n    for j in range(m):\n        M[0][j] = c[j] % modulus if modulus is not None else c[j]\n    for i in range(1, m):\n        M[i][i - 1] = 1\n\n    # Helper nested functions for matrix ops (use nested to respect single top-level function rule)\n    def mat_mult(A, B):\n        # multiply matrices A (r x s) and B (s x t) -> (r x t)\n        r, s = len(A), len(A[0])\n        s2, t = len(B), len(B[0])\n        if s != s2:\n            raise ValueError(\"Incompatible matrix sizes for multiplication.\")\n        # Initialize result\n        R = [[0] * t for _ in range(r)]\n        if modulus is None:\n            for i in range(r):\n                Ai = A[i]\n                Ri = R[i]\n                for k in range(s):\n                    aik = Ai[k]\n                    if aik == 0:\n                        continue\n                    Bk = B[k]\n                    for j in range(t):\n                        Ri[j] += aik * Bk[j]\n        else:\n            mod = modulus\n            for i in range(r):\n                Ai = A[i]\n                Ri = R[i]\n                for k in range(s):\n                    aik = Ai[k]\n                    if aik == 0:\n                        continue\n                    Bk = B[k]\n                    for j in range(t):\n                        Ri[j] = (Ri[j] + aik * Bk[j]) % mod\n        return R\n\n    def mat_pow(mat, exp):\n        # exponentiate square matrix mat to power exp (non-negative integer)\n        size = len(mat)\n        # Initialize result to identity\n        result = [[0] * size for _ in range(size)]\n        for i in range(size):\n            result[i][i] = 1\n        base = [row[:] for row in mat]\n        e = exp\n        while e > 0:\n            if e & 1:\n                result = mat_mult(result, base)\n            base = mat_mult(base, base)\n            e >>= 1\n        return result\n\n    def mat_vec_mult(mat, vec):\n        # multiply matrix (r x s) by vector of length s -> vector length r\n        r, s = len(mat), len(mat[0])\n        if len(vec) != s:\n            raise ValueError(\"Matrix and vector size mismatch.\")\n        out = [0] * r\n        if modulus is None:\n            for i in range(r):\n                ssum = 0\n                row = mat[i]\n                for j in range(s):\n                    ssum += row[j] * vec[j]\n                out[i] = ssum\n        else:\n            mod = modulus\n            for i in range(r):\n                ssum = 0\n                row = mat[i]\n                for j in range(s):\n                    ssum = (ssum + row[j] * vec[j]) % mod\n                out[i] = ssum\n        return out\n\n    # Prepare state vector: [a_m, a_{m-1}, ..., a_1]\n    state = [ (m_init[m - 1 - i] % modulus) if modulus is not None else m_init[m - 1 - i] for i in range(m) ]\n\n    # We need M^(n-m) * state, then take first element => a_n\n    power = n - m\n    Mpow = mat_pow(M, power)\n    res_vec = mat_vec_mult(Mpow, state)\n    ans = res_vec[0]\n    return ans % modulus if (modulus is not None) else ans",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-03-15 01:09:46"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        },
+        "timestamp": "2026-03-15 01:09:48"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "discussion",
+          "is_answer_attempt": false
+        },
+        "timestamp": "2026-03-15 01:10:05"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        },
+        "timestamp": "2026-03-15 01:10:05"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "clarification",
+          "is_answer_attempt": false
+        },
+        "timestamp": "2026-03-15 01:10:16"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        },
+        "timestamp": "2026-03-15 01:10:16"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "discussion",
+          "is_answer_attempt": false
+        },
+        "timestamp": "2026-03-15 01:10:33"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        },
+        "timestamp": "2026-03-15 01:10:34"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-03-15 01:10:55"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def fibfib(n, modulus=None):\n    \"\"\"\n    Compute fibfib(n) for the sequence defined by\n      fibfib(0) = 0, fibfib(1) = 0, fibfib(2) = 1,\n      fibfib(k) = fibfib(k-1) + fibfib(k-2) + fibfib(k-3) for k >= 3.\n\n    Indexing is 0-based (n is a non-negative integer). If `modulus` is provided (positive int),\n    results are returned modulo that value (useful for very large n).\n\n    Examples:\n      fibfib(0) -> 0\n      fibfib(1) -> 0\n      fibfib(2) -> 1\n      fibfib(3) -> 1  (1+0+0)\n      fibfib(4) -> 2  (1+1+0)\n      fibfib(5) -> 4  (2+1+1)\n\n    This implementation uses 3x3 matrix exponentiation to get O(log n) time.\n    \"\"\"\n    # Validate n\n    if not isinstance(n, int) or n < 0:\n        raise ValueError(\"n must be a non-negative integer (0-based index).\")\n    if modulus is not None:\n        if not isinstance(modulus, int) or modulus <= 0:\n            raise ValueError(\"modulus must be a positive integer when provided.\")\n\n    # Base cases\n    if n == 0 or n == 1:\n        return 0 if modulus is None else 0 % modulus\n    if n == 2:\n        return 1 if modulus is None else 1 % modulus\n\n    # Companion matrix for Tribonacci:\n    # state_k = [a_k, a_{k-1}, a_{k-2}]^T\n    # M * state_k = state_{k+1}, where first row is [1,1,1], then [1,0,0], [0,1,0]\n    mod = modulus\n    M = [\n        [1 % mod if mod is not None else 1, 1 % mod if mod is not None else 1, 1 % mod if mod is not None else 1],\n        [1 % mod if mod is not None else 1, 0, 0],\n        [0, 1 % mod if mod is not None else 1, 0],\n    ]\n\n    def mat_mult(A, B):\n        # multiply matrices A (r x s) and B (s x t) -> (r x t)\n        r, s = len(A), len(A[0])\n        s2, t = len(B), len(B[0])\n        if s != s2:\n            raise ValueError(\"Incompatible matrix sizes for multiplication.\")\n        R = [[0] * t for _ in range(r)]\n        if mod is None:\n            for i in range(r):\n                Ai = A[i]\n                Ri = R[i]\n                for k in range(s):\n                    aik = Ai[k]\n                    if aik == 0:\n                        continue\n                    Bk = B[k]\n                    for j in range(t):\n                        Ri[j] += aik * Bk[j]\n        else:\n            for i in range(r):\n                Ai = A[i]\n                Ri = R[i]\n                for k in range(s):\n                    aik = Ai[k]\n                    if aik == 0:\n                        continue\n                    Bk = B[k]\n                    for j in range(t):\n                        Ri[j] = (Ri[j] + aik * Bk[j]) % mod\n        return R\n\n    def mat_pow(mat, exp):\n        size = len(mat)\n        # identity\n        result = [[0] * size for _ in range(size)]\n        for i in range(size):\n            result[i][i] = 1\n        base = [row[:] for row in mat]\n        e = exp\n        while e > 0:\n            if e & 1:\n                result = mat_mult(result, base)\n            base = mat_mult(base, base)\n            e >>= 1\n        return result\n\n    def mat_vec_mult(mat, vec):\n        r, s = len(mat), len(mat[0])\n        if len(vec) != s:\n            raise ValueError(\"Matrix and vector size mismatch.\")\n        out = [0] * r\n        if mod is None:\n            for i in range(r):\n                ssum = 0\n                row = mat[i]\n                for j in range(s):\n                    ssum += row[j] * vec[j]\n                out[i] = ssum\n        else:\n            for i in range(r):\n                ssum = 0\n                row = mat[i]\n                for j in range(s):\n                    ssum = (ssum + row[j] * vec[j]) % mod\n                out[i] = ssum\n        return out\n\n    # We know state for k=2: [a2, a1, a0] = [1,0,0]. To get a_n (n>=2) we need M^(n-2) * state.\n    power = n - 2\n    Mpow = mat_pow(M, power)\n    state = [1 % mod if mod is not None else 1, 0, 0]\n    res_vec = mat_vec_mult(Mpow, state)\n    ans = res_vec[0]\n    return ans % mod if mod is not None else ans",
+          "is_correct": true,
+          "score": 1
+        },
+        "timestamp": "2026-03-15 01:10:55"
+      }
+    ],
+    "num_resets": 0
+  },
+  "timestamp": "2026-03-15 01:10:55"
+}

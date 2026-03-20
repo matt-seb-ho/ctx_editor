@@ -141,7 +141,15 @@ def resolve_ast_by_type(value):
     elif isinstance(value, ast.BinOp):  # Added this condition to handle function calls as arguments
         output = eval(ast.unparse(value))
     elif isinstance(value, ast.Name):
-        output = value.id
+        # Handle JavaScript-style booleans (true/false) and null
+        if value.id == "true":
+            output = True
+        elif value.id == "false":
+            output = False
+        elif value.id in ("null", "None"):
+            output = None
+        else:
+            output = value.id
     elif isinstance(value, ast.Call):
         if len(value.keywords) == 0:
             output = ast.unparse(value)

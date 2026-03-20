@@ -26,6 +26,7 @@ _DEFAULT_PROMPT_FILES: dict[str, Path] = {
     "assistant": _PROMPTS_DIR / "assistant_reflection.txt",
     "context_editor": _PROMPTS_DIR / "context_editor_reflection.txt",
     "edit_decision": _PROMPTS_DIR / "edit_decision_reflection.txt",
+    "analyzer": _PROMPTS_DIR / "analyzer_reflection.txt",
 }
 
 # Map target → takeaway-only reflection prompt file (for batch Step 1)
@@ -33,6 +34,7 @@ _DEFAULT_TAKEAWAY_PROMPT_FILES: dict[str, Path] = {
     "assistant": _PROMPTS_DIR / "assistant_reflect_takeaways.txt",
     "context_editor": _PROMPTS_DIR / "context_editor_reflect_takeaways.txt",
     "edit_decision": _PROMPTS_DIR / "edit_decision_reflect_takeaways.txt",
+    "analyzer": _PROMPTS_DIR / "analyzer_reflect_takeaways.txt",
 }
 
 # Unify prompt (for batch Step 2) — shared across all targets
@@ -147,7 +149,7 @@ class CheatsheetMemory(MemoryModule):
         return f"CheatsheetMemory(v{self._version}, {len(self._content)} chars): {preview}"
 
 
-VALID_TARGETS = frozenset({"assistant", "context_editor", "edit_decision"})
+VALID_TARGETS = frozenset({"assistant", "context_editor", "edit_decision", "analyzer"})
 
 
 class CheatsheetUpdater(MemoryUpdater):

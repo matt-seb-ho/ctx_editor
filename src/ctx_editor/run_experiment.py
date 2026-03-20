@@ -13,10 +13,27 @@ from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
 from ctx_editor.agents import LengthConstrainedUserAgent, NaturalUserAgent, SystemAgent, UserAgent
-from ctx_editor.core import ConversationSimulator, ModelConfig, SimulatorConfig
+from ctx_editor.core import ConversationSimulator, ConversationTrace, ModelConfig, SimulationResult, SimulatorConfig
+from ctx_editor.identify_false_negatives import (
+    FalseNegativeResult,
+    analyze_sample_inline,
+    compute_adjusted_accuracy,
+    print_fn_summary,
+    save_fn_results,
+)
 from ctx_editor.memory import CheatsheetMemory, CheatsheetUpdater, MemoryModule
-from ctx_editor.execution import BatchedRunner, OfflineMemoryLearner, ParallelRunner, load_trajectories
-from ctx_editor.models import AnthropicModelClient, LoadBalancerConfig, OpenAIModelClient, set_content_filter_log_path
+from ctx_editor.execution import (
+    BatchedRunner,
+    OfflineMemoryLearner,
+    ParallelRunner,
+    load_trajectories,
+)
+from ctx_editor.models import (
+    AnthropicModelClient,
+    LoadBalancerConfig,
+    OpenAIModelClient,
+    set_content_filter_log_path,
+)
 from ctx_editor.utils.ledger import add_run
 from ctx_editor.utils.logging import (
     get_logger,
@@ -119,8 +136,10 @@ def get_strategy(cfg: DictConfig):
     # Fallback to manual instantiation
     from ctx_editor.strategies import (
         AgenticEditStrategy,
+        AppendAnalysisStrategy,
         BaselineStrategy,
         ContextEditStrategy,
+        ContextEditV2Strategy,
         ReflectionStrategy,
     )
 
@@ -129,6 +148,21 @@ def get_strategy(cfg: DictConfig):
         return BaselineStrategy(
             use_memory=strategy_cfg.get("use_memory", False),
             memory_target=strategy_cfg.get("memory_target", "system"),
+        )
+    elif "append_analysis" in strategy_name:
+        return AppendAnalysisStrategy(
+            analyzer_model=strategy_cfg.get("analyzer_model", "gpt-4o-mini"),
+            min_turns=strategy_cfg.get("min_turns", 3),
+            use_memory=strategy_cfg.get("use_memory", False),
+            memory_target=strategy_cfg.get("memory_target", "analyzer"),
+        )
+    elif "context_edit_v2" in strategy_name:
+        return ContextEditV2Strategy(
+            analyzer_model=strategy_cfg.get("analyzer_model", "gpt-4o-mini"),
+            min_turns=strategy_cfg.get("min_turns", 3),
+            max_resets=strategy_cfg.get("max_resets", 3),
+            use_memory=strategy_cfg.get("use_memory", False),
+            memory_target=strategy_cfg.get("memory_target", "analyzer"),
         )
     elif "context_edit" in strategy_name:
         return ContextEditStrategy(
@@ -185,13 +219,30 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     # Load components
     samples = load_samples(cfg)
     model_client = get_model_client(cfg)
-    strategy = get_strategy(cfg)
     memory = setup_memory(cfg)
+
+    # Auto-compute min_turns for analysis strategies based on task data.
+    # Ensures at least 2 analyses run per conversation: skip_turns = min_shards - 2.
+    # Only applies when strategy config has min_turns="auto".
+    strategy_cfg_raw = OmegaConf.to_container(cfg.experiment.strategy, resolve=True)
+    if strategy_cfg_raw.get("min_turns") == "auto":
+        shard_counts = [len(s.get("shards", [])) for s in samples]
+        min_shards = min(shard_counts) if shard_counts else 5
+        auto_min_turns = max(min_shards - 2, 2)  # At least 2 turns before analysis
+        logger.info(f"Auto min_turns: min_shards={min_shards}, setting min_turns={auto_min_turns}")
+        # Override in the Hydra config so strategy instantiation picks it up
+        cfg.experiment.strategy.min_turns = auto_min_turns
+
+    strategy = get_strategy(cfg)
 
     logger.info(f"Loaded {len(samples)} samples for task config '{cfg.task.name}'")
 
     # Create simulator factory
-    def make_simulator(sample: dict, memory: Optional[MemoryModule] = None):
+    def make_simulator(
+        sample: dict,
+        memory: Optional[MemoryModule] = None,
+        trace: Optional[ConversationTrace] = None,
+    ):
         # Build ModelConfig from hydra config
         model_cfg_dict = OmegaConf.to_container(cfg.model, resolve=True)
         model_config = ModelConfig.from_dict(model_cfg_dict)
@@ -237,6 +288,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             strategy=strategy,
             memory=memory,
             config=sim_config,
+            trace=trace,
         )
 
     # Run experiment
@@ -249,9 +301,29 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         pbar.n = completed
         pbar.refresh()
 
+    # False negative analysis setup
+    fna_cfg = cfg.get("false_negative_analysis", {})
+    fna_enabled = fna_cfg.get("enabled", False)
+    fna_mode = fna_cfg.get("mode", "batch")
+    fna_model = fna_cfg.get("model", "gpt-5-mini")
+    fna_exclude_non_answer = fna_cfg.get("exclude_non_answer_attempts", False)
+    fn_results: list[FalseNegativeResult] = []
+
     # Incremental result saving - save each result as it completes so
     # progress is not lost if the experiment hangs or is interrupted.
     partial_results_path = output_dir / "results_partial.jsonl"
+
+    async def _run_immediate_fn_analysis(result: "SimulationResult") -> None:
+        """Run false negative analysis immediately after a conversation completes."""
+        if not fna_enabled or fna_mode != "immediate":
+            return
+        try:
+            result_dict = result.to_dict()
+            fn_result = await analyze_sample_inline(result_dict, model_client, fna_model)
+            if fn_result:
+                fn_results.append(fn_result)
+        except Exception as e:
+            logger.warning(f"False negative analysis failed for {result.sample_id}: {e}")
 
     def save_result_incrementally(result: "SimulationResult") -> None:
         """Save a single result to disk immediately upon completion."""
@@ -270,6 +342,10 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             output_dir=str(output_dir),
             assistant_model=cfg.model.assistant.model,
         )
+
+        # Immediate false negative analysis (fire-and-forget via event loop)
+        if fna_enabled and fna_mode == "immediate":
+            asyncio.ensure_future(_run_immediate_fn_analysis(result))
 
     # Create memory updater with grounding config and target
     memory_updater = CheatsheetUpdater(
@@ -329,11 +405,85 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         )
         return metrics
 
-    if (
-        execution_mode == "batched"
-        and cfg.memory.enabled
-        and cfg.memory.source == "continual"
-    ):
+    # Replay setup: if replay_source is set, load baseline traces and wrap the
+    # simulator factory so each simulator gets a pre-loaded trace. This composes
+    # with any execution mode (parallel, batched, sequential).
+    replay_source = cfg.execution.get("replay_source")
+    replay_traces = None
+    user_sim_skip_results: list[SimulationResult] = []  # Results for skipped user-sim-induced samples
+    if replay_source:
+        from ctx_editor.execution.replay import (
+            load_baseline_traces,
+            build_replay_trace,
+            load_user_sim_induced_ids,
+        )
+
+        replay_turns = cfg.execution.get("replay_turns", 1)
+        replay_traces = load_baseline_traces(replay_source)
+        logger.info(
+            f"Replay mode: loaded {len(replay_traces)} baseline traces from {replay_source}"
+            f" (replaying last {replay_turns} turn{'s' if replay_turns > 1 else ''})"
+        )
+
+        # Filter samples to only those with matching baseline traces
+        original_count = len(samples)
+        samples = [s for s in samples if s.get("task_id", "unknown") in replay_traces]
+        if len(samples) < original_count:
+            logger.warning(
+                f"Replay: {original_count - len(samples)} samples skipped "
+                f"(no matching baseline trace)"
+            )
+
+        # Skip samples with user-simulator-induced errors (pre-computed)
+        user_sim_induced_ids = load_user_sim_induced_ids(replay_source)
+        if user_sim_induced_ids:
+            skipped_samples = [
+                s for s in samples if s.get("task_id", "unknown") in user_sim_induced_ids
+            ]
+            samples = [
+                s for s in samples if s.get("task_id", "unknown") not in user_sim_induced_ids
+            ]
+            logger.info(
+                f"Replay: skipping {len(skipped_samples)} user-sim-induced samples: "
+                f"{[s.get('task_id') for s in skipped_samples]}"
+            )
+            # Create skip results so they appear in output as user-sim-induced
+            for s in skipped_samples:
+                skip_result = SimulationResult(
+                    sample_id=s.get("task_id", "unknown"),
+                    task_name=s.get("task", "unknown"),
+                    is_correct=False,
+                    score=0.0,
+                    num_turns=0,
+                    total_cost_usd=0.0,
+                    trace={"messages": [], "logs": [], "num_resets": 0},
+                    metadata={
+                        "skipped": True,
+                        "skip_reason": "user_sim_induced",
+                        "replay_mode": True,
+                    },
+                )
+                user_sim_skip_results.append(skip_result)
+                save_result_incrementally(skip_result)
+
+        pbar.total = len(samples)
+        pbar.refresh()
+
+        # Wrap the factory to inject replay traces
+        _original_factory = make_simulator
+
+        def make_simulator(
+            sample: dict,
+            memory: Optional[MemoryModule] = None,
+            trace: Optional[ConversationTrace] = None,
+        ):
+            sample_id = sample.get("task_id", "unknown")
+            trace_data = replay_traces.get(sample_id)
+            if trace_data:
+                trace = build_replay_trace(trace_data, replay_source, replay_turns=replay_turns)
+            return _original_factory(sample, memory=memory, trace=trace)
+
+    if execution_mode == "batched" and cfg.memory.enabled and cfg.memory.source == "continual":
         # Batched execution with continual learning
         runner = BatchedRunner(
             batch_size=cfg.execution.batch_size,
@@ -371,6 +521,13 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     valid_results = [r for r in results if "error" not in r.metadata]
     error_results = [r for r in results if "error" in r.metadata]
 
+    # Log user-sim-induced skips (excluded from accuracy denominator entirely)
+    num_user_sim_skipped = len(user_sim_skip_results)
+    if num_user_sim_skipped:
+        logger.info(
+            f"{num_user_sim_skipped} samples excluded (user-sim-induced errors in baseline traces)"
+        )
+
     def _user_output_tokens(r) -> int:
         """Extract user agent output tokens from a result."""
         if r.usage_stats:
@@ -385,9 +542,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     avg_score = sum(r.score for r in valid_results) / total if total > 0 else 0
     total_cost = sum(r.total_cost_usd for r in results)  # cost includes errors
     avg_turns = sum(r.num_turns for r in valid_results) / total if total > 0 else 0
-    avg_user_tokens = (
-        sum(_user_output_tokens(r) for r in valid_results) / total if total > 0 else 0
-    )
+    avg_user_tokens = sum(_user_output_tokens(r) for r in valid_results) / total if total > 0 else 0
 
     # Compute per-task metrics (excluding errored conversations)
     valid_by_task = defaultdict(list)
@@ -413,9 +568,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
             sum(r.num_turns for r in task_results) / task_total if task_total > 0 else 0
         )
         task_avg_user_tokens = (
-            sum(_user_output_tokens(r) for r in task_results) / task_total
-            if task_total > 0
-            else 0
+            sum(_user_output_tokens(r) for r in task_results) / task_total if task_total > 0 else 0
         )
 
         per_task_metrics[task_name] = {
@@ -435,6 +588,7 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         "total_samples": total,
         "total_attempted": total_attempted,
         "errors": num_errors,
+        "user_sim_skipped": num_user_sim_skipped,
         "correct": correct,
         "accuracy": correct / total if total > 0 else 0,
         "average_score": avg_score,
@@ -445,9 +599,20 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         "per_task": per_task_metrics,
     }
 
+    # Add replay provenance to metrics
+    if replay_source:
+        metrics["replay"] = {
+            "source": replay_source,
+        }
+
     # Log overall metrics
-    error_suffix = f" ({num_errors} errors excluded)" if num_errors > 0 else ""
-    logger.info(f"Results: {correct}/{total} correct ({metrics['accuracy']:.2%}){error_suffix}")
+    suffixes = []
+    if num_errors > 0:
+        suffixes.append(f"{num_errors} errors excluded")
+    if num_user_sim_skipped > 0:
+        suffixes.append(f"{num_user_sim_skipped} user-sim-induced skipped")
+    suffix_str = f" ({', '.join(suffixes)})" if suffixes else ""
+    logger.info(f"Results: {correct}/{total} correct ({metrics['accuracy']:.2%}){suffix_str}")
     logger.info(f"Average score: {avg_score:.3f}")
     logger.info(f"Total cost: ${total_cost:.4f}")
 
@@ -496,8 +661,43 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
         extra={
             "user_mode": cfg.user_mode.name,
             "data_file": cfg.task.get("data_file", ""),
+            **dict(cfg.get("metadata", {})),
         },
     )
+
+    # Run batch false negative analysis if enabled
+    if fna_enabled and fna_mode == "batch":
+        incorrect_results = [r for r in valid_results if not r.is_correct]
+        if incorrect_results:
+            logger.info(
+                f"Running false negative analysis on {len(incorrect_results)} incorrect samples..."
+            )
+            for r in tqdm(incorrect_results, desc="False negative analysis", unit="sample"):
+                try:
+                    fn_result = await analyze_sample_inline(r.to_dict(), model_client, fna_model)
+                    if fn_result:
+                        fn_results.append(fn_result)
+                except Exception as e:
+                    logger.warning(f"False negative analysis failed for {r.sample_id}: {e}")
+
+    # Save false negative results and report adjusted accuracy
+    if fn_results:
+        fn_output_path = str(output_dir / "false_negatives.json")
+        save_fn_results(fn_results, fn_output_path)
+        print_fn_summary(fn_results, correct, total, fna_exclude_non_answer)
+
+        # Compute and log adjusted accuracy
+        adj = compute_adjusted_accuracy(correct, total, fn_results, fna_exclude_non_answer)
+        metrics["adjusted_accuracy"] = adj["adjusted_accuracy"]
+        metrics["adjusted_total"] = adj["adjusted_total"]
+        metrics["user_sim_induced"] = adj["user_sim_induced"]
+        metrics["non_answer_attempts"] = adj["non_answer_attempts"]
+        logger.info(
+            f"Adjusted accuracy: {adj['adjusted_correct']}/{adj['adjusted_total']} "
+            f"({adj['adjusted_accuracy']:.2%}) "
+            f"[{adj['user_sim_induced']} user-sim-induced, "
+            f"{adj['non_answer_attempts']} non-answer-attempts excluded={fna_exclude_non_answer}]"
+        )
 
     # Save final memory
     if memory and cfg.memory.get("save_path"):
@@ -531,11 +731,26 @@ def main(cfg: DictConfig) -> None:
     summary_lines.append(f"Experiment: {cfg.experiment_name}")
 
     num_errors = metrics.get("errors", 0)
-    error_note = f"  ({num_errors} errors excluded)" if num_errors > 0 else ""
+    num_skipped = metrics.get("user_sim_skipped", 0)
+    notes = []
+    if num_errors > 0:
+        notes.append(f"{num_errors} errors excluded")
+    if num_skipped > 0:
+        notes.append(f"{num_skipped} user-sim-induced skipped")
+    note_str = f"  ({', '.join(notes)})" if notes else ""
     summary_lines.append(
         f"Accuracy: {metrics['accuracy']:.2%} "
-        f"({metrics['correct']}/{metrics['total_samples']}){error_note}"
+        f"({metrics['correct']}/{metrics['total_samples']}){note_str}"
     )
+    if "adjusted_accuracy" in metrics:
+        adj_note = (
+            f"  [{metrics['user_sim_induced']} user-sim-induced excluded"
+            f", {metrics['non_answer_attempts']} non-answer-attempts]"
+        )
+        summary_lines.append(
+            f"Adjusted Accuracy: {metrics['adjusted_accuracy']:.2%} "
+            f"({metrics['correct']}/{metrics['adjusted_total']}){adj_note}"
+        )
     summary_lines.append(f"Average Score: {metrics['average_score']:.3f}")
     summary_lines.append(f"Total Cost: ${metrics['total_cost_usd']:.4f}")
     summary_lines.append(f"Average Turns: {metrics['average_turns']:.1f}")

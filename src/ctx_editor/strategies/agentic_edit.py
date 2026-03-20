@@ -317,9 +317,6 @@ Use it to guide your editing — it identifies specific problems with the assist
         # Add last user message
         last_user = trace.last_user_message
         if last_user:
-            new_messages.append(
-                Message(role="assistant", content="Understood. Let me work on this with the updated context.")
-            )
             new_messages.append(Message(role="user", content=last_user.content))
 
         trace.reset_conversation(new_messages, label="context_edit")

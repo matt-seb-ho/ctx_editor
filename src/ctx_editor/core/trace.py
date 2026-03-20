@@ -26,6 +26,8 @@ class ConversationTrace:
     logs: list[dict[str, Any]] = field(default_factory=list)
     # Track number of context resets for analysis
     num_resets: int = 0
+    # Provenance tracking for replay mode — records where this trace originated
+    provenance: Optional[dict[str, Any]] = None
 
     def get_active_messages(self) -> list[Message]:
         """Get only visible messages (the active conversation)."""
@@ -227,7 +229,7 @@ class ConversationTrace:
         """Get the full trace including logs for serialization.
 
         Returns:
-            Dictionary with 'messages', 'logs', and 'num_resets'.
+            Dictionary with 'messages', 'logs', 'num_resets', and optionally 'provenance'.
             All messages (visible and hidden) are included - use the 'visible'
             field to reconstruct pre/post-edit states.
         """
@@ -243,11 +245,64 @@ class ConversationTrace:
                 entry["metadata"] = msg.metadata
             messages.append(entry)
 
-        return {
+        result = {
             "messages": messages,
             "logs": self.logs,
             "num_resets": self.num_resets,
         }
+        if self.provenance:
+            result["provenance"] = self.provenance
+        return result
+
+    def get_user_messages_string(
+        self,
+        active_only: bool = True,
+        include_compacted: bool = False,
+        all_unique: bool = False,
+    ) -> str:
+        """Get only user messages as a formatted string, numbered by turn.
+
+        Args:
+            active_only: If True, only include visible messages.
+            include_compacted: If True, also include "compacted conversation" messages.
+                This is important for S2 (context edit) — after a reset, the compacted
+                conversation contains the previous task spec and should be included
+                when the analyzer builds a new task spec.
+            all_unique: If True, include ALL user messages (visible and hidden),
+                deduplicated by content. This ensures the task spec query sees
+                every user message across all resets, without the bias of a
+                previous compacted task spec. Overrides active_only and
+                include_compacted when set.
+        """
+        if all_unique:
+            # Get all user messages across resets, deduplicated
+            all_msgs = self.to_messages(include_system=False, active_only=False)
+            user_msgs = [msg for msg in all_msgs if msg.role == "user"]
+            # Deduplicate by content (preserves order, keeps first occurrence)
+            seen: set[str] = set()
+            unique_msgs = []
+            for msg in user_msgs:
+                content = msg.content.strip()
+                if content not in seen:
+                    seen.add(content)
+                    unique_msgs.append(msg)
+            parts = []
+            for i, msg in enumerate(unique_msgs, 1):
+                parts.append(f"[Message {i}]\n{msg.content}")
+            return "\n\n".join(parts)
+
+        messages = self.to_messages(include_system=False, active_only=active_only)
+        relevant_roles = {"user"}
+        if include_compacted:
+            relevant_roles.add("compacted conversation")
+        relevant_msgs = [msg for msg in messages if msg.role in relevant_roles]
+        parts = []
+        for i, msg in enumerate(relevant_msgs, 1):
+            if msg.role == "compacted conversation":
+                parts.append(f"[Previous Task Summary]\n{msg.content}")
+            else:
+                parts.append(f"[Message {i}]\n{msg.content}")
+        return "\n\n".join(parts)
 
     def get_conversation_string(
         self,
@@ -276,6 +331,31 @@ class ConversationTrace:
 
         return "\n\n".join([f"[{msg.role}] {msg.content}" for msg in messages])
 
+    @property
+    def previous_task_spec(self) -> Optional[str]:
+        """Extract the task spec from the last compacted conversation message, if any.
+
+        Returns the content under '# User Task Specification (So Far)' from
+        the most recent compacted conversation message, or None if no resets
+        have occurred.
+        """
+        for msg in reversed(self.messages):
+            if msg.role == "compacted conversation":
+                content = msg.content
+                marker = "# User Task Specification (So Far)"
+                idx = content.find(marker)
+                if idx == -1:
+                    return None
+                # Extract from after the marker to the next section header or end
+                start = idx + len(marker)
+                rest = content[start:]
+                # Find next section header (# ...) if any
+                next_section = rest.find("\n# ")
+                if next_section != -1:
+                    return rest[:next_section].strip()
+                return rest.strip()
+        return None
+
     def get_revealed_shard_ids(self) -> list[str]:
         """Get IDs of shards that have been revealed."""
         return [log["data"]["shard_id"] for log in self.logs if log["type"] == "shard_revealed"]
@@ -295,4 +375,91 @@ class ConversationTrace:
         ]
         new_trace.logs = [dict(log) for log in self.logs]
         new_trace.num_resets = self.num_resets
+        new_trace.provenance = dict(self.provenance) if self.provenance else None
         return new_trace
+
+    @classmethod
+    def from_saved_trace(
+        cls,
+        trace_data: dict[str, Any],
+        truncate_final_assistant: bool = False,
+        truncate_turns: int = 0,
+        provenance: Optional[dict[str, Any]] = None,
+    ) -> "ConversationTrace":
+        """Reconstruct a ConversationTrace from saved trace data.
+
+        Args:
+            trace_data: The 'trace' dict from a saved trace file, containing
+                'messages', 'logs', and 'num_resets'.
+            truncate_final_assistant: If True, remove the last assistant message
+                from visible messages (for replay mode — we want to regenerate it).
+                Ignored if truncate_turns > 0.
+            truncate_turns: Number of complete turns (user+assistant pairs) to
+                remove from the end for multi-turn replay. When > 0, overrides
+                truncate_final_assistant.
+            provenance: Optional provenance metadata to attach to this trace.
+
+        Returns:
+            A ConversationTrace with the reconstructed state.
+        """
+        trace = cls()
+        trace.provenance = provenance
+
+        # Reconstruct messages
+        for msg_data in trace_data.get("messages", []):
+            trace.messages.append(Message.from_dict(msg_data))
+
+        # Reconstruct logs
+        trace.logs = list(trace_data.get("logs", []))
+        trace.num_resets = trace_data.get("num_resets", 0)
+
+        if truncate_turns > 0:
+            # Multi-turn truncation: remove the last k visible (user, assistant) pairs.
+            # Walk backwards removing messages, counting complete turns removed.
+            turns_removed = 0
+            while turns_removed < truncate_turns:
+                # Remove the last visible assistant message
+                found_assistant = False
+                for i in range(len(trace.messages) - 1, -1, -1):
+                    if trace.messages[i].role == "assistant" and trace.messages[i].visible:
+                        trace.messages.pop(i)
+                        found_assistant = True
+                        break
+                if not found_assistant:
+                    break  # No more assistant messages to remove
+
+                # Remove the last visible user message
+                for i in range(len(trace.messages) - 1, -1, -1):
+                    if trace.messages[i].role == "user" and trace.messages[i].visible:
+                        trace.messages.pop(i)
+                        break
+
+                # Strip the corresponding logs for this turn (verification, answer_evaluation,
+                # shard_revealed — each turn produces one verification log and optionally others)
+                while trace.logs and trace.logs[-1]["type"] in (
+                    "verification",
+                    "answer_evaluation",
+                ):
+                    trace.logs.pop()
+                # Remove the shard_revealed log for this turn if present
+                if trace.logs and trace.logs[-1]["type"] == "shard_revealed":
+                    trace.logs.pop()
+
+                turns_removed += 1
+
+        elif truncate_final_assistant:
+            # Single-turn truncation (original behavior): remove last assistant message only.
+            for i in range(len(trace.messages) - 1, -1, -1):
+                msg = trace.messages[i]
+                if msg.role == "assistant" and msg.visible:
+                    trace.messages.pop(i)
+                    break
+
+            # Strip logs from the final turn's verification/evaluation.
+            while trace.logs and trace.logs[-1]["type"] in (
+                "verification",
+                "answer_evaluation",
+            ):
+                trace.logs.pop()
+
+        return trace

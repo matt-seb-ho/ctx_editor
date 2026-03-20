@@ -4,7 +4,15 @@ from typing import TYPE_CHECKING, Optional, Protocol, runtime_checkable
 
 from ..core.types import Message
 
-MEMORY_BLOCK_TEMPLATE = "\n\n<cheatsheet>\n{memory_content}\n</cheatsheet>"
+MEMORY_BLOCK_TEMPLATE = """
+
+<cheatsheet>
+The following cheatsheet contains strategies, common pitfalls, and lessons learned from \
+previous similar tasks. Use your discretion to decide which points are relevant to the \
+current task — not all will apply.
+
+{memory_content}
+</cheatsheet>"""
 
 if TYPE_CHECKING:
     from ..core.trace import ConversationTrace

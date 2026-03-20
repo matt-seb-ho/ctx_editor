@@ -12,6 +12,15 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
     from ..strategies.base import ContextStrategy
 
+# Prompt wrapper for Option 2 conversation format: render history as string
+# inside a single user message rather than as alternating API messages.
+ASSISTANT_PROMPT_WRAPPER = """\
+Here is the current conversation:
+
+{conversation}
+
+Please respond to the user. Do not include [user] or [assistant] tags in your response."""
+
 
 class ConversationSimulator:
     """Orchestrates multi-turn conversations for evaluation.
@@ -30,6 +39,7 @@ class ConversationSimulator:
         strategy: "ContextStrategy",
         memory: Optional["MemoryModule"] = None,
         config: Optional[SimulatorConfig] = None,
+        trace: Optional[ConversationTrace] = None,
     ):
         """Initialize the simulator.
 
@@ -42,6 +52,8 @@ class ConversationSimulator:
             strategy: Strategy for context preparation.
             memory: Optional memory module for context augmentation.
             config: Simulator configuration.
+            trace: Optional pre-loaded trace (for replay mode). If provided,
+                the simulator will use this trace instead of creating a new one.
         """
         self.sample = sample
         self.task = task
@@ -52,14 +64,50 @@ class ConversationSimulator:
         self.memory = memory
         self.config = config or SimulatorConfig()
 
-        self.trace = ConversationTrace()
         self.usage_stats = UsageStats()
         self.is_completed = False
         self.final_result: Optional[SimulationResult] = None
 
-        # Initialize with system message
-        system_prompt = task.generate_system_prompt(sample)
-        self.trace.add_system_message(system_prompt)
+        if trace is not None:
+            # Replay mode: use the pre-loaded trace
+            self.trace = trace
+        else:
+            # Normal mode: create fresh trace with system message
+            self.trace = ConversationTrace()
+            system_prompt = task.generate_system_prompt(sample)
+            self.trace.add_system_message(system_prompt)
+
+    @staticmethod
+    def _render_for_assistant(context_messages: list[Message]) -> list[dict[str, str]]:
+        """Render context messages into Option 2 format for the API call.
+
+        Instead of passing the conversation as alternating user/assistant API messages,
+        we render it as a tagged string inside a single user message. This gives full
+        control over formatting and allows injecting arbitrary content (analysis, edited
+        context) without worrying about API message alternation requirements.
+
+        Format sent to API:
+            [{"role": "system", "content": "..."},
+             {"role": "user", "content": "Here is the current conversation:\\n\\n[CONTENT]\\n\\n..."}]
+        """
+        system_content = None
+        conversation_parts = []
+
+        for msg in context_messages:
+            if msg.role == "system":
+                system_content = msg.content
+            else:
+                conversation_parts.append(f"[{msg.role}]\n{msg.content}")
+
+        conversation_str = "\n\n".join(conversation_parts)
+        user_content = ASSISTANT_PROMPT_WRAPPER.format(conversation=conversation_str)
+
+        api_messages = []
+        if system_content:
+            api_messages.append({"role": "system", "content": system_content})
+        api_messages.append({"role": "user", "content": user_content})
+
+        return api_messages
 
     def _build_result_metadata(self, extra: dict[str, Any] | None = None) -> dict[str, Any]:
         """Build metadata dict for SimulationResult, including grounding info.
@@ -84,8 +132,16 @@ class ConversationSimulator:
 
         return metadata
 
+    @property
+    def is_replay(self) -> bool:
+        """Whether this simulator is running in replay mode (pre-loaded trace)."""
+        return self.trace.provenance is not None
+
     async def run(self, verbose: bool = False) -> SimulationResult:
         """Run the full conversation simulation.
+
+        If the simulator was initialized with a pre-loaded trace (replay mode),
+        delegates to run_final_turn() instead of running the full loop.
 
         Args:
             verbose: Whether to print conversation progress.
@@ -93,6 +149,16 @@ class ConversationSimulator:
         Returns:
             SimulationResult with evaluation outcome and trace.
         """
+        # Replay mode
+        if self.is_replay:
+            replay_turns = (self.trace.provenance or {}).get("replay_turns", 1)
+            if replay_turns <= 1:
+                # Single-turn replay: only regenerate the final assistant turn
+                return await self.run_final_turn(verbose)
+            else:
+                # Multi-turn replay: run k turns of the normal loop
+                return await self._run_multi_turn_replay(replay_turns, verbose)
+
         verbose = verbose or self.config.verbose
 
         shards = self.sample.get("shards", [])
@@ -120,9 +186,9 @@ class ConversationSimulator:
         if self.final_result is None:
             self.final_result = SimulationResult(
                 sample_id=self.sample.get("task_id", "unknown"),
-                task_name=self.task.get_task_name()
-                if hasattr(self.task, "get_task_name")
-                else "unknown",
+                task_name=(
+                    self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown"
+                ),
                 is_correct=False,
                 score=0.0,
                 num_turns=self.trace.total_user_turns,  # Use total across all resets
@@ -133,6 +199,192 @@ class ConversationSimulator:
             )
 
         return self.final_result
+
+    async def run_final_turn(self, verbose: bool = False) -> SimulationResult:
+        """Run only the final turn on a pre-loaded trace (replay mode).
+
+        Applies the context strategy, generates assistant response, verifies,
+        and evaluates — but does NOT generate a new user message (the last user
+        message is already in the trace from the baseline run).
+
+        Args:
+            verbose: Whether to print progress.
+
+        Returns:
+            SimulationResult with evaluation outcome and trace.
+        """
+        verbose = verbose or self.config.verbose
+
+        # Apply context strategy
+        context_messages = await self.strategy.prepare_context(
+            trace=self.trace,
+            memory=self.memory,
+            model_client=self.model_client,
+        )
+
+        # Render and generate assistant response
+        messages_for_api = self._render_for_assistant(context_messages)
+
+        assistant_cfg = self.config.model_config.assistant
+        max_tokens = assistant_cfg.get_effective_max_tokens()
+
+        assistant_response = await self.model_client.generate(
+            messages=messages_for_api,
+            model=assistant_cfg.model,
+            temperature=assistant_cfg.temperature,
+            max_tokens=max_tokens,
+            timeout=assistant_cfg.timeout,
+            reasoning_effort=assistant_cfg.reasoning_effort,
+        )
+
+        self.trace.add_assistant_message(
+            content=assistant_response.content,
+            metadata={"cost_usd": assistant_response.total_usd},
+        )
+        self.usage_stats.record("assistant", assistant_response)
+
+        if verbose:
+            print(f"\033[91m[assistant] {assistant_response.content}\033[0m")
+
+        # Verify the response
+        system_cfg = self.config.model_config.system
+        verification = await self.system_agent.verify_response(
+            trace=self.trace,
+            model_client=self.model_client,
+            reasoning_effort=system_cfg.reasoning_effort,
+        )
+        if verification.model_response:
+            self.usage_stats.record("system", verification.model_response)
+
+        self.trace.add_log(
+            "verification",
+            {
+                "response_type": verification.response_type,
+                "is_answer_attempt": verification.is_answer_attempt,
+            },
+        )
+
+        # If answer attempt, extract and evaluate
+        eval_result = None
+        extracted_answer = None
+        is_correct = False
+        score = 0.0
+
+        if verification.is_answer_attempt:
+            extraction = await self.system_agent.extract_answer(
+                trace=self.trace,
+                model_client=self.model_client,
+                reasoning_effort=system_cfg.reasoning_effort,
+            )
+            for model_response in extraction.model_responses:
+                self.usage_stats.record("system", model_response)
+
+            evaluation_return = self.task.evaluator_function(
+                extraction.answer,
+                self.sample,
+            )
+
+            if isinstance(evaluation_return, dict):
+                score = evaluation_return.get("score", 0.0)
+                is_correct = evaluation_return.get("is_correct", score == 1.0)
+            elif isinstance(evaluation_return, tuple):
+                is_correct, _ = evaluation_return
+                score = 1.0 if is_correct else 0.0
+            else:
+                is_correct = bool(evaluation_return)
+                score = 1.0 if is_correct else 0.0
+
+            eval_result = EvaluationResult(
+                is_correct=is_correct,
+                score=score,
+                extracted_answer=extraction.answer,
+                raw_evaluation=evaluation_return if isinstance(evaluation_return, dict) else None,
+            )
+            extracted_answer = extraction.answer
+
+            self.trace.add_log(
+                "answer_evaluation",
+                {
+                    "extracted_answer": extraction.answer,
+                    "is_correct": is_correct,
+                    "score": score,
+                },
+            )
+
+            if verbose:
+                icon = "\033[92m✔\033[0m" if is_correct else "\033[91m✘\033[0m"
+                print(f"{icon} Score: {score}")
+
+        return SimulationResult(
+            sample_id=self.sample.get("task_id", "unknown"),
+            task_name=(
+                self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown"
+            ),
+            is_correct=is_correct,
+            score=score,
+            num_turns=self.trace.total_user_turns,
+            total_cost_usd=self.usage_stats.total_cost_usd(),
+            trace=self.trace.to_full_trace(),
+            extracted_answer=extracted_answer,
+            evaluation_result=eval_result,
+            usage_stats=self.usage_stats,
+            metadata=self._build_result_metadata({"replay_mode": True}),
+        )
+
+    async def _run_multi_turn_replay(
+        self, num_turns: int, verbose: bool = False
+    ) -> SimulationResult:
+        """Run multiple turns on a pre-loaded trace (multi-turn replay mode).
+
+        Truncated turns are re-simulated using the normal turn loop, with
+        user agent generating new user messages and strategy applied fresh.
+
+        Args:
+            num_turns: Number of turns to replay.
+            verbose: Whether to print progress.
+
+        Returns:
+            SimulationResult with evaluation outcome and trace.
+        """
+        verbose = verbose or self.config.verbose
+        turns_run = 0
+
+        while turns_run < num_turns and not self.is_completed:
+            # Check if all shards have been revealed
+            shards = self.sample.get("shards", [])
+            revealed_shard_ids = set(self.trace.get_revealed_shard_ids())
+            if len(revealed_shard_ids) == len(shards) and len(shards) > 0:
+                if verbose:
+                    print(
+                        f"\033[94m[log] all shards revealed "
+                        f"({len(revealed_shard_ids)}/{len(shards)})\033[0m"
+                    )
+                break
+
+            await self._run_turn(verbose)
+
+            # Check if user budget was exhausted
+            if any(log["type"] == "user_budget_exhausted" for log in self.trace.logs):
+                break
+
+            turns_run += 1
+
+        if self.final_result is not None:
+            return self.final_result
+
+        return SimulationResult(
+            sample_id=self.sample.get("task_id", "unknown"),
+            task_name=(
+                self.task.get_task_name() if hasattr(self.task, "get_task_name") else "unknown"
+            ),
+            is_correct=False,
+            score=0.0,
+            num_turns=self.trace.total_user_turns,
+            total_cost_usd=self.usage_stats.total_cost_usd(),
+            trace=self.trace.to_full_trace(),
+            usage_stats=self.usage_stats,
+            metadata=self._build_result_metadata({"replay_mode": True, "replay_turns": num_turns}),
+        )
 
     async def _run_turn(self, verbose: bool = False) -> None:
         """Execute a single conversation turn.
@@ -184,12 +436,9 @@ class ConversationSimulator:
             model_client=self.model_client,
         )
 
-        # Convert to dict format for API call
-        messages_for_api = [
-            msg.to_dict() if isinstance(msg, Message) else msg for msg in context_messages
-        ]
+        # 3. Render as Option 2 format and generate assistant response
+        messages_for_api = self._render_for_assistant(context_messages)
 
-        # 3. Generate assistant response using role config
         assistant_cfg = self.config.model_config.assistant
         max_tokens = assistant_cfg.get_effective_max_tokens()
 
@@ -285,9 +534,11 @@ class ConversationSimulator:
                 self.is_completed = True
                 self.final_result = SimulationResult(
                     sample_id=self.sample.get("task_id", "unknown"),
-                    task_name=self.task.get_task_name()
-                    if hasattr(self.task, "get_task_name")
-                    else "unknown",
+                    task_name=(
+                        self.task.get_task_name()
+                        if hasattr(self.task, "get_task_name")
+                        else "unknown"
+                    ),
                     is_correct=is_correct,
                     score=score,
                     num_turns=self.trace.total_user_turns,  # Use total across all resets
