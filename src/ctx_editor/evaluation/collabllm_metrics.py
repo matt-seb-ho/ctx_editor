@@ -292,7 +292,7 @@ async def judge_conversation_accuracy(
                 messages=[{"role": "user", "content": prompt}],
                 model=model,
                 temperature=0.0,
-                max_tokens=1500,
+                max_tokens=4000,
             )
             parsed = _parse_json_response(response.content)
             if parsed and "accuracy" in parsed:
@@ -300,6 +300,12 @@ async def judge_conversation_accuracy(
                 # Clamp to valid range
                 score = max(0.0, min(1.0, score))
                 return score, response
+            else:
+                logger.warning(
+                    f"judge_conversation_accuracy attempt {attempt + 1}: "
+                    f"JSON parse failed, response length={len(response.content)}, "
+                    f"preview: {response.content[:200]}..."
+                )
         except Exception as e:
             logger.warning(f"judge_conversation_accuracy attempt {attempt + 1} failed: {e}")
 
