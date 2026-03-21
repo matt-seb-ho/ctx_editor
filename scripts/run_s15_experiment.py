@@ -142,13 +142,23 @@ def build_compacted_messages(
     system_message: str,
     analysis: dict,
     last_user_message: str,
+    accumulate: bool = False,
+    no_notes: bool = False,
+    no_clarification: bool = False,
+    task_name: str = "",
 ) -> list[dict]:
     """Build compacted context from analysis, like S2 does on reset."""
     messages = []
 
-    # System message
-    if system_message:
-        messages.append({"role": "system", "content": system_message})
+    # System message with optional anti-clarification
+    sys_content = system_message or ""
+    if no_clarification:
+        sys_content += (
+            "\n\nIMPORTANT: Do not ask clarifying questions. "
+            "Answer directly based on the specification provided."
+        )
+    if sys_content:
+        messages.append({"role": "system", "content": sys_content})
 
     # Compacted conversation: task spec + aligned
     task_spec = analysis.get("user_intent", "")
@@ -163,13 +173,33 @@ def build_compacted_messages(
     if aligned:
         compact_parts.append(f"# What Looks Right So Far\n{aligned}")
 
+    if accumulate:
+        if task_name == "actions":
+            compact_parts.append(
+                "IMPORTANT: Your response must include ALL requested function calls for the "
+                "complete task specification, including any calls described above as "
+                "'what looks right'. Do not assume prior calls have been submitted — "
+                "your response must be self-contained and complete. "
+                "Present a single, consolidated list of function calls. "
+                "Do not duplicate or repeat any function call."
+            )
+        else:
+            compact_parts.append(
+                "IMPORTANT: Your response must include ALL required outputs for the "
+                "complete task specification, including any work described above as "
+                "'what looks right'. Do not assume prior work has been submitted — "
+                "your response must be self-contained and complete. "
+                "Output everything exactly once — do not duplicate or repeat outputs."
+            )
+
     messages.append({"role": "user", "content": "\n\n".join(compact_parts)})
 
-    # Context edit notes (issues) as system injection, like S2 does
-    issues = analysis.get("issues", "")
-    if issues and issues.strip().lower() != "none":
-        notes = f"\n\n<context_edit_notes>\n{issues}\n</context_edit_notes>"
-        messages[0]["content"] += notes
+    # Context edit notes (issues) as system injection
+    if not no_notes:
+        issues = analysis.get("issues", "")
+        if issues and issues.strip().lower() != "none":
+            notes = f"\n\n<context_edit_notes>\n{issues}\n</context_edit_notes>"
+            messages[0]["content"] += notes
 
     # Last user message
     if last_user_message:
@@ -263,6 +293,9 @@ async def run_experiment(
     max_concurrent: int = 8,
     sanitize: bool = False,
     mode: str = "s15",
+    accumulate: bool = False,
+    no_notes: bool = False,
+    no_clarification: bool = False,
 ):
     """Run S1.5 or S3 experiment on S1 traces."""
     # Load traces
@@ -366,7 +399,11 @@ async def run_experiment(
                     system_msg, analysis, last_user_msg, conversation, model_client, model,
                 )
             else:
-                messages = build_compacted_messages(system_msg, analysis, last_user_msg)
+                messages = build_compacted_messages(
+                    system_msg, analysis, last_user_msg,
+                    accumulate=accumulate, no_notes=no_notes,
+                    no_clarification=no_clarification, task_name=task_name,
+                )
 
             # Generate assistant response
             try:
@@ -505,6 +542,18 @@ def main():
         "--sanitize", action="store_true",
         help="Sanitize analysis to remove clarification-seeking patterns before context building",
     )
+    parser.add_argument(
+        "--accumulate", action="store_true",
+        help="Add instruction that response must include ALL outputs (not just incremental)",
+    )
+    parser.add_argument(
+        "--no-notes", action="store_true",
+        help="Do not inject <context_edit_notes> (issues) into the system message",
+    )
+    parser.add_argument(
+        "--no-clarification", action="store_true",
+        help="Add instruction to assistant system prompt discouraging clarification questions",
+    )
 
     args = parser.parse_args()
     asyncio.run(run_experiment(
@@ -515,6 +564,9 @@ def main():
         max_concurrent=args.max_concurrent,
         sanitize=args.sanitize,
         mode=args.mode,
+        accumulate=args.accumulate,
+        no_notes=args.no_notes,
+        no_clarification=args.no_clarification,
     ))
 
 
