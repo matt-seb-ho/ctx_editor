@@ -3,11 +3,13 @@
 from .agentic_edit import AgenticEditStrategy
 from .analyzer import ConversationAnalyzer
 from .append_analysis import AppendAnalysisStrategy
+from .assistant_omit import AssistantOmitStrategy
 from .base import ContextStrategy
 from .baseline import BaselineStrategy
 from .context_compaction import ContextCompactionStrategy
 from .context_edit import ContextEditStrategy
 from .context_edit_v2 import ContextEditV2Strategy
+from .ergo_restart import ERGORestartStrategy
 from .prior_work_baselines import ConcatenateUserStrategy, OmitAssistantStrategy
 from .reflection import ReflectionStrategy
 
@@ -17,6 +19,8 @@ __all__ = [
     "ContextEditStrategy",
     "ContextEditV2Strategy",
     "ContextCompactionStrategy",
+    "ERGORestartStrategy",
+    "AssistantOmitStrategy",
     "AgenticEditStrategy",
     "ReflectionStrategy",
     "AppendAnalysisStrategy",
