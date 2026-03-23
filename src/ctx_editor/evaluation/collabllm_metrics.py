@@ -21,6 +21,7 @@ EXTRACT_COMPLETION_PROMPT = (_PROMPTS_DIR / "extract_completion.txt").read_text(
 ACCURACY_JUDGE_PROMPT = (_PROMPTS_DIR / "accuracy_judge.txt").read_text()
 INTERACTIVITY_JUDGE_PROMPT = (_PROMPTS_DIR / "interactivity_judge.txt").read_text()
 CONVERSATION_JUDGE_PROMPT = (_PROMPTS_DIR / "conversation_judge.txt").read_text()
+DOCUMENT_JUDGE_PROMPT = (_PROMPTS_DIR / "document_judge.txt").read_text()
 
 
 def _parse_json_response(text: str) -> dict | None:
@@ -270,21 +271,30 @@ async def judge_conversation_accuracy(
     model_client: "ModelClient",
     model: str,
     max_retries: int = 3,
+    extract_type: str = "code",
 ) -> tuple[float, Any]:
-    """Judge code accuracy based on what the user actually asked for in the conversation.
+    """Judge accuracy based on what the user actually asked for in the conversation.
 
-    Unlike judge_accuracy (which compares against ground truth) or judge_pass_rate
-    (which runs test cases), this evaluates whether the assistant's code fulfills
-    the user's actual requests as stated in the conversation.
+    Uses the code judge prompt for code tasks, document judge prompt for
+    document tasks. Both evaluate the extracted artifact against the user's
+    actual requests in the conversation (not external ground truth).
 
     Returns:
         Tuple of (accuracy_score, model_response). Score is 1.0, 0.5, or 0.0.
     """
     chat_history = _format_messages_for_prompt(messages)
-    prompt = CONVERSATION_JUDGE_PROMPT.format(
-        chat_history=chat_history,
-        extracted_code=extracted_code.strip() if extracted_code else "(no code extracted)",
-    )
+    content = extracted_code.strip() if extracted_code else "(nothing extracted)"
+
+    if extract_type == "document":
+        prompt = DOCUMENT_JUDGE_PROMPT.format(
+            chat_history=chat_history,
+            extracted_document=content,
+        )
+    else:
+        prompt = CONVERSATION_JUDGE_PROMPT.format(
+            chat_history=chat_history,
+            extracted_code=content,
+        )
 
     for attempt in range(max_retries):
         try:
@@ -449,6 +459,7 @@ class CollabLLMEvaluator:
                     extracted_code=extracted,
                     model_client=model_client,
                     model=self.model,
+                    extract_type=self.extract_type,
                 )
                 if acc_resp:
                     result.eval_cost_usd += acc_resp.total_usd

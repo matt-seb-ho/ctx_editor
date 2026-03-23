@@ -104,6 +104,80 @@ def load_collabllm_bigcodebench(
     return samples
 
 
+def load_collabllm_medium(
+    limit: int | None = None,
+    split: str = "test",
+    seed: int = 42,
+) -> list[dict[str, Any]]:
+    """Load Medium doc edit dataset (MediumDocEdit-Chat from CollabLLM paper).
+
+    Loads Medium articles from HuggingFace, filters to short articles (<=512 tokens),
+    and formats as document editing tasks.
+
+    Args:
+        limit: Maximum number of samples to load. None for all.
+        split: Which split to return ("test" or "train").
+        seed: Random seed for subsampling.
+
+    Returns:
+        List of sample dicts.
+    """
+    import tiktoken
+    from datasets import load_dataset
+
+    raw = load_dataset("Kamaljp/medium_articles", trust_remote_code=True)
+    full = [row for row in raw["train"] if row.get("timestamp") is not None]
+    full.sort(key=lambda x: x["timestamp"])
+
+    # Match CollabLLM's split ratios
+    n_total = len(full)
+    n_test = int(n_total * 0.005)
+    n_train = int(n_total * 0.020)
+
+    recent = full[-(n_train + n_test) :]
+    random.Random(42).shuffle(recent)  # deterministic split
+
+    test_set = set(id(row) for row in recent[:n_test])
+    train_set = set(id(row) for row in recent[n_test:])
+
+    encoding = tiktoken.get_encoding("cl100k_base")
+
+    samples = []
+    for row in recent:
+        tokens = len(encoding.encode(row["text"], disallowed_special=()))
+        if tokens > 512:
+            continue
+
+        is_test = id(row) in test_set
+        row_split = "test" if is_test else "train"
+        if row_split != split:
+            continue
+
+        title = row["title"]
+        prompt = f"Please write an article in less than 500 words about:\n\n{title}\n\n{row['text']}"
+
+        samples.append(
+            {
+                "task_id": f"medium/{len(samples)}",
+                "task": "collabllm_doc",
+                "task_desc": "document editing",
+                "single_turn_prompt": prompt,
+                "single_turn_completion": row["text"],
+                "single_turn_metadata": {
+                    "source": "medium",
+                    "title": title,
+                    "url": row.get("url", ""),
+                },
+            }
+        )
+
+    if limit and limit < len(samples):
+        rng = random.Random(seed)
+        samples = rng.sample(samples, limit)
+
+    return samples
+
+
 COLLABLLM_DATASETS = {
     "math-hard": {
         "loader": load_collabllm_math_hard,
@@ -117,6 +191,13 @@ COLLABLLM_DATASETS = {
         "extract_type": "runnable code",
         "eval_method": "pass_rate",
         "default_split": "v0.1.2",
+    },
+    "medium": {
+        "loader": load_collabllm_medium,
+        "task_desc": "document editing",
+        "extract_type": "document",
+        "eval_method": "conversation_judge",
+        "default_split": "test",
     },
 }
 
