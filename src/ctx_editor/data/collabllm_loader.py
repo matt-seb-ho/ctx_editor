@@ -125,7 +125,7 @@ def load_collabllm_medium(
     import tiktoken
     from datasets import load_dataset
 
-    raw = load_dataset("Kamaljp/medium_articles", trust_remote_code=True)
+    raw = load_dataset("Kamaljp/medium_articles")
     full = [row for row in raw["train"] if row.get("timestamp") is not None]
     full.sort(key=lambda x: x["timestamp"])
 
