@@ -54,72 +54,108 @@ No LLM calls, no threshold. This is the simplest baseline.
 ### Datasets
 - **MATH-Hard**: 20 from lighteval/MATH-Hard test split
 - **BigCodeBench**: 20 from bigcode/bigcodebench v0.1.2
+- **MediumDocEdit**: 20 from Kamaljp/medium_articles (<=512 token articles)
 
-### Code evaluation
-BigCodeBench pass_rate (test execution) is 0% for all methods due to `task_func` naming mismatch (see initial experiments report). We use a **conversation-aware LLM judge** (gpt-5) that evaluates whether the extracted code fulfills what the user actually asked for, scoring 1.0 (full), 0.5 (partial), or 0.0 (fail).
+### Evaluation
+- **Math**: LLM-as-judge (gpt-4o-mini) comparing extracted answer vs ground truth
+- **Code**: gpt-5 conversation-aware judge (scores against user's actual requests, not test cases)
+- **Doc edit**: gpt-5 conversation-aware document judge (scores against user's editing requests)
+
+BigCodeBench pass_rate (test execution) is 0% for all methods due to `task_func` naming mismatch (see initial experiments report).
 
 ## Results
 
-| Method | Math-Hard | BigCodeBench | Math Turns | Code Turns |
-|--------|-----------|-------------|------------|------------|
-| **Baseline** | 40.0% (8/20) | 62.5% (n=20) | 9.1 | 5.5 |
-| **Compaction (ours)** | **45.0%** (9/20) | **82.5%** (n=20) | 10.4 | 6.8 |
-| **AO (Huang)** | 50.0% (10/20) | 82.5% (n=20) | 10.0 | 5.3 |
-| **ERGO** | 50.0% (10/20) | 77.5% (n=20) | 8.9 | 5.2 |
+### Single replicate (run 1)
+
+| Method | Math-Hard | BigCodeBench | MediumDocEdit | Math Turns | Code Turns | Doc Turns |
+|--------|-----------|-------------|---------------|------------|------------|-----------|
+| **Baseline** | 40.0% | 62.5% | 95.0% | 9.1 | 5.5 | 5.0 |
+| **Compaction (ours)** | 45.0% | **82.5%** | 97.5% | 10.4 | 6.8 | 4.5 |
+| **AO (Huang)** | 50.0% | 82.5% | 97.5% | 10.0 | 5.3 | 4.7 |
+| **ERGO** | 50.0% | 77.5% | 97.5% | 8.9 | 5.2 | 5.1 |
+
+### Averaged across 2 replicates (math and code only)
+
+| Method | Math-Hard (avg) | BigCodeBench (avg) |
+|--------|-----------------|--------------------|
+| **Baseline** | 50.0% | 67.5% |
+| **Compaction (ours)** | 45.0% | 71.2% |
+| **AO (Huang)** | 50.0% | **85.0%** |
+| **ERGO** | 50.0% | 75.0% |
+
+Run 2 individual results: Baseline math 60%, Compaction math 45%, AO math 50%, ERGO math 50%. Baseline code 72.5%, Compaction code 60%, AO code 87.5%, ERGO code 72.5%.
+
+### Interactivity scores (run 1)
+
+| Method | Math | Code | Doc |
+|--------|------|------|-----|
+| Baseline | 0.965 | 1.000 | 0.955 |
+| Compaction | 0.885 | 0.935 | 0.950 |
+| AO (Huang) | **1.000** | **1.000** | **1.000** |
+| ERGO | 0.875 | 0.974 | 0.950 |
+
+AO consistently achieves perfect or near-perfect interactivity. This is because the assistant never sees its own prior responses, so it naturally asks more clarifying questions on every turn.
 
 ### Output directories
-- Baseline Math: `outputs/2026-03-17/04-16-54/`
-- Baseline Code: `outputs/2026-03-20/10-22-05/`
-- Compaction Math: `outputs/2026-03-18/20-49-55/`
-- Compaction Code: `outputs/2026-03-20/10-22-06/`
-- AO Math: `outputs/2026-03-23/ao_math/`
-- AO Code: `outputs/2026-03-23/ao_code/`
-- ERGO Math: `outputs/2026-03-23/ergo_math/`
-- ERGO Code: `outputs/2026-03-23/ergo_code/`
+- Run 1: `outputs/2026-03-17/04-16-54/` (baseline math), `outputs/2026-03-20/10-22-05/` (baseline code), etc.
+- Run 2: `outputs/2026-03-23/r2_*/`
+- Doc edit: `outputs/2026-03-23/*_doc/`
 - Code re-evals: `reeval_gpt-5_conversation_judge/` subdirs
-
 ## Discussion
 
-### Math-Hard: Reset baselines match or beat compaction
+### Math-Hard: All methods cluster at ~50%, high variance
 
-On math, both ERGO (50%) and AO (50%) outperform compaction (45%) and baseline (40%). This is consistent with prior findings on LiC: for math problems, discarding assistant work is low-cost because the user messages contain all the necessary information. The assistant's failed reasoning attempts are more harmful than helpful, and a clean restart lets the model try fresh.
+Averaged across 2 replicates, all methods land at 45-50% on math. The baseline itself swung from 40% to 60% between replicates, showing the variance floor at n=20. There is no statistically meaningful difference between methods on math.
 
-The 5pp gap between compaction and the reset baselines suggests that compaction's preserved "correct work" is sometimes contaminated or misleading for math, where correctness is all-or-nothing.
+This is consistent with prior findings on LiC: for math problems, discarding assistant work is low-cost because the user messages contain all the necessary information.
 
-### BigCodeBench: Compaction matches AO, beats ERGO
+### BigCodeBench: Context interventions help, AO leads
 
-On code (conversation-aware judge), the picture is different:
-- **Compaction (82.5%) = AO (82.5%)**: Both preserve user intent equally well
-- **ERGO (77.5%)**: Slightly lower -- the rewrite step may be losing nuance from the user's incremental requirements
-- **Baseline (62.5%)**: Significantly worse -- accumulated bad code in context hurts
+On code (averaged across 2 replicates, gpt-5 conversation judge):
+- **AO (85.0%)** leads -- stripping assistant messages consistently helps
+- **ERGO (75.0%)** and **Compaction (71.2%)** are similar
+- **Baseline (67.5%)** worst -- accumulated bad code in context hurts
 
-The code results show that context interventions help across the board (+15-20pp over baseline), but the specific mechanism matters less than simply removing bad content. Compaction and AO achieve the same accuracy despite very different approaches: compaction preserves good work, AO discards everything.
+All interventions beat baseline by 4-18pp, but there's high variance (compaction scored 82.5% in run 1, 60% in run 2).
 
-### Why AO performs well on CollabLLM
+### MediumDocEdit: At ceiling for gpt-5-mini
 
-Contrary to our hypothesis, AO performs as well as compaction even on the collaborative coding task. This may be because:
+All methods score 95-97.5% on doc edit with the gpt-5 judge. The task is at ceiling: Medium articles are short (<=512 tokens), conversations are brief (4-5 turns), and gpt-5-mini handles document editing easily regardless of context strategy.
 
-1. **Short conversations**: With gpt-4o user sim, code conversations average only 5-7 turns. There's limited assistant work product to preserve.
-2. **Option 2 rendering**: Our framework packs all messages into a single user prompt for the assistant. Removing assistant messages from this format still leaves a coherent (if sparse) conversation for the model to work with.
-3. **gpt-5-mini capability**: A strong enough assistant may not need prior work preserved in context; it can regenerate solutions from user messages alone.
+This is consistent with CollabLLM paper's observation that their base model (Llama-3-8B) scores much lower on doc edit -- a weaker model would show more differentiation. With gpt-5-mini, the task is simply too easy.
 
-### Limitations
+### Interactivity: AO achieves perfect scores
 
-- **n=20 per task**: All differences are within noise at this sample size. Math: 40-50% range (2 correct answers between methods). Code: 77.5-82.5% (1 sample difference).
-- **Math uses gpt-4o-mini user sim, code uses gpt-4o**: Not directly comparable across tasks.
-- **No complexity stratification**: CollabLLM's 14-turn conversations may not be complex/stateful enough to show compaction's advantage over simpler baselines. Longer, more complex tasks (e.g., multi-file coding, iterative document editing) would better test our hypothesis.
-- **ERGO had 1 error on code** (content filter): 19/20 evaluated vs 20/20 for others.
+AO consistently scores 1.0 on interactivity across all tasks. This is because without seeing its own prior responses, the assistant naturally asks more clarifying questions on every turn (it doesn't know what it has already addressed). This artificially inflates interactivity for AO.
+
+Our interactivity scores (0.87-1.0) are much higher than CollabLLM paper's reported range (20-50% for code, 40-60% for math) because gpt-5-mini is inherently more interactive than Llama-3-8B.
+
+### Why we don't see compaction's advantage
+
+Several factors work against demonstrating compaction's value in this setting:
+
+1. **Short conversations**: 4-10 turns average. Limited assistant work product accumulates, so there's little to preserve vs discard.
+2. **Strong assistant model**: gpt-5-mini (even at low reasoning) can regenerate solutions from scratch easily, reducing the value of preserved context.
+3. **Small sample size**: n=20 with high variance makes methods statistically indistinguishable.
+4. **Tasks at ceiling**: Doc edit is trivially easy for this model. Math is inherently lossy (all-or-nothing). Code is the most promising but still shows high replicate variance.
+5. **CollabLLM's conversation protocol**: The user simulator terminates quickly with strong models, limiting conversation depth.
+
+For compaction to show clear advantages, we likely need: (a) longer conversations with accumulated assistant work product, (b) a weaker assistant model where regeneration from scratch is costly, or (c) more complex stateful tasks where context continuity matters (e.g., multi-file coding, long document editing with many revision cycles).
 
 ### Implementation notes
 
-**ERGO content filter issue**: The original ERGO-style "prompt rewriter" framing triggered Azure's jailbreak detection filter, causing 75% of samples to fail. We rephrased the prompt as a "helpful assistant that consolidates information" which resolved the issue (commit `786d103`).
+**ERGO content filter**: The original "prompt rewriter" framing triggered Azure's jailbreak filter (75% failure rate). Rephrased as "helpful assistant that consolidates information" (commit `786d103`).
 
-**AO on Option 2**: In our framework, the assistant sees conversation via Option 2 rendering (`[user]\n...\n\n[assistant]\n...`). With AO, the rendered conversation only has `[user]` blocks. This is a valid representation but differs from standard message-list AO where assistant messages simply aren't in the `messages` array.
+**AO on Option 2**: With our Option 2 rendering, AO conversations have only `[user]` blocks in the rendered prompt. The assistant never sees prior responses but still receives the full user message history.
+
+**Replicate variance**: Baseline math swung from 40% to 60% between runs. Compaction code swung from 82.5% to 60%. At n=20, these are 1-4 sample differences that flip the ranking.
 
 ## Files Created
 
 - `src/ctx_editor/strategies/ergo_restart.py` -- ERGORestartStrategy
 - `src/ctx_editor/strategies/assistant_omit.py` -- AssistantOmitStrategy
 - `src/ctx_editor/strategies/prompts/ergo_rewrite.txt` -- ERGO consolidation prompt
+- `src/ctx_editor/prompts/collabllm/document_judge.txt` -- Document quality judge prompt
 - `src/ctx_editor/config/experiment/collabllm_ergo.yaml`
 - `src/ctx_editor/config/experiment/collabllm_assistant_omit.yaml`
+- `src/ctx_editor/data/collabllm_loader.py` -- Added Medium doc edit dataset loader
