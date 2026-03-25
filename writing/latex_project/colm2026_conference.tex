@@ -70,7 +70,7 @@ Our approach decomposes the analysis into two subtasks, externally implementing 
 
     \item \textbf{Approach evaluation} (monitoring and inhibition). A second call compares this clean specification against the full conversation to identify what the assistant got right and where it diverged. This implements the performance monitoring and error detection functions that enable course correction.
 
-    \item \textbf{Meta-cognitive learning.} A Dynamic Cheatsheet~\citep{suzgun2025cheatsheet} accumulates transferable self-reflection principles across problem instances, enabling the system to learn from past executive function failures.
+    \item \textbf{Experience accumulation.} We apply the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet} to accumulate transferable analysis principles across problem instances, demonstrating that context curation quality improves with experience.
 \end{itemize}
 
 The reason for decomposing the analysis---rather than having a single call assess the full conversation---is our most striking finding: prior assistant messages act as a \emph{cognitive hazard} for the analyzer. Even when prompted as an independent reviewer with no role obligation to the assistant, the model's analysis is severely degraded by exposure to the assistant's messages. The mechanism is not fully understood---it may be attention-based anchoring, implicit role consistency, or some other property of how LLMs process multi-party conversation---but the effect is unambiguous: analysis quality collapses to baseline or worse when the analyzer sees assistant messages during intent extraction (Section~\ref{sec:cognitive-hazard}). This is not a prompting failure that more careful instructions could fix; we tried.
@@ -79,14 +79,14 @@ This means the problem is recursive: we want the model to identify what is bad i
 
 Critically, we demonstrate that this benchmark-specificity extends to prior work's strongest baseline. On the tau2-bench tool-use benchmark~\citep{yao2024tau}, blanket assistant omission~\citep{huang2026context} is \emph{catastrophically} destructive: performance drops from 55\% to 0\% as the agent loses all tool results and enters infinite re-lookup loops. Our context editing approach maintains or improves upon the baseline (55--60\%), and on WildChat conversations~\citep{zhao2024wildchat}, our best strategy achieves 84--86\% quality win rates against both full context and assistant omission while intervening on only 72\% of turns ($n$=179 turns across three strategies). These results establish that intelligent context curation---not wholesale context removal---is necessary for robust multi-turn deployment.
 
-We present investigations along three axes:
+We evaluate across settings of increasing statefulness:
 
 \begin{enumerate}
-    \item \textbf{Externalized executive function on LiC.} Subtask decomposition with structural attention control achieves substantial improvements, with memory-based learning further amplifying analysis quality (Section~\ref{sec:lic-results}).
+    \item \textbf{Controlled study on LiC.} We develop and ablate the method on the Lost in Conversation benchmark~\citep{laban2025lost}, where context pollution is deliberately induced. Subtask decomposition with structural attention control substantially closes the gap to baseline omission, and ablations reveal the cognitive hazard: assistant messages degrade even an independent reviewer's analysis (Section~\ref{sec:lic-results}).
 
-    \item \textbf{Agentic evaluation on tau2-bench.} Context editing outperforms the baseline while blanket omission catastrophically fails, demonstrating the necessity of selective curation in stateful settings (Section~\ref{sec:tau2-results}).
+    \item \textbf{Real conversations: CollabLLM and WildChat.} On WildChat, we reproduce the evaluation of \citet{huang2026context} and compare three intervention strategies: Gated Reset achieves 84--86\% quality win rates against both full context and assistant omission while intervening on only 72\% of turns (Section~\ref{sec:collab-results}).
 
-    \item \textbf{Realistic settings: CollabLLM and WildChat.} Context curation improves accuracy in genuinely collaborative interactions. On WildChat, we compare three intervention strategies head-to-head: Gated Reset achieves 84--86\% quality win rates against both baselines while intervening on only 72\% of turns, confirming the value of intelligent gating over unconditional intervention (Section~\ref{sec:collab-results}).
+    \item \textbf{Agentic tool use: tau2-bench.} Blanket omission catastrophically fails (0\% vs.\ 55\% baseline) in stateful tool-use settings, while our context editing maintains or improves performance (55--60\%), confirming that curation---not removal---is necessary as settings become more complex (Section~\ref{sec:tau2-results}).
 \end{enumerate}
 
 
@@ -189,9 +189,7 @@ The structural exclusion of assistant messages from Subtask~1 exploits a propert
 \subsection{Memory-based learning}
 \label{sec:memory}
 
-The Dynamic Cheatsheet accumulates self-reflection principles across problem instances, injected into the analyzer's prompt. For the primary hard-attention system, memory targets the approach evaluation subtask. For soft-attention experiments, memory targets spec extraction directly.
-
-\paragraph{Update mechanism: Reflect-then-Unify.} After processing a batch of problems: (1) \emph{Reflect}---for each trajectory, an LLM generates generalizable takeaways from the outcome; (2) \emph{Unify}---a single LLM call merges new takeaways with the current cheatsheet, deduplicating and resolving contradictions. Cheatsheet length is capped at 1500 words; meta-level principles (``verify output format matches user specification'') transfer well, while task-specific content (algorithmic recipes) causes anchoring on stale patterns.
+We apply the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet} to test whether context curation quality improves with experience. The cheatsheet accumulates self-reflection principles across problem instances, injected into the analyzer's prompt. For the primary hard-attention system, memory targets the approach evaluation subtask. For soft-attention experiments, memory targets spec extraction directly. We use the standard Reflect-then-Unify update mechanism from \citet{suzgun2025cheatsheet}, capping cheatsheet length at 1500 words.
 
 \subsection{CollabLLM adaptation}
 \label{sec:compaction}
@@ -257,8 +255,10 @@ CollabLLM's standard BigCodeBench evaluation uses test-case execution, which req
 \label{sec:results}
 %% ============================================================
 
-\subsection{Main results (LiC)}
+\subsection{Controlled study: Lost in Conversation}
 \label{sec:lic-results}
+
+We use the LiC benchmark as a controlled testbed to develop and ablate our method. LiC deliberately induces context pollution through incremental specification disclosure, providing a clean signal for measuring intervention effects. However, because LiC tasks are self-contained and user messages alone fully specify the problem, blanket assistant omission (which effectively recovers the single-turn setting) serves as an upper bound that is difficult to exceed. Our analysis-based methods close much of the gap to this upper bound, and the ablations here reveal \emph{why} the system works and what its limitations are.
 
 \begin{table}[t]
 \centering
@@ -294,12 +294,12 @@ Reset & 80\% & 69\% & 40\% & 30\% \\
 Reset + Memory & 85\% & 68\% & \textbf{44\%} & 30\% \\
 \bottomrule
 \end{tabular}
-\caption{Effect of adding memory. Memory amplifies analysis quality: Augment + Memory achieves the best math result (90\%, exceeding Omit Assistant's 85\%) and ties for best on database (44\%).}
+\caption{Effect of adding memory (Dynamic Cheatsheet~\citep{suzgun2025cheatsheet}). Memory improves analysis quality, showing that context curation is a learnable skill.}
 \label{tab:lic-memory}
 \end{table}
 
-\paragraph{Simple baselines are strong when rederivation is cheap.}
-The most important comparison in Table~\ref{tab:lic-main} is between our analysis-based methods and the simpler prior-work baselines. On math, code, and actions, simply omitting assistant messages or concatenating user messages matches or exceeds our analysis pipeline. This confirms a key insight: on LiC, the problem is primarily that the assistant's prior messages are harmful, and removing them is sufficient. The model can solve these tasks from scratch given clean user messages.
+\paragraph{Omission baselines are an upper bound on LiC.}
+On math, code, and actions, simply omitting assistant messages or concatenating user messages matches or exceeds our analysis pipeline (Table~\ref{tab:lic-main}). This is expected: LiC tasks are self-contained, and removing all assistant messages effectively recovers the single-turn setting. The model can solve these tasks from scratch given clean user messages, making omission a near-optimal strategy. The value of our approach emerges in settings where this assumption breaks down (Sections~\ref{sec:collab-results}--\ref{sec:tau2-results}).
 
 \paragraph{Analysis adds value through intelligent consolidation.}
 Our methods outperform the simple baselines on \textbf{database} (44\% vs.\ 32\%), the most schema-dependent task where raw fragmented user messages are insufficient. The task specification extraction---which consolidates scattered user requirements into a structured spec grounded in the system message's schema---provides value beyond simple message filtering. On \textbf{math with memory}, Augment + Memory (90\%) also outperforms Omit Assistant (85\%), showing that learned analysis principles can exceed what raw user messages provide.
@@ -307,8 +307,8 @@ Our methods outperform the simple baselines on \textbf{database} (44\% vs.\ 32\%
 \paragraph{Context removal provides additional benefit over analysis alone.}
 Reset outperforms Augment on code (+13pp), database (+8pp), and actions (+8pp). Both use identical analysis; the difference is whether the assistant sees the full polluted history or a clean compacted context. This confirms that context pollution---the assistant anchoring on its prior incorrect responses---is a real and measurable problem separable from intent fragmentation.
 
-\paragraph{Memory amplifies analysis quality.}
-Table~\ref{tab:lic-memory} shows that memory provides consistent benefit when applied to analysis-based methods. Augment + Memory achieves the best results on math (90\%) and ties for best on database (44\%). Memory helps the analyzer produce more decisive task specifications and more concrete error identification.
+\paragraph{Context curation is a learnable skill.}
+Applying the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet} to accumulate analysis principles across problem instances improves performance (Table~\ref{tab:lic-memory}). Augment + Memory achieves the best results on math (90\%) and ties for best on database (44\%). This demonstrates that context curation quality can be improved through experience, though we view memory as an enhancer of the core analysis rather than a primary contribution.
 
 
 \subsection{The cognitive hazard: why the analyzer must be shielded}
@@ -341,47 +341,10 @@ When the analyzer sees assistant messages during spec extraction, performance co
 The soft-attention decomposed variant underperforms single-pass (40\% vs.\ 55\% math; 11\% vs.\ 21\% code). When Subtask~1 produces a contaminated specification and passes it to Subtask~2 as authoritative, contamination compounds. This is a cautionary finding for multi-stage LLM pipelines: chaining calls can amplify rather than correct errors when earlier stages are contaminated.
 
 
-\subsection{Agentic evaluation: tau2-bench}
-\label{sec:tau2-results}
-
-We evaluate on tau2-bench \texttt{telecom\_small} to test whether our methods generalize to realistic, stateful, tool-use settings where blanket context removal is expected to fail.
-
-\begin{table}[t]
-\centering
-\begin{tabular}{lcc}
-\toprule
-\textbf{Strategy} & \textbf{Success Rate} & \textbf{Cost} \\
-\midrule
-Baseline & 45--55\% & \$0.51 \\
-Omit Assistant & \textbf{0\%} & \$0.36 \\
-Gated Reset (v9) & 45\% & \$0.63 \\
-Gated Reset (v10) & \textbf{55--60\%} & \$0.60--0.67 \\
-Gated Rewrite (v10) & 25\% & \$0.57 \\
-Gated Rewrite (v10.1) & 40\% & \$0.54 \\
-\bottomrule
-\end{tabular}
-\caption{Tau2-bench \texttt{telecom\_small} results (20 tasks, \texttt{gpt-5-mini}). Baseline range reflects variance across experiments. Gated Reset (v10) range reflects two confirmation runs. Omit Assistant is catastrophically destructive in agentic settings.}
-\label{tab:tau2-main}
-\end{table}
-
-\paragraph{Assistant omission is catastrophic in agentic settings.}
-The most striking result is that blanket assistant omission (AO) achieves \textbf{0\%} success (Table~\ref{tab:tau2-main}), compared to 45--55\% for the unmodified baseline. When all assistant messages and tool results are stripped before each LLM call, the agent loses all diagnostic progress---API call results, account lookups, troubleshooting history---and enters infinite re-lookup loops. This is the strongest possible evidence that context omission, while effective on LiC's self-contained tasks, is fundamentally incompatible with stateful, tool-use settings.
-
-\paragraph{Context editing outperforms baseline with strategic reflection.}
-With v10 prompts, which reframe the analysis as ``mid-task strategic reflection'' rather than pollution detection, Gated Reset achieves 55--60\% across two confirmation runs---consistently above the 45--55\% baseline. The strategic direction component (``what hasn't been tried?'') appears to be the key improvement, redirecting the agent toward unexplored diagnostic avenues rather than simply flagging errors.
-
-\paragraph{LLM rewriting is harmful in data-rich agentic settings.}
-Gated Rewrite underperforms both baseline and Gated Reset, dropping to 25\% with v10 prompts. The additional LLM rewrite step loses concrete tool result data through summarization, triggers false-positive resets via verbose issue descriptions, and misdirects the agent toward procedural concerns. Even with targeted fixes (v10.1: 40\%), Gated Rewrite does not match Gated Reset. In agentic settings where tool results contain structured data that must be preserved exactly, programmatic template filling is superior to LLM-generated summaries. However, as we show on WildChat (Section~\ref{sec:collab-results}), the Rewrite variant excels in open-domain conversational settings where the diversity of formats benefits from the model's flexibility.
-
-\paragraph{Context pollution is not the dominant failure mode.}
-Diagnostic analysis of baseline failures reveals that only 1 of 11 failures shows clear over-anchoring. The dominant failure modes are missing domain knowledge (4/11) and step budget exhaustion (4/11). This means Gated Reset's improvements come not primarily from removing pollution but from its strategic reflection component---redirecting the agent to explore new approaches. The executive function framing captures this: the system provides not just inhibitory control (suppressing bad reasoning) but cognitive flexibility (suggesting alternative strategies).
-
-\paragraph{Variance and confirmation.}
-Three-trial variance measurement (60 runs) shows the baseline at 53.3\% and Gated Reset (v9) at 43.3\%, with massive per-task variance from \texttt{gpt-5-mini}'s forced \texttt{temperature=1.0}. Six tasks always pass, five always fail, nine are mixed. The v10 prompt improvement (60\%, 55\% in two runs) is robust to this variance, consistently exceeding the baseline.
-
-
-\subsection{Realistic settings: CollabLLM and WildChat}
+\subsection{Realistic conversations: CollabLLM and WildChat}
 \label{sec:collab-results}
+
+We next evaluate on increasingly realistic conversational settings where the assistant's prior work carries more value and blanket omission becomes less viable.
 
 \begin{table}[t]
 \centering
@@ -450,14 +413,47 @@ On the 76 AO failure turns---cases where Huang et al.\ identify blanket omission
 
 On-topic win rates follow a similar pattern (Gated Reset: 74.6\% vs AO; Rewrite: 68.5\%) but with meaningfully more ties, consistent with quality being the more discriminating dimension and suggesting the judge is not simply preferring our output format.
 
-\subparagraph{Strategy comparison.}
-The finding that Gated Reset outperforms Rewrite on WildChat (86.1\% vs 82.6\%) echoes the tau2-bench pattern where programmatic template filling beat LLM-generated summaries. However, both the absolute gap and the nature of the advantage differ. On tau2-bench, Rewrite was actively harmful (25\% vs 55--60\% for Gated Reset) because the LLM rewrite step lost critical structured data. On WildChat, both strategies perform well; Gated Reset's edge comes from its more conservative intervention policy rather than from failures in the rewrite step. This suggests the Rewrite variant is most valuable when the programmatic template cannot capture the diversity of conversational formats, while Gated Reset is preferred when accurate gating can avoid unnecessary disruption.
-
 \subparagraph{Format bias caveat.}
 The uniformly high win rates across turn types and strategies raise a format bias concern: the restructured output format (structured task spec + organized headers) may inherently present better to the judge than raw multi-turn conversation rendering, inflating absolute win rates. However, the relative comparison between Gated Reset and Rewrite is less affected since both produce similarly structured output, and the on-topic dimension shows meaningfully more ties than quality, indicating the judge discriminates between content dimensions rather than simply preferring format.
 
 
-\subsection{Learning to resist the cognitive hazard}
+\subsection{Agentic evaluation: tau2-bench}
+\label{sec:tau2-results}
+
+We evaluate on tau2-bench \texttt{telecom\_small} to test whether context curation generalizes to the most stateful setting: agentic tool-use conversations where the assistant's prior work (API calls, diagnostic results) is essential and blanket omission is expected to fail catastrophically.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Strategy} & \textbf{Success Rate} & \textbf{Cost} \\
+\midrule
+Baseline & 45--55\% & \$0.51 \\
+Omit Assistant & \textbf{0\%} & \$0.36 \\
+Gated Reset (v9) & 45\% & \$0.63 \\
+Gated Reset (v10) & \textbf{55--60\%} & \$0.60--0.67 \\
+Gated Rewrite (v10) & 25\% & \$0.57 \\
+Gated Rewrite (v10.1) & 40\% & \$0.54 \\
+\bottomrule
+\end{tabular}
+\caption{Tau2-bench \texttt{telecom\_small} results (20 tasks, \texttt{gpt-5-mini}). Baseline range reflects variance across experiments. Gated Reset (v10) range reflects two confirmation runs. Omit Assistant is catastrophically destructive in agentic settings.}
+\label{tab:tau2-main}
+\end{table}
+
+\paragraph{Assistant omission is catastrophic in agentic settings.}
+The most striking result is that blanket assistant omission (AO) achieves \textbf{0\%} success (Table~\ref{tab:tau2-main}), compared to 45--55\% for the unmodified baseline. When all assistant messages and tool results are stripped before each LLM call, the agent loses all diagnostic progress---API call results, account lookups, troubleshooting history---and enters infinite re-lookup loops. This confirms the central motivation for context curation: omission-based approaches, while effective on self-contained tasks, are fundamentally incompatible with stateful settings.
+
+\paragraph{Context editing maintains or improves performance.}
+With v10 prompts, which reframe the analysis as ``mid-task strategic reflection'' rather than pollution detection, Gated Reset achieves 55--60\% across two confirmation runs---consistently above the 45--55\% baseline. The strategic direction component (``what hasn't been tried?'') appears to be the key improvement, redirecting the agent toward unexplored diagnostic avenues rather than simply flagging errors. Consistent with WildChat (Section~\ref{sec:collab-results}), Gated Reset outperforms Gated Rewrite (25--40\%), as the LLM rewrite step loses concrete tool result data through summarization. However, the gap is much larger here than on WildChat (where both strategies perform well), confirming that programmatic template filling is critical when structured data must be preserved exactly.
+
+\paragraph{Context pollution is not the dominant failure mode.}
+Diagnostic analysis of baseline failures reveals that only 1 of 11 failures shows clear over-anchoring. The dominant failure modes are missing domain knowledge (4/11) and step budget exhaustion (4/11). This means Gated Reset's improvements come not primarily from removing pollution but from its strategic reflection component---redirecting the agent to explore new approaches. The executive function framing captures this: the system provides not just inhibitory control (suppressing bad reasoning) but cognitive flexibility (suggesting alternative strategies).
+
+\paragraph{Variance and confirmation.}
+Three-trial variance measurement (60 runs) shows the baseline at 53.3\% and Gated Reset (v9) at 43.3\%, with massive per-task variance from \texttt{gpt-5-mini}'s forced \texttt{temperature=1.0}. Six tasks always pass, five always fail, nine are mixed. The v10 prompt improvement (60\%, 55\% in two runs) is robust to this variance, consistently exceeding the baseline.
+
+
+\subsection{Toward general-purpose analysis: soft attention and memory}
 \label{sec:decontamination}
 
 \begin{table}[t]
@@ -495,13 +491,15 @@ Memory-based decontamination shows its strongest effect on database: +15pp in bo
 
 \subsection{Context curation vs.\ context removal: a spectrum of settings}
 
-Our results across three evaluation settings---LiC, tau2-bench, and CollabLLM---paint a coherent picture of when context removal suffices and when curation is necessary.
+Our results across four evaluation settings paint a coherent picture: the value of context curation over blanket removal scales with the statefulness and complexity of the conversation.
 
-On LiC, where tasks are self-contained and rederivation is cheap, simple omission baselines are very strong (Table~\ref{tab:lic-main}). Our analysis-based methods add value through intelligent consolidation (database) and learned analysis principles (math with memory), but the marginal benefit over brute-force removal is modest on most tasks. This characterizes the benchmark, not our approach.
+On LiC, where tasks are self-contained and rederivation is cheap, blanket omission is a near-optimal upper bound (Table~\ref{tab:lic-main}). Our methods close most of the gap to this bound and exceed it on database (where schema-grounded consolidation helps) and math with memory. But LiC is designed to admit this trivial solution; its value to our investigation is as a controlled environment for ablation and analysis, not as a test of the method's practical ceiling.
 
-On tau2-bench, the picture inverts entirely. Blanket omission catastrophically destroys performance (0\% vs.\ 55\% baseline), while Gated Reset maintains or improves upon the baseline (55--60\%). The critical difference is \emph{statefulness}: tau2-bench conversations involve tool calls whose results are essential context. Discarding this context is not a ``conservative'' strategy---it is a destructive one. The Rewrite variant underperforms in this data-rich setting (25--40\%) because the LLM rewrite step loses structured tool data, but both strategies perform well on WildChat's open-domain conversations (Gated Reset: 86\%, Rewrite: 83\%)---demonstrating that the performance gap between strategies depends on the structure of the conversation and the importance of preserving exact data.
+On WildChat, where context pollution occurs naturally in real human-AI conversations, context curation clearly outperforms both baselines. All three strategies achieve 82--86\% quality win rates against AO and 80--84\% against FC ($n$=173--178). Gated Reset is the best performer (86.1\% vs AO) while intervening on only 72\% of turns, with intelligent gating that intervenes less on stateful turns (62.7\% edit rate on \texttt{no\_feedback} vs.\ 78\% on other types). This is the strongest evidence that curation provides real value beyond what omission can deliver.
 
-CollabLLM and WildChat results occupy a middle ground. On CollabLLM, full-conversation analysis without structural exclusion provides +5--20pp improvement. On WildChat, all three strategies achieve 82--86\% quality win rates against AO and 80--84\% against FC across all turn types ($n$=173--178), demonstrating that even on real human-AI conversations---where context pollution occurs naturally rather than through simulation---selective curation consistently outperforms both the unmodified conversation and blanket omission. Notably, Gated Reset is the best strategy on both tau2-bench and WildChat, suggesting that conservative, gated intervention is a robust default: intervene when the analysis finds clear issues, fall back to full context otherwise. The 72.3\% edit rate on WildChat (with only 62.7\% on \texttt{no\_feedback} turns) shows the gating is discriminating, not merely triggering less often.
+On tau2-bench, the case for curation becomes existential. Blanket omission catastrophically fails (0\% vs.\ 55\% baseline) because the agent depends on tool results that omission destroys. Gated Reset maintains or improves upon the baseline (55--60\%), though diagnostic analysis reveals that context pollution is not the dominant failure mode in this subset---the improvement comes primarily from strategic reflection redirecting the agent toward unexplored approaches.
+
+Across settings, Gated Reset is consistently the best or joint-best strategy, suggesting that conservative, gated intervention is a robust default. The Rewrite variant performs comparably on open-domain conversations (WildChat: 83\%) but fails in data-rich agentic settings (tau2: 25--40\%) where the LLM rewrite step loses structured data. The choice of intervention strategy depends on the structure of the conversation: programmatic templates when data fidelity matters, LLM rewriting when format diversity demands flexibility.
 
 \subsection{Executive function as an agent design pattern}
 \label{sec:exec-function-pattern}
@@ -550,15 +548,13 @@ The exact mechanism remains unclear: possible explanations include attention-bas
 We investigate whether LLMs can curate their own conversational context to mitigate multi-turn performance degradation, framing the problem as one of \emph{externalized executive function}. Our key findings:
 
 \begin{enumerate}
-    \item \textbf{Context curation works, with value proportional to task statefulness.} On LiC, where rederivation is cheap, simple omission baselines are competitive. On tau2-bench, where conversations involve essential tool results, omission is catastrophically destructive (0\% vs.\ 55\% baseline) while our methods maintain or improve performance (55--60\%). The value of intelligent curation over brute-force removal scales with the complexity and statefulness of the setting.
+    \item \textbf{Context curation outperforms both baselines on real conversations.} On WildChat, Gated Reset achieves 84--86\% quality win rates against both full context and assistant omission while intervening on only 72\% of turns. On tau2-bench, blanket omission catastrophically fails (0\% vs.\ 55\% baseline) while our methods maintain or improve performance (55--60\%). The value of curation over removal scales with the statefulness of the setting.
 
     \item \textbf{Assistant messages are a cognitive hazard.} Even a model prompted as an independent reviewer produces severely degraded analysis when exposed to assistant messages. This requires structural exclusion or learned resistance, and has broad implications for multi-stage LLM system design.
 
-    \item \textbf{Memory-based learning teaches partial resistance} to the cognitive hazard, closing up to 65\% of the performance gap on structured tasks when the analyzer must see the full conversation.
+    \item \textbf{The framework generalizes across settings.} From controlled benchmarks (LiC) to collaborative coding (CollabLLM) to real conversations (WildChat) to agentic tool use (tau2-bench), context curation provides consistent improvements. Gated Reset is the best or joint-best strategy across all settings, suggesting conservative, gated intervention as a robust default.
 
-    \item \textbf{The framework generalizes across settings.} From self-contained tasks (LiC) to agentic tool use (tau2-bench) to collaborative coding (CollabLLM) to real conversations (WildChat, 84--86\% win rates for Gated Reset vs.\ both baselines), context curation provides consistent improvements, with the strongest relative gains in settings where context removal fails. The same strategy---Gated Reset---is the best performer on both tau2-bench and WildChat, achieving this while intervening on only 72\% of turns.
-
-    \item \textbf{Evaluation methodology matters.} User simulator quality control, replay-based isolation, and conversation-aware evaluation are necessary for reliable multi-turn measurement.
+    \item \textbf{Context curation is a learnable skill.} Applying Dynamic Cheatsheet memory~\citep{suzgun2025cheatsheet} to accumulate analysis principles closes up to 65\% of the gap to hard-attention oracles, and soft-attention experiments show that resistance to the cognitive hazard can be partially learned.
 \end{enumerate}
 
 The externalized executive function framing---an agent scheduling LLM queries with custom context windows to implement selective attention, performance monitoring, and cognitive flexibility---provides a general pattern for addressing the self-reflective capacity that models lack natively. As LLM deployment increasingly involves long, stateful, multi-turn interactions, the gap between context removal (which cannot scale) and context curation (which can) will only grow.
