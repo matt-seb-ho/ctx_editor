@@ -130,11 +130,25 @@ def aggregate_phase2(results: list[dict]) -> dict[str, Any]:
                 "ontopic": _win_rate(results, pair, "ontopic"),
             }
 
-    # S3 edit rate
-    s3_results = [r for r in results if "s3_analysis" in r]
-    if s3_results:
-        edited = sum(1 for r in s3_results if r["s3_analysis"].get("edited", False))
-        metrics["s3_edit_rate"] = edited / len(s3_results) if s3_results else 0
+    # S2 vs AO (if present)
+    for pair in ("ao_vs_s2", "fc_vs_s2"):
+        if any(pair in r.get("judgments", {}) for r in results):
+            metrics[pair] = {
+                "quality": _win_rate(results, pair, "quality"),
+                "ontopic": _win_rate(results, pair, "ontopic"),
+            }
+
+    # Edit rates
+    for key, analysis_key in [("s3_edit_rate", "s3_analysis"), ("s2_edit_rate", "s2_analysis")]:
+        analysis_results = [r for r in results if analysis_key in r]
+        if analysis_results:
+            edited = sum(1 for r in analysis_results if r[analysis_key].get("edited", False))
+            metrics[key] = edited / len(analysis_results)
+
+    # All known pairs for by-turn-type breakdown
+    all_pairs = [
+        "ao_vs_s3", "fc_vs_s3", "ao_vs_s15", "fc_vs_s15", "ao_vs_s2", "fc_vs_s2",
+    ]
 
     # By turn type
     metrics["by_turn_type"] = {}
@@ -142,7 +156,7 @@ def aggregate_phase2(results: list[dict]) -> dict[str, Any]:
         subset = [r for r in results if r.get("turn_type") == turn_type]
         if subset:
             entry = {"count": len(subset)}
-            for pair in ("ao_vs_s3", "fc_vs_s3"):
+            for pair in all_pairs:
                 if any(pair in r.get("judgments", {}) for r in subset):
                     entry[pair] = {
                         "quality": _win_rate(subset, pair, "quality"),

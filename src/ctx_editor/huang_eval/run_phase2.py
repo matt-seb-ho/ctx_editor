@@ -26,7 +26,7 @@ load_dotenv(Path(__file__).parent.parent.parent.parent / ".env")
 
 from ..models import get_model_client
 from .pairwise_judge import judge_pairwise
-from .replay import generate_ao, generate_fc, generate_s3, generate_s15
+from .replay import generate_ao, generate_fc, generate_s2, generate_s3, generate_s15
 from .aggregate import aggregate_phase2, load_turn_results, format_summary, write_breakdown_csv
 
 logger = logging.getLogger(__name__)
@@ -65,10 +65,11 @@ async def process_failure_turn(
     judge_model: str,
     analyzer_model: str,
     run_s15: bool,
+    run_s2: bool,
     results_file: Path,
     rng: random.Random,
 ) -> dict | None:
-    """Process a single AO failure turn with S3 (and optionally S1.5)."""
+    """Process a single AO failure turn with S3 (and optionally S1.5 and/or S2)."""
     turns = conversation["turns"]
     conv_id = conversation["conversation_id"]
 
@@ -155,6 +156,36 @@ async def process_failure_turn(
                 "quality_justification": fc_vs_s15.quality_justification,
                 "ontopic_justification": fc_vs_s15.ontopic_justification,
                 "confidence": fc_vs_s15.confidence,
+            }
+
+        # Optionally run S2 (gated context edit with v11 analyzer)
+        if run_s2:
+            s2_response, s2_analysis = await generate_s2(
+                turns, turn_index, model_client, respondent_model, analyzer_model,
+            )
+            ao_vs_s2 = await judge_pairwise(
+                turns, turn_index, ao_response, s2_response, "ao", "s2",
+                model_client, judge_model, rng,
+            )
+            fc_vs_s2 = await judge_pairwise(
+                turns, turn_index, fc_response, s2_response, "fc", "s2",
+                model_client, judge_model, rng,
+            )
+            result["s2_response"] = s2_response[:1000]
+            result["s2_analysis"] = s2_analysis
+            result["judgments"]["ao_vs_s2"] = {
+                "quality_winner": ao_vs_s2.quality_winner,
+                "ontopic_winner": ao_vs_s2.ontopic_winner,
+                "quality_justification": ao_vs_s2.quality_justification,
+                "ontopic_justification": ao_vs_s2.ontopic_justification,
+                "confidence": ao_vs_s2.confidence,
+            }
+            result["judgments"]["fc_vs_s2"] = {
+                "quality_winner": fc_vs_s2.quality_winner,
+                "ontopic_winner": fc_vs_s2.ontopic_winner,
+                "quality_justification": fc_vs_s2.quality_justification,
+                "ontopic_justification": fc_vs_s2.ontopic_justification,
+                "confidence": fc_vs_s2.confidence,
             }
 
         # Save incrementally
@@ -264,6 +295,7 @@ async def run_phase2(args):
                 judge_model=args.judge_model,
                 analyzer_model=args.analyzer_model,
                 run_s15=args.run_s15,
+                run_s2=args.run_s2,
                 results_file=results_file,
                 rng=rng,
             )
@@ -296,6 +328,8 @@ async def run_phase2(args):
     pair_keys = ["ao_vs_s3", "fc_vs_s3"]
     if args.run_s15:
         pair_keys.extend(["ao_vs_s15", "fc_vs_s15"])
+    if args.run_s2:
+        pair_keys.extend(["ao_vs_s2", "fc_vs_s2"])
     write_breakdown_csv(all_results, pair_keys, output_dir / "breakdown_by_type.csv")
 
     summary = format_summary(phase1_metrics, metrics)
@@ -326,6 +360,8 @@ def main():
                         help="Custom turns JSON file (overrides ao_failure_turns.json)")
     parser.add_argument("--run-s15", action="store_true",
                         help="Also run S1.5 (programmatic reset) alongside S3")
+    parser.add_argument("--run-s2", action="store_true",
+                        help="Also run S2 (gated context edit with v11 analyzer)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", default="outputs/huang_eval/phase2/{timestamp}",
                         help="Output directory (supports {timestamp})")

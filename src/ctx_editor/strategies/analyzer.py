@@ -155,8 +155,10 @@ class ConversationAnalyzer:
         self.reasoning_effort = reasoning_effort
         self.prompt_version = prompt_version
 
-        if prompt_version in ("v6", "v7", "v8"):
-            self._task_spec_template = _load_prompt(f"analyzer_{prompt_version}_task_spec")
+        if prompt_version in ("v6", "v7", "v8", "v11"):
+            # v11 reuses v8 task spec prompt, only the compare prompt differs
+            task_spec_version = "v8" if prompt_version == "v11" else prompt_version
+            self._task_spec_template = _load_prompt(f"analyzer_{task_spec_version}_task_spec")
             self._compare_template = _load_prompt(f"analyzer_{prompt_version}_compare")
         elif prompt_version == "v8_soft":
             # Soft attention ablation: two queries, but Query 1 sees full conversation
