@@ -202,8 +202,14 @@ async def run_phase2(args):
     phase1_results, ao_failures, conversations = load_phase1_data(phase1_dir)
     logger.info(f"Phase 1: {len(phase1_results)} turn results, {len(ao_failures)} AO failures")
 
+    # Override turns list if a custom file is provided
+    if args.turns_file:
+        with open(args.turns_file) as f:
+            ao_failures = json.load(f)
+        logger.info(f"Using custom turns file: {args.turns_file} ({len(ao_failures)} turns)")
+
     if not ao_failures:
-        logger.warning("No AO failure turns found in Phase 1. Nothing to do.")
+        logger.warning("No turns to process. Nothing to do.")
         return
 
     # Limit if requested
@@ -316,6 +322,8 @@ def main():
                         help="Max concurrent turn processing")
     parser.add_argument("--max-turns", type=int, default=None,
                         help="Max failure turns to process (None = all)")
+    parser.add_argument("--turns-file", default=None,
+                        help="Custom turns JSON file (overrides ao_failure_turns.json)")
     parser.add_argument("--run-s15", action="store_true",
                         help="Also run S1.5 (programmatic reset) alongside S3")
     parser.add_argument("--seed", type=int, default=42)
