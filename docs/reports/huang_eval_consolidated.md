@@ -69,7 +69,7 @@ These are the turns Huang identifies as problematic for AO -- where blanket assi
 
 | Strategy | n | vs AO | vs FC | Edit rate |
 |----------|---|-------|-------|-----------|
-| S1.5 (v8, always reset) | TBD | TBD | TBD | 100% |
+| S1.5 (v8, always reset) | 176 | 83.0% | 83.5% | 100% |
 | S2 (v11, gated) | 173 | **86.1%** | **83.8%** | 72.3% |
 | S3 (v8, LLM compaction) | 178 | 82.6% | 80.3% | 84.3% |
 
@@ -77,7 +77,7 @@ These are the turns Huang identifies as problematic for AO -- where blanket assi
 
 | Strategy | n | vs AO | vs FC |
 |----------|---|-------|-------|
-| S1.5 | TBD | TBD | TBD |
+| S1.5 | 176 | 68.8% | 68.2% |
 | S2 | 173 | 74.6% | 71.1% |
 | S3 | 178 | 68.5% | 67.4% |
 
@@ -117,7 +117,7 @@ These are the turns Huang identifies as problematic for AO -- where blanket assi
 | S3 on all turns (178 turns) | `outputs/huang_eval/phase2_full/2026-03-25/01-39-43/` |
 | S2+S3 on AO failures (75 turns) | `outputs/huang_eval/phase2_s2_failures/2026-03-25/04-53-30/` |
 | S2+S3 on all turns (173 turns) | `outputs/huang_eval/phase2_s2_full/2026-03-25/06-13-04/` |
-| S1.5+S3 on all turns (in progress) | `outputs/huang_eval/phase2_s15_full/2026-03-25/09-05-26/` |
+| S1.5+S3 on all turns (176 turns) | `outputs/huang_eval/phase2_s15_full/2026-03-25/09-05-26/` |
 
 ## Prompt Versions
 
