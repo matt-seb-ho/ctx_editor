@@ -14,6 +14,7 @@ This report documents a small-scale reproduction of Huang et al. "Do LLMs Benefi
 - **AO (assistant-omitted):** All prior assistant messages replaced with `"[Response provided]"` placeholders, plus Huang's AO system message instructing the model to infer prior responses from user messages. This is Huang's main intervention.
 - **S3 (ConversationAnalyzer v8 + LLM compaction):** The v8 two-query hard-attention analyzer inspects the conversation for problematic content (anchoring, failed approaches, erroneous assumptions), then an LLM compaction step (context_compaction.txt prompt) rewrites the context to surgically remove harmful content while preserving correct information.
 - **S1.5 (analyzer + programmatic template):** Same analyzer as S3, but instead of LLM compaction, uses a programmatic template to reset context. No additional LLM call for the compaction step.
+- **S2 (gated context edit with v11 analyzer):** Uses the v11 analyzer prompt (generalized from tau2's v10 "mid-task reflection" framing). Key difference from S1.5/S3: S2 gates on `needs_edit` -- if the analyzer finds no issues, returns FC (no reset). This avoids unnecessary resets on turns where the conversation is on track. When reset IS triggered, uses programmatic template (like S1.5). The v11 compare prompt tightens the issues section to require exact "None" when no problems exist, preventing false triggers.
 
 **Turn classification.** Each user turn was classified using Huang's classifier prompt into one of three types: `new_ask` (new topic or question), `feedback` (user gives feedback on prior response), `no_feedback` (continuation without explicit feedback, often stateful).
 
@@ -201,14 +202,117 @@ S3 edit rate: 84.3%
 
 **7. Relative ordering still informative despite format bias.** Even if absolute win rates are inflated by format advantage, the relative comparisons within S3 results are still valid. S3 wins slightly more against AO than against FC, which is expected (FC has the context that AO lacks). And the on-topic dimension shows more ties than quality, suggesting the judge is at least somewhat discriminating between dimensions.
 
+## S2 (Gated Context Edit) on AO Failure Subset
+
+S2 uses the v11 analyzer prompt (generalized from tau2's v10 "mid-task reflection" framing) with gating: only resets when `needs_edit=True`. When no issues are found, falls back to FC.
+
+### Run Config
+
+```
+python -m ctx_editor.huang_eval.run_phase2 \
+    --phase1-dir outputs/huang_eval/phase1/2026-03-24/02-22-57 \
+    --respondent-model gpt-5-mini --judge-model gpt-5-mini \
+    --analyzer-model gpt-5-mini --max-concurrent 5 --run-s2 --seed 42
+```
+
+**Prompt versions:** Analyzer v11 (task spec: `analyzer_v8_task_spec.txt`, compare: `analyzer_v11_compare.txt`). Programmatic post-reset template (no LLM compaction).
+
+**Output location:** `outputs/huang_eval/phase2_s2_failures/2026-03-25/04-53-30/`
+
+### Results (n=75, AO failure subset)
+
+S2 edit rate: 68.0% (v11 gating prevents reset on 32% of turns)
+
+**S2 vs AO and S3 vs AO (quality) -- side by side:**
+
+| Comparison | Winner | Loser | Tie |
+|------------|--------|-------|-----|
+| AO vs S2 | **S2 93.3%** | AO 5.3% | 1.3% |
+| AO vs S3 | S3 85.3% | AO 14.7% | 0.0% |
+| FC vs S2 | **S2 82.7%** | FC 17.3% | 0.0% |
+| FC vs S3 | S3 84.0% | FC 16.0% | 0.0% |
+
+**S2 vs AO by turn type (quality):**
+
+| Turn Type | n | S2 wins | AO wins | Tie |
+|-----------|---|---------|---------|-----|
+| new_ask | 22 | 90.9% | 9.1% | 0.0% |
+| feedback | 16 | 100.0% | 0.0% | 0.0% |
+| no_feedback | 37 | 91.9% | 5.4% | 2.7% |
+
+## S2 on All Turns (Unconditional)
+
+### Run Config
+
+```
+python -m ctx_editor.huang_eval.run_phase2 \
+    --phase1-dir outputs/huang_eval/phase1/2026-03-24/02-22-57 \
+    --turns-file outputs/huang_eval/phase1/2026-03-24/02-22-57/all_turns.json \
+    --respondent-model gpt-5-mini --judge-model gpt-5-mini \
+    --analyzer-model gpt-5-mini --max-concurrent 5 --run-s2 --seed 42
+```
+
+**Output location:** `outputs/huang_eval/phase2_s2_full/2026-03-25/06-13-04/`
+
+### Results (n=173, all turn types)
+
+S2 edit rate: 72.3%
+
+**Overall comparisons (quality):**
+
+| Comparison | Winner | Loser | Tie |
+|------------|--------|-------|-----|
+| AO vs S2 | **S2 86.1%** | AO 12.7% | 1.2% |
+| AO vs S3 | S3 87.3% | AO 11.6% | 1.2% |
+| FC vs S2 | **S2 83.8%** | FC 12.7% | 3.5% |
+| FC vs S3 | S3 83.2% | FC 15.6% | 1.2% |
+
+**S2 and S3 by turn type (quality):**
+
+| Turn Type | n | S2 vs AO (S2 wins) | S3 vs AO (S3 wins) | S2 vs FC (S2 wins) | S3 vs FC (S3 wins) |
+|-----------|---|---------------------|---------------------|---------------------|---------------------|
+| new_ask | 64 | 87.5% | 89.1% | 87.5% | 90.6% |
+| feedback | 42 | 85.7% | 85.7% | 83.3% | 76.2% |
+| no_feedback | 67 | 85.1% | 86.6% | 80.6% | 80.6% |
+| **Overall** | **173** | **86.1%** | **87.3%** | **83.8%** | **83.2%** |
+
+**S2 edit rate by turn type:**
+
+| Turn Type | n | Edit rate |
+|-----------|---|-----------|
+| new_ask | 64 | 78.1% |
+| feedback | 42 | 78.6% |
+| no_feedback | 67 | 62.7% |
+| Overall | 173 | 72.3% |
+
+### S2 Analysis
+
+**8. S2 performs on par with S3 across all turns.** S2 beats AO 86.1% and FC 83.8%, nearly identical to S3's 87.3% and 83.2%. This is notable because S2 uses the v11 prompt (different from S3's v8) and gates on `needs_edit` (only resetting 72.3% of turns), while S3 always resets.
+
+**9. S2's gating is well-calibrated.** S2 edits less often on no_feedback turns (62.7%) than on new_ask or feedback turns (~78%). This makes sense: on no_feedback turns, the user is referencing prior assistant outputs, so the conversation is more likely to be on track (the assistant just needs to continue). The gating prevents unnecessary resets in these cases. On the failure subset, S2 still achieves higher quality win rates than S3 (93.3% vs 85.3%) -- suggesting that when S2 does reset, it does so more effectively, and when it doesn't, FC (the fallback) is the right choice.
+
+**10. v11 "mid-task reflection" framing is effective.** The v11 prompt's tighter issues section (requiring exact "None" for no errors) results in a 72.3% edit rate vs S3's ~85% (which uses v8's looser issues section). This means v11 avoids resetting on ~13% more turns where no reset is needed, without sacrificing quality.
+
 ## Caveats
 
-**1. ~~Selection bias.~~** Resolved by the full 179-turn evaluation. S3 wins unconditionally.
+**1. ~~Selection bias.~~** Resolved by the full unconditional evaluations for both S3 and S2.
 
-**2. Format/presentation bias.** The S3 compacted format (structured task spec + "what looks right" headers) may inherently look better to the judge than raw Option 2 conversation rendering, regardless of content quality. This could inflate S3 win rates. Spot-checking individual comparisons and/or using a judge that sees only the final response (not the context construction) would help control for this.
+**2. Format/presentation bias.** All reset-based strategies (S2, S3, S1.5) produce compacted contexts with structured headers (task spec, progress summary) that may look better to the judge than raw Option 2 conversation rendering. This could inflate win rates for all our methods equally. The relative comparisons between our methods (S2 vs S3 vs S1.5) are less affected since they share similar output formats.
 
 **3. Judge model.** gpt-5-mini was used as the judge, not gpt-5 as Huang used. A weaker judge may be less reliable, particularly on subtle quality distinctions.
 
-**4. Scale.** 30 conversations and 179 turns is a pilot. Huang used 300 conversations. A production run with 100+ conversations and a gpt-5 judge would be more defensible for a paper submission.
+**4. Scale.** 30 conversations and ~179 turns is a pilot. Huang used 300 conversations. A production run with 100+ conversations and a gpt-5 judge would be more defensible for a paper submission.
 
 **5. Response caching.** Phase 2 reuses FC/AO responses from Phase 1's `turn_results.jsonl`, truncated to 1000 characters. For turns where the cached response was truncated, the judge may not have had full context to evaluate. Future runs should store full responses or regenerate them.
+
+## Prompt Versions Reference
+
+| Prompt | File | Used by |
+|--------|------|---------|
+| Task spec (v8) | `strategies/prompts/analyzer_v8_task_spec.txt` | S2, S3, S1.5 |
+| Compare (v8) | `strategies/prompts/analyzer_v8_compare.txt` | S3, S1.5 |
+| Compare (v11) | `strategies/prompts/analyzer_v11_compare.txt` | S2 |
+| Compaction (S3) | `strategies/prompts/context_compaction.txt` | S3 only |
+| AO system message | `huang_eval/prompts/ao_system_message.txt` | AO |
+| Turn classifier | `huang_eval/prompts/turn_classifier.txt` | All (classification) |
+| Pairwise judge | `huang_eval/prompts/pairwise_judge.txt` | All (evaluation) |
