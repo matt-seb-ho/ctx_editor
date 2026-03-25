@@ -572,7 +572,7 @@ class ConversationAnalyzer:
         memory_target_query: "compare" (default), "spec", or "both".
         enforce_compliance: if True, append compliance rules to Query 2 prompt.
         """
-        if self.prompt_version in ("v6", "v7", "v8"):
+        if self.prompt_version in ("v6", "v7", "v8", "v11"):
             return await self._analyze_v6(
                 trace, model_client, memory, spec_only=spec_only,
                 memory_target_query=memory_target_query,
