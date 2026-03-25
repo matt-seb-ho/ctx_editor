@@ -40,6 +40,7 @@ class ContextEditV2Strategy(BaseStrategy):
         max_resets: int = 3,
         use_memory: bool = False,
         memory_target: str = "analyzer",
+        accumulate_instruction: bool = False,
     ):
         self.analyzer = ConversationAnalyzer(
             model=analyzer_model,
@@ -52,9 +53,10 @@ class ContextEditV2Strategy(BaseStrategy):
         self.max_resets = max_resets
         self.use_memory = use_memory
         self.memory_target = memory_target
+        self.accumulate_instruction = accumulate_instruction
 
-    @staticmethod
     def _build_edited_context(
+        self,
         trace: "ConversationTrace",
         result: "AnalysisResult",
     ) -> list[Message]:
@@ -91,6 +93,14 @@ class ContextEditV2Strategy(BaseStrategy):
         ]
         if result.aligned:
             compact_parts.append(f"# What Looks Right So Far\n{result.aligned}")
+
+        if self.accumulate_instruction:
+            compact_parts.append(
+                "IMPORTANT: Your response must include ALL required outputs for the "
+                "complete task specification, including any work described above as "
+                "'what looks right'. Do not assume prior work has been submitted — "
+                "your response must be self-contained and complete."
+            )
 
         new_messages.append(
             Message(role="compacted conversation", content="\n\n".join(compact_parts))

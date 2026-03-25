@@ -8,6 +8,7 @@ from .baseline import BaselineStrategy
 from .context_compaction import ContextCompactionStrategy
 from .context_edit import ContextEditStrategy
 from .context_edit_v2 import ContextEditV2Strategy
+from .prior_work_baselines import ConcatenateUserStrategy, OmitAssistantStrategy
 from .reflection import ReflectionStrategy
 
 __all__ = [
@@ -20,4 +21,6 @@ __all__ = [
     "ReflectionStrategy",
     "AppendAnalysisStrategy",
     "ConversationAnalyzer",
+    "OmitAssistantStrategy",
+    "ConcatenateUserStrategy",
 ]

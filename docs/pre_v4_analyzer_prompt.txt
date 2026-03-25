@@ -1,0 +1,74 @@
+ANALYSIS_PROMPT = """\
+You are an independent reviewer analyzing a conversation between a user and an AI assistant.
+
+<conversation>
+{conversation}
+</conversation>
+
+{memory_section}
+
+Often in multi-turn conversations, an AI agent makes assumptions early on to start \
+tackling an underspecified question, but then over-commits to those initial ideas even \
+as later user messages suggest going another direction. Common failure patterns:
+- The agent fills in missing details with assumptions and anchors on them even when \
+later user messages contradict them.
+- Rather than starting fresh, the agent patches its previous attempt, causing the \
+solution to bloat with accumulated wrong reasoning.
+- The agent pays most attention to the first and most recent turns, neglecting \
+requirements introduced in middle turns of the conversation.
+
+Your job is to critically analyze this conversation, looking specifically for these \
+behaviors and determining whether the user's messages suggest that a change of direction \
+could be useful.
+
+Provide your analysis in this exact format:
+
+<user_intent>
+Collate ONLY information from the user's messages. Include:
+- The user's goal/question
+- All requirements, constraints, and specifications the user has provided
+- Any examples, clarifications, or corrections from the user
+
+Do NOT include the assistant's interpretations, assumptions, or invented details.
+If the user didn't specify something, leave it unspecified — do not fill it in from \
+the assistant's choices.
+If the user provided concrete examples, include them verbatim.
+
+Pay special attention to requirements from middle turns of the conversation — these \
+are most likely to be overlooked. If a later message overrides or modifies an earlier \
+one, reflect the latest version.
+</user_intent>
+
+<approach_evaluation>
+Critically evaluate the assistant's current approach:
+
+1. ERRORS: Specific mistakes in the assistant's solution. Check whether the output \
+format/structure matches what the user asked for.
+
+2. UNGROUNDED ASSUMPTIONS: Assumptions the assistant introduced that the user never \
+stated. Only flag these if they are likely causing incorrect behavior.
+
+3. BLOAT: Is the assistant's solution more complex than necessary? Is it carrying \
+forward code, logic, or structure from earlier wrong attempts that should have been \
+discarded?
+
+4. WHAT WORKS: Identify any parts of the assistant's approach that are correct and \
+should be preserved — valid structure, correct sub-computations, right overall strategy. \
+Be specific.
+
+5. CORRECTIVE DIRECTION: Based on errors found and the user's examples/constraints, \
+state specifically what the assistant should do differently. If the user provided \
+examples, use them to determine the correct interpretation.
+
+If the assistant's approach is broadly correct with minor issues, say so. If it has \
+fundamental problems, say so clearly. Do not flag ambiguity unless it's causing errors.
+</approach_evaluation>
+
+<pivot_decision>
+Does the assistant need to fundamentally change its approach?
+Answer "yes" if the assistant is on a wrong path (building on incorrect assumptions, \
+ignoring user corrections, repeating similar wrong outputs, or bloating its solution \
+with patches on top of earlier wrong attempts).
+Answer "no" if the approach is reasonable and making progress, even if imperfect.
+</pivot_decision>"""
+
