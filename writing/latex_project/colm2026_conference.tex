@@ -19,7 +19,7 @@
 \hypersetup{colorlinks=true, citecolor=darkblue, linkcolor=darkblue, urlcolor=darkblue}
 
 
-\title{Externalized Executive Function via Self-Aware Context Curation}
+\title{Curing Context Pollution: Externalized Executive Function\\for Multi-Turn LLM Conversations}
 
 % Authors must not appear in the submitted version.
 \author{Anonymous Authors}
@@ -36,7 +36,7 @@
 \maketitle
 
 \begin{abstract}
-Large language models suffer well-documented performance degradation in extended multi-turn settings as their own prior outputs and tool calls accumulate in context---a problem variously termed \emph{context pollution}~\citep{huang2026context} or \emph{context rot}~\citep{laban2025lost,khalid2025ergo}. Prior mitigations simply discard all assistant messages, which works only when the model can re-derive answers from scratch. We propose \emph{self-aware context curation}: a separate analyzer agent re-reads the conversation, identifies where the assistant's reasoning diverged from the user's intent, and rewrites the context---preserving correct work while removing content that anchors the model on earlier mistakes. The analyzer decomposes its work into two steps: (1)~extracting a clean task specification from user messages alone, and (2)~comparing that specification against the assistant's outputs. This decomposition is necessary because we find that prior assistant messages act as a \emph{cognitive hazard}: even an independent reviewer model produces degraded analysis when exposed to them. We evaluate on math, code generation, SQL, and function-calling tasks under controlled multi-turn settings, real human--AI conversations, and agentic tool-use scenarios. Our methods improve multi-turn accuracy substantially (e.g., 60\%$\to$90\% on math, 16\%$\to$72\% on code). On agentic tool-use tasks, blanket assistant omission drops performance from 55\% to 0\%, while our approach maintains 55--60\%; on real conversations, our best strategy wins 84--86\% of pairwise quality comparisons against both full context and assistant omission. These results establish that intelligent context curation---not wholesale removal---is necessary for robust multi-turn interaction.
+Large language models degrade in extended multi-turn conversations as their own prior outputs accumulate in context---a phenomenon known as \emph{context pollution}~\citep{huang2026context} or \emph{context rot}~\citep{laban2025lost,khalid2025ergo}. Prior mitigations simply discard all assistant messages, which works only when the model can re-derive answers from scratch. We propose \emph{context curation via externalized executive function}: a separate analyzer agent extracts a clean task specification from user messages alone, compares it against the assistant's work, and rewrites the context---preserving what is correct while removing what anchors the model on earlier mistakes. This two-step decomposition is necessary because prior assistant messages act as a \emph{cognitive hazard}: even an independent reviewer model produces degraded analysis when exposed to them. Across math, code, SQL, function-calling, real human--AI conversations, and agentic tool-use settings, our methods substantially improve multi-turn accuracy (e.g., 60\%$\to$90\% on math). Critically, blanket omission catastrophically fails in agentic settings (55\%$\to$0\%), while our approach maintains or improves performance.
 \end{abstract}
 
 
@@ -50,7 +50,7 @@ Large language models suffer well-documented performance degradation in extended
 \begin{figure}[t]
 \centering
 \fbox{\parbox{0.95\linewidth}{\centering\textbf{[Figure 2: Method overview.]} The analyzer reads the conversation in two steps: (1)~extract a clean task specification from user messages only (selective attention), (2)~compare it against the full conversation to identify correct and incorrect assistant work (error monitoring). The result is used to rewrite the context, preserving correct work and removing pollution, before the assistant generates its next response.}}
-\caption{Self-aware context curation. A separate analyzer agent externalizes the executive functions that LLMs lack: selective attention (filtering out assistant messages during intent extraction) and error monitoring (comparing clean intent against the assistant's actual work).}
+\caption{Context curation via externalized executive function. A separate analyzer agent externalizes the executive functions that LLMs lack: selective attention (filtering out assistant messages during intent extraction) and error monitoring (comparing clean intent against the assistant's actual work).}
 \label{fig:method}
 \end{figure}
 
@@ -71,7 +71,7 @@ Two mechanisms drive this failure:
 
 Existing mitigations simply discard all assistant messages~\citep{huang2026context,khalid2025ergo}, effectively restarting from scratch each turn. This works when the model can re-derive the answer from user messages alone. But in realistic settings---multi-step coding, iterative design, tool-use agents---the assistant's prior work is essential context. Discarding it is not just wasteful but destructive: on the tau2-bench agentic benchmark~\citep{yao2024tau}, blanket assistant omission drops performance from 55\% to 0\%.
 
-We propose \emph{self-aware context curation}: rather than discarding all assistant context, a separate analyzer agent re-reads the conversation, identifies where the assistant diverged from the user's intent, and rewrites the context to preserve correct work while removing harmful content (Figure~\ref{fig:method}). This externalizes the executive functions that LLMs lack internally---selective attention, error monitoring, and strategy shifting---through an agent that schedules LLM calls with carefully controlled context windows. In this sense, our work extends test-time scaling~\citep{wei2022chain,wang2023selfconsistency,yao2024tree} from the single-turn setting (scaling compute within one generation) to the multi-turn setting (curating the accumulated context presented to the model).
+We propose \emph{context curation via externalized executive function}: rather than discarding all assistant context, a separate analyzer agent re-reads the conversation, identifies where the assistant diverged from the user's intent, and rewrites the context to preserve correct work while removing harmful content (Figure~\ref{fig:method}). This externalizes the executive functions that LLMs lack internally---selective attention, error monitoring, and strategy shifting---through an agent that schedules LLM calls with carefully controlled context windows. In this sense, our work extends test-time scaling~\citep{wei2022chain,wang2023selfconsistency,yao2024tree} from the single-turn setting (scaling compute within one generation) to the multi-turn setting (curating the accumulated context presented to the model).
 
 The analyzer decomposes its work into two steps:
 \begin{itemize}
@@ -100,6 +100,9 @@ Chain-of-thought~\citep{wei2022chain}, self-consistency~\citep{wang2023selfconsi
 
 \paragraph{Dynamic Cheatsheet.}
 \citet{suzgun2025cheatsheet} introduced a mutable text document that accumulates task-relevant knowledge across problem instances at test time without gradient updates. We adapt this mechanism for context curation, targeting the cheatsheet at the analyzer's executive function rather than the task-solving assistant.
+
+\paragraph{Context compression.}
+Methods like LLMLingua~\citep{jiang2023llmlingua} and context distillation compress long contexts for efficiency, reducing token count while preserving information. Our work addresses a different goal: improving \emph{correctness} rather than efficiency, by selectively removing content that actively degrades performance. The two approaches are complementary---curation could be combined with compression.
 
 \paragraph{Agentic benchmarks.}
 Tau2-bench~\citep{yao2024tau} evaluates LLM agents on customer service tasks requiring tool use and stateful dialogue. Unlike LiC's self-contained tasks, tau2-bench conversations involve API calls whose results are essential for subsequent reasoning, making blanket context removal fundamentally incompatible with task success.
@@ -143,6 +146,8 @@ The analysis produces a structured artifact (task specification, aligned work, i
 
 The analytical core (Section~\ref{sec:decomposition}) is the contribution; the intervention strategy is a design choice. We use unconditional Reset for short, self-contained LiC tasks; Gated Reset for long agentic conversations; and Rewrite for diverse open-domain conversations.
 
+\paragraph{Computational overhead.} The analyzer adds 2 LLM calls per turn (spec extraction + approach evaluation), plus 1 call for Rewrite. On tau2-bench, this increases average cost from \$0.51 to \$0.60--0.67 per task (Table~\ref{tab:tau2-main}). Gating reduces overhead by skipping intervention when no issues are found.
+
 \subsection{Agentic adaptation}
 \label{sec:agentic-methods}
 
@@ -172,7 +177,7 @@ We apply the Dynamic Cheatsheet to test whether curation quality improves with e
 
 \paragraph{WildChat.} We reproduce the evaluation of \citet{huang2026context} on 30 WildChat-1M conversations~\citep{zhao2024wildchat} (179 turns), filtered per Huang's criteria. Phase~1 identifies turns where assistant omission (AO) degrades quality ($n$=76 AO failure turns); Phase~2 evaluates our strategies on all turns. Pairwise judgments use Huang's judge prompt on quality and on-topic dimensions.
 
-\paragraph{CollabLLM.} We evaluate on MATH-Hard and BigCodeBench ($n$=20 each). Since standard BigCodeBench evaluation requires exact function signatures that the user simulator never conveys, we develop a conversation-aware LLM judge (GPT-5) that evaluates against what the user actually asked for.
+\paragraph{CollabLLM.} We evaluate on MATH-Hard and BigCodeBench ($n$=20 each). Standard BigCodeBench evaluation uses test-case execution requiring exact function signatures, but the user simulator never conveys these signatures exactly, making pass\_rate systematically zero for all conditions. We develop a conversation-aware LLM judge (GPT-5) that evaluates the assistant's code against the user's actual intent as expressed in the conversation, assessing functional correctness rather than signature conformance.
 
 \paragraph{Models.} GPT-5-mini is used as the primary assistant and analyzer across all settings. See Appendix~\ref{app:sample-counts} for full model assignments per setting.
 
@@ -210,7 +215,7 @@ Reset (ours) & 75\% & 61\% & \textbf{48\%} & 52\% \\
 Gated Reset (ours) & 75\% & 72\% & 44\% & 74\% \\
 \bottomrule
 \end{tabular}
-\caption{LiC accuracy by strategy (no memory). On database, our methods outperform simple baselines through schema-grounded consolidation. All strategies include an accumulate instruction for parallel-call actions tasks.}
+\caption{LiC accuracy by strategy (no memory). On database, our methods outperform simple baselines through schema-grounded consolidation. For actions (parallel function calling), all strategies include a prompt instruction to consolidate all function calls in the final response, since the evaluation requires all calls to appear in a single turn.}
 \label{tab:lic-main}
 \end{table}
 
@@ -350,7 +355,7 @@ Gated Reset with strategic-reflection prompts (v10) achieves 55--60\% across two
 Diagnostic analysis (Appendix~\ref{app:tau2-diagnostic}) reveals that only 1 of 11 baseline failures shows clear anchoring; the dominant modes are missing domain knowledge (4/11) and step budget exhaustion (4/11). Gated Reset's gains come primarily from cognitive flexibility---redirecting the agent to new strategies---rather than inhibitory control alone.
 
 
-\subsection{Soft attention and decontamination learning}
+\subsection{Preliminary: soft attention and decontamination learning}
 \label{sec:decontamination}
 
 \begin{table}[t]
@@ -375,6 +380,8 @@ Diagnostic analysis (Appendix~\ref{app:tau2-diagnostic}) reveals that only 1 of 
 \end{table}
 
 Reset outperforms Augment even with contaminated specs (code: 23\% vs.\ 13\%), confirming that context pollution and spec contamination are separable problems. Memory-based decontamination shows its strongest effect on database (+15pp), closing 65\% of the gap to hard attention. The learned principles converge on structured heuristics: ``build a user-only spec first, then overlay assistant suggestions as hypotheses.'' Code remains resistant (+1--2pp), suggesting more structurally diverse contamination patterns.
+
+\paragraph{Memory across settings.} Across both hard-attention (Table~\ref{tab:lic-memory}) and soft-attention (Table~\ref{tab:soft-attention}) experiments, the Dynamic Cheatsheet consistently improves analysis quality. In hard-attention mode, memory pushes Augment to 90\% on math (exceeding Omit Assistant's 85\%); in soft-attention mode, it closes 65\% of the gap to hard-attention oracles on database. This suggests context curation is a \emph{learnable skill}: the analyzer improves with experience, accumulating principles that transfer across problem instances.
 
 
 %% ============================================================
@@ -409,7 +416,7 @@ Sample sizes are modest (19--25 per LiC task, 20 tau2-bench tasks, 30 WildChat c
 \label{sec:conclusion}
 %% ============================================================
 
-We propose self-aware context curation to mitigate multi-turn performance degradation, framing the problem as externalized executive function. Our key findings: (1)~context curation outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the framework generalizes across controlled benchmarks, real conversations, and agentic tool use; and (4)~curation is a learnable skill, with memory closing up to 65\% of the gap to hard-attention oracles. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context curation (which can) will only grow.
+We propose context curation via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context curation outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the framework generalizes across controlled benchmarks, real conversations, and agentic tool use; and (4)~curation is a learnable skill, with memory closing up to 65\% of the gap to hard-attention oracles. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context curation (which can) will only grow.
 
 
 %% ============================================================
