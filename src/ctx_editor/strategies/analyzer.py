@@ -87,6 +87,7 @@ class AnalysisResult:
     aligned: str  # What the assistant got right
     issues: str  # What contradicts the task spec
     raw_output: str  # Full output from comparison query
+    corrective_direction: str = ""  # v9+: what to do differently (optional)
 
     @property
     def needs_edit(self) -> bool:
@@ -155,9 +156,9 @@ class ConversationAnalyzer:
         self.reasoning_effort = reasoning_effort
         self.prompt_version = prompt_version
 
-        if prompt_version in ("v6", "v7", "v8", "v11"):
-            # v11 reuses v8 task spec prompt, only the compare prompt differs
-            task_spec_version = "v8" if prompt_version == "v11" else prompt_version
+        if prompt_version in ("v6", "v7", "v8", "v9", "v11"):
+            # v9 and v11 reuse v8 task spec prompt, only the compare prompt differs
+            task_spec_version = "v8" if prompt_version in ("v9", "v11") else prompt_version
             self._task_spec_template = _load_prompt(f"analyzer_{task_spec_version}_task_spec")
             self._compare_template = _load_prompt(f"analyzer_{prompt_version}_compare")
         elif prompt_version == "v8_soft":
@@ -287,6 +288,7 @@ class ConversationAnalyzer:
 
         aligned = self._extract_tag(compare_output, "aligned")
         issues = self._extract_tag(compare_output, "issues")
+        corrective_direction = self._extract_tag(compare_output, "corrective_direction")
 
         # Fallback: if the model didn't use XML tags, try section-header parsing
         if not aligned and not issues:
@@ -307,6 +309,7 @@ class ConversationAnalyzer:
             aligned=aligned,
             issues=issues,
             raw_output=f"--- TASK SPEC ---\n{spec_output}\n\n--- COMPARISON ---\n{compare_output}",
+            corrective_direction=corrective_direction,
         )
 
     # --- v8_soft: two-query, but Query 1 sees full conversation ---
@@ -572,7 +575,7 @@ class ConversationAnalyzer:
         memory_target_query: "compare" (default), "spec", or "both".
         enforce_compliance: if True, append compliance rules to Query 2 prompt.
         """
-        if self.prompt_version in ("v6", "v7", "v8", "v11"):
+        if self.prompt_version in ("v6", "v7", "v8", "v9", "v11"):
             return await self._analyze_v6(
                 trace, model_client, memory, spec_only=spec_only,
                 memory_target_query=memory_target_query,

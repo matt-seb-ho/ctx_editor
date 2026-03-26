@@ -138,6 +138,69 @@ def sanitize_analysis(analysis: dict) -> dict:
     return sanitized
 
 
+ACCUMULATE_ACTIONS_TEXT = (
+    "IMPORTANT: Your response must include ALL requested function calls for the "
+    "complete task specification. Do not assume prior calls have been submitted — "
+    "your response must be self-contained and complete. "
+    "Present a single, consolidated list of function calls. "
+    "Do not duplicate or repeat any function call."
+)
+
+ACCUMULATE_GENERAL_TEXT = (
+    "IMPORTANT: Your response must include ALL required outputs for the "
+    "complete task specification. Do not assume prior work has been submitted — "
+    "your response must be self-contained and complete. "
+    "Output everything exactly once — do not duplicate or repeat outputs."
+)
+
+
+def build_full_conversation_messages(
+    trace_data: dict,
+    accumulate: bool = False,
+    task_name: str = "",
+    no_clarification: bool = False,
+) -> list[dict]:
+    """Rebuild full conversation from trace, optionally adding accumulate to system prompt.
+
+    Used for s0-accum and s1-accum modes — keeps full history, just adds accumulate.
+    """
+    trace_messages = trace_data.get("trace", {}).get("messages", [])
+    messages = []
+    for msg in trace_messages:
+        if not msg.get("visible", True):
+            continue
+        role = msg.get("role", "unknown")
+        content = msg.get("content", "")
+        # Map special roles to standard ones
+        if role in ("system",):
+            messages.append({"role": "system", "content": content})
+        elif role in ("user",):
+            messages.append({"role": "user", "content": content})
+        elif role in ("assistant",):
+            messages.append({"role": "assistant", "content": content})
+        elif role in ("conversation analysis",):
+            # S1 traces have analysis messages — keep them
+            messages.append({"role": "user", "content": f"[conversation analysis]\n{content}"})
+
+    # Add accumulate instruction to system message
+    if accumulate and messages and messages[0]["role"] == "system":
+        accum_text = ACCUMULATE_ACTIONS_TEXT if task_name == "actions" else ACCUMULATE_GENERAL_TEXT
+        messages[0]["content"] += f"\n\n{accum_text}"
+
+    # Add no-clarification to system message
+    if no_clarification and messages and messages[0]["role"] == "system":
+        messages[0]["content"] += (
+            "\n\nIMPORTANT: Do not ask clarifying questions. "
+            "Answer directly based on the specification provided."
+        )
+
+    # Remove the last assistant message (we'll regenerate it)
+    while messages and messages[-1]["role"] == "assistant":
+        messages.pop()
+
+    return messages
+
+
 def build_compacted_messages(
     system_message: str,
     analysis: dict,
@@ -372,38 +435,49 @@ async def run_experiment(
                     "skip_reason": metadata.get("skip_reason", "unknown"),
                 }
 
-            # Extract analysis
-            analysis = extract_analysis(trace_data)
-            if not analysis:
-                logger.warning(f"[{sample_id}] No analysis found, skipping")
-                return {
-                    "sample_id": sample_id,
-                    "task_name": task_name,
-                    "is_correct": False,
-                    "score": 0.0,
-                    "error": "no_analysis",
-                }
-
-            # Optionally sanitize analysis to remove clarification-seeking patterns
-            if sanitize:
-                analysis = sanitize_analysis(analysis)
-
-            # Build compacted context
-            system_msg = get_system_message(trace_data)
-            last_user_msg = get_last_user_message(trace_data)
-            compaction_output = None
-
-            if mode == "s3":
-                conversation = get_conversation_string(trace_data)
-                messages, compaction_output = await build_compacted_messages_s3(
-                    system_msg, analysis, last_user_msg, conversation, model_client, model,
+            # For s0-accum and s1-accum, we don't need analysis
+            if mode in ("s0-accum", "s1-accum"):
+                messages = build_full_conversation_messages(
+                    trace_data,
+                    accumulate=accumulate,
+                    task_name=task_name,
+                    no_clarification=no_clarification,
                 )
+                analysis = {}
+                compaction_output = None
             else:
-                messages = build_compacted_messages(
-                    system_msg, analysis, last_user_msg,
-                    accumulate=accumulate, no_notes=no_notes,
-                    no_clarification=no_clarification, task_name=task_name,
-                )
+                # Extract analysis
+                analysis = extract_analysis(trace_data)
+                if not analysis:
+                    logger.warning(f"[{sample_id}] No analysis found, skipping")
+                    return {
+                        "sample_id": sample_id,
+                        "task_name": task_name,
+                        "is_correct": False,
+                        "score": 0.0,
+                        "error": "no_analysis",
+                    }
+
+                # Optionally sanitize analysis to remove clarification-seeking patterns
+                if sanitize:
+                    analysis = sanitize_analysis(analysis)
+
+                # Build compacted context
+                system_msg = get_system_message(trace_data)
+                last_user_msg = get_last_user_message(trace_data)
+                compaction_output = None
+
+                if mode == "s3":
+                    conversation = get_conversation_string(trace_data)
+                    messages, compaction_output = await build_compacted_messages_s3(
+                        system_msg, analysis, last_user_msg, conversation, model_client, model,
+                    )
+                else:
+                    messages = build_compacted_messages(
+                        system_msg, analysis, last_user_msg,
+                        accumulate=accumulate, no_notes=no_notes,
+                        no_clarification=no_clarification, task_name=task_name,
+                    )
 
             # Generate assistant response
             try:
@@ -455,6 +529,15 @@ async def run_experiment(
                 extracted = None
 
             # Save trace
+            analysis_used = {}
+            if analysis:
+                analysis_used = {
+                    "user_intent": analysis.get("user_intent", "")[:500],
+                    "aligned": analysis.get("aligned", "")[:500],
+                    "issues": analysis.get("issues", "")[:500],
+                    "needs_edit": analysis.get("needs_edit"),
+                }
+
             result = {
                 "sample_id": sample_id,
                 "task_name": task_name,
@@ -463,12 +546,7 @@ async def run_experiment(
                 "score": score,
                 "extracted_answer": str(extracted) if extracted else "",
                 "assistant_response": assistant_response,
-                "analysis_used": {
-                    "user_intent": analysis.get("user_intent", "")[:500],
-                    "aligned": analysis.get("aligned", "")[:500],
-                    "issues": analysis.get("issues", "")[:500],
-                    "needs_edit": analysis.get("needs_edit"),
-                },
+                "analysis_used": analysis_used,
                 "messages_sent": messages,
             }
             if compaction_output:
@@ -535,8 +613,9 @@ def main():
     parser.add_argument("--label", default="s15", help="Experiment label")
     parser.add_argument("--max-concurrent", type=int, default=8)
     parser.add_argument(
-        "--mode", choices=["s15", "s3"], default="s15",
-        help="Compaction mode: s15 (programmatic) or s3 (LLM-based)",
+        "--mode", choices=["s15", "s3", "s0-accum", "s1-accum"], default="s15",
+        help="Mode: s15 (programmatic compaction), s3 (LLM compaction), "
+             "s0-accum (baseline + accumulate), s1-accum (S1 + accumulate)",
     )
     parser.add_argument(
         "--sanitize", action="store_true",
