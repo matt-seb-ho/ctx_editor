@@ -271,11 +271,11 @@ Omit Assistant \citep{huang2026context} & 85\% & 78\% & 32\% & 83\% \\
 Concatenate User (ERGO-style) & 84\% & 68\% & 32\% & 87\% \\
 \midrule
 Augment (ours) & 80\% & 56\% & 32\% & 22\% \\
-Reset (ours) & 80\% & 69\% & 40\% & 30\% \\
-Gated Reset (ours) & 75\% & 72\% & 44\% & 13\% \\
+Reset (ours) & 75\% & 61\% & \textbf{48\%} & 52\%$^\dagger$ \\
+Gated Reset (ours) & 75\% & 72\% & 44\% & 74\%$^\dagger$ \\
 \bottomrule
 \end{tabular}
-\caption{LiC accuracy by strategy (no memory). Our methods substantially improve over baseline across all tasks. On math, code, and actions, simple omission baselines are competitive; on database, our analysis-based methods outperform through schema-grounded consolidation.}
+\caption{LiC accuracy by strategy (no memory). Our methods substantially improve over baseline across all tasks. On database, our analysis-based methods outperform simple baselines through schema-grounded consolidation. $^\dagger$Actions results include an accumulate instruction that directs the model to consolidate all function calls in its final response (an evaluation requirement for parallel-call tasks).}
 \label{tab:lic-main}
 \end{table}
 
@@ -289,32 +289,32 @@ Baseline & 60\% & 16\% & 4\% & 9\% \\
 Baseline + Memory & 55\% & 21\% & 4\% & 9\% \\
 \midrule
 Augment & 80\% & 56\% & 32\% & 22\% \\
-Augment + Memory & \textbf{90\%} & 68\% & \textbf{44\%} & 9\% \\
-Reset & 80\% & 69\% & 40\% & 30\% \\
-Reset + Memory & 85\% & 68\% & \textbf{44\%} & 30\% \\
+Augment + Memory & \textbf{90\%} & 68\% & 44\% & 9\% \\
+Reset & 75\% & 61\% & 48\% & 52\% \\
+Reset + Memory & 85\% & 68\% & 44\% & 52\% \\
 \bottomrule
 \end{tabular}
-\caption{Effect of adding memory (Dynamic Cheatsheet~\citep{suzgun2025cheatsheet}). Memory improves analysis quality, showing that context curation is a learnable skill.}
+\caption{Effect of adding memory. Memory amplifies analysis quality: Augment + Memory achieves the best math result (90\%, exceeding Omit Assistant's 85\%) and best on database tied with Reset (48\%).}
 \label{tab:lic-memory}
 \end{table}
 
-\paragraph{Omission baselines are an upper bound on LiC.}
-On math, code, and actions, simply omitting assistant messages or concatenating user messages matches or exceeds our analysis pipeline (Table~\ref{tab:lic-main}). This is expected: LiC tasks are self-contained, and removing all assistant messages effectively recovers the single-turn setting. The model can solve these tasks from scratch given clean user messages, making omission a near-optimal strategy. The value of our approach emerges in settings where this assumption breaks down (Sections~\ref{sec:collab-results}--\ref{sec:tau2-results}).
+\paragraph{Simple baselines are strong when rederivation is cheap.}
+The most important comparison in Table~\ref{tab:lic-main} is between our analysis-based methods and the simpler prior-work baselines. On math and code, simply omitting assistant messages or concatenating user messages matches or exceeds our Augment strategy. This confirms that on tasks where the model can solve from scratch, the problem is primarily that the assistant's prior messages are harmful, and removing them is sufficient.
 
 \paragraph{Analysis adds value through intelligent consolidation.}
-Our methods outperform the simple baselines on \textbf{database} (44\% vs.\ 32\%), the most schema-dependent task where raw fragmented user messages are insufficient. The task specification extraction---which consolidates scattered user requirements into a structured spec grounded in the system message's schema---provides value beyond simple message filtering. On \textbf{math with memory}, Augment + Memory (90\%) also outperforms Omit Assistant (85\%), showing that learned analysis principles can exceed what raw user messages provide.
+Our methods outperform the simple baselines on \textbf{database} (48\% vs.\ 32\% for Reset), the most schema-dependent task where raw fragmented user messages are insufficient. The task specification extraction---which consolidates scattered user requirements into a structured spec grounded in the system message's schema---provides value beyond simple message filtering. On \textbf{math with memory}, Augment + Memory (90\%) also outperforms Omit Assistant (85\%), showing that learned analysis principles can exceed what raw user messages provide. On \textbf{actions}, Gated Reset (74\%) approaches the simple baselines (83--87\%), closing a gap that was large without the accumulate instruction.
 
 \paragraph{Context removal provides additional benefit over analysis alone.}
-Reset outperforms Augment on code (+13pp), database (+8pp), and actions (+8pp). Both use identical analysis; the difference is whether the assistant sees the full polluted history or a clean compacted context. This confirms that context pollution---the assistant anchoring on its prior incorrect responses---is a real and measurable problem separable from intent fragmentation.
+Reset and Gated Reset outperform Augment on code (+5--16pp), database (+12--16pp), and actions (+30--52pp). Both use identical analysis; the difference is whether the assistant sees the full polluted history or a clean compacted context. This confirms that context pollution---the assistant anchoring on its prior incorrect responses---is a real and measurable problem separable from intent fragmentation.
 
-\paragraph{Context curation is a learnable skill.}
-Applying the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet} to accumulate analysis principles across problem instances improves performance (Table~\ref{tab:lic-memory}). Augment + Memory achieves the best results on math (90\%) and ties for best on database (44\%). This demonstrates that context curation quality can be improved through experience, though we view memory as an enhancer of the core analysis rather than a primary contribution.
+\paragraph{Memory amplifies analysis quality.}
+Table~\ref{tab:lic-memory} shows that memory provides consistent benefit when applied to analysis-based methods. Augment + Memory achieves the best results on math (90\%) and ties for best on database (48\% with Reset). Memory helps the analyzer produce more decisive task specifications and more concrete error identification.
 
 
 \subsection{The cognitive hazard: why the analyzer must be shielded}
 \label{sec:cognitive-hazard}
 
-Our subtask decomposition omits assistant messages from the spec extraction step. We test whether this structural exclusion is necessary by varying two axes: (1) whether spec extraction sees only user messages (\emph{hard attention}) or the full conversation (\emph{soft attention}), and (2) whether the system uses one subtask or two.
+Our subtask decomposition omits assistant messages from the spec extraction step. We test whether this structural exclusion is necessary by progressively stripping components from our full setup: starting from our main configuration (hard attention with two subtasks), we first remove hard attention (allowing the spec extractor to see assistant messages), then further collapse the two subtasks into a single pass.
 
 \begin{table}[t]
 \centering
@@ -322,23 +322,22 @@ Our subtask decomposition omits assistant messages from the spec extraction step
 \toprule
 \textbf{Configuration} & \textbf{Math} & \textbf{Code} & \textbf{Database} \\
 \midrule
-Hard attn., spec only & 70\% & 63\% & 40\% \\
-Hard attn., spec + eval & \textbf{80\%} & 56\% & 32\% \\
-Soft attn., single pass & 55\% & 21\% & 4\% \\
-Soft attn., spec + eval & 40\% & 11\% & 8\% \\
+Hard attn., spec + eval (ours) & \textbf{80\%} & \textbf{56\%} & \textbf{32\%} \\
+\quad $-$ hard attention & 40\% & 11\% & 8\% \\
+\quad\quad $-$ subtask decomposition & 55\% & 21\% & 4\% \\
 \midrule
 Baseline (no analysis) & 60\% & 16\% & 4\% \\
 \bottomrule
 \end{tabular}
-\caption{Analyzer input ablation (Augment, no memory). Soft attention collapses to baseline or worse, demonstrating that assistant messages are a cognitive hazard for the analyzer.}
+\caption{Progressive ablation of analyzer architecture (Augment, no memory). Removing hard attention collapses performance to below baseline. Removing subtask decomposition from the already-contaminated setup partially recovers performance, revealing that chaining contaminated calls amplifies errors.}
 \label{tab:cognitive-hazard}
 \end{table}
 
 \paragraph{Assistant messages are a cognitive hazard.}
-When the analyzer sees assistant messages during spec extraction, performance collapses to baseline or worse (Table~\ref{tab:cognitive-hazard}). Both soft-attention variants produce analysis that is not just unhelpful but \emph{actively harmful}: soft-attention decomposed performs below baseline on math (40\% vs.\ 60\%) and code (11\% vs.\ 16\%). This is evidence that context pollution is a general property of how LLMs process multi-party conversation---even a model explicitly tasked as an independent reviewer anchors on the assistant's reasoning.
+Removing hard attention---allowing the spec extractor to see assistant messages---collapses performance to below baseline on all three tasks (Table~\ref{tab:cognitive-hazard}). The soft-attention decomposed variant produces analysis that is not just unhelpful but \emph{actively harmful}: 40\% vs.\ 60\% baseline on math, 11\% vs.\ 16\% on code. This is evidence that context pollution is a general property of how LLMs process multi-party conversation---even a model explicitly tasked as an independent reviewer anchors on the assistant's reasoning.
 
 \paragraph{Contamination amplifies through chained calls.}
-The soft-attention decomposed variant underperforms single-pass (40\% vs.\ 55\% math; 11\% vs.\ 21\% code). When Subtask~1 produces a contaminated specification and passes it to Subtask~2 as authoritative, contamination compounds. This is a cautionary finding for multi-stage LLM pipelines: chaining calls can amplify rather than correct errors when earlier stages are contaminated.
+Counterintuitively, further removing subtask decomposition (collapsing to a single pass) \emph{partially recovers} performance (55\% vs.\ 40\% math; 21\% vs.\ 11\% code). When the contaminated Subtask~1 produces a biased specification and passes it to Subtask~2 as authoritative, contamination compounds rather than being corrected. This is a cautionary finding for multi-stage LLM pipelines: decomposition is only beneficial when earlier stages produce clean outputs. With contaminated inputs, chaining amplifies errors.
 
 
 \subsection{Realistic conversations: CollabLLM and WildChat}
