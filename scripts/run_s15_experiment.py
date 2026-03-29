@@ -42,6 +42,9 @@ logger = get_logger("s15_experiment")
 _COMPACTION_PROMPT_PATH = (
     Path(__file__).parent.parent / "src" / "ctx_editor" / "strategies" / "prompts" / "context_compaction.txt"
 )
+_COMPACTION_PROMPT_V2_PATH = (
+    Path(__file__).parent.parent / "src" / "ctx_editor" / "strategies" / "prompts" / "context_compaction_v2.txt"
+)
 
 
 def load_s1_traces(s1_dir: str) -> list[dict]:
@@ -292,13 +295,15 @@ async def build_compacted_messages_s3(
     conversation: str,
     model_client,
     model: str,
+    use_v2_prompt: bool = False,
 ) -> list[dict]:
     """Build compacted context via LLM compaction (S3).
 
     An LLM reads the full conversation + analysis output and writes
     optimized compacted context, controlling task spec presentation.
     """
-    prompt_template = _COMPACTION_PROMPT_PATH.read_text()
+    prompt_path = _COMPACTION_PROMPT_V2_PATH if use_v2_prompt else _COMPACTION_PROMPT_PATH
+    prompt_template = prompt_path.read_text()
     prompt = prompt_template.format(
         conversation=conversation,
         analysis_user_intent=analysis.get("user_intent", ""),
@@ -314,9 +319,12 @@ async def build_compacted_messages_s3(
     )
     compaction_output = response.content
 
-    # Parse tagged sections
+    # Parse tagged sections (v2 uses <verified_work> instead of <work_so_far>)
     task_spec_match = re.search(r"<task_spec>(.*?)</task_spec>", compaction_output, re.DOTALL)
-    work_match = re.search(r"<work_so_far>(.*?)</work_so_far>", compaction_output, re.DOTALL)
+    work_match = (
+        re.search(r"<verified_work>(.*?)</verified_work>", compaction_output, re.DOTALL)
+        or re.search(r"<work_so_far>(.*?)</work_so_far>", compaction_output, re.DOTALL)
+    )
 
     task_spec = task_spec_match.group(1).strip() if task_spec_match else ""
     work_so_far = work_match.group(1).strip() if work_match else ""
@@ -359,6 +367,8 @@ async def run_experiment(
     accumulate: bool = False,
     no_notes: bool = False,
     no_clarification: bool = False,
+    data_file_override: str | None = None,
+    use_v2_prompt: bool = False,
 ):
     """Run S1.5 or S3 experiment on S1 traces."""
     # Load traces
@@ -402,14 +412,14 @@ async def run_experiment(
         from lic.tasks.actions.task_actions import TaskActions
         evaluator = TaskActions()
 
-    # Load original samples from dev subset data files
+    # Load original samples from data files
     dev_data_files = {
         "math": "data/dev_math_subset.json",
         "code": "data/dev_code_subset.json",
         "database": "data/dev_database_subset.json",
         "actions": "data/dev_actions_subset.json",
     }
-    data_file = dev_data_files.get(task_filter)
+    data_file = data_file_override or dev_data_files.get(task_filter)
     if data_file and Path(data_file).exists():
         with open(data_file) as f:
             for sample in json.load(f):
@@ -471,6 +481,7 @@ async def run_experiment(
                     conversation = get_conversation_string(trace_data)
                     messages, compaction_output = await build_compacted_messages_s3(
                         system_msg, analysis, last_user_msg, conversation, model_client, model,
+                        use_v2_prompt=use_v2_prompt,
                     )
                 else:
                     messages = build_compacted_messages(
@@ -633,6 +644,14 @@ def main():
         "--no-clarification", action="store_true",
         help="Add instruction to assistant system prompt discouraging clarification questions",
     )
+    parser.add_argument(
+        "--data-file",
+        help="Path to data file with original samples (overrides default dev_*_subset.json)",
+    )
+    parser.add_argument(
+        "--v2-prompt", action="store_true",
+        help="Use v2 compaction prompt (structured, enumerated output) for S3 mode",
+    )
 
     args = parser.parse_args()
     asyncio.run(run_experiment(
@@ -646,6 +665,8 @@ def main():
         accumulate=args.accumulate,
         no_notes=args.no_notes,
         no_clarification=args.no_clarification,
+        data_file_override=args.data_file,
+        use_v2_prompt=args.v2_prompt,
     ))
 
 
