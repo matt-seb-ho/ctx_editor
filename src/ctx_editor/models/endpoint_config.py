@@ -9,7 +9,7 @@ class EndpointConfig:
     """Configuration for a single API endpoint."""
 
     name: str
-    type: Literal["azure", "openai"]
+    type: Literal["azure", "openai", "openrouter"]
     supported_models: list[str]
     max_concurrent: int = 10
     priority: int = 1  # Lower = higher priority

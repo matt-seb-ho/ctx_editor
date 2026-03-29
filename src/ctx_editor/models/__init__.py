@@ -9,19 +9,29 @@ _openai_client_cls = None
 _anthropic_client_cls = None
 
 
-def OpenAIModelClient(load_balancer_config: LoadBalancerConfig | None = None):
+def OpenAIModelClient(
+    load_balancer_config: LoadBalancerConfig | None = None,
+    base_url: str | None = None,
+    api_key_env: str | None = None,
+):
     """Get OpenAI model client (lazy import).
 
     Args:
         load_balancer_config: Optional load balancer configuration for
             multi-endpoint support.
+        base_url: Optional base URL for OpenAI-compatible APIs (e.g. OpenRouter).
+        api_key_env: Environment variable name for the API key when using base_url.
     """
     global _openai_client_cls
     if _openai_client_cls is None:
         from .openai_model import OpenAIModelClient as _OpenAI
 
         _openai_client_cls = _OpenAI
-    return _openai_client_cls(load_balancer_config=load_balancer_config)
+    return _openai_client_cls(
+        load_balancer_config=load_balancer_config,
+        base_url=base_url,
+        api_key_env=api_key_env,
+    )
 
 
 def AnthropicModelClient():
@@ -49,6 +59,12 @@ def get_model_client(
     """
     if "claude" in model_name.lower() or "anthropic" in model_name.lower():
         return AnthropicModelClient()
+    elif "/" in model_name:
+        # OpenRouter model format: provider/model-name
+        return OpenAIModelClient(
+            base_url="https://openrouter.ai/api/v1",
+            api_key_env="OPENROUTER_API_KEY",
+        )
     else:
         return OpenAIModelClient(load_balancer_config=load_balancer_config)
 

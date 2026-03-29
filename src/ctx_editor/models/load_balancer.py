@@ -90,6 +90,18 @@ class EndpointLoadBalancer:
                 )
             return AsyncOpenAI(api_key=api_key)
 
+        elif config.type == "openrouter":
+            api_key = os.environ.get(config.api_key_env or "OPENROUTER_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    f"API key not found for OpenRouter endpoint '{config.name}': "
+                    f"env var '{config.api_key_env or 'OPENROUTER_API_KEY'}' not set"
+                )
+            return AsyncOpenAI(
+                api_key=api_key,
+                base_url="https://openrouter.ai/api/v1",
+            )
+
         elif config.type == "azure":
             if config.auth_method == "azure_cli":
                 from azure.identity import AzureCliCredential, get_bearer_token_provider

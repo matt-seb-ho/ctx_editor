@@ -82,13 +82,20 @@ class OpenAIModelClient(BaseModelClient):
 
     _gpt5_temp_warned: bool = False  # Class-level flag to warn only once
 
-    def __init__(self, load_balancer_config: Optional[LoadBalancerConfig] = None):
+    def __init__(
+        self,
+        load_balancer_config: Optional[LoadBalancerConfig] = None,
+        base_url: Optional[str] = None,
+        api_key_env: Optional[str] = None,
+    ):
         """Initialize the OpenAI client.
 
         Args:
             load_balancer_config: Optional load balancer configuration.
                 If provided with endpoints, enables multi-endpoint load balancing.
                 If None, uses single-endpoint mode (backward compatible).
+            base_url: Optional base URL for OpenAI-compatible APIs (e.g. OpenRouter).
+            api_key_env: Environment variable name for the API key when using base_url.
         """
         self.load_balancer: Optional[EndpointLoadBalancer] = None
         self.client: Optional[Union[AsyncOpenAI, AsyncAzureOpenAI]] = None
@@ -96,6 +103,14 @@ class OpenAIModelClient(BaseModelClient):
         if load_balancer_config and load_balancer_config.endpoints:
             # Multi-endpoint mode
             self.load_balancer = EndpointLoadBalancer(load_balancer_config)
+        elif base_url:
+            # Custom base URL mode (e.g. OpenRouter)
+            api_key = os.environ.get(api_key_env or "OPENAI_API_KEY")
+            if not api_key:
+                raise ValueError(
+                    f"API key not found: env var '{api_key_env or 'OPENAI_API_KEY'}' not set"
+                )
+            self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         else:
             # Single-endpoint mode (backward compatible)
             if os.getenv("USE_AZURE_OAI", "false").lower() == "true":

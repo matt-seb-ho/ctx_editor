@@ -512,27 +512,32 @@ async def run_experiment(
             # Evaluate
             if evaluator:
                 orig_sample = original_samples.get(sample_id, {})
-                if task_name == "actions":
-                    # Actions: evaluator_function takes raw response + sample
-                    if orig_sample:
-                        eval_result = evaluator.evaluator_function(assistant_response, orig_sample)
-                        is_correct = eval_result.get("is_correct", False)
-                    else:
-                        is_correct = False
-                    extracted = assistant_response[:200]
-                else:
-                    # Math/code/database: extract_answer + evaluator_function
-                    extracted = evaluator.extract_answer(assistant_response)
-                    if extracted and orig_sample:
-                        eval_result = evaluator.evaluator_function(extracted, orig_sample)
-                        if isinstance(eval_result, bool):
-                            is_correct = eval_result
-                        elif isinstance(eval_result, dict):
-                            is_correct = eval_result.get("is_correct", eval_result.get("score", 0) >= 1.0)
+                try:
+                    if task_name == "actions":
+                        # Actions: evaluator_function takes raw response + sample
+                        if orig_sample:
+                            eval_result = evaluator.evaluator_function(assistant_response, orig_sample)
+                            is_correct = eval_result.get("is_correct", False)
                         else:
                             is_correct = False
+                        extracted = assistant_response[:200]
                     else:
-                        is_correct = False
+                        # Math/code/database: extract_answer + evaluator_function
+                        extracted = evaluator.extract_answer(assistant_response)
+                        if extracted and orig_sample:
+                            eval_result = evaluator.evaluator_function(extracted, orig_sample)
+                            if isinstance(eval_result, bool):
+                                is_correct = eval_result
+                            elif isinstance(eval_result, dict):
+                                is_correct = eval_result.get("is_correct", eval_result.get("score", 0) >= 1.0)
+                            else:
+                                is_correct = False
+                        else:
+                            is_correct = False
+                except Exception as eval_err:
+                    logger.warning(f"[{sample_id}] Evaluation error: {eval_err}")
+                    is_correct = False
+                    extracted = None
                 score = 1.0 if is_correct else 0.0
             else:
                 is_correct = False
