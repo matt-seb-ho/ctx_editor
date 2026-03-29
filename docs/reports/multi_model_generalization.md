@@ -137,20 +137,46 @@ Uses the Phase 2 pipeline from the existing 30-conversation pilot (`docs/reports
 | feedback | 16 | 75.0% | 18.8% | 6.2% |
 | no_feedback | 37 | 81.1% | 10.8% | 8.1% |
 
+### Re-Judging: DeepSeek Responses with gpt-5 as Judge
+
+The initial DeepSeek WildChat run used DeepSeek as its own judge. To control for judge calibration, we re-judged the same DeepSeek-generated responses using gpt-5 as judge (via `scripts/rejudge_phase2.py`).
+
+**Quality win rates -- DeepSeek responses, two judges:**
+
+| Comparison | DeepSeek judges | gpt-5 judges |
+|---|---|---|
+| S3 vs AO | S3 52.6%, AO 44.7% | **S3 27.6%, AO 65.8%** |
+| S3 vs FC | S3 53.9%, FC 43.4% | **S3 21.1%, FC 67.1%** |
+| S1.5 vs AO | S1.5 59.2%, AO 40.8% | **S1.5 30.3%, AO 55.3%** |
+| S1.5 vs FC | S1.5 56.6%, FC 42.1% | **S1.5 28.9%, FC 56.6%** |
+
+**S3 vs AO by turn type (quality, gpt-5 judge):**
+
+| Turn Type | n | S3 wins | AO wins | Tie |
+|---|---|---|---|---|
+| new_ask | 23 | 30.4% | 52.2% | 17.4% |
+| feedback | 16 | 6.2% | 93.8% | 0.0% |
+| no_feedback | 37 | 35.1% | 62.2% | 2.7% |
+
+**Re-judge output**: `outputs/huang_eval/rejudge/2026-03-29/08-55-54`
+
 ### WildChat Analysis
 
 **1. gpt-5 shows strong S3/S1.5 gains, consistent with LiC.** S3 beats AO on 81.6% of quality judgments (vs 86.8% for gpt-5-mini). S1.5 beats AO on 78.9%. The slightly lower margins compared to gpt-5-mini may reflect gpt-5's more discriminating self-judgment rather than a weaker intervention effect.
 
-**2. DeepSeek results are substantially weaker.** S3 barely edges AO (52.6% vs 44.7%), and S1.5 is only modestly better (59.2% vs 40.8%). The effect is concentrated in `new_ask` turns (69.6% S3 win rate) but collapses on `feedback` turns (31.2% S3 win rate, AO wins 68.8%).
+**2. DeepSeek context editing actively hurts on WildChat, per gpt-5 judge.** When gpt-5 judges DeepSeek's responses, AO beats S3 65.8% to 27.6%, and FC beats S3 67.1% to 21.1%. This is a full reversal from DeepSeek-as-judge (where S3 narrowly won). The effect is not limited to feedback turns -- AO wins across all turn types. This means that on these AO-failure turns (selected because gpt-5-mini's AO lost to FC), DeepSeek's S3/S1.5 compacted context produces responses that gpt-5 considers worse than either the full context or the AO context.
 
-**3. DeepSeek feedback turns are a clear failure mode.** On the 16 feedback turns, DeepSeek's S3 loses to AO 68.8% to 31.2%, and loses to FC 75.0% to 25.0%. This is the opposite of gpt-5 (S3 wins 75.0% on feedback). Possible explanations:
-   - DeepSeek's analyzer may produce lower-quality analysis on feedback turns, where the user is referencing and correcting specific prior assistant work.
-   - DeepSeek-as-judge may have different preferences than GPT-family judges -- it may weight response style or verbosity differently.
-   - The S3 compaction prompt, tuned primarily for GPT models, may not interact well with DeepSeek's generation patterns.
+**3. Feedback turns are catastrophic for DeepSeek S3.** On 16 feedback turns, gpt-5 judge gives AO a 93.8% to 6.2% win rate over S3. This is the strongest per-category signal in any experiment. DeepSeek's analyzer likely fails to capture user feedback that references specific prior assistant work -- the compacted context loses critical information that the feedback depends on.
 
-**4. Judge model confound.** Because each model judges its own output, the absolute win rates are not directly comparable. gpt-5-mini showed 87% S3 win rates with gpt-5-mini as judge; gpt-5 shows 82% with gpt-5 as judge; DeepSeek shows 53% with DeepSeek as judge. Part of this variation may reflect judge calibration rather than intervention quality. A controlled comparison with a fixed judge model would be needed to disentangle these effects.
+**4. The judge model matters enormously.** DeepSeek-as-judge gave S3 a 52.6% win rate; gpt-5-as-judge gave it 27.6%. This 25pp swing is larger than most intervention effects. It confirms that WildChat pairwise judging results must be interpreted relative to the judge model. The original gpt-5-mini pilot's 87% S3 win rates should be viewed with this caveat in mind -- part of the signal may be judge-specific preference for the compacted format.
 
-**5. S1.5 outperforms S3 for DeepSeek.** On quality, S1.5 beats AO at 59.2% vs S3's 52.6%. On on-topic, S1.5 also wins (47.4% vs 39.5%). The programmatic template appears more robust across model families than LLM compaction, consistent with prior LiC findings.
+**5. LiC vs WildChat diverge for DeepSeek.** On LiC (objective evaluation), DeepSeek gets the largest S1.5 gains of any model (+38.5pp average). On WildChat (subjective judging), context editing hurts. Possible explanations:
+   - LiC uses structured task problems where context reset removes unambiguously wrong work. WildChat conversations are more stateful and open-ended; resetting may discard useful context more often.
+   - The v8 analyzer prompts were developed for LiC-style task problems. They may not generalize well to the diverse conversation types in WildChat.
+   - The AO failure turns were selected using gpt-5-mini's Phase 1 judgments. On these specific turns, FC beat AO because the assistant context carried useful information. Resetting that context (via S3/S1.5) may be precisely the wrong intervention for these turns.
+   - DeepSeek may produce compacted contexts or reset responses that are stylistically different from what gpt-5 prefers as a judge.
+
+**6. S1.5 still outperforms S3 for DeepSeek (both judges).** Even with gpt-5 judging, S1.5 (30.3% vs AO) does slightly better than S3 (27.6% vs AO). The programmatic template remains more robust than LLM compaction, consistent across all experiments.
 
 ## Infrastructure Changes
 
@@ -167,6 +193,7 @@ Supporting these experiments required adding OpenRouter as a provider:
 | `config/model/deepseek_v3_2.yaml` | DeepSeek V3.2 via OpenRouter |
 | `config/model/qwen_35b.yaml` | Qwen 3.5 35B-A3B via OpenRouter |
 | `scripts/run_s15_experiment.py` | try/except around evaluation for code SyntaxErrors |
+| `scripts/rejudge_phase2.py` | Re-judge Phase 2 responses with different judge model |
 
 ## Output Directories
 
@@ -230,6 +257,7 @@ Supporting these experiments required adding OpenRouter as a provider:
 | gpt-5 | `outputs/huang_eval/phase2/2026-03-29/04-55-58` |
 | DeepSeek V3.2 | `outputs/huang_eval/phase2/2026-03-29/04-56-00` |
 | gpt-5-mini (baseline) | `outputs/huang_eval/phase2/2026-03-24/02-54-36` |
+| DeepSeek (re-judged by gpt-5) | `outputs/huang_eval/rejudge/2026-03-29/08-55-54` |
 
 ## Run Commands
 
@@ -281,7 +309,7 @@ python -m ctx_editor.huang_eval.run_phase2 \
 
 2. **Replaying foreign conversations.** All LiC models replay gpt-5.2 baseline conversations. S0 results reflect how well each model handles gpt-5.2's polluted context, not its own multi-turn behavior. This is a controlled comparison but may not reflect real deployment scenarios.
 
-3. **Self-judging on WildChat.** Each model judges its own responses. This confounds intervention effects with judge calibration. DeepSeek's lower S3 win rates may partly reflect a less discriminating judge rather than a weaker intervention.
+3. **Judge model sensitivity on WildChat.** Re-judging DeepSeek with gpt-5 reversed the direction of results (S3 went from winning to losing). This demonstrates that WildChat pairwise judging is highly sensitive to judge model choice. All WildChat results should be interpreted with this caveat. The gpt-5-mini pilot's ~87% S3 win rates have not been cross-validated with another judge.
 
 4. **Same analyzer prompts for all models.** The v8 analyzer and S3 compaction prompts were developed and tuned using GPT models. They may not be optimal for DeepSeek or Qwen. Prompt sensitivity could explain some of DeepSeek's weaker WildChat results.
 
@@ -291,8 +319,8 @@ python -m ctx_editor.huang_eval.run_phase2 \
 
 ## Conclusions
 
-Context editing via S1.5 produces large, consistent accuracy gains across four model families on the LiC benchmark. The effect is not specific to GPT models, not specific to a particular parameter scale, and not limited to a single task domain. Smaller models benefit more, suggesting context editing is especially valuable when model capability is the binding constraint.
+Context editing via S1.5 produces large, consistent accuracy gains across four model families on the LiC benchmark. The effect is not specific to GPT models, not specific to a particular parameter scale, and not limited to a single task domain. Smaller models benefit more (+42pp average for 3B-active Qwen vs +26pp for gpt-5-mini), suggesting context editing is especially valuable when model capability is the binding constraint.
 
-On the WildChat benchmark, gpt-5 shows strong results comparable to gpt-5-mini. DeepSeek shows weaker but still positive results on quality, with a notable failure on feedback turns that warrants further investigation -- potentially with a fixed judge model to control for judge calibration effects.
+On WildChat, the picture is more nuanced. gpt-5 shows strong S3/S1.5 win rates (82%/79% vs AO), consistent with LiC. DeepSeek's WildChat results reverse direction depending on the judge: DeepSeek-as-judge gives S3 a narrow win (53%), while gpt-5-as-judge gives S3 a clear loss (28%). This 25pp judge-dependent swing demonstrates that pairwise quality judging is sensitive to judge model choice in ways that ground-truth evaluation (LiC) is not. The divergence between LiC (where DeepSeek benefits most from context editing) and WildChat (where it may hurt) likely reflects the difference between structured task problems and open-ended stateful conversations.
 
-The programmatic template approach (S1.5) is consistently competitive with or better than LLM compaction (S3) across all models, reinforcing the finding that the primary intervention is context cleanup, not sophisticated rewriting.
+The programmatic template approach (S1.5) is consistently competitive with or better than LLM compaction (S3) across all models and both benchmarks, reinforcing the finding that the primary intervention is context cleanup, not sophisticated rewriting.
