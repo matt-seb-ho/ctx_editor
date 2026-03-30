@@ -1,0 +1,68 @@
+Reflect on this WildChat conversation turn and produce a bullet list of takeaways for improving
+the conversation analyzer.
+
+## What the Analyzer Does
+
+The analyzer independently reviews multi-turn conversations to identify where the assistant's
+approach has diverged from what the user actually asked for. It produces:
+- **Task Spec**: Clean specification from user messages only (no assistant assumptions)
+- **What Looks Right**: Parts of the assistant's approach that are correctly aligned
+- **What Needs to Change**: Issues where the assistant contradicts user requirements
+
+The analysis is then used to reset context: the old conversation is replaced with compacted
+context (task spec + aligned work only), removing the assistant's wrong reasoning so it can
+start fresh without anchoring on previous mistakes. This is the S1.5 strategy.
+
+## Evaluation Environment
+
+This is a WildChat conversation -- a real user interacting with an assistant on diverse topics
+(math, coding, writing, etc.). Unlike controlled benchmarks:
+- The user may reference prior assistant output (feedback turns, stateful continuations)
+- There is no ground truth answer -- quality is judged by a pairwise LLM judge
+- The judge sees the ORIGINAL conversation context when evaluating both responses
+- S1.5 wins when the compacted context produces a better response than keeping the full
+  (possibly polluted) context
+
+## How to Read the Turn
+
+The turn shows: the conversation up to a user message, the analyzer's output (task spec,
+aligned, issues), and the outcome -- whether the S1.5 response was judged better or worse
+than the AO (assistant-omitted) and FC (full context) baselines.
+
+## What Makes Good Takeaways
+
+- **Diagnostic patterns**: What conversation signals indicate the analyzer should/shouldn't
+  recommend a context reset? (e.g., "user referencing specific prior output = high-value context")
+- **Task spec quality**: What makes a good vs bad task spec for open-ended conversations?
+- **Aligned work extraction**: When is preserving aligned work critical vs unnecessary?
+- **Issues section**: What makes actionable vs unhelpful issue descriptions?
+- **When NOT to reset**: Patterns where keeping full context would have been better
+
+<turn>
+Conversation ID: {conversation_id}
+Turn index: {turn_index}
+Turn type: {turn_type}
+
+Conversation context (up to the target user message):
+{conversation_context}
+
+Analyzer output:
+- Task Spec: {task_spec}
+- What Looks Right: {aligned}
+- What Needs to Change: {issues}
+- Triggered edit: {edited}
+
+Outcome:
+- S1.5 vs AO (quality): {s15_vs_ao}
+- S1.5 vs FC (quality): {s15_vs_fc}
+</turn>
+
+Bad takeaways (harm future performance):
+- Topic-specific rules that won't transfer (e.g., "for ANTLR grammars, always include X")
+- Generic advice ("be thorough", "check carefully")
+- Solution templates or code snippets
+
+Produce a concise bullet list of takeaways. Each must be a transferable analysis principle --
+something the analyzer can apply to ANY future conversation regardless of topic.
+
+Takeaways:

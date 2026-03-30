@@ -9,7 +9,7 @@ import re
 from collections import defaultdict
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Optional
 
 from ..core.trace import ConversationTrace
 from ..core.types import Message
@@ -410,11 +410,15 @@ async def generate_s15(
     model_client: "ModelClient",
     respondent_model: str,
     analyzer_model: str,
+    memory: Optional[Any] = None,
 ) -> tuple[str, dict[str, Any]]:
     """Generate S1.5 response: analyzer output programmatically templated into context.
 
     Same as S3 but without the LLM compaction step -- analysis fields are
     directly templated into the compacted context.
+
+    Args:
+        memory: Optional MemoryModule to inject into analyzer compare query.
 
     Returns:
         Tuple of (response_text, analysis_metadata).
@@ -430,7 +434,7 @@ async def generate_s15(
         timeout=120,
         prompt_version="v8",
     )
-    analysis = await analyzer.analyze(trace, model_client)
+    analysis = await analyzer.analyze(trace, model_client, memory=memory)
 
     analysis_meta = {
         "user_intent": analysis.user_intent,

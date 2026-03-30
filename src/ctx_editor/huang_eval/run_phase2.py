@@ -65,6 +65,7 @@ async def process_failure_turn(
     judge_model: str,
     analyzer_model: str,
     run_s15: bool,
+    memory=None,
     run_s2: bool,
     regenerate_baselines: bool,
     results_file: Path,
@@ -133,6 +134,7 @@ async def process_failure_turn(
         if run_s15:
             s15_response, s15_analysis = await generate_s15(
                 turns, turn_index, model_client, respondent_model, analyzer_model,
+                memory=memory,
             )
             ao_vs_s15 = await judge_pairwise(
                 turns, turn_index, ao_response, s15_response, "ao", "s15",
