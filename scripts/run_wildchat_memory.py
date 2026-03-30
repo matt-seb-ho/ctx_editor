@@ -1,15 +1,18 @@
 #!/usr/bin/env python3
-"""WildChat S1.5 with memory learning.
+"""WildChat S1.5 with memory learning (train/eval split).
 
-Re-runs S1.5 on Phase 2 AO-failure turns with accumulating memory.
-Processes turns sequentially so later turns benefit from lessons learned
-from earlier turns. Uses existing AO/FC responses from a prior Phase 2 run.
+Two-phase design:
+1. Train: Run S1.5 (no memory) on a subset of turns, learn a cheatsheet offline.
+2. Eval: Run S1.5 with frozen memory on the remaining turns. Compare to S1.5 without memory.
+
+Both phases use existing AO/FC responses from a prior Phase 2 run.
 
 Usage:
     python scripts/run_wildchat_memory.py \
-        --phase2-dir outputs/huang_eval/phase2/2026-03-24/02-54-36 \
+        --phase2-dir outputs/huang_eval/phase2/2026-03-29/21-43-34 \
         --phase1-dir outputs/huang_eval/phase1/2026-03-24/02-22-57 \
-        --model gpt-5-mini --batch-size 5 --seed 42
+        --model deepseek/deepseek-v3.2 --judge-model gpt-5-mini \
+        --train-split 0.33 --seed 42
 """
 
 import argparse
@@ -67,7 +70,6 @@ def format_conversation_context(turns: list[dict], turn_index: int) -> str:
         if i >= turn_index:
             break
         parts.append(f"[{msg['role']}]\n{msg['content']}")
-    # Include the target user message
     if turn_index < len(turns):
         parts.append(f"[user]\n{turns[turn_index]['content']}")
     return "\n\n".join(parts)
@@ -86,21 +88,13 @@ async def reflect_on_turn(
     ao_vs_s15 = judgments.get("ao_vs_s15", {})
     fc_vs_s15 = judgments.get("fc_vs_s15", {})
 
-    s15_vs_ao = f"S1.5 {ao_vs_s15.get('quality_winner', '?')}"
-    if ao_vs_s15.get("quality_winner") == "s15":
-        s15_vs_ao = "S1.5 wins"
-    elif ao_vs_s15.get("quality_winner") == "ao":
-        s15_vs_ao = "AO wins"
-    else:
-        s15_vs_ao = "Tie"
-
-    s15_vs_fc = f"S1.5 {fc_vs_s15.get('quality_winner', '?')}"
-    if fc_vs_s15.get("quality_winner") == "s15":
-        s15_vs_fc = "S1.5 wins"
-    elif fc_vs_s15.get("quality_winner") == "fc":
-        s15_vs_fc = "FC wins"
-    else:
-        s15_vs_fc = "Tie"
+    def _winner_str(j, cond_win, cond_lose):
+        w = j.get("quality_winner", "?")
+        if w == cond_win:
+            return f"{cond_win.upper()} wins"
+        elif w == cond_lose:
+            return f"{cond_lose.upper()} wins"
+        return "Tie"
 
     prompt = _TAKEAWAY_PROMPT.format(
         conversation_id=turn_result.get("conversation_id", "?"),
@@ -111,8 +105,8 @@ async def reflect_on_turn(
         aligned=s15_analysis.get("aligned", "(not available)"),
         issues=s15_analysis.get("issues", "(not available)"),
         edited=s15_analysis.get("edited", "?"),
-        s15_vs_ao=s15_vs_ao,
-        s15_vs_fc=s15_vs_fc,
+        s15_vs_ao=_winner_str(ao_vs_s15, "s15", "ao"),
+        s15_vs_fc=_winner_str(fc_vs_s15, "s15", "fc"),
     )
 
     response = await model_client.generate(
@@ -132,15 +126,11 @@ async def unify_takeaways(
 ) -> str:
     """Merge takeaways into updated cheatsheet."""
     current = memory.content if memory.content else "(empty)"
-
-    takeaway_parts = []
-    for i, t in enumerate(takeaways, 1):
-        takeaway_parts.append(f"From turn {i}:\n{t}")
-    takeaways_text = "\n\n".join(takeaway_parts)
+    takeaway_parts = [f"From turn {i}:\n{t}" for i, t in enumerate(takeaways, 1)]
 
     prompt = _UNIFY_PROMPT.format(
         current_cheatsheet=current,
-        takeaways=takeaways_text,
+        takeaways="\n\n".join(takeaway_parts),
     )
 
     response = await model_client.generate(
@@ -152,16 +142,143 @@ async def unify_takeaways(
     return response.content.strip()
 
 
+async def run_s15_batch(
+    indices: list[int],
+    phase2_results: list[dict],
+    conversations: dict,
+    model_client,
+    judge_client,
+    model: str,
+    judge_model: str,
+    memory: CheatsheetMemory | None,
+    rng: random.Random,
+    output_dir: Path,
+    label: str,
+) -> list[dict]:
+    """Run S1.5 + judging on a batch of turns in parallel."""
+    turn_rngs = [random.Random(rng.randint(0, 2**32)) for _ in indices]
+
+    async def process_turn(idx, turn_rng):
+        orig = phase2_results[idx]
+        conv_id = orig["conversation_id"]
+        turn_index = orig["turn_index"]
+
+        conv = conversations.get(conv_id)
+        if not conv:
+            return None
+
+        turns = conv["turns"]
+
+        try:
+            s15_response, s15_analysis = await generate_s15(
+                turns, turn_index, model_client, model, model,
+                memory=memory,
+            )
+        except Exception as e:
+            logger.error(f"[{label}] S1.5 failed {conv_id}:{turn_index}: {e}")
+            return None
+
+        ao_response = orig.get("ao_response", "")
+        fc_response = orig.get("fc_response", "")
+
+        try:
+            ao_vs_s15, fc_vs_s15 = await asyncio.gather(
+                judge_pairwise(
+                    turns, turn_index, ao_response, s15_response, "ao", "s15",
+                    judge_client, judge_model, turn_rng,
+                ),
+                judge_pairwise(
+                    turns, turn_index, fc_response, s15_response, "fc", "s15",
+                    judge_client, judge_model, turn_rng,
+                ),
+            )
+        except Exception as e:
+            logger.error(f"[{label}] Judging failed {conv_id}:{turn_index}: {e}")
+            return None
+
+        result = {
+            "conversation_id": conv_id,
+            "turn_index": turn_index,
+            "turn_type": orig.get("turn_type", "unknown"),
+            "split": label,
+            "s15_response": s15_response[:1000],
+            "s15_analysis": s15_analysis,
+            "ao_response": ao_response[:1000],
+            "fc_response": fc_response[:1000],
+            "memory_version": memory.version if memory else -1,
+            "judgments": {
+                "ao_vs_s15": {
+                    "quality_winner": ao_vs_s15.quality_winner,
+                    "quality_justification": ao_vs_s15.quality_justification,
+                    "ontopic_winner": ao_vs_s15.ontopic_winner,
+                    "ontopic_justification": ao_vs_s15.ontopic_justification,
+                    "confidence": ao_vs_s15.confidence,
+                },
+                "fc_vs_s15": {
+                    "quality_winner": fc_vs_s15.quality_winner,
+                    "quality_justification": fc_vs_s15.quality_justification,
+                    "ontopic_winner": fc_vs_s15.ontopic_winner,
+                    "ontopic_justification": fc_vs_s15.ontopic_justification,
+                    "confidence": fc_vs_s15.confidence,
+                },
+            },
+            "timestamp": datetime.now().isoformat(),
+        }
+
+        ao_w = ao_vs_s15.quality_winner
+        fc_w = fc_vs_s15.quality_winner
+        logger.info(f"  [{label}] {conv_id[:15]}:{turn_index} | AO:{ao_w} FC:{fc_w}")
+        return result
+
+    tasks = [process_turn(idx, rng) for idx, rng in zip(indices, turn_rngs)]
+    results = await asyncio.gather(*tasks)
+    valid = [r for r in results if r is not None]
+
+    # Save incrementally
+    with open(output_dir / "turn_results.jsonl", "a") as f:
+        for r in valid:
+            f.write(json.dumps(r) + "\n")
+
+    return valid
+
+
+def print_metrics(results: list[dict], label: str):
+    """Print win rate metrics for a set of results."""
+    for key in ["ao_vs_s15", "fc_vs_s15"]:
+        cond1, _, cond2 = key.partition("_vs_")
+        counts = defaultdict(int)
+        by_type = defaultdict(lambda: defaultdict(int))
+        for rec in results:
+            j = rec.get("judgments", {}).get(key)
+            if not j:
+                continue
+            counts[j["quality_winner"]] += 1
+            by_type[rec["turn_type"]][j["quality_winner"]] += 1
+
+        n = sum(counts.values())
+        if n == 0:
+            continue
+        c1 = counts.get(cond1, 0)
+        c2 = counts.get(cond2, 0)
+        t = counts.get("tie", 0)
+        print(f"  {cond1.upper()} vs {cond2.upper()} (n={n}): "
+              f"{cond1.upper()} {c1/n:.1%}, {cond2.upper()} {c2/n:.1%}, Tie {t/n:.1%}")
+        for tt in sorted(by_type):
+            tc = by_type[tt]
+            tn = sum(tc.values())
+            print(f"    {tt} (n={tn}): {cond2.upper()} {tc.get(cond2,0)/tn:.1%}")
+
+
 async def run_experiment(
     phase2_dir: str,
     phase1_dir: str,
     model: str,
-    batch_size: int = 5,
+    judge_model: str,
+    train_split: float = 0.33,
     seed: int = 42,
     memory_path: str | None = None,
 ):
-    """Run S1.5 with memory learning on WildChat AO-failure turns."""
-    # Load data
+    """Run train/eval memory experiment."""
     phase2_results = load_phase2_results(phase2_dir)
     conversations = load_conversations(phase1_dir)
     logger.info(f"Loaded {len(phase2_results)} turn results, {len(conversations)} conversations")
@@ -176,7 +293,8 @@ async def run_experiment(
         "phase2_source": phase2_dir,
         "phase1_source": phase1_dir,
         "model": model,
-        "batch_size": batch_size,
+        "judge_model": judge_model,
+        "train_split": train_split,
         "seed": seed,
         "memory_path": memory_path,
         "timestamp": datetime.now().isoformat(),
@@ -185,247 +303,142 @@ async def run_experiment(
         json.dump(config, f, indent=2)
 
     logger.info(f"Output: {output_dir}")
-    logger.info(f"Model: {model}, batch_size: {batch_size}")
+    logger.info(f"Respondent/analyzer: {model}, Judge: {judge_model}")
 
-    # Initialize model client and memory
+    # Initialize clients
     model_client = get_model_client(model)
+    judge_client = get_model_client(judge_model) if judge_model != model else model_client
+
+    # Split turns
+    rng = random.Random(seed)
+    indices = list(range(len(phase2_results)))
+    rng.shuffle(indices)
+
+    n_train = int(len(indices) * train_split)
+    train_indices = indices[:n_train]
+    eval_indices = indices[n_train:]
+    logger.info(f"Split: {len(train_indices)} train, {len(eval_indices)} eval")
+
+    # ============================================================
+    # PHASE 1: Train -- S1.5 without memory, learn cheatsheet
+    # ============================================================
+    logger.info(f"\n{'='*60}\nPHASE: TRAIN (no memory, {len(train_indices)} turns)\n{'='*60}")
+
+    train_rng = random.Random(seed + 1)
+    train_results = await run_s15_batch(
+        train_indices, phase2_results, conversations,
+        model_client, judge_client, model, judge_model,
+        memory=None, rng=train_rng, output_dir=output_dir, label="train",
+    )
+
+    print(f"\n--- Train results (no memory, n={len(train_results)}) ---")
+    print_metrics(train_results, "train")
+
+    # Learn memory from train results
     memory = CheatsheetMemory.load(memory_path) if memory_path else CheatsheetMemory(_content="")
 
-    # Shuffle turns for consistent ordering
-    rng = random.Random(seed)
-    turns_order = list(range(len(phase2_results)))
-    rng.shuffle(turns_order)
+    logger.info(f"Learning memory from {len(train_results)} train turns...")
 
-    all_results = []
-    memory_versions = []  # Track memory evolution
+    # Reflect on all train turns in parallel
+    async def _reflect(result):
+        conv = conversations[result["conversation_id"]]
+        context = format_conversation_context(conv["turns"], result["turn_index"])
+        return await reflect_on_turn(result, context, model_client, model)
 
-    # Process in batches
-    batches = [turns_order[i:i + batch_size] for i in range(0, len(turns_order), batch_size)]
+    takeaways = list(await asyncio.gather(*[_reflect(r) for r in train_results]))
 
-    for batch_num, batch_indices in enumerate(batches, 1):
-        logger.info(f"\n--- Batch {batch_num}/{len(batches)} (memory v{memory.version}) ---")
-        if memory.content:
-            logger.info(f"Memory ({len(memory.content.split())} words): {memory.content[:200]}...")
+    # Unify into memory
+    new_content = await unify_takeaways(memory, takeaways, model_client, model)
+    memory.update(new_content)
+    memory.save(str(output_dir / "memory_trained.json"))
+    logger.info(f"Memory learned: v{memory.version}, {len(memory.content.split())} words")
+    logger.info(f"Memory content:\n{memory.content[:500]}...")
 
-        batch_results = []
-        batch_rng = random.Random(seed + batch_num)
-        # Pre-generate per-turn rngs so parallel execution is deterministic
-        turn_rngs = [random.Random(batch_rng.randint(0, 2**32)) for _ in batch_indices]
+    # ============================================================
+    # PHASE 2a: Eval -- S1.5 WITHOUT memory (baseline)
+    # ============================================================
+    logger.info(f"\n{'='*60}\nPHASE: EVAL BASELINE (no memory, {len(eval_indices)} turns)\n{'='*60}")
 
-        async def process_turn(idx, turn_rng):
-            orig = phase2_results[idx]
-            conv_id = orig["conversation_id"]
-            turn_index = orig["turn_index"]
+    eval_rng_baseline = random.Random(seed + 2)
+    eval_baseline_results = await run_s15_batch(
+        eval_indices, phase2_results, conversations,
+        model_client, judge_client, model, judge_model,
+        memory=None, rng=eval_rng_baseline, output_dir=output_dir, label="eval_baseline",
+    )
 
-            conv = conversations.get(conv_id)
-            if not conv:
-                logger.warning(f"Conversation {conv_id} not found, skipping")
-                return None
+    # ============================================================
+    # PHASE 2b: Eval -- S1.5 WITH frozen memory
+    # ============================================================
+    logger.info(f"\n{'='*60}\nPHASE: EVAL MEMORY (frozen memory v{memory.version}, {len(eval_indices)} turns)\n{'='*60}")
 
-            turns = conv["turns"]
+    eval_rng_memory = random.Random(seed + 2)  # Same seed for same judge randomization
+    eval_memory_results = await run_s15_batch(
+        eval_indices, phase2_results, conversations,
+        model_client, judge_client, model, judge_model,
+        memory=memory, rng=eval_rng_memory, output_dir=output_dir, label="eval_memory",
+    )
 
-            # Generate S1.5 with current memory
-            try:
-                s15_response, s15_analysis = await generate_s15(
-                    turns, turn_index, model_client, model, model,
-                    memory=memory,
-                )
-            except Exception as e:
-                logger.error(f"S1.5 generation failed for {conv_id}:{turn_index}: {e}")
-                return None
-
-            # Judge against AO and FC in parallel
-            ao_response = orig.get("ao_response", "")
-            fc_response = orig.get("fc_response", "")
-
-            try:
-                ao_vs_s15, fc_vs_s15 = await asyncio.gather(
-                    judge_pairwise(
-                        turns, turn_index, ao_response, s15_response, "ao", "s15",
-                        model_client, model, turn_rng,
-                    ),
-                    judge_pairwise(
-                        turns, turn_index, fc_response, s15_response, "fc", "s15",
-                        model_client, model, turn_rng,
-                    ),
-                )
-            except Exception as e:
-                logger.error(f"Judging failed for {conv_id}:{turn_index}: {e}")
-                return None
-
-            result = {
-                "conversation_id": conv_id,
-                "turn_index": turn_index,
-                "turn_type": orig.get("turn_type", "unknown"),
-                "s15_response": s15_response[:1000],
-                "s15_analysis": s15_analysis,
-                "ao_response": ao_response[:1000],
-                "fc_response": fc_response[:1000],
-                "judgments": {
-                    "ao_vs_s15": {
-                        "quality_winner": ao_vs_s15.quality_winner,
-                        "quality_justification": ao_vs_s15.quality_justification,
-                        "ontopic_winner": ao_vs_s15.ontopic_winner,
-                        "ontopic_justification": ao_vs_s15.ontopic_justification,
-                        "confidence": ao_vs_s15.confidence,
-                    },
-                    "fc_vs_s15": {
-                        "quality_winner": fc_vs_s15.quality_winner,
-                        "quality_justification": fc_vs_s15.quality_justification,
-                        "ontopic_winner": fc_vs_s15.ontopic_winner,
-                        "ontopic_justification": fc_vs_s15.ontopic_justification,
-                        "confidence": fc_vs_s15.confidence,
-                    },
-                },
-                "memory_version": memory.version,
-                "timestamp": datetime.now().isoformat(),
-            }
-
-            ao_winner = ao_vs_s15.quality_winner
-            fc_winner = fc_vs_s15.quality_winner
-            logger.info(
-                f"  [{conv_id[:15]}:{turn_index}] "
-                f"vs AO: {ao_winner}, vs FC: {fc_winner} "
-                f"(mem v{memory.version})"
-            )
-            return result
-
-        # Run all turns in this batch in parallel
-        turn_tasks = [
-            process_turn(idx, rng)
-            for idx, rng in zip(batch_indices, turn_rngs)
-        ]
-        turn_results = await asyncio.gather(*turn_tasks)
-
-        for result in turn_results:
-            if result is None:
-                continue
-            batch_results.append(result)
-            all_results.append(result)
-            with open(output_dir / "turn_results.jsonl", "a") as f:
-                f.write(json.dumps(result) + "\n")
-
-        # Learn from this batch
-        if batch_results:
-            logger.info(f"Learning from {len(batch_results)} turns...")
-
-            # Step 1: Reflect on each turn (parallel)
-            async def _reflect(result):
-                conv = conversations[result["conversation_id"]]
-                context = format_conversation_context(conv["turns"], result["turn_index"])
-                return await reflect_on_turn(result, context, model_client, model)
-
-            takeaways = list(await asyncio.gather(*[_reflect(r) for r in batch_results]))
-
-            # Step 2: Unify into memory
-            new_content = await unify_takeaways(memory, takeaways, model_client, model)
-            memory.update(new_content)
-
-            memory_versions.append({
-                "version": memory.version,
-                "batch": batch_num,
-                "word_count": len(memory.content.split()),
-                "content": memory.content,
-                "batch_size": len(batch_results),
-            })
-
-            # Save memory checkpoint
-            memory.save(str(output_dir / f"memory_v{memory.version}.json"))
-            logger.info(f"Memory updated to v{memory.version} ({len(memory.content.split())} words)")
-
-    # Save final memory
-    memory.save(str(output_dir / "memory_final.json"))
-
-    # Save memory evolution
-    with open(output_dir / "memory_evolution.json", "w") as f:
-        json.dump(memory_versions, f, indent=2)
-
-    # Compute metrics
+    # ============================================================
+    # Results
+    # ============================================================
     print(f"\n{'='*60}")
-    print(f"WILDCHAT MEMORY EXPERIMENT RESULTS")
+    print(f"WILDCHAT MEMORY EXPERIMENT: {model}")
+    print(f"Judge: {judge_model}")
     print(f"{'='*60}")
-    print(f"Model: {model}")
-    print(f"Turns: {len(all_results)}")
-    print(f"Batch size: {batch_size}")
-    print(f"Final memory version: {memory.version}")
-    print()
 
-    for key in ["ao_vs_s15", "fc_vs_s15"]:
-        cond1, _, cond2 = key.partition("_vs_")
-        quality_counts = defaultdict(int)
-        by_type = defaultdict(lambda: defaultdict(int))
-        by_mem_version = defaultdict(lambda: defaultdict(int))
+    print(f"\n--- Train (no memory, n={len(train_results)}) ---")
+    print_metrics(train_results, "train")
 
-        for rec in all_results:
-            j = rec.get("judgments", {}).get(key)
-            if not j:
-                continue
-            quality_counts[j["quality_winner"]] += 1
-            by_type[rec["turn_type"]][j["quality_winner"]] += 1
-            by_mem_version[rec["memory_version"]][j["quality_winner"]] += 1
+    print(f"\n--- Eval BASELINE (no memory, n={len(eval_baseline_results)}) ---")
+    print_metrics(eval_baseline_results, "eval_baseline")
 
-        n = sum(quality_counts.values())
-        if n == 0:
-            continue
+    print(f"\n--- Eval MEMORY (frozen v{memory.version}, n={len(eval_memory_results)}) ---")
+    print_metrics(eval_memory_results, "eval_memory")
 
-        c1 = quality_counts.get(cond1, 0)
-        c2 = quality_counts.get(cond2, 0)
-        t = quality_counts.get("tie", 0)
-        print(f"--- {cond1.upper()} vs {cond2.upper()} (n={n}) ---")
-        print(f"  quality: {cond1.upper()} wins {c1/n:.1%}, {cond2.upper()} wins {c2/n:.1%}, Tie {t/n:.1%}")
-
-        for tt in sorted(by_type.keys()):
-            counts = by_type[tt]
-            tt_n = sum(counts.values())
-            print(f"    {tt} (n={tt_n}): {cond1.upper()} {counts.get(cond1,0)/tt_n:.1%}, {cond2.upper()} {counts.get(cond2,0)/tt_n:.1%}, Tie {counts.get('tie',0)/tt_n:.1%}")
-
-        # Show by memory version
-        print(f"  By memory version:")
-        for v in sorted(by_mem_version.keys()):
-            counts = by_mem_version[v]
-            v_n = sum(counts.values())
-            print(f"    v{v} (n={v_n}): {cond2.upper()} wins {counts.get(cond2,0)/v_n:.1%}")
-        print()
-
-    # Save summary
-    summary = {
-        "model": model,
-        "n_turns": len(all_results),
-        "batch_size": batch_size,
-        "final_memory_version": memory.version,
-    }
-    for key in ["ao_vs_s15", "fc_vs_s15"]:
-        cond1, _, cond2 = key.partition("_vs_")
-        counts = defaultdict(int)
-        for rec in all_results:
-            j = rec.get("judgments", {}).get(key)
-            if j:
-                counts[j["quality_winner"]] += 1
-        n = sum(counts.values())
-        if n > 0:
-            summary[key] = {
-                f"{cond1}_wins": counts.get(cond1, 0) / n,
-                f"{cond2}_wins": counts.get(cond2, 0) / n,
-                "tie": counts.get("tie", 0) / n,
-                "n": n,
-            }
-    with open(output_dir / "summary.json", "w") as f:
-        json.dump(summary, f, indent=2)
-
+    print(f"\nMemory: {len(memory.content.split())} words")
     print(f"Output: {output_dir}")
     print(f"{'='*60}\n")
 
+    # Save summary
+    def _win_rates(results, key):
+        cond1, _, cond2 = key.partition("_vs_")
+        counts = defaultdict(int)
+        for r in results:
+            j = r.get("judgments", {}).get(key)
+            if j:
+                counts[j["quality_winner"]] += 1
+        n = sum(counts.values())
+        if n == 0:
+            return {}
+        return {f"{cond1}_wins": counts.get(cond1, 0)/n, f"{cond2}_wins": counts.get(cond2, 0)/n, "tie": counts.get("tie", 0)/n, "n": n}
+
+    summary = {
+        "model": model,
+        "judge_model": judge_model,
+        "train_split": train_split,
+        "n_train": len(train_results),
+        "n_eval": len(eval_baseline_results),
+        "memory_words": len(memory.content.split()),
+        "train": {k: _win_rates(train_results, k) for k in ["ao_vs_s15", "fc_vs_s15"]},
+        "eval_baseline": {k: _win_rates(eval_baseline_results, k) for k in ["ao_vs_s15", "fc_vs_s15"]},
+        "eval_memory": {k: _win_rates(eval_memory_results, k) for k in ["ao_vs_s15", "fc_vs_s15"]},
+    }
+    with open(output_dir / "summary.json", "w") as f:
+        json.dump(summary, f, indent=2)
+
 
 def main():
-    parser = argparse.ArgumentParser(description="WildChat S1.5 with memory learning")
+    parser = argparse.ArgumentParser(description="WildChat S1.5 memory: train/eval split")
     parser.add_argument("--phase2-dir", required=True,
                         help="Phase 2 output dir with existing AO/FC/S1.5 results")
     parser.add_argument("--phase1-dir", required=True,
                         help="Phase 1 output dir with conversations/")
     parser.add_argument("--model", default="gpt-5-mini",
-                        help="Model for S1.5 generation, judging, and memory learning")
-    parser.add_argument("--batch-size", type=int, default=5,
-                        help="Turns per batch before memory update")
+                        help="Model for S1.5 generation and analysis")
+    parser.add_argument("--judge-model", default="gpt-5-mini",
+                        help="Model for pairwise judging (can differ from respondent)")
+    parser.add_argument("--train-split", type=float, default=0.33,
+                        help="Fraction of turns for training (default: 0.33)")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--memory-path", default=None,
                         help="Path to pre-existing memory to start from")
@@ -435,7 +448,8 @@ def main():
         phase2_dir=args.phase2_dir,
         phase1_dir=args.phase1_dir,
         model=args.model,
-        batch_size=args.batch_size,
+        judge_model=args.judge_model,
+        train_split=args.train_split,
         seed=args.seed,
         memory_path=args.memory_path,
     ))
