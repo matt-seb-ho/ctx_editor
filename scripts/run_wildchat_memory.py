@@ -209,8 +209,10 @@ async def run_experiment(
 
         batch_results = []
         batch_rng = random.Random(seed + batch_num)
+        # Pre-generate per-turn rngs so parallel execution is deterministic
+        turn_rngs = [random.Random(batch_rng.randint(0, 2**32)) for _ in batch_indices]
 
-        for idx in batch_indices:
+        async def process_turn(idx, turn_rng):
             orig = phase2_results[idx]
             conv_id = orig["conversation_id"]
             turn_index = orig["turn_index"]
@@ -218,7 +220,7 @@ async def run_experiment(
             conv = conversations.get(conv_id)
             if not conv:
                 logger.warning(f"Conversation {conv_id} not found, skipping")
-                continue
+                return None
 
             turns = conv["turns"]
 
@@ -230,24 +232,26 @@ async def run_experiment(
                 )
             except Exception as e:
                 logger.error(f"S1.5 generation failed for {conv_id}:{turn_index}: {e}")
-                continue
+                return None
 
-            # Judge against AO and FC (reuse existing baselines from Phase 2)
+            # Judge against AO and FC in parallel
             ao_response = orig.get("ao_response", "")
             fc_response = orig.get("fc_response", "")
 
             try:
-                ao_vs_s15 = await judge_pairwise(
-                    turns, turn_index, ao_response, s15_response, "ao", "s15",
-                    model_client, model, batch_rng,
-                )
-                fc_vs_s15 = await judge_pairwise(
-                    turns, turn_index, fc_response, s15_response, "fc", "s15",
-                    model_client, model, batch_rng,
+                ao_vs_s15, fc_vs_s15 = await asyncio.gather(
+                    judge_pairwise(
+                        turns, turn_index, ao_response, s15_response, "ao", "s15",
+                        model_client, model, turn_rng,
+                    ),
+                    judge_pairwise(
+                        turns, turn_index, fc_response, s15_response, "fc", "s15",
+                        model_client, model, turn_rng,
+                    ),
                 )
             except Exception as e:
                 logger.error(f"Judging failed for {conv_id}:{turn_index}: {e}")
-                continue
+                return None
 
             result = {
                 "conversation_id": conv_id,
@@ -277,13 +281,6 @@ async def run_experiment(
                 "timestamp": datetime.now().isoformat(),
             }
 
-            batch_results.append(result)
-            all_results.append(result)
-
-            # Save incrementally
-            with open(output_dir / "turn_results.jsonl", "a") as f:
-                f.write(json.dumps(result) + "\n")
-
             ao_winner = ao_vs_s15.quality_winner
             fc_winner = fc_vs_s15.quality_winner
             logger.info(
@@ -291,20 +288,34 @@ async def run_experiment(
                 f"vs AO: {ao_winner}, vs FC: {fc_winner} "
                 f"(mem v{memory.version})"
             )
+            return result
+
+        # Run all turns in this batch in parallel
+        turn_tasks = [
+            process_turn(idx, rng)
+            for idx, rng in zip(batch_indices, turn_rngs)
+        ]
+        turn_results = await asyncio.gather(*turn_tasks)
+
+        for result in turn_results:
+            if result is None:
+                continue
+            batch_results.append(result)
+            all_results.append(result)
+            with open(output_dir / "turn_results.jsonl", "a") as f:
+                f.write(json.dumps(result) + "\n")
 
         # Learn from this batch
         if batch_results:
             logger.info(f"Learning from {len(batch_results)} turns...")
 
-            # Step 1: Reflect on each turn
-            takeaways = []
-            for result in batch_results:
-                conv_id = result["conversation_id"]
-                conv = conversations[conv_id]
+            # Step 1: Reflect on each turn (parallel)
+            async def _reflect(result):
+                conv = conversations[result["conversation_id"]]
                 context = format_conversation_context(conv["turns"], result["turn_index"])
+                return await reflect_on_turn(result, context, model_client, model)
 
-                takeaway = await reflect_on_turn(result, context, model_client, model)
-                takeaways.append(takeaway)
+            takeaways = list(await asyncio.gather(*[_reflect(r) for r in batch_results]))
 
             # Step 2: Unify into memory
             new_content = await unify_takeaways(memory, takeaways, model_client, model)
