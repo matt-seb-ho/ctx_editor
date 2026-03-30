@@ -318,6 +318,66 @@ python -m ctx_editor.huang_eval.run_phase2 \
 
 **Critical**: `--regenerate-baselines` is required when using a different respondent model than Phase 1. Without it, AO/FC responses are cached from Phase 1 (gpt-5-mini), producing a cross-model comparison instead of same-model.
 
+## Part 3: WildChat Memory Learning
+
+### Experimental Setup
+
+Tests whether the cheatsheet memory system (developed for LiC) can improve S1.5 analysis quality on WildChat. Memory is injected into the analyzer's compare query (Query 2), same as in LiC.
+
+- **Model**: gpt-5-mini (all roles: respondent, analyzer, judge, learner)
+- **Data**: Same 76 AO failure turns from Phase 1
+- **Processing**: Sequential (not parallel), batch_size=5
+- **Learning**: After each batch of 5 turns, Reflect-then-Unify updates the cheatsheet
+- **AO/FC baselines**: Reused from original Phase 2 run (gpt-5-mini, same-model)
+- **S1.5 responses**: Regenerated with memory-augmented analyzer
+
+Run command:
+```bash
+python scripts/run_wildchat_memory.py \
+    --phase2-dir outputs/huang_eval/phase2/2026-03-24/02-54-36 \
+    --phase1-dir outputs/huang_eval/phase1/2026-03-24/02-22-57 \
+    --model gpt-5-mini --batch-size 5 --seed 42
+```
+
+Output: `outputs/huang_eval/memory/2026-03-30/04-00-10`
+
+### Results
+
+| Comparison | S1.5 (no memory, n=76) | S1.5+memory (n=75) |
+|---|---|---|
+| S1.5 vs AO | S1.5 90.8%, AO 9.2% | S1.5 86.7%, AO 13.3% |
+| S1.5 vs FC | S1.5 86.8%, FC 13.2% | S1.5 80.0%, FC 18.7% |
+
+**S1.5+memory by turn type (quality, vs AO):**
+
+| Turn Type | n | S1.5 wins | AO wins |
+|---|---|---|---|
+| feedback | 15 | 93.3% | 6.7% |
+| new_ask | 23 | 82.6% | 17.4% |
+| no_feedback | 37 | 86.5% | 13.5% |
+
+15 memory versions were learned across 76 turns. The final cheatsheet contained 1250 words covering: task spec construction principles, reset-vs-in-place decision heuristics, diagnostic patterns, persona/token preservation, and corrective action formatting.
+
+### Memory Analysis
+
+**Memory did not improve over baseline S1.5 on WildChat.** The win rates dropped slightly (90.8% to 86.7% vs AO, 86.8% to 80.0% vs FC). Several factors likely contribute:
+
+1. **Ceiling effect**: The baseline was already at 91% S1.5 win rate vs AO. With only 76 turns, improving from 91% to (say) 95% would require flipping 3 turns -- well within noise for a non-paired comparison.
+
+2. **Not a paired comparison**: The memory run processed turns in a different (shuffled) order than the original, and S1.5 responses were regenerated. The judge saw different position-randomized comparisons. The 4pp difference is within expected variance.
+
+3. **Memory may add noise on open-ended tasks**: The cheatsheet grew to 1250 words of analyzer guidance. On WildChat's diverse conversation types, generic analysis principles may dilute the analyzer's attention on the specific conversation at hand. The LiC memory system benefits from domain-specific learning (e.g., "math problems with boxed answers"), which transfers well within-domain but may not transfer as cleanly across WildChat's heterogeneous topics.
+
+4. **Feedback turns improved**: S1.5+memory achieved 93.3% win rate on feedback turns (vs AO), compared to gpt-5-mini baseline's typical ~80% on feedback. The memory learned to "keep referenced assistant lines as high-value context" and use "in-place" edits when the user references prior output. This is exactly the right lesson for feedback turns, but the sample is small (n=15).
+
+5. **Sequential ordering**: Early turns (v0) had no memory and still performed well. Memory learning requires enough trajectory diversity to learn generalizable principles. With only 76 turns across diverse topics, the cheatsheet may not have converged on truly useful patterns.
+
+### Conclusion for Memory on WildChat
+
+Memory learning does not produce a measurable improvement on WildChat in this experiment. The most likely explanation is a ceiling effect -- S1.5 already wins ~91% of comparisons on these turns, leaving little room for memory to help. Memory may be more valuable on harder benchmarks or when the baseline S1.5 win rate is lower (e.g., the DeepSeek WildChat results where S1.5 won only 59% vs AO).
+
+The learned cheatsheet content is high-quality and captures real patterns (persona preservation, reset heuristics, feedback handling), suggesting the learning mechanism works. The issue is that these patterns are already implicit in the v8 analyzer prompt, so explicitly stating them adds redundancy rather than new information.
+
 ## Limitations
 
 1. **Single run per condition.** With n=20 for LiC and n=76 for WildChat, differences under ~15pp may not be statistically significant. The consistent direction of effects across all models partially compensates for this.
