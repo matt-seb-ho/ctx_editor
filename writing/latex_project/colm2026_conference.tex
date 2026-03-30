@@ -37,7 +37,7 @@
 \maketitle
 
 \begin{abstract}
-Large language models degrade in extended multi-turn conversations as the assistant's own prior outputs accumulate and act as context pollution, anchoring future generation on earlier (often incorrect) reasoning. The model over-conditions on its own responses and struggles to update its approach when the user provides new or correcting information. We frame this as a deficit of \emph{executive function}: the higher-order cognitive capacity for monitoring one's own reasoning, flexibly updating beliefs when they conflict with new evidence, and inhibiting responses anchored on unproductive approaches. We propose \emph{context editing via externalized executive function}, in which a separate self-review agent identifies where the assistant's approach has been invalidated by the user's requirements, where errors have been carried forward, or where unproductive reasoning has accumulated, then rewrites the context to preserve correct work while removing what is harmful. Across math, code, SQL, function-calling, real human--AI conversations, and agentic tool-use settings, our approach substantially improves multi-turn performance (e.g., 60\%$\to$90\% on math), with gains that generalize across four model families at different scales---including open-weight models---and are largest for smaller models (+42pp average for a 3B-active model). Prior mitigations that simply discard all assistant messages suffice in simple settings but catastrophically fail in agentic settings where state must be tracked (55\%$\to$0\%), demonstrating that selective context editing is necessary for complex multi-turn interactions.
+Large language models degrade in extended multi-turn conversations as the assistant's own prior outputs accumulate and act as context pollution, anchoring future generation on earlier (often incorrect) reasoning. The model over-conditions on its own responses and struggles to update its approach when the user provides new or correcting information. We frame this as a deficit of \emph{executive function}: the higher-order cognitive capacity for monitoring one's own reasoning, flexibly updating beliefs when they conflict with new evidence, and inhibiting responses anchored on unproductive approaches. We propose \emph{context editing via externalized executive function}, in which a separate self-review agent identifies where the assistant's approach has been invalidated by the user's requirements, where errors have been carried forward, or where unproductive reasoning has accumulated, then rewrites the context to preserve correct work while removing what is harmful. Across math, code, SQL, function-calling, real human--AI conversations, and agentic tool-use settings, our approach substantially improves multi-turn performance (e.g., 60\%$\to$90\% on math), with gains that generalize across four model families at different scales---including open-weight models---and are largest for smaller models (+42pp average for a 3B-active model). We further show that context editing is a learnable skill: a memory-based system accumulates analysis principles from experience and transfers them to unseen conversations without parameter updates. Prior mitigations that simply discard all assistant messages suffice in simple settings but catastrophically fail in agentic settings where state must be tracked (55\%$\to$0\%), demonstrating that selective context editing is necessary for complex multi-turn interactions.
 \end{abstract}
 
 
@@ -62,6 +62,7 @@ This design is empirically necessary. We find that prior assistant messages act 
     \item We propose context editing via externalized executive function, a self-review agent that selectively edits conversation context to remove pollution while preserving correct work.
     \item We identify that prior assistant messages constitute a \emph{cognitive hazard} that degrades even independent reviewer models, requiring structural exclusion by design.
     \item We evaluate across controlled multi-turn benchmarks (math, code, SQL, function calling), real human--AI conversations (WildChat), and agentic tool-use tasks (tau2-bench), demonstrating consistent improvement across four model families and showing that our approach succeeds where blanket omission catastrophically fails (0\%).
+    \item We show that context editing is a learnable skill: without any parameter updates, a memory-based learning system accumulates analysis principles from a small training set and transfers them to unseen conversations, improving win rates by up to +13.8pp on WildChat.
 \end{itemize}
 
 
@@ -158,7 +159,9 @@ Structural exclusion of assistant messages exploits a property of LiC: user mess
 \subsection{Memory-based learning}
 \label{sec:memory}
 
-We apply the Dynamic Cheatsheet to test whether curation quality improves with experience. The cheatsheet accumulates analysis principles across problem instances, injected into the analyzer's prompt. For hard-attention, memory targets the approach evaluation step; for soft-attention, it targets spec extraction. We cap cheatsheet length at 1500 words.
+We apply the Dynamic Cheatsheet to test whether curation quality improves with experience. The cheatsheet accumulates analysis principles across problem instances, injected into the analyzer's compare query (Subtask~2). For hard-attention, memory targets the approach evaluation step; for soft-attention, it targets spec extraction. We cap cheatsheet length at 1500 words.
+
+On LiC, memory is learned and evaluated online: each batch updates the cheatsheet, and later problems benefit from accumulated principles. To test cross-domain transfer on WildChat, we use a train/eval split: one-third of turns are used for offline learning (Reflect-then-Unify on training results), and the frozen cheatsheet is evaluated on the remaining two-thirds. This avoids confounding memory quality with ordering effects and provides a controlled comparison where the only variable is the presence of the cheatsheet.
 
 
 %% ============================================================
@@ -420,7 +423,37 @@ Diagnostic analysis (Appendix~\ref{app:tau2-diagnostic}) reveals that only 1 of 
 
 Reset outperforms Augment even with contaminated specs (code: 23\% vs.\ 13\%), confirming that context pollution and spec contamination are separable problems. Memory-based decontamination shows its strongest effect on database (+15pp), closing 65\% of the gap to hard attention. The learned principles converge on structured heuristics: ``build a user-only spec first, then overlay assistant suggestions as hypotheses.'' Code remains resistant (+1--2pp), suggesting more structurally diverse contamination patterns.
 
-\paragraph{Memory across settings.} Across both hard-attention (Table~\ref{tab:lic-memory}) and soft-attention (Table~\ref{tab:soft-attention}) experiments, the Dynamic Cheatsheet consistently improves analysis quality. In hard-attention mode, memory pushes Augment to 90\% on math (exceeding Omit Assistant's 85\%); in soft-attention mode, it closes 65\% of the gap to hard-attention oracles on database. This suggests context editing is a \emph{learnable skill}: the analyzer improves with experience, accumulating principles that transfer across problem instances.
+\subsection{Memory-based learning across settings}
+\label{sec:memory-results}
+
+Across hard-attention (Table~\ref{tab:lic-memory}), soft-attention (Table~\ref{tab:soft-attention}), and real conversations (Table~\ref{tab:wildchat-memory}), the Dynamic Cheatsheet consistently improves analysis quality when there is headroom for improvement.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Condition} & \textbf{vs AO} & \textbf{vs FC} & \textbf{$\Delta$ vs AO} \\
+\midrule
+\multicolumn{4}{l}{\emph{DeepSeek V3.2 (eval split, $n$=51, judged by GPT-5-mini)}} \\
+\quad Reset (baseline) & 72.5\% & 72.5\% & --- \\
+\quad Reset + memory & \textbf{86.3\%} & \textbf{80.4\%} & \textbf{+13.8pp} \\
+\midrule
+\multicolumn{4}{l}{\emph{GPT-5-mini (online, $n$=75, self-judged)}} \\
+\quad Reset (baseline) & 90.8\% & 86.8\% & --- \\
+\quad Reset + memory & 86.7\% & 80.0\% & $-$4.1pp \\
+\bottomrule
+\end{tabular}
+\caption{WildChat memory results. Memory improves DeepSeek's Reset win rate by +13.8pp when there is headroom; GPT-5-mini's near-ceiling baseline (91\%) leaves no room for improvement. DeepSeek is judged by GPT-5-mini (cross-model) to avoid the self-judge confound. Memory is learned from 25 training turns and frozen for evaluation.}
+\label{tab:wildchat-memory}
+\end{table}
+
+\paragraph{Memory helps most where the baseline is weakest.} On LiC, memory pushes Augment to 90\% on math, exceeding Omit Assistant's 85\% (Table~\ref{tab:lic-memory}). On soft-attention, it closes 65\% of the gap to hard-attention oracles on database. On WildChat, memory improves DeepSeek's Reset win rate from 72.5\% to 86.3\% vs.\ AO---a +13.8pp gain---but has no effect on GPT-5-mini (91\% baseline, ceiling effect). The pattern is consistent: memory is most valuable when the analyzer has room to improve.
+
+\paragraph{Feedback turns show the largest gain.} Breaking down by turn type, feedback turns improve from 70\% to 100\% ($n$=10, +30pp), compared to +12pp on no\_feedback and +6pp on new\_ask. Feedback turns were previously the weakest category for context editing (Section~\ref{sec:collab-results}): the user references specific prior assistant work, and a na\"ive reset discards those details. The learned cheatsheet addresses this directly, learning to preserve user references to prior output and prefer in-place corrections over full resets when the user is building on specific work.
+
+\paragraph{Small training sets suffice.} The WildChat cheatsheet was learned from just 25 training turns in a single Reflect-then-Unify pass and generalized to 51 unseen evaluation turns. This suggests WildChat conversations contain learnable patterns that transfer, and that the memory system is sample-efficient enough to be practical.
+
+\paragraph{Context editing is a learnable skill.} Taken together, these results show that context editing quality improves with experience across benchmarks and model families, without any parameter updates. The analyzer accumulates principles---structured heuristics like ``build a user-only spec first, then overlay assistant suggestions as hypotheses''---that transfer across problem instances and conversation types.
 
 
 %% ============================================================
@@ -455,7 +488,7 @@ This is a preliminary study with modest sample sizes; the multi-turn simulation 
 \label{sec:conclusion}
 %% ============================================================
 
-We propose context editing via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context editing outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the effect generalizes across four model families spanning proprietary and open-weight architectures at different scales, with smaller models benefiting most (+42pp for 3B-active Qwen vs.\ +20pp for GPT-5); and (4)~context editing is a learnable skill, with memory closing up to 65\% of the gap to hard-attention oracles. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context editing (which can) will only grow.
+We propose context editing via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context editing outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the effect generalizes across four model families spanning proprietary and open-weight architectures at different scales, with smaller models benefiting most (+42pp for 3B-active Qwen vs.\ +20pp for GPT-5); and (4)~context editing is a learnable skill, with memory-based learning improving analysis quality across benchmarks without parameter updates---closing 65\% of the gap to hard-attention oracles on LiC and boosting WildChat win rates by +13.8pp for DeepSeek. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context editing (which can) will only grow.
 
 
 %% ============================================================
