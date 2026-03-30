@@ -66,6 +66,7 @@ async def process_failure_turn(
     analyzer_model: str,
     run_s15: bool,
     run_s2: bool,
+    regenerate_baselines: bool,
     results_file: Path,
     rng: random.Random,
 ) -> dict | None:
@@ -75,11 +76,11 @@ async def process_failure_turn(
 
     try:
         # We need the AO response for comparison. Regenerate or use cached.
-        if phase1_result and "ao_response" in phase1_result:
+        if not regenerate_baselines and phase1_result and "ao_response" in phase1_result:
             ao_response = phase1_result["ao_response"]
             fc_response = phase1_result.get("fc_response", "")
         else:
-            # Regenerate
+            # Regenerate AO/FC with the respondent model
             ao_response, fc_response = await asyncio.gather(
                 generate_ao(turns, turn_index, model_client, respondent_model),
                 generate_fc(turns, turn_index, model_client, respondent_model),
@@ -296,6 +297,7 @@ async def run_phase2(args):
                 analyzer_model=args.analyzer_model,
                 run_s15=args.run_s15,
                 run_s2=args.run_s2,
+                regenerate_baselines=getattr(args, "regenerate_baselines", False),
                 results_file=results_file,
                 rng=rng,
             )
@@ -362,6 +364,8 @@ def main():
                         help="Also run S1.5 (programmatic reset) alongside S3")
     parser.add_argument("--run-s2", action="store_true",
                         help="Also run S2 (gated context edit with v11 analyzer)")
+    parser.add_argument("--regenerate-baselines", action="store_true",
+                        help="Regenerate AO/FC with respondent model instead of using Phase 1 cache")
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output-dir", default="outputs/huang_eval/phase2/{timestamp}",
                         help="Output directory (supports {timestamp})")
