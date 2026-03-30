@@ -8,6 +8,7 @@
 \usepackage{booktabs}
 \usepackage{multirow}
 \usepackage{xcolor}
+\usepackage{graphicx}
 
 % NOTE: including geometry package
 % The geometery package modifies some page properties when used. This can dramatically change the page margins, leading to severe template violation, and potential desk rejection. If the package is required, it can be used with the "pass" flag to skip the default page modifications, as in the following line:
@@ -36,7 +37,7 @@
 \maketitle
 
 \begin{abstract}
-Large language models degrade in extended multi-turn conversations as the assistant's own prior outputs accumulate and act as context pollution, anchoring future generation on earlier (often incorrect) reasoning. The model over-conditions on its own responses and struggles to update its approach when the user provides new or correcting information. We frame this as a deficit of \emph{executive function}: the higher-order cognitive capacity for monitoring one's own reasoning, flexibly updating beliefs when they conflict with new evidence, and inhibiting responses anchored on unproductive approaches. We propose \emph{context editing via externalized executive function}, in which a separate self-review agent identifies where the assistant's approach has been invalidated by the user's requirements, where errors have been carried forward, or where unproductive reasoning has accumulated, then rewrites the context to preserve correct work while removing what is harmful. Across math, code, SQL, function-calling, real human--AI conversations, and agentic tool-use settings, our approach substantially improves multi-turn performance (e.g., 60\%$\to$90\% on math). Prior mitigations that simply discard all assistant messages suffice in simple settings but catastrophically fail in agentic settings where state must be tracked (55\%$\to$0\%), demonstrating that selective context editing is necessary for complex multi-turn interactions.
+Large language models degrade in extended multi-turn conversations as the assistant's own prior outputs accumulate and act as context pollution, anchoring future generation on earlier (often incorrect) reasoning. The model over-conditions on its own responses and struggles to update its approach when the user provides new or correcting information. We frame this as a deficit of \emph{executive function}: the higher-order cognitive capacity for monitoring one's own reasoning, flexibly updating beliefs when they conflict with new evidence, and inhibiting responses anchored on unproductive approaches. We propose \emph{context editing via externalized executive function}, in which a separate self-review agent identifies where the assistant's approach has been invalidated by the user's requirements, where errors have been carried forward, or where unproductive reasoning has accumulated, then rewrites the context to preserve correct work while removing what is harmful. Across math, code, SQL, function-calling, real human--AI conversations, and agentic tool-use settings, our approach substantially improves multi-turn performance (e.g., 60\%$\to$90\% on math), with gains that generalize across four model families at different scales---including open-weight models---and are largest for smaller models (+42pp average for a 3B-active model). Prior mitigations that simply discard all assistant messages suffice in simple settings but catastrophically fail in agentic settings where state must be tracked (55\%$\to$0\%), demonstrating that selective context editing is necessary for complex multi-turn interactions.
 \end{abstract}
 
 
@@ -60,20 +61,22 @@ This design is empirically necessary. We find that prior assistant messages act 
     \item We frame multi-turn LLM degradation as a deficit of executive function, providing a unified cognitive-science lens for failure modes previously described in isolation.
     \item We propose context editing via externalized executive function, a self-review agent that selectively edits conversation context to remove pollution while preserving correct work.
     \item We identify that prior assistant messages constitute a \emph{cognitive hazard} that degrades even independent reviewer models, requiring structural exclusion by design.
-    \item We evaluate across controlled multi-turn benchmarks (math, code, SQL, function calling), real human--AI conversations (WildChat), and agentic tool-use tasks (tau2-bench), demonstrating consistent improvement and showing that our approach succeeds where blanket omission catastrophically fails (0\%).
+    \item We evaluate across controlled multi-turn benchmarks (math, code, SQL, function calling), real human--AI conversations (WildChat), and agentic tool-use tasks (tau2-bench), demonstrating consistent improvement across four model families and showing that our approach succeeds where blanket omission catastrophically fails (0\%).
 \end{itemize}
 
 
 \begin{figure}[t]
 \centering
-\fbox{\parbox{0.95\linewidth}{\centering\textbf{[Figure 1: Problem illustration.]} A multi-turn conversation where the assistant commits to an incorrect interpretation early on. Later user messages correct the misunderstanding, but the assistant's prior reasoning remains in context and anchors subsequent responses, leading to repeated errors.}}
+% \fbox{\parbox{0.95\linewidth}{\centering\textbf{[Figure 1: Problem illustration.]} A multi-turn conversation where the assistant commits to an incorrect interpretation early on. Later user messages correct the misunderstanding, but the assistant's prior reasoning remains in context and anchors subsequent responses, leading to repeated errors.}}
+\includegraphics[width=\textwidth]{assets/ctxe_fig1(2).png}
 \caption{Context pollution in multi-turn conversations. The assistant's early (incorrect) reasoning persists in context and biases all subsequent generation, even after the user provides correcting information.}
 \label{fig:problem}
 \end{figure}
 
 \begin{figure}[t]
 \centering
-\fbox{\parbox{0.95\linewidth}{\centering\textbf{[Figure 2: Method overview.]} The analyzer reads the conversation in two steps: (1)~extract a clean task specification from user messages only (selective attention), (2)~compare it against the full conversation to identify correct and incorrect assistant work (error monitoring). The result is used to rewrite the context, preserving correct work and removing pollution, before the assistant generates its next response.}}
+% \fbox{\parbox{0.95\linewidth}{\centering\textbf{[Figure 2: Method overview.]} The analyzer reads the conversation in two steps: (1)~extract a clean task specification from user messages only (selective attention), (2)~compare it against the full conversation to identify correct and incorrect assistant work (error monitoring). The result is used to rewrite the context, preserving correct work and removing pollution, before the assistant generates its next response.}}
+\includegraphics[width=\textwidth]{assets/ctxe_fig2(4).png}
 \caption{Context editing via externalized executive function. A separate analyzer agent externalizes the executive functions that LLMs lack: selective attention (filtering out assistant messages during intent extraction) and error monitoring (comparing clean intent against the assistant's actual work).}
 \label{fig:method}
 \end{figure}
@@ -173,7 +176,7 @@ We apply the Dynamic Cheatsheet to test whether curation quality improves with e
 
 \paragraph{CollabLLM.} We evaluate on MATH-Hard and BigCodeBench. Standard BigCodeBench evaluation uses test-case execution requiring exact function signatures, but the user simulator never conveys these signatures exactly, making pass\_rate systematically zero for all conditions. We develop a conversation-aware LLM judge (GPT-5) that evaluates the assistant's code against the user's actual intent as expressed in the conversation, assessing functional correctness rather than signature conformance.
 
-\paragraph{Models.} GPT-5-mini is used as the primary assistant and analyzer across all settings. See Appendix~\ref{app:sample-counts} for full model assignments per setting.
+\paragraph{Models.} GPT-5-mini is used as the primary assistant and analyzer for the main experiments. We additionally evaluate GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active, open-weight) on LiC and WildChat (Section~\ref{sec:multi-model}). See Appendix~\ref{app:sample-counts} for full model assignments per setting.
 
 \subsection{Conditions}
 
@@ -243,6 +246,48 @@ Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--1
 
 \paragraph{Memory amplifies analysis quality.}
 Memory provides consistent benefit for analysis-based methods (Table~\ref{tab:lic-memory}), helping the analyzer produce more decisive specifications and more concrete error identification.
+
+
+\subsection{Generalization across model families}
+\label{sec:multi-model}
+
+The results above use GPT-5-mini throughout. A natural question is whether context editing addresses a quirk of one model or a general phenomenon. We evaluate three additional models---GPT-5 (full-size), DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)---spanning proprietary and open-weight architectures at different scales.
+
+\paragraph{Problem selection.} Because stronger models solve easier problems regardless of context pollution, we re-ran the subset selection protocol using GPT-5.2 LiC logs (instead of GPT-5-mini), selecting the 20 hardest true-negative instances per task to ensure a challenging set for this model class.
+
+\paragraph{Protocol.} Each model serves as both assistant (final-turn regeneration) and analyzer. All models replay conversations originally generated by GPT-5.2; the Baseline reflects how model $X$ handles GPT-5.2's polluted context, while Reset reflects model $X$ given a clean context derived from its own analysis. User and system agents use GPT-4o-mini throughout. We compare Baseline against unconditional Reset (the best-performing strategy in Section~\ref{sec:lic-results}).
+
+\begin{table}[t]
+\centering
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Model} & \textbf{Strategy} & \textbf{Math} & \textbf{Code} & \textbf{Database} & \textbf{Actions} & \textbf{Avg.\ $\Delta$} \\
+\midrule
+\multirow{2}{*}{GPT-5-mini} & Baseline & 20\% & 10\% & 5\% & 60\% & \\
+ & Reset & \textbf{55\%} & \textbf{25\%} & \textbf{40\%} & \textbf{80\%} & +26pp \\
+\midrule
+\multirow{2}{*}{GPT-5} & Baseline & 40\% & 21\% & 27\% & 85\% & \\
+ & Reset & \textbf{70\%} & \textbf{47\%} & \textbf{65\%} & 70\% & +20pp \\
+\midrule
+\multirow{2}{*}{DeepSeek V3.2} & Baseline & 50\% & 7\% & 10\% & 35\% & \\
+ & Reset & \textbf{80\%} & \textbf{62\%} & \textbf{45\%} & \textbf{70\%} & +39pp \\
+\midrule
+\multirow{2}{*}{Qwen 3.5 35B} & Baseline & 55\% & 21\% & 5\% & 45\% & \\
+ & Reset & \textbf{75\%} & \textbf{64\%} & \textbf{75\%} & \textbf{80\%} & +42pp \\
+\bottomrule
+\end{tabular}
+\caption{Multi-model LiC results on the hard subset ($n$=20 per task, selected using GPT-5.2). Reset improves accuracy for 15 of 16 model--task pairs. Denominators vary slightly for code (14--15 valid samples due to evaluation errors); percentages use valid denominators. The sole regression is GPT-5 actions, where the baseline is already near ceiling (85\%).}
+\label{tab:multi-model}
+\end{table}
+
+\paragraph{Context editing generalizes across architectures.}
+Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains ranging from +15pp to +70pp. The sole exception is GPT-5 on actions, where the baseline is already near ceiling (85\%) and Reset discards useful conversational context.
+
+\paragraph{Smaller models benefit more.}
+Average gains scale inversely with model capability: Qwen 3.5 (3B active) gains +42pp, DeepSeek V3.2 (37B active) gains +39pp, GPT-5-mini gains +26pp, and GPT-5 gains +20pp. This is intuitive: smaller models are more susceptible to being misled by polluted context, so cleaning that context provides a larger relative benefit. It also suggests context editing is a cost-effective intervention for smaller, cheaper models.
+
+\paragraph{Stronger baselines do not diminish gains.}
+Qwen's math baseline is already the highest across all models (55\%), yet Reset still adds +20pp. GPT-5's database baseline is 27\%, and Reset adds +38pp. The intervention does not merely help weak models reach a capability ceiling---it helps all models overcome context pollution regardless of their baseline capability.
 
 
 \subsection{The cognitive hazard}
@@ -315,6 +360,9 @@ Rewrite & 178 & 82.6\% & 80.3\% & 68.5\% & 84.3\% \\
 
 Phase~2 evaluates our strategies on all turns unconditionally (Table~\ref{tab:wildchat-quality}). Gated Reset achieves 86.1\% win rate vs.\ AO and 83.8\% vs.\ FC while intervening on only 72\% of turns. Its gating is intelligent: the edit rate on \texttt{no\_feedback} turns (62.7\%) is lower than on \texttt{new\_ask} (78.1\%) and \texttt{feedback} (78.6\%) turns, correctly intervening less on stateful turns that are more often on track. On AO failure turns specifically---cases where Huang et al.\ identify blanket omission as actively harmful---Gated Reset achieves 93.3\% win rate vs.\ AO.
 
+\paragraph{Multi-model WildChat.}
+We also run Phase~2 with DeepSeek V3.2 as respondent, judge, and analyzer (regenerating all baselines for same-model comparison). DeepSeek shows moderate gains: Rewrite wins 61.8\% vs.\ AO 28.9\% on quality, and Reset wins 59.2\% vs.\ AO 31.6\%. These are smaller than GPT-5-mini's $\sim$85\% win rates but consistent in direction. GPT-5 as respondent/self-judge shows Rewrite \emph{losing} to baselines; however, this result is confounded by (1)~GPT-5 self-judging its own outputs, compounding preference for its unedited generation style, and (2)~a structural bias in the judge prompt: the judge sees the original full conversation as context for \emph{both} responses, favoring those generated from less-modified contexts. GPT-5's LiC results (ground-truth evaluation; Table~\ref{tab:multi-model}) remain clear gains.
+
 \paragraph{Format bias caveat.} The restructured output format may present better to the LLM judge, inflating absolute win rates. However, relative comparisons between strategies (which share similar formats) are less affected, and the on-topic dimension shows more ties than quality, suggesting the judge discriminates content rather than format.
 
 
@@ -329,7 +377,7 @@ Phase~2 evaluates our strategies on all turns unconditionally (Table~\ref{tab:wi
 \midrule
 Baseline & 45--55\% & \$0.51 \\
 Omit Assistant & 0\% & \$0.36 \\
-Gated Reset (ours) & \textbf{55--60\%} & \$0.60--0.67 \\
+Gated Reset (ours) & \textbf{55--65\%} & \$0.60--0.67 \\
 \bottomrule
 \end{tabular}
 \caption{Tau2-bench \texttt{telecom\_small} results. Omit Assistant is catastrophically destructive in agentic settings. Gated Reset consistently exceeds the baseline.}
@@ -384,7 +432,7 @@ Reset outperforms Augment even with contaminated specs (code: 23\% vs.\ 13\%), c
 
 The value of context editing over blanket removal scales with conversation statefulness. On LiC (self-contained tasks), omission is near-optimal; our methods close most of the gap and exceed it on database and math-with-memory. On WildChat (real conversations), editing clearly outperforms both baselines (82--86\% win rates). On tau2-bench (agentic tool use), omission is catastrophic (0\%) while context editing maintains or improves performance (55--60\%).
 
-Across settings, Gated Reset is consistently the best or joint-best strategy, suggesting conservative, gated intervention as a robust default. Rewrite performs comparably on diverse conversations but fails in data-rich agentic settings where summarization loses structured data.
+Across settings, Gated Reset is consistently the best or joint-best strategy, suggesting conservative, gated intervention as a robust default. Rewrite performs comparably on diverse conversations but fails in data-rich agentic settings where summarization loses structured data. Crucially, these gains are not specific to one model: Reset improves 15 of 16 model--task pairs across four architectures (Table~\ref{tab:multi-model}), with smaller models benefiting most (+42pp for Qwen 3.5 vs.\ +20pp for GPT-5).
 
 \subsection{Executive function as a design pattern}
 \label{sec:exec-function-pattern}
@@ -399,7 +447,7 @@ The cognitive hazard (Table~\ref{tab:cognitive-hazard}) has broad implications: 
 
 \subsection{Limitations}
 
-This is a preliminary study with modest sample sizes; the multi-turn simulation framework requires $N\times$ more LLM calls than single-turn evaluation (where $N$ is average conversation length), making large-scale runs expensive. Per-condition sample counts are in Appendix~\ref{app:sample-counts}. LiC, CollabLLM, and tau2-bench use simulated users. All experiments use GPT-5-mini; interaction with other architectures is unexplored. WildChat pairwise judgments may be inflated by format bias (see Section~\ref{sec:collab-results}). Long-horizon tasks (multi-file coding, iterative design) remain untested.
+This is a preliminary study with modest sample sizes; the multi-turn simulation framework requires $N\times$ more LLM calls than single-turn evaluation (where $N$ is average conversation length), making large-scale runs expensive. Per-condition sample counts are in Appendix~\ref{app:sample-counts}. LiC, CollabLLM, and tau2-bench use simulated users. The multi-model evaluation (Section~\ref{sec:multi-model}) replays conversations originally generated by GPT-5.2, isolating the effect of context editing but not testing each model's own multi-turn generation dynamics. WildChat multi-model evaluation is limited by the self-judge confound (each model judges its own outputs) and structural bias in the judge prompt. WildChat pairwise judgments may be inflated by format bias (see Section~\ref{sec:collab-results}). Long-horizon tasks (multi-file coding, iterative design) remain untested.
 
 
 %% ============================================================
@@ -407,7 +455,7 @@ This is a preliminary study with modest sample sizes; the multi-turn simulation 
 \label{sec:conclusion}
 %% ============================================================
 
-We propose context editing via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context editing outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the framework generalizes across controlled benchmarks, real conversations, and agentic tool use; and (4)~context editing is a learnable skill, with memory closing up to 65\% of the gap to hard-attention oracles. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context editing (which can) will only grow.
+We propose context editing via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context editing outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the effect generalizes across four model families spanning proprietary and open-weight architectures at different scales, with smaller models benefiting most (+42pp for 3B-active Qwen vs.\ +20pp for GPT-5); and (4)~context editing is a learnable skill, with memory closing up to 65\% of the gap to hard-attention oracles. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context editing (which can) will only grow.
 
 
 %% ============================================================
