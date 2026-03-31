@@ -10,6 +10,8 @@
 \usepackage{xcolor}
 \usepackage{graphicx}
 \usepackage{fvextra}          % extends fancyvrb with working breaklines
+\usepackage{algorithm}
+\usepackage{algorithmic}
 
 % A command to typeset a prompt from a file, with wrapping
 \newcounter{promptctr}
@@ -64,17 +66,17 @@ Large language models degrade in extended multi-turn conversations as the assist
 \label{sec:intro}
 %% ============================================================
 
-Multi-turn conversation is the dominant mode of interaction with large language models, especially as agentic AI systems place models in long, stateful dialogues with humans and tools. Yet LLMs perform substantially worse in multi-turn settings than on equivalent single-turn tasks. \citet{laban2025lost} showed that accuracy drops 39\% on average across 15 models and 6 task domains---even across conversations spanning only a handful of turns. \citet{huang2026context} identified the primary cause: \emph{context pollution}, the accumulation of incorrect assumptions, failed approaches, and speculative reasoning in the assistant's own prior messages. This degradation does not require extreme context length; the assistant's own generated tokens act as pollution, anchoring future generation on flawed foundations even when the user explicitly corrects course (Figure~\ref{fig:problem}).
+Multi-turn conversation is the dominant mode of interaction with large language models, especially as agentic AI systems place models in long, stateful dialogues with humans and tools. Yet LLMs perform substantially worse in multi-turn settings than on equivalent single-turn tasks. \citet{laban2025lost} showed that accuracy drops 39\% on average across 15 models and 6 task domains, even across conversations spanning only a handful of turns. \citet{huang2026context} identified the primary cause: \emph{context pollution}, the accumulation of incorrect assumptions, failed approaches, and speculative reasoning in the assistant's own prior messages. This degradation does not require extreme context length; the assistant's own generated tokens act as pollution, anchoring future generation on flawed foundations even when the user explicitly corrects course (Figure~\ref{fig:problem}).
 
-This degradation is not a capability deficit---the model can solve the same problem from scratch. It is a \emph{self-regulation} deficit. In cognitive science, \textbf{executive function} refers to the higher-order processes that manage attention, suppress inappropriate responses, and update working representations when circumstances change~\citep{miyake2000unity,diamond2013executive}. We draw on this framework to characterize the specific failure here: not a single-turn reasoning deficit, but the inability to \emph{self-correct across turns}. A human problem-solver recognizes when an approach is failing, suppresses the impulse to continue, and redirects effort. Current LLMs struggle with this: they cannot selectively ignore their own prior reasoning, even when it has since become invalidated.
+This degradation is not a capability deficit; the model can solve the same problem from scratch. It is a \emph{self-regulation} deficit. In cognitive science, \textbf{executive function} refers to the higher-order processes that manage attention, suppress inappropriate responses, and update working representations when circumstances change~\citep{miyake2000unity,diamond2013executive}. We draw on this framework to characterize the specific failure here: not a single-turn reasoning deficit, but the inability to \emph{self-correct across turns}. A human problem-solver recognizes when an approach is failing, suppresses the impulse to continue, and redirects effort. Current LLMs struggle with this: they cannot selectively ignore their own prior reasoning, even when it has since become invalidated.
 
-Existing mitigations simply discard all assistant messages~\citep{huang2026context,khalid2025ergo}, effectively restarting from scratch each turn. This works when the model can re-derive the answer from user messages alone. But in realistic settings---multi-step coding, iterative design, tool-use agents---the assistant's prior work is essential context. Discarding it is not just wasteful but destructive: on the tau2-bench agentic benchmark~\citep{barres2025tau2}, blanket assistant omission drops performance from 55\% to 0\%.
+Existing mitigations simply discard all assistant messages~\citep{huang2026context,khalid2025ergo}, effectively restarting from scratch each turn. This works when the model can re-derive the answer from user messages alone. But in realistic settings such as multi-step coding, iterative design, and tool-use agents, the assistant's prior work is essential context. Discarding it is not just wasteful but destructive: on the tau2-bench agentic benchmark~\citep{barres2025tau2}, blanket assistant omission drops performance from 55\% to 0\%.
 
 We propose \emph{context editing via externalized executive function}: a separate self-review agent identifies where the assistant has diverged from the user's intent, where errors have been carried forward, and where unproductive reasoning has accumulated, then rewrites the context to preserve correct work while removing what is harmful (Figure~\ref{fig:method}).
 
-There is a useful irony in this framing. The transformer architecture~\citep{Vaswani+2017} is built around the attention mechanism, which computes relevance weights over all tokens in context. Yet this token-level attention demonstrably fails at the \emph{cognitive} task of selective attention: deciding which prior reasoning to rely on and which to suppress. Our approach uses autoregressive generation---additional LLM calls at test time---to make these harder, deliberate decisions about what deserves attention, compensating for a deficit that the architectural attention mechanism cannot resolve on its own. In this way, our work extends test-time scaling~\citep{wei2022chain,wang2023selfconsistency,yao2024tree} from single-turn settings (scaling compute within one generation) to multi-turn settings (editing the accumulated context presented to the model).
+Although the transformer's attention mechanism~\citep{Vaswani+2017} computes relevance weights over all tokens, it demonstrably fails at the \emph{cognitive} task of selective attention: deciding which prior reasoning to rely on and which to suppress. Our approach uses additional LLM calls at test time to make these deliberate decisions, extending test-time scaling~\citep{wei2022chain,wang2023selfconsistency,yao2024tree} from single-turn settings (scaling compute within one generation) to multi-turn settings (editing the accumulated context presented to the model).
 
-Interestingly, we find that prior assistant messages act as a \emph{cognitive hazard}: even a model prompted as an independent reviewer produces degraded analysis when exposed to them, collapsing performance to baseline or worse (Section~\ref{sec:cognitive-hazard}). Context pollution impairs not just the conversational assistant where we might expect the model to bias towards consistency with its prior messages but \emph{any model processing the same context}, requiring either structural exclusion or other means for addressing the issue.
+A further challenge is that prior assistant messages act as a \emph{cognitive hazard}: even a model prompted as an independent reviewer produces degraded analysis when exposed to them, collapsing performance to baseline or worse (Section~\ref{sec:cognitive-hazard}). Context pollution therefore impairs not just the conversational assistant, where we might expect the model to bias toward consistency with its prior messages, but \emph{any model processing the same context}, requiring structural exclusion by design.
 
 \paragraph{Contributions.}
 \begin{itemize}
@@ -100,13 +102,13 @@ Interestingly, we find that prior assistant messages act as a \emph{cognitive ha
 %% ============================================================
 
 \paragraph{Multi-turn degradation and context pollution.}
-\citet{laban2025lost} introduced the Lost in Conversation (LiC) framework, showing that multi-turn performance drops 39\% on average across 15 LLMs---driven by increased unreliability (+112\%) rather than reduced capability ($-$16\%). \citet{huang2026context} termed this \emph{context pollution} and showed that simply omitting all assistant messages (assistant omission, AO) recovers much of the lost performance across multiple settings, establishing that the assistant's own outputs---not user messages or task difficulty---are the primary source of degradation. \citet{khalid2025ergo} proposed ERGO, which monitors token-level entropy and triggers context resets. Both approaches discard all assistant messages, which is effective only when the model can re-derive answers from scratch. We build on their finding while showing that omission fails catastrophically in agentic settings.
+\citet{laban2025lost} introduced the Lost in Conversation (LiC) framework, showing that multi-turn performance drops 39\% on average across 15 LLMs, driven by increased unreliability (+112\%) rather than reduced capability ($-$16\%). \citet{huang2026context} termed this \emph{context pollution} and showed that simply omitting all assistant messages (assistant omission, AO) recovers much of the lost performance, establishing that the assistant's own outputs are the primary source of degradation. \citet{khalid2025ergo} proposed ERGO, which monitors token-level entropy and triggers context resets. Critically, both approaches treat context as \emph{uniformly harmful}: they discard all assistant messages without distinguishing correct work from polluting content. This is effective only when the model can re-derive answers from user messages alone. We build on their diagnostic finding while treating context as \emph{heterogeneous}, selectively preserving useful assistant content and removing what is harmful, and showing that blanket omission fails catastrophically in agentic settings where such re-derivation is impossible.
 
 \paragraph{Executive function in cognitive science.}
-Executive function refers to the cognitive processes that regulate attention, suppress inappropriate responses, and update working representations~\citep{miyake2000unity}. \citet{diamond2013executive} identifies three core components: inhibitory control, working memory updating, and cognitive flexibility. We use this framework to characterize what LLMs lack in multi-turn settings. The connection is functional, not mechanistic: the \emph{behavioral} failures align with executive function deficits, though we do not claim LLMs share human cognitive architecture. This parallels how \citet{yao2024tree} drew on dual-process theory~\citep{kahneman2011thinking} to motivate tree-structured search for single-turn problems.
+Executive function refers to the cognitive processes that regulate attention, suppress inappropriate responses, and update working representations~\citep{miyake2000unity}, with three core components: inhibitory control, working memory updating, and cognitive flexibility~\citep{diamond2013executive}. We use this framework to characterize what LLMs lack in multi-turn settings. The connection is functional, not mechanistic: the \emph{behavioral} failures align with executive function deficits, though we do not claim LLMs share human cognitive architecture.
 
 \paragraph{Agentic context management.}
-A growing body of work uses LLM-driven context manipulation for long-horizon tasks: THREAD~\citep{schroeder2025thread} spawns sub-agents with summarized results, Recursive Language Models~\citep{zhang2025rlm} treat context as a programmatically manipulated variable, and Context Folding~\citep{sun2025contextfolding} trains agents to branch and collapse sub-trajectories. These methods target \emph{compaction}---fitting more reasoning into bounded context. Our work addresses a different problem: \emph{context pollution}, where the assistant's own prior outputs actively mislead future generation even within ample context. Compaction preserves information while reducing tokens; we selectively \emph{remove} information that is harmful.
+A growing body of work uses LLM-driven context manipulation for long-horizon tasks: THREAD~\citep{schroeder2025thread} spawns sub-agents with summarized results, Recursive Language Models~\citep{zhang2025rlm} treat context as a programmatically manipulated variable, and Context Folding~\citep{sun2025contextfolding} trains agents to branch and collapse sub-trajectories. These methods target \emph{compaction}, fitting more reasoning into bounded context. Our work addresses a different problem: \emph{context pollution}, where the assistant's own prior outputs actively mislead future generation even within ample context. Compaction preserves information while reducing tokens; we selectively \emph{remove} information that is harmful.
 
 Two recent works are more closely related. U-Fold~\citep{su2026ufold} uses intent summarization and data extraction for multi-turn conversations, but targets redundancy in tool responses rather than self-induced pollution. MemoBrain~\citep{qian2026memobrain} draws on the executive function framework to construct dependency-aware reasoning graphs, but its executive control serves long-horizon compaction (folding sub-trajectories, flushing low-salience nodes) rather than identifying invalidated reasoning. Both are complementary to our pollution-focused intervention; see Appendix~\ref{app:agentic-context} for extended discussion.
 
@@ -131,47 +133,79 @@ We also draw on test-time scaling and memory-based self-improvement; related wor
 \label{fig:method}
 \end{figure}
 
-% \subsection{Problem setting}
-% \label{sec:problem-setting}
+\subsection{Problem formulation}
+\label{sec:problem-setting}
 
-% We use the Lost in Conversation (LiC) framework~\citep{laban2025lost} for controlled evaluation. Each instance consists of a fully-specified question $q$ with ground truth answer $a$, sharded into $k$ pieces $\{s_1, \ldots, s_k\}$ revealed incrementally by a simulated user. For agentic evaluation, we extend to tau2-bench~\citep{yao2024tau}, where the assistant uses tools (API calls) to resolve customer service issues through multi-turn dialogue.
+Consider a multi-turn conversation between a user and an LLM assistant. At turn $t$, the conversation context is the message sequence $C_t = (u_1, a_1, u_2, a_2, \ldots, u_t)$, where $u_i$ and $a_i$ denote user and assistant messages respectively. The assistant generates its response by sampling $a_t \sim p_\theta(\cdot \mid C_t)$.
 
-We use additional LLM calls to analyze the conversation history and edit the context before each assistant turn. The analysis identifies where the assistant's approach has diverged from the user's actual intent; the edit surgically removes or restructures the polluting content while preserving correct work.
+Let $\mathcal{T}^*$ denote the true task specification, which the user reveals incrementally across messages $U_t = (u_1, \ldots, u_t)$.  In principle, $U_t$ provides a progressively more complete view of $\mathcal{T}^*$.  However, the assistant tokens $A_{t-1} = (a_1, \ldots, a_{t-1})$ encode latent assumptions $\hat{\mathcal{T}}_i$ that may diverge from $\mathcal{T}^*$ as new user messages refine or contradict earlier interpretations.  This creates a \emph{distribution shift}: the model conditions on $C_t = (U_t, A_{t-1})$, but $A_{t-1}$ biases the posterior toward stale assumptions, so that
+\begin{equation}
+\label{eq:pollution}
+p_\theta(\text{correct} \mid U_t, A_{t-1}) \;<\; p_\theta(\text{correct} \mid U_t),
+\end{equation}
+i.e., the assistant's own prior outputs \emph{reduce} the probability of a correct response. \citet{huang2026context} empirically confirm this inequality: simply omitting $A_{t-1}$ (assistant omission) recovers much of the lost accuracy.
+
+However, omission is a blunt instrument. In stateful settings, $A_{t-1}$ contains essential information (e.g., tool-call results, agreed-upon decisions) that cannot be re-derived from $U_t$ alone. We seek an \emph{editing operator} $\mathcal{E}$ that produces a modified context $C'_t = \mathcal{E}(C_t)$ satisfying two properties:
+\begin{enumerate}
+    \item \textbf{Decontamination.} $C'_t$ suppresses the biasing effect of stale assumptions in $A_{t-1}$, so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid C_t)$.
+    \item \textbf{Preservation.} $C'_t$ retains task-relevant information from both $U_t$ and $A_{t-1}$, so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid U_t)$ whenever $A_{t-1}$ contains useful state.
+\end{enumerate}
+
+We implement $\mathcal{E}$ using additional LLM calls that analyze the conversation history and edit the context before each assistant turn. The analysis identifies where the assistant's approach has diverged from $\mathcal{T}^*$; the edit surgically removes or restructures the polluting content while preserving correct work. Algorithm~\ref{alg:context-edit} gives the full procedure.
 
 \subsection{Conversation analysis via subtask decomposition}
 \label{sec:decomposition}
 
-Rather than asking a single model to assess the full conversation in one pass, we decompose the analysis into two subtasks with different contexts.
+Rather than asking a single model to assess the full conversation in one pass, we decompose the analysis into two subtasks with different contexts (Algorithm~\ref{alg:context-edit}, lines 2--5).
 
 \paragraph{Subtask 1: Task specification extraction (selective attention).}
-The model sees only the system message and user messages---no assistant responses---and produces a consolidated task specification. The system message grounds the output format (e.g., SQL schema, function signatures). By physically excluding assistant messages, we implement attentional control that the model cannot perform internally.
+The model sees only $U_t$ (user messages and system message), with $A_{t-1}$ structurally excluded, and produces a consolidated task specification $\hat{\mathcal{T}}$. The system message grounds the output format (e.g., SQL schema, function signatures). By physically excluding assistant messages, we implement attentional control that the model cannot perform internally.
 
 \paragraph{Subtask 2: Approach evaluation (error monitoring).}
-The model sees the specification from Subtask~1 plus the full conversation, and optionally a memory cheatsheet. It identifies what the assistant got right (\texttt{aligned}) and where it diverged (\texttt{issues}).
+The model receives $\hat{\mathcal{T}}$ together with the full context $C_t$ (including assistant messages), and optionally a memory cheatsheet $M$. It identifies what the assistant got right (\texttt{aligned}) and where it diverged (\texttt{issues}).
 
-This decomposition is empirically necessary: Subtask~1 must be shielded from the assistant's prior reasoning, because even a model explicitly tasked as an independent reviewer anchors on the assistant's approach. Including assistant messages in Subtask~1 collapses effectiveness to baseline or worse (Section~\ref{sec:cognitive-hazard}). The two-query design ensures that at least one stage---task specification extraction---is completely unaffected by context pollution.
+This decomposition is empirically necessary: Subtask~1 must be shielded from $A_{t-1}$, because even a model explicitly tasked as an independent reviewer anchors on the assistant's reasoning. Including assistant messages in Subtask~1 collapses effectiveness to baseline or worse (Section~\ref{sec:cognitive-hazard}). The two-query design ensures that at least one stage, task specification extraction, is completely unaffected by context pollution.
 
 \subsection{Intervention strategies}
 \label{sec:strategies}
 
-The analysis produces a structured artifact (task specification, aligned work, issues). Three strategies use this artifact with increasing levels of context modification:
+The analysis produces a structured artifact $(\hat{\mathcal{T}}, \texttt{aligned}, \texttt{issues})$. Three strategies implement the editing operator $\mathcal{E}$ with increasing levels of context modification:
 
-\paragraph{Augment.} The artifact is appended to the conversation. The full history is preserved; polluting content remains visible but the analysis provides corrective signal.
+\paragraph{Augment.} The artifact is appended to $C_t$. The full history is preserved; polluting content in $A_{t-1}$ remains visible but the analysis provides corrective signal. Formally, $C'_t = C_t \oplus (\hat{\mathcal{T}}, \texttt{aligned}, \texttt{issues})$.
 
-\paragraph{Reset.} The artifact populates a template that \emph{replaces} the entire conversation. All prior messages are removed; the specification and aligned content are preserved in a clean format. Issues guide the edit but are not reintroduced.
+\paragraph{Reset.} The artifact populates a template that \emph{replaces} the entire conversation: $C'_t = \textsc{Template}(\hat{\mathcal{T}}, \texttt{aligned})$. All prior messages are removed; the specification and aligned content are preserved in a clean format. Issues guide the edit but are not reintroduced.
 
-\paragraph{Rewrite.} An additional LLM call generates a restructured context from the artifact. This is the most flexible intervention but may lose concrete details through summarization.
+\paragraph{Rewrite.} An additional LLM call generates a restructured context: $C'_t \sim p_\theta(\cdot \mid \hat{\mathcal{T}}, \texttt{aligned}, \texttt{issues}, C_t)$. This is the most flexible intervention but may lose concrete details through summarization.
 
-\paragraph{Gating.} Any intervention can be applied unconditionally or \emph{gated} (triggered only when the analyzer detects substantive issues). Gating reduces cost and avoids disrupting conversations that are already on track---critical in agentic settings where resets discard expensive-to-reobtain tool results.
+\paragraph{Gating.} Any intervention can be applied unconditionally or \emph{gated}, triggered only when the analyzer detects substantive issues (Algorithm~\ref{alg:context-edit}, lines 6--8). Gating reduces cost and avoids disrupting conversations that are already on track, which is critical in agentic settings where resets discard expensive-to-reobtain tool results.
 
 The analytical core (Section~\ref{sec:decomposition}) is the contribution; the intervention strategy is a design choice. We use unconditional Reset for short, self-contained LiC tasks; Gated Reset for long agentic conversations; and Rewrite for diverse open-domain conversations.
+
+\begin{algorithm}[t]
+\caption{Context Editing via Externalized Executive Function}
+\label{alg:context-edit}
+\begin{algorithmic}[1]
+\REQUIRE Conversation context $C_t = (u_1, a_1, \ldots, u_t)$, gating flag $g$
+\STATE \textbf{// Subtask 1: Selective attention (spec extraction)}
+\STATE $U_t \leftarrow (u_1, \ldots, u_t)$ \hfill $\triangleright$ Structurally exclude $A_{t-1}$
+\STATE $\hat{\mathcal{T}} \leftarrow \textsc{Analyze}(U_t)$ \hfill $\triangleright$ Extract clean task specification
+\STATE \textbf{// Subtask 2: Error monitoring (approach evaluation)}
+\STATE $(\texttt{aligned}, \texttt{issues}) \leftarrow \textsc{Evaluate}(\hat{\mathcal{T}}, C_t)$
+\IF{$g$ \AND $\texttt{issues} = \emptyset$}
+    \RETURN $C_t$ \hfill $\triangleright$ No edit needed (gated pass-through)
+\ENDIF
+\STATE \textbf{// Apply editing operator $\mathcal{E}$}
+\STATE $C'_t \leftarrow \textsc{Intervene}(\hat{\mathcal{T}}, \texttt{aligned}, \texttt{issues}, C_t)$
+\RETURN $C'_t$
+\end{algorithmic}
+\end{algorithm}
 
 \subsection{Memory-based learning}
 \label{sec:memory}
 
 We explore whether conversation analysis for context editing can be learned via lightweight memory-based methods. While various approaches with varying degrees of complexity exist (Appendix~\ref{app:additional-related}), we aim to isolate the impact of memory-based learning from experience by experimenting with a minimal design. We adapt the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet}, which represents memory as a single text artifact that is globally updated with a single query and has no retrieval mechanism.
 
-After each problem instance, a reflection query examines the analysis and outcome, abstracting transferable takeaways (e.g., common pitfalls, effective consolidation strategies). These are used to update the cheatsheet---a plain-text memory of strategies and pitfalls accumulated across instances. The cheatsheet is injected into the analyzer's approach evaluation query (Subtask~2) on subsequent problems, providing learned priors for the analysis. We cap cheatsheet length at 1500 words to prevent unbounded growth from degrading quality. Implementation details on update strategies and evaluation protocols are in Appendix~\ref{app:memory-details}.
+After each problem instance, a reflection query examines the analysis and outcome, abstracting transferable takeaways (e.g., common pitfalls, effective consolidation strategies). These update a cheatsheet $M$, a plain-text memory of strategies and pitfalls accumulated across instances. The cheatsheet is injected into the analyzer's approach evaluation (Subtask~2) on subsequent problems, providing learned priors that improve the quality of $\mathcal{E}$. We cap cheatsheet length at 1500 words to prevent unbounded growth from degrading quality. Implementation details on update strategies and evaluation protocols are in Appendix~\ref{app:memory-details}.
 
 
 %% ============================================================
@@ -182,13 +216,13 @@ After each problem instance, a reflection query examines the analysis and outcom
 We use GPT-5-mini as the primary assistant and analyzer throughout, with additional models tested for generalization.
 
 \paragraph{Lost in Conversation (LiC).}
-We evaluate on the LiC framework~\citep{laban2025lost}, which provides controlled evaluation of multi-turn performance degradation. Each instance consists of a fully-specified question sharded into pieces revealed incrementally by a simulated user across multiple turns. We evaluate on four task domains: math word problems, code generation, database (SQL generation), and function calling (reported as ``actions'' in tables). To isolate intervention effects from conversational variance, all strategies share the same baseline conversation prefix and only the final turns are regenerated with each intervention (replay mode). We compare our methods (Augment, Reset, Gated Reset) against the unmodified baseline and two prior-work approaches: Assistant Messages Omitted (AO;~\citealt{huang2026context}) and Concatenate User (ERGO-style;~\citealt{khalid2025ergo}). Because LiC tasks are self-contained---user messages alone fully specify the problem---AO and Concatenate User effectively collapse the multi-turn setting back to the single-turn case, serving as upper bounds rather than realistic baselines.
+We evaluate on the LiC framework~\citep{laban2025lost}, where each instance is a fully-specified question sharded into pieces revealed incrementally by a simulated user. We test four domains: math, code, database (SQL), and function calling (``actions''). To isolate intervention effects, all strategies share the same baseline conversation prefix and only the final turns are regenerated (replay mode). We compare against Assistant Messages Omitted (AO;~\citealt{huang2026context}) and Concatenate User (ERGO-style;~\citealt{khalid2025ergo}). Because LiC tasks are self-contained (user messages alone fully specify the problem), AO and Concatenate User collapse the multi-turn setting to single-turn, serving as upper bounds rather than realistic baselines.
 
 \paragraph{CollabLLM.}
 We evaluate on MATH-Hard and BigCodeBench using the CollabLLM multi-turn conversation framework, providing a slightly more realistic setting than LiC with natural back-and-forth between user and assistant. Evaluation details are in Appendix~\ref{app:collabllm}.
 
 \paragraph{WildChat.}
-We reproduce the evaluation of \citet{huang2026context} on WildChat-1M conversations~\citep{zhao2024wildchat}, filtered per Huang's criteria (English, technical, 5--10 rounds). Phase~1 identifies turns where AO degrades quality; Phase~2 evaluates our strategies on all turns. Pairwise judgments use Huang's judge prompt on quality and on-topic dimensions. Unlike LiC, WildChat conversations are stateful---the user may reference prior assistant work---so AO is not an upper bound and can actively hurt performance.
+We reproduce the evaluation of \citet{huang2026context} on WildChat-1M conversations~\citep{zhao2024wildchat}, filtered per Huang's criteria (English, technical, 5--10 rounds). Phase~1 identifies turns where AO degrades quality; Phase~2 evaluates our strategies on all turns using Huang's pairwise judge prompt. Unlike LiC, WildChat conversations are stateful, so AO can actively hurt performance.
 
 \paragraph{Tau2-bench.}
 As a preliminary exploration of the agentic setting, we evaluate on the \texttt{telecom\_small} subset of tau2-bench~\citep{yao2024tau}. This setting demonstrates that omitting assistant messages in stateful, tool-use conversations is catastrophically destructive. Agentic adaptation details are in Appendix~\ref{app:agentic-methods}.
@@ -233,7 +267,7 @@ Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--1
 
 \paragraph{Generalization across model families.}
 \label{sec:multi-model}
-We evaluate three additional models---GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)---on a harder problem subset selected to remain challenging for stronger models (protocol details in Appendix~\ref{app:multi-model-protocol}). Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains ranging from +15pp to +70pp across proprietary and open-weight architectures at different scales.
+We evaluate three additional models (GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)) on a harder problem subset selected to remain challenging for stronger models (protocol details in Appendix~\ref{app:multi-model-protocol}). Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains ranging from +15pp to +70pp across proprietary and open-weight architectures at different scales.
 
 \begin{table}[t]
 \centering
@@ -302,11 +336,9 @@ AO achieves \textbf{0\%} on tau2-bench (Table~\ref{tab:tau2-main}): stripping as
 
 \subsection{Editing vs.\ removal across settings}
 
-The value of context editing over blanket removal scales with conversation statefulness. On LiC (self-contained tasks), omission is near-optimal; our methods close most of the gap and exceed it on database. On WildChat (real conversations), editing clearly outperforms both AO and full context (82--86\% win rates). On tau2-bench (agentic tool use), AO is catastrophic (0\%) while context editing maintains or improves performance (55--60\%).
+The value of context editing over blanket removal scales with conversation statefulness: on LiC, omission is near-optimal and our methods close most of the gap; on WildChat, editing outperforms both AO and full context (82--86\% win rates); on tau2-bench, AO is catastrophic (0\%) while editing maintains or improves performance. Gated Reset is consistently the best or joint-best strategy across all settings, suggesting conservative, gated intervention as a robust default. These gains generalize across four model families (Table~\ref{tab:multi-model}).
 
-Across settings, Gated Reset is consistently the best or joint-best strategy, suggesting conservative, gated intervention as a robust default. Rewrite performs comparably on diverse conversations but fails in data-rich agentic settings where summarization loses structured data. Crucially, these gains are not specific to one model: Reset improves 15 of 16 model--task pairs across four architectures (Table~\ref{tab:multi-model}).
-
-\paragraph{Cost--capability tradeoff.} The analyzer adds 2 LLM calls per turn (spec extraction + approach evaluation), plus 1 call for Rewrite---substantially more expensive than simply deleting assistant messages (AO) or heuristically resetting the conversation (ERGO). On tau2-bench, this increases average cost from \$0.51 to \$0.60--0.67 per task (Table~\ref{tab:tau2-main}). We justify this cost on two grounds. First, AO and ERGO-style resets catastrophically fail in stateful settings (0\% on tau2-bench), while our approach maintains or improves performance across all settings tested. Second, unlike hand-crafted reset heuristics that require per-domain tuning, the analysis uses autoregressive LLM generation to make editing decisions. This makes the analytical capability amenable to self-distillation: reasoning models already produce internal chain-of-thought before responding, so the analysis could in principle be absorbed into the model's own reasoning process, eliminating the external call overhead entirely. We view the current multi-query architecture as a proof of concept for a capability that should ultimately be internalized.
+\paragraph{Cost--capability tradeoff.} The analyzer adds 2 LLM calls per turn (spec extraction + approach evaluation), plus 1 for Rewrite, increasing tau2-bench cost from \$0.51 to \$0.60--0.67 per task (Table~\ref{tab:tau2-main}). We justify this cost on two grounds. First, cheaper alternatives catastrophically fail in stateful settings (AO achieves 0\% on tau2-bench). Second, unlike hand-crafted heuristics, the analysis uses autoregressive LLM generation, making it amenable to self-distillation: reasoning models could in principle absorb the analysis into their own chain-of-thought, eliminating the external call overhead. We view the current multi-query architecture as a proof of concept for a capability that should ultimately be internalized.
 
 
 \subsection{Conversation analysis ablations}
@@ -338,7 +370,7 @@ Allowing the spec extractor to see assistant messages collapses performance to \
 \paragraph{Contamination amplifies through chained calls.}
 Counterintuitively, collapsing to a single pass \emph{partially recovers} performance (55\% vs.\ 40\% on math). When a contaminated Subtask~1 passes a biased specification to Subtask~2 as authoritative, errors compound. This is a cautionary finding for multi-stage LLM pipelines: decomposition is only beneficial when earlier stages produce clean outputs.
 
-These results have broad implications: any system that uses an LLM to evaluate another LLM's output faces this risk. Multi-stage pipelines cannot rely on prompting for selective attention; structural data flow control is required. The exact mechanism---attention-based anchoring, implicit role consistency, or something else---remains an open question.
+These results have broad implications: any system that uses an LLM to evaluate another LLM's output faces this risk. Multi-stage pipelines cannot rely on prompting for selective attention; structural data flow control is required. The exact mechanism (attention-based anchoring, implicit role consistency, or something else) remains an open question.
 
 
 \subsection{Memory-based learning}
@@ -406,12 +438,12 @@ We make task-specific adjustments to the LiC evaluation protocol to reduce false
 
 \paragraph{Database.} Similar to code, the original database prompt does not specify an output format, making SQL extraction fragile. Our v2 prompt requires the final query in a \texttt{```sql} markdown code fence, with the constraint that only one such fence should be used for the final answer.
 
-\paragraph{Actions (function calling).} This is the only LiC task that expects multiple output artifacts (a list of function calls). Because shards are revealed incrementally, the assistant sometimes reasonably assumes it does not need to repeat previously established function calls in its final response---but evaluation only considers the last assistant message. Our v2 system prompt adds an explicit instruction to output all function calls needed to fulfill the user's complete request at each turn, ensuring the evaluated response contains the full set.
+\paragraph{Actions (function calling).} This is the only LiC task that expects multiple output artifacts (a list of function calls). Because shards are revealed incrementally, the assistant sometimes reasonably assumes it does not need to repeat previously established function calls in its final response, but evaluation only considers the last assistant message. Our v2 system prompt adds an explicit instruction to output all function calls needed to fulfill the user's complete request at each turn, ensuring the evaluated response contains the full set.
 
 \subsection{False negative identification}
 \label{app:false-neg}
 
-Through manual trace analysis, we found that the user simulator model (which converts problem shards into natural-language user messages) sometimes rephrases shards in ways that subtly distort the original meaning---introducing ambiguity, altering constraints, or omitting critical details. While LiC controls for the \emph{sharding} process by verifying that concatenated-shard performance approximates single-turn performance, it does not control for the user simulator's \emph{rephrasing} and \emph{ordering} of those shards.
+Through manual trace analysis, we found that the user simulator model (which converts problem shards into natural-language user messages) sometimes rephrases shards in ways that subtly distort the original meaning, introducing ambiguity, altering constraints, or omitting critical details. While LiC controls for the \emph{sharding} process by verifying that concatenated-shard performance approximates single-turn performance, it does not control for the user simulator's \emph{rephrasing} and \emph{ordering} of those shards.
 
 We account for this with a post-hoc false negative identification procedure applied to all tasks. For each instance where the assistant fails, we collate all user simulator messages and compare them against the original single-turn question. We query GPT-5 (prompt provided in supplemental materials) to determine whether the user simulator's messages, taken as a union, provide sufficient information to solve the original problem.
 
@@ -429,7 +461,7 @@ We provide the full text of key prompts used in our system. Template variables a
 \label{prompt:query1}
 \promptinput{assets/prompts/analyzer_query1_task_spec.txt}
 
-The analyzer sees \emph{only} the system message and user messages---assistant messages are structurally excluded. This is the ``hard attention'' design described in Section~\ref{sec:cognitive-hazard}.
+The analyzer sees \emph{only} the system message and user messages; assistant messages are structurally excluded. This is the ``hard attention'' design described in Section~\ref{sec:cognitive-hazard}.
 
 \refstepcounter{promptctr}
 \paragraph{Prompt \thepromptctr: Subtask 2 --- Approach evaluation.}
@@ -515,7 +547,7 @@ Following \citet{huang2026context}, WildChat turns are classified into three typ
 \section{Soft vs.\ hard attention}
 \label{app:soft-attention}
 
-Structural exclusion of assistant messages (hard attention) exploits a property of LiC: user messages alone fully specify the task. In realistic settings, the task may depend on prior assistant work---for example, when a user says ``sharpen the phrasing in sentence 2,'' the referent exists only in the assistant's output. \citet{huang2026context} observe similar cases where user messages alone are insufficient for understanding the task.
+Structural exclusion of assistant messages (hard attention) exploits a property of LiC: user messages alone fully specify the task. In realistic settings, the task may depend on prior assistant work. For example, when a user says ``sharpen the phrasing in sentence 2,'' the referent exists only in the assistant's output. \citet{huang2026context} observe similar cases where user messages alone are insufficient for understanding the task.
 
 We introduce a \emph{soft-attention} variant where Subtask~1 sees the full conversation but explicitly reasons through source attribution: listing user-stated requirements with provenance, flagging assistant-originated interpretations as hypotheses, and writing the specification from user-grounded requirements only. We call this ``soft attention'' because the model must rely on transformer attention to selectively weight user-grounded information, rather than having polluting content physically removed from its context.
 
@@ -566,7 +598,7 @@ Memory-based decontamination (using hard-attention specs as oracle targets to le
 \label{tab:wildchat-memory}
 \end{table}
 
-We evaluate two learning regimes. \emph{Online}: reflections update the cheatsheet incrementally as problems are solved in batches, so later problems benefit from accumulated principles---a form of continual test-time learning. \emph{Offline}: a set of training trajectories is used to initialize the cheatsheet via a Reflect-then-Unify pipeline (individual reflections followed by a consolidation pass), and the frozen cheatsheet is applied at evaluation time. The offline regime provides a controlled comparison where the only variable is the presence of the cheatsheet. On LiC, we use online learning. On WildChat, we use the offline regime with a train/eval split (one-third training, two-thirds evaluation) to avoid confounding memory quality with ordering effects and to test cross-domain transfer.
+We evaluate two learning regimes. \emph{Online}: reflections update the cheatsheet incrementally as problems are solved in batches, so later problems benefit from accumulated principles, a form of continual test-time learning. \emph{Offline}: a set of training trajectories is used to initialize the cheatsheet via a Reflect-then-Unify pipeline (individual reflections followed by a consolidation pass), and the frozen cheatsheet is applied at evaluation time. The offline regime provides a controlled comparison where the only variable is the presence of the cheatsheet. On LiC, we use online learning. On WildChat, we use the offline regime with a train/eval split (one-third training, two-thirds evaluation) to avoid confounding memory quality with ordering effects and to test cross-domain transfer.
 
 \section{Trajectory example: WildChat Maven debugging}
 \label{app:trajectories}
@@ -575,15 +607,15 @@ We present a representative WildChat conversation where context curation (S2) ou
 
 \subsection{Conversation summary}
 
-The user runs \texttt{mvn clean install} and encounters a sequence of errors. Early turns establish the environment (GitHub Codespaces) and initial diagnosis (JRE vs.\ JDK). By Turn~8, the user reports \emph{``Still getting: Fatal error compiling: error: invalid target release: 17''} after following the assistant's prior suggestion---a classic \texttt{no\_feedback} turn where the user implicitly references the prior assistant response without providing explicit corrective feedback.
+The user runs \texttt{mvn clean install} and encounters a sequence of errors. Early turns establish the environment (GitHub Codespaces) and initial diagnosis (JRE vs.\ JDK). By Turn~8, the user reports \emph{``Still getting: Fatal error compiling: error: invalid target release: 17''} after following the assistant's prior suggestion, a classic \texttt{no\_feedback} turn where the user implicitly references the prior assistant response without providing explicit corrective feedback.
 
 \subsection{Turn 8: three conditions compared}
 
-\paragraph{AO (assistant-omitted).} With all prior assistant messages replaced by \texttt{[Response provided]} placeholders, AO re-suggests \texttt{apt-get install} and checking \texttt{java -version}---steps the user has already performed. AO cannot connect ``still getting'' to what was already tried.
+\paragraph{AO (assistant-omitted).} With all prior assistant messages replaced by \texttt{[Response provided]} placeholders, AO re-suggests \texttt{apt-get install} and checking \texttt{java -version}, repeating steps the user has already performed. AO cannot connect ``still getting'' to what was already tried.
 
 \paragraph{FC (full context).} FC sees the full history and includes \texttt{update-alternatives} commands, but still partially repeats earlier suggestions. The model anchors on the same diagnostic approach (checking \texttt{java -version}) rather than recognizing that the user already tried the basic install without resolution.
 
-\paragraph{S2 (context curation).} The analyzer identifies that the prior assistant's diagnostic reasoning was flawed---relying on \texttt{java -version} text parsing rather than checking \texttt{javac} directly---and that the conversation was stuck repeating an insufficient fix. The rewritten context preserves the correct diagnosis (Maven needs a JDK) while removing the flawed reasoning. S2's response:
+\paragraph{S2 (context curation).} The analyzer identifies that the prior assistant's diagnostic reasoning was flawed (relying on \texttt{java -version} text parsing rather than checking \texttt{javac} directly) and that the conversation was stuck repeating an insufficient fix. The rewritten context preserves the correct diagnosis (Maven needs a JDK) while removing the flawed reasoning. S2's response:
 \begin{itemize}
     \item Correctly diagnoses why the error persists: Maven may use a different Java than what \texttt{java -version} reports
     \item Provides non-redundant steps (does not re-suggest things already tried)
@@ -609,7 +641,7 @@ All three pairwise comparisons were judged by GPT-5-mini:
 
 \subsection{Conversation-level results}
 
-Across all 7 evaluated turns, S2 wins every pairwise comparison against both baselines (Table~\ref{tab:traj-turns}). On turns where AO beats FC (turns 2, 10, 12, 14), context pollution hurts more than context loss---but S2 still wins by removing the pollution while preserving useful context.
+Across all 7 evaluated turns, S2 wins every pairwise comparison against both baselines (Table~\ref{tab:traj-turns}). On turns where AO beats FC (turns 2, 10, 12, 14), context pollution hurts more than context loss, yet S2 still wins by removing the pollution while preserving useful context.
 
 \begin{table}[h]
 \centering
@@ -668,7 +700,7 @@ A growing line of work uses persistent memory to improve LLM capabilities withou
 
 THREAD~\citep{schroeder2025thread} spawns sub-agents that report summarized results back to a main thread, reducing context accumulation. Recursive Language Models~\citep{zhang2025rlm} treat context as a variable manipulated via code operations in a REPL, enabling a controller LLM to programmatically decompose and recursively query sub-calls. Context Folding~\citep{sun2025contextfolding} uses reinforcement learning (FoldGRPO) to train agents that branch into sub-trajectories and collapse intermediate steps into concise summaries, maintaining active context 10$\times$ smaller than ReAct baselines.
 
-These methods share a common goal: \emph{compaction}---fitting more reasoning into a bounded context window. Our work addresses a fundamentally different problem: \emph{context pollution}, the assistant's own prior outputs actively misleading future generation, even well within the context window. Compaction methods preserve information while reducing tokens; we selectively \emph{remove} information that is harmful. The two goals are complementary but require different analytical capabilities.
+These methods share a common goal, \emph{compaction}: fitting more reasoning into a bounded context window. Our work addresses a fundamentally different problem: \emph{context pollution}, the assistant's own prior outputs actively mislead future generation, even well within the context window. Compaction methods preserve information while reducing tokens; we selectively \emph{remove} information that is harmful. The two goals are complementary but require different analytical capabilities.
 
 U-Fold~\citep{ye2025ufold} targets multi-turn conversation with a two-stage pipeline: intent summarization (creating a TODO-list from conversation history) and data extraction (retaining only relevant tool responses). While structurally similar to our two-query decomposition, U-Fold addresses redundancy in tool responses, not self-induced pollution from the assistant's own reasoning.
 
@@ -677,9 +709,9 @@ MemoBrain~\citep{qian2026memobrain} formalizes ``executive memory'' as an online
 \section{Executive function as a design pattern}
 \label{app:exec-function-pattern}
 
-Our approach instantiates a general pattern: \emph{externalized executive function} via an agent that schedules LLM calls with custom context windows. Different subtasks of self-reflection require different context---intent extraction must be shielded from contamination, approach evaluation needs both clean intent and the full history, strategic reflection identifies unexplored alternatives. This pattern generalizes: any setting where an LLM reasons about potentially misleading context (code review, fact-checking) could benefit from structured context control. The executive function framing provides the design vocabulary: what should each reasoning step attend to, and what should it be shielded from?
+Our approach instantiates a general pattern: \emph{externalized executive function} via an agent that schedules LLM calls with custom context windows. Different subtasks of self-reflection require different context: intent extraction must be shielded from contamination, approach evaluation needs both clean intent and the full history, strategic reflection identifies unexplored alternatives. This pattern generalizes: any setting where an LLM reasons about potentially misleading context (code review, fact-checking) could benefit from structured context control. The executive function framing provides the design vocabulary: what should each reasoning step attend to, and what should it be shielded from?
 
-We do not claim the LLM is self-aware in any phenomenological sense. Rather, the system designer's knowledge of context pollution as a systematic failure mode is encoded into the agent architecture---analogous to using an external checklist to compensate for known cognitive biases.
+We do not claim the LLM is self-aware in any phenomenological sense. Rather, the system designer's knowledge of context pollution as a systematic failure mode is encoded into the agent architecture, analogous to using an external checklist to compensate for known cognitive biases.
 
 % \section{Limitations}
 % \label{app:limitations}
