@@ -123,6 +123,8 @@ Two recent works are more closely related. U-Fold~\citep{ye2025ufold} uses inten
 
 % We use the Lost in Conversation (LiC) framework~\citep{laban2025lost} for controlled evaluation. Each instance consists of a fully-specified question $q$ with ground truth answer $a$, sharded into $k$ pieces $\{s_1, \ldots, s_k\}$ revealed incrementally by a simulated user. For agentic evaluation, we extend to tau2-bench~\citep{yao2024tau}, where the assistant uses tools (API calls) to resolve customer service issues through multi-turn dialogue.
 
+We use additional LLM calls to analyze the conversation history and edit the context before each assistant turn. The analysis identifies where the assistant's approach has diverged from the user's actual intent; the edit surgically removes or restructures the polluting content while preserving correct work.
+
 \subsection{Conversation analysis via subtask decomposition}
 \label{sec:decomposition}
 
@@ -134,7 +136,7 @@ The model sees only the system message and user messages---no assistant response
 \paragraph{Subtask 2: Approach evaluation (error monitoring).}
 The model sees the specification from Subtask~1 plus the full conversation, and optionally a memory cheatsheet. It identifies what the assistant got right (\texttt{aligned}) and where it diverged (\texttt{issues}).
 
-This decomposition is empirically necessary: including assistant messages in Subtask~1 collapses effectiveness to baseline or worse (Section~\ref{sec:cognitive-hazard}).
+This decomposition is empirically necessary: Subtask~1 must be shielded from the assistant's prior reasoning, because even a model explicitly tasked as an independent reviewer anchors on the assistant's approach. Including assistant messages in Subtask~1 collapses effectiveness to baseline or worse (Section~\ref{sec:cognitive-hazard}). The two-query design ensures that at least one stage---task specification extraction---is completely unaffected by context pollution.
 
 \subsection{Intervention strategies}
 \label{sec:strategies}
@@ -153,22 +155,16 @@ The analytical core (Section~\ref{sec:decomposition}) is the contribution; the i
 
 \paragraph{Computational overhead.} The analyzer adds 2 LLM calls per turn (spec extraction + approach evaluation), plus 1 call for Rewrite. On tau2-bench, this increases average cost from \$0.51 to \$0.60--0.67 per task (Table~\ref{tab:tau2-main}). Gating reduces overhead by skipping intervention when no issues are found.
 
-\subsection{Agentic adaptation}
-\label{sec:agentic-methods}
-
-For tau2-bench, we make three modifications: (1)~the analyzer explicitly tracks environment state (account settings, diagnostic results) revealed through tool calls; (2)~the analysis is reframed as ``strategic reflection,'' identifying unexplored diagnostic avenues rather than just flagging errors; and (3)~resets are gated and capped at 3 per conversation to prevent infinite loops.
-
-\subsection{Toward general-purpose analysis: soft attention}
-\label{sec:soft-attention}
-
-Structural exclusion of assistant messages exploits a property of LiC: user messages alone fully specify the task. In realistic settings, the task may depend on prior assistant work. We introduce a \emph{soft-attention} variant where the model sees the full conversation but explicitly reasons through source attribution---listing user-stated requirements with provenance, flagging assistant-originated interpretations as hypotheses, and writing the specification from user-grounded requirements only. We also test \emph{memory-based decontamination}: using hard-attention specs as oracle targets, the model learns decontamination principles via the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet}.
-
 \subsection{Memory-based learning}
 \label{sec:memory}
 
-We apply the Dynamic Cheatsheet to test whether curation quality improves with experience. The cheatsheet accumulates analysis principles across problem instances, injected into the analyzer's compare query (Subtask~2). For hard-attention, memory targets the approach evaluation step; for soft-attention, it targets spec extraction. We cap cheatsheet length at 1500 words.
+We explore whether analysis quality improves with experience, using parameter-update-free learning via the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet}---a minimal memory-based approach.
 
-On LiC, memory is learned and evaluated online: each batch updates the cheatsheet, and later problems benefit from accumulated principles. To test cross-domain transfer on WildChat, we use a train/eval split: one-third of turns are used for offline learning (Reflect-then-Unify on training results), and the frozen cheatsheet is evaluated on the remaining two-thirds. This avoids confounding memory quality with ordering effects and provides a controlled comparison where the only variable is the presence of the cheatsheet.
+\paragraph{Mechanism.} After each problem instance, a reflection query examines the analysis and outcome, abstracting transferable takeaways (e.g., common pitfalls, effective consolidation strategies). These are used to update a ``cheatsheet''---a plain-text memory of strategies and pitfalls accumulated across instances. The cheatsheet is injected into the analyzer's approach evaluation query (Subtask~2) on subsequent problems, providing learned priors for the analysis. We cap cheatsheet length at 1500 words to prevent unbounded growth from degrading quality.
+
+\paragraph{Update strategies.} We evaluate two learning regimes. \emph{Online}: reflections update the cheatsheet incrementally as problems are solved in batches, so later problems benefit from accumulated principles---a form of continual test-time learning. \emph{Offline}: a set of training trajectories is used to initialize the cheatsheet via a Reflect-then-Unify pipeline (individual reflections followed by a consolidation pass), and the frozen cheatsheet is applied at evaluation time. The offline regime provides a controlled comparison where the only variable is the presence of the cheatsheet.
+
+\paragraph{Evaluation.} On LiC, we use online learning. On WildChat, we use the offline regime with a train/eval split (one-third training, two-thirds evaluation) to avoid confounding memory quality with ordering effects and to test cross-domain transfer.
 
 
 %% ============================================================
@@ -176,25 +172,21 @@ On LiC, memory is learned and evaluated online: each batch updates the cheatshee
 \label{sec:experiments}
 %% ============================================================
 
-\subsection{Evaluation settings}
+Simulating multi-turn conversations requires $N\times$ more LLM calls than single-turn evaluation (where $N$ is the average conversation length), making experiments substantially more expensive than standard benchmarks. We use GPT-5-mini as the primary assistant and analyzer throughout, with additional models tested for generalization.
 
-\paragraph{Lost in Conversation (LiC).} We evaluate on four task domains: math word problems, code generation, SQL generation, and parallel function calling. To isolate intervention effects from conversational variance, all strategies share the same baseline conversation prefix and only the final turn is regenerated with the intervention applied (replay mode). Per-task sample counts and filtering details are in Appendix~\ref{app:user-sim-qc}.
+\paragraph{Lost in Conversation (LiC).}
+We evaluate on the LiC framework~\citep{laban2025lost}, which provides controlled evaluation of multi-turn performance degradation. Each instance consists of a fully-specified question sharded into pieces revealed incrementally by a simulated user across multiple turns. We evaluate on four task domains: math word problems, code generation, database (SQL generation), and function calling (reported as ``actions'' in tables). To isolate intervention effects from conversational variance, all strategies share the same baseline conversation prefix and only the final turn is regenerated with the intervention applied (replay mode). We compare our methods (Augment, Reset, Gated Reset) against the unmodified baseline and two prior-work approaches: Assistant Messages Omitted (AO;~\citealt{huang2026context}) and Concatenate User (ERGO-style;~\citealt{khalid2025ergo}). Because LiC tasks are self-contained---user messages alone fully specify the problem---AO and Concatenate User effectively collapse the multi-turn setting back to the single-turn case, serving as upper bounds rather than realistic baselines. Per-task sample counts are in Appendix~\ref{app:sample-counts}.
 
-\paragraph{Tau2-bench.} We evaluate on the \texttt{telecom\_small} subset of tau2-bench~\citep{yao2024tau}, using GPT-5-mini for all components.
+\paragraph{CollabLLM.}
+We evaluate on MATH-Hard and BigCodeBench using the CollabLLM multi-turn conversation framework, providing a slightly more realistic setting than LiC with natural back-and-forth between user and assistant. Evaluation details are in Appendix~\ref{app:collabllm}.
 
-\paragraph{WildChat.} We reproduce the evaluation of \citet{huang2026context} on WildChat-1M conversations~\citep{zhao2024wildchat}, filtered per Huang's criteria (English, technical, 5--10 rounds). Phase~1 identifies turns where assistant omission (AO) degrades quality; Phase~2 evaluates our strategies on all turns. Pairwise judgments use Huang's judge prompt on quality and on-topic dimensions.
+\paragraph{WildChat.}
+We reproduce the evaluation of \citet{huang2026context} on WildChat-1M conversations~\citep{zhao2024wildchat}, filtered per Huang's criteria (English, technical, 5--10 rounds). Phase~1 identifies turns where AO degrades quality; Phase~2 evaluates our strategies on all turns. Pairwise judgments use Huang's judge prompt on quality and on-topic dimensions. Unlike LiC, WildChat conversations are stateful---the user may reference prior assistant work---so AO is not an upper bound and can actively hurt performance.
 
-\paragraph{CollabLLM.} We evaluate on MATH-Hard and BigCodeBench. Standard BigCodeBench evaluation uses test-case execution requiring exact function signatures, but the user simulator never conveys these signatures exactly, making pass\_rate systematically zero for all conditions. We develop a conversation-aware LLM judge (GPT-5) that evaluates the assistant's code against the user's actual intent as expressed in the conversation, assessing functional correctness rather than signature conformance.
+\paragraph{Tau2-bench.}
+As a preliminary exploration of the agentic setting, we evaluate on the \texttt{telecom\_small} subset of tau2-bench~\citep{yao2024tau}. This setting demonstrates that omitting assistant messages in stateful, tool-use conversations is catastrophically destructive. Agentic adaptation details are in Appendix~\ref{app:agentic-methods}.
 
-\paragraph{Models.} GPT-5-mini is used as the primary assistant and analyzer for the main experiments. We additionally evaluate GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active, open-weight) on LiC and WildChat (Section~\ref{sec:multi-model}). See Appendix~\ref{app:sample-counts} for full model assignments per setting.
-
-\subsection{Conditions}
-
-\paragraph{LiC.} We compare our methods (Augment, Reset, Gated Reset, with and without memory) against the baseline and two prior-work baselines: Omit Assistant~\citep{huang2026context} and Concatenate User (ERGO-style;~\citealt{khalid2025ergo}).
-
-\paragraph{Tau2-bench.} We compare the baseline, Assistant Omission, Gated Reset, and Gated Rewrite across two prompt framings (pollution-detection vs.\ strategic-reflection).
-
-\paragraph{Soft attention.} On held-out LiC test splits, we evaluate chain-of-thought soft-attention variants with and without memory-based decontamination, comparing against hard-attention oracles.
+\paragraph{Models.} GPT-5-mini is used as the primary assistant and analyzer. We additionally evaluate GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active, open-weight) on LiC and WildChat. See Appendix~\ref{app:sample-counts} for full model assignments.
 
 
 %% ============================================================
@@ -202,10 +194,8 @@ On LiC, memory is learned and evaluated online: each batch updates the cheatshee
 \label{sec:results}
 %% ============================================================
 
-\subsection{Controlled study: Lost in Conversation}
+\subsection{Lost in Conversation}
 \label{sec:lic-results}
-
-LiC tasks are self-contained: user messages alone fully specify the problem, so blanket assistant omission (which recovers the single-turn setting) serves as a strong upper bound. Our analysis-based methods close much of this gap, and ablations reveal why.
 
 \begin{table}[t]
 \centering
@@ -214,58 +204,29 @@ LiC tasks are self-contained: user messages alone fully specify the problem, so 
 \textbf{Strategy} & \textbf{Math} & \textbf{Code} & \textbf{Database} & \textbf{Actions} \\
 \midrule
 Baseline & 60\% & 16\% & 4\% & 35\% \\
-Omit Assistant \citep{huang2026context} & 85\% & 78\% & 32\% & 83\% \\
-Concatenate User (ERGO-style) & 84\% & 68\% & 32\% & 87\% \\
+\midrule
+\multicolumn{5}{l}{\emph{Upper bounds (collapse to single-turn)}} \\
+\quad AO \citep{huang2026context} & 85\% & 78\% & 32\% & 83\% \\
+\quad Concatenate User (ERGO-style) & 84\% & 68\% & 32\% & 87\% \\
 \midrule
 Augment (ours) & 80\% & 56\% & 32\% & 48\% \\
 Reset (ours) & 75\% & 61\% & \textbf{48\%} & 52\% \\
 Gated Reset (ours) & 75\% & 72\% & 44\% & 74\% \\
 \bottomrule
 \end{tabular}
-\caption{LiC accuracy by strategy (no memory). On database, our methods outperform simple baselines through schema-grounded consolidation. All strategies include an instruction to consolidate parallel function calls in the final response for actions evaluation.}
+\caption{LiC accuracy by strategy. AO and Concatenate User serve as upper bounds: they collapse the multi-turn setting to single-turn by removing or consolidating assistant messages. On database, our methods outperform these upper bounds through schema-grounded consolidation.}
 \label{tab:lic-main}
 \end{table}
 
-\begin{table}[t]
-\centering
-\begin{tabular}{lcccc}
-\toprule
-\textbf{Strategy} & \textbf{Math} & \textbf{Code} & \textbf{Database} & \textbf{Actions} \\
-\midrule
-Baseline & 60\% & 16\% & 4\% & 35\% \\
-\quad + Memory & 55\% & 21\% & 4\% & 35\% \\
-\midrule
-Augment & 80\% & 56\% & 32\% & 48\% \\
-\quad + Memory & \textbf{90\%} & 68\% & 44\% & 9\% \\
-Reset & 75\% & 61\% & 48\% & 52\% \\
-\quad + Memory & 85\% & 68\% & 44\% & 52\% \\
-\bottomrule
-\end{tabular}
-\caption{Effect of memory. Memory amplifies analysis-based methods: Augment + Memory achieves 90\% on math, exceeding Omit Assistant's 85\%.}
-\label{tab:lic-memory}
-\end{table}
-
-\paragraph{Simple baselines are strong when rederivation is cheap.}
-On math and code, simply omitting assistant messages matches or exceeds our Augment strategy (Table~\ref{tab:lic-main}). When the model can solve from scratch, removing the polluting messages is sufficient.
-
-\paragraph{Analysis adds value through intelligent consolidation.}
-Our methods outperform simple baselines on \textbf{database} (Reset: 48\% vs.\ 32\%), where raw fragmented user messages are insufficient and schema-grounded consolidation helps. With memory, Augment achieves 90\% on math, exceeding Omit Assistant (85\%).
+\paragraph{Context editing closes most of the gap to upper bounds.}
+On math, Augment reaches 80\%, closing 80\% of the 25pp gap between baseline and AO (Table~\ref{tab:lic-main}). On code, Gated Reset reaches 72\%, closing 90\% of the gap. On database, Reset (48\%) \emph{exceeds} both upper bounds (32\%), because intelligent consolidation outperforms na\"ive message removal when fragmented user messages require schema-grounded assembly.
 
 \paragraph{Context removal provides additional benefit.}
-Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--16pp) using identical analysis. The difference is whether the assistant sees the polluted history or a clean context, confirming that anchoring on prior responses is a separable problem from intent fragmentation.
+Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--16pp) using identical analysis. The difference is whether the assistant sees the polluted history or a clean context, confirming that anchoring on prior responses is separable from intent fragmentation.
 
-\paragraph{Memory amplifies analysis quality.}
-Memory provides consistent benefit for analysis-based methods (Table~\ref{tab:lic-memory}), helping the analyzer produce more decisive specifications and more concrete error identification.
-
-
-\subsection{Generalization across model families}
+\paragraph{Generalization across model families.}
 \label{sec:multi-model}
-
-The results above use GPT-5-mini throughout. A natural question is whether context editing addresses a quirk of one model or a general phenomenon. We evaluate three additional models---GPT-5 (full-size), DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)---spanning proprietary and open-weight architectures at different scales.
-
-\paragraph{Problem selection.} Because stronger models solve easier problems regardless of context pollution, we re-ran the subset selection protocol using GPT-5.2 LiC logs (instead of GPT-5-mini), selecting the 20 hardest true-negative instances per task to ensure a challenging set for this model class.
-
-\paragraph{Protocol.} Each model serves as both assistant (final-turn regeneration) and analyzer. All models replay conversations originally generated by GPT-5.2; the Baseline reflects how model $X$ handles GPT-5.2's polluted context, while Reset reflects model $X$ given a clean context derived from its own analysis. User and system agents use GPT-4o-mini throughout. We compare Baseline against unconditional Reset (the best-performing strategy in Section~\ref{sec:lic-results}).
+We evaluate three additional models---GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)---on a harder problem subset selected to remain challenging for stronger models (protocol details in Appendix~\ref{app:multi-model-protocol}). Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains ranging from +15pp to +70pp across proprietary and open-weight architectures at different scales. The sole exception is GPT-5 on actions, where the baseline is already near ceiling (85\%).
 
 \begin{table}[t]
 \centering
@@ -286,50 +247,12 @@ The results above use GPT-5-mini throughout. A natural question is whether conte
  & Reset & \textbf{75\%} & \textbf{64\%} & \textbf{75\%} & \textbf{80\%} & +42pp \\
 \bottomrule
 \end{tabular}
-\caption{Multi-model LiC results on the hard subset ($n$=20 per task, selected using GPT-5.2). Reset improves accuracy for 15 of 16 model--task pairs. Denominators vary slightly for code (14--15 valid samples due to evaluation errors); percentages use valid denominators. The sole regression is GPT-5 actions, where the baseline is already near ceiling (85\%).}
+\caption{Multi-model LiC results on a hard subset ($n$=20 per task). Reset improves accuracy for 15 of 16 model--task pairs across four architectures.}
 \label{tab:multi-model}
 \end{table}
 
-\paragraph{Context editing generalizes across architectures.}
-Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains ranging from +15pp to +70pp. The sole exception is GPT-5 on actions, where the baseline is already near ceiling (85\%) and Reset discards useful conversational context.
 
-\paragraph{Smaller models benefit more.}
-Average gains scale inversely with model capability: Qwen 3.5 (3B active) gains +42pp, DeepSeek V3.2 (37B active) gains +39pp, GPT-5-mini gains +26pp, and GPT-5 gains +20pp. This is intuitive: smaller models are more susceptible to being misled by polluted context, so cleaning that context provides a larger relative benefit. It also suggests context editing is a cost-effective intervention for smaller, cheaper models.
-
-\paragraph{Stronger baselines do not diminish gains.}
-Qwen's math baseline is already the highest across all models (55\%), yet Reset still adds +20pp. GPT-5's database baseline is 27\%, and Reset adds +38pp. The intervention does not merely help weak models reach a capability ceiling---it helps all models overcome context pollution regardless of their baseline capability.
-
-
-\subsection{The cognitive hazard}
-\label{sec:cognitive-hazard}
-
-We test whether structural exclusion of assistant messages is necessary by progressively ablating the analyzer: removing hard attention (allowing the spec extractor to see assistant messages), then collapsing to a single pass.
-
-\begin{table}[t]
-\centering
-\begin{tabular}{lccc}
-\toprule
-\textbf{Configuration} & \textbf{Math} & \textbf{Code} & \textbf{Database} \\
-\midrule
-Context Edit (Augment) & \textbf{80\%} & \textbf{56\%} & \textbf{32\%} \\
-\quad $-$ hard attention & 40\% & 11\% & 8\% \\
-\quad\quad $-$ subtask decomposition & 55\% & 21\% & 4\% \\
-\midrule
-Baseline (no analysis) & 60\% & 16\% & 4\% \\
-\bottomrule
-\end{tabular}
-\caption{Progressive ablation of analyzer architecture (Augment, no memory). Removing hard attention collapses performance to below baseline; chaining contaminated calls further amplifies errors.}
-\label{tab:cognitive-hazard}
-\end{table}
-
-\paragraph{Assistant messages are a cognitive hazard.}
-Allowing the spec extractor to see assistant messages collapses performance to \emph{below baseline} on all tasks (Table~\ref{tab:cognitive-hazard}): 40\% vs.\ 60\% on math, 11\% vs.\ 16\% on code. Even a model explicitly tasked as an independent reviewer anchors on the assistant's reasoning.
-
-\paragraph{Contamination amplifies through chained calls.}
-Counterintuitively, collapsing to a single pass \emph{partially recovers} performance (55\% vs.\ 40\% on math). When a contaminated Subtask~1 passes a biased specification to Subtask~2 as authoritative, errors compound. This is a cautionary finding for multi-stage LLM pipelines: decomposition is only beneficial when earlier stages produce clean outputs.
-
-
-\subsection{Realistic conversations: CollabLLM and WildChat}
+\subsection{CollabLLM}
 \label{sec:collab-results}
 
 \begin{table}[t]
@@ -347,11 +270,13 @@ BigCodeBench (matched, $n$=12) & 58.3\% & \textbf{75.0\%} & +16.7pp \\
 \label{tab:collabllm}
 \end{table}
 
-\paragraph{CollabLLM.}
-Despite using single-pass analysis without structural exclusion, Rewrite improves accuracy on both tasks (Table~\ref{tab:collabllm}), most notably +20pp on BigCodeBench. Context rewriting removes accumulated confusion from early exchanges while preserving correct work, and reduces assistant tokens by 74\% on math with no cost increase.
+Despite using single-pass analysis without structural exclusion, Rewrite improves accuracy on both tasks (Table~\ref{tab:collabllm}), most notably +20pp on BigCodeBench. Context rewriting removes accumulated confusion from early exchanges while preserving correct work.
 
-\paragraph{WildChat.}
-Phase~1 reproduces Huang's finding: assistant omission (AO) helps on \texttt{new\_ask} and \texttt{feedback} turns but \emph{hurts} on stateful \texttt{no\_feedback} turns (FC wins 53.6\% vs.\ AO 42.0\%).
+
+\subsection{WildChat}
+\label{sec:wildchat-results}
+
+Unlike LiC, WildChat conversations are stateful: AO is not an upper bound and can actively degrade quality. Phase~1 reproduces Huang's finding: AO helps on \texttt{new\_ask} and \texttt{feedback} turns but \emph{hurts} on stateful \texttt{no\_feedback} turns (FC wins 53.6\% vs.\ AO 42.0\%).
 
 \begin{table}[t]
 \centering
@@ -364,19 +289,18 @@ Gated Reset & 173 & \textbf{86.1\%} & \textbf{83.8\%} & \textbf{74.6\%} & 72.3\%
 Rewrite & 178 & 82.6\% & 80.3\% & 68.5\% & 84.3\% \\
 \bottomrule
 \end{tabular}
-\caption{WildChat quality win rates on all evaluated turns (pairwise LLM judge). Gated Reset achieves the highest win rates while intervening on only 72\% of turns.}
+\caption{WildChat quality win rates (pairwise LLM judge). All strategies outperform both AO and full context (FC). Gated Reset achieves the highest win rates while intervening on only 72\% of turns.}
 \label{tab:wildchat-quality}
 \end{table}
 
-Phase~2 evaluates our strategies on all turns unconditionally (Table~\ref{tab:wildchat-quality}). Gated Reset achieves 86.1\% win rate vs.\ AO and 83.8\% vs.\ FC while intervening on only 72\% of turns. Its gating is intelligent: the edit rate on \texttt{no\_feedback} turns (62.7\%) is lower than on \texttt{new\_ask} (78.1\%) and \texttt{feedback} (78.6\%) turns, correctly intervening less on stateful turns that are more often on track. On AO failure turns specifically---cases where Huang et al.\ identify blanket omission as actively harmful---Gated Reset achieves 93.3\% win rate vs.\ AO.
+\paragraph{Context editing outperforms both AO and full context.}
+Gated Reset achieves 86.1\% win rate vs.\ AO and 83.8\% vs.\ FC while intervening on only 72\% of turns (Table~\ref{tab:wildchat-quality}). Its gating is intelligent: the edit rate on \texttt{no\_feedback} turns (62.7\%) is lower than on \texttt{new\_ask} (78.1\%) and \texttt{feedback} (78.6\%) turns, correctly intervening less on stateful turns. On turns where Huang et al.\ identify AO as actively harmful, Gated Reset achieves a 93.3\% win rate vs.\ AO.
 
 \paragraph{Multi-model WildChat.}
-We also run Phase~2 with DeepSeek V3.2 as respondent, judge, and analyzer (regenerating all baselines for same-model comparison). DeepSeek shows moderate gains: Rewrite wins 61.8\% vs.\ AO 28.9\% on quality, and Reset wins 59.2\% vs.\ AO 31.6\%. These are smaller than GPT-5-mini's $\sim$85\% win rates but consistent in direction. We exclude GPT-5 WildChat results because WildChat relies on pairwise LLM judging (unlike LiC's ground-truth evaluation), and GPT-5 serving as both respondent and self-judge introduces compounding confounds that make the comparison unreliable. GPT-5's LiC results (Table~\ref{tab:multi-model}), which use deterministic evaluation, show clear gains.
-
-\paragraph{Format bias caveat.} The restructured output format may present better to the LLM judge, inflating absolute win rates. However, relative comparisons between strategies (which share similar formats) are less affected, and the on-topic dimension shows more ties than quality, suggesting the judge discriminates content rather than format.
+DeepSeek V3.2 (serving as respondent, judge, and analyzer) shows consistent gains: Rewrite wins 61.8\% vs.\ AO 28.9\%, and Reset wins 59.2\% vs.\ AO 31.6\%. These are smaller than GPT-5-mini's gains but consistent in direction.
 
 
-\subsection{Agentic evaluation: tau2-bench}
+\subsection{Tau2-bench}
 \label{sec:tau2-results}
 
 \begin{table}[t]
@@ -386,81 +310,19 @@ We also run Phase~2 with DeepSeek V3.2 as respondent, judge, and analyzer (regen
 \textbf{Strategy} & \textbf{Success Rate} & \textbf{Cost} \\
 \midrule
 Baseline & 45--55\% & \$0.51 \\
-Omit Assistant & 0\% & \$0.36 \\
+AO & 0\% & \$0.36 \\
 Gated Reset (ours) & \textbf{55--65\%} & \$0.60--0.67 \\
 \bottomrule
 \end{tabular}
-\caption{Tau2-bench \texttt{telecom\_small} results. Omit Assistant is catastrophically destructive in agentic settings. Gated Reset consistently exceeds the baseline.}
+\caption{Tau2-bench \texttt{telecom\_small} results. AO is catastrophically destructive in agentic settings. Gated Reset consistently exceeds the baseline.}
 \label{tab:tau2-main}
 \end{table}
 
-\paragraph{Assistant omission is catastrophic.}
-Blanket omission achieves \textbf{0\%} (Table~\ref{tab:tau2-main}). Stripping assistant messages and tool results causes the agent to lose all diagnostic progress and enter infinite re-lookup loops. This confirms that omission-based approaches are fundamentally incompatible with stateful settings.
+\paragraph{AO is catastrophic in agentic settings.}
+Blanket omission achieves \textbf{0\%} (Table~\ref{tab:tau2-main}): stripping assistant messages and tool results causes the agent to lose all diagnostic progress and enter infinite re-lookup loops. This confirms that omission-based approaches are fundamentally incompatible with stateful settings.
 
 \paragraph{Context editing maintains or improves performance.}
-Gated Reset achieves 55--60\% across two confirmation runs (Table~\ref{tab:tau2-main}), consistently above the 45--55\% baseline. The strategic reflection component (``what hasn't been tried?'') redirects the agent toward unexplored diagnostic avenues. We also tested a Gated Rewrite variant, which underperformed because the LLM rewrite step loses concrete tool data through summarization---confirming that programmatic templates are critical when structured data must be preserved exactly.
-
-\paragraph{Context pollution is not the dominant failure mode.}
-Diagnostic analysis (Appendix~\ref{app:tau2-diagnostic}) reveals that only 1 of 11 baseline failures shows clear anchoring; the dominant modes are missing domain knowledge (4/11) and step budget exhaustion (4/11). Gated Reset's gains come primarily from cognitive flexibility---redirecting the agent to new strategies---rather than inhibitory control alone.
-
-
-\subsection{Preliminary: soft attention and decontamination learning}
-\label{sec:decontamination}
-
-\begin{table}[t]
-\centering
-\begin{tabular}{lccc}
-\toprule
-\textbf{Condition} & \textbf{Math} & \textbf{Code} & \textbf{Database} \\
-\midrule
-\multicolumn{4}{l}{\emph{Augment}} \\
-\quad Soft-cot (no memory) & 40\% & 13\% & 31\% \\
-\quad Soft-cot + memory & 56\% & 14\% & \textbf{46\%} \\
-\quad Hard attention (oracle) & \textbf{80\%} & \textbf{40\%} & 54\% \\
-\midrule
-\multicolumn{4}{l}{\emph{Reset}} \\
-\quad Soft-cot (no memory) & 42\% & 23\% & 31\% \\
-\quad Soft-cot + memory & 42\% & 25\% & \textbf{46\%} \\
-\quad Hard attention (oracle) & \textbf{67\%} & \textbf{46\%} & 54\% \\
-\bottomrule
-\end{tabular}
-\caption{Soft-attention results on held-out test splits. Memory closes up to 65\% of the gap to hard attention on database.}
-\label{tab:soft-attention}
-\end{table}
-
-Reset outperforms Augment even with contaminated specs (code: 23\% vs.\ 13\%), confirming that context pollution and spec contamination are separable problems. Memory-based decontamination shows its strongest effect on database (+15pp), closing 65\% of the gap to hard attention. The learned principles converge on structured heuristics: ``build a user-only spec first, then overlay assistant suggestions as hypotheses.'' Code remains resistant (+1--2pp), suggesting more structurally diverse contamination patterns.
-
-\subsection{Memory-based learning across settings}
-\label{sec:memory-results}
-
-Across hard-attention (Table~\ref{tab:lic-memory}), soft-attention (Table~\ref{tab:soft-attention}), and real conversations (Table~\ref{tab:wildchat-memory}), the Dynamic Cheatsheet consistently improves analysis quality when there is headroom for improvement.
-
-\begin{table}[t]
-\centering
-\begin{tabular}{lccc}
-\toprule
-\textbf{Condition} & \textbf{vs AO} & \textbf{vs FC} & \textbf{$\Delta$ vs AO} \\
-\midrule
-\multicolumn{4}{l}{\emph{DeepSeek V3.2 (eval split, $n$=51, judged by GPT-5-mini)}} \\
-\quad Reset (baseline) & 72.5\% & 72.5\% & --- \\
-\quad Reset + memory & \textbf{86.3\%} & \textbf{80.4\%} & \textbf{+13.8pp} \\
-\midrule
-\multicolumn{4}{l}{\emph{GPT-5-mini (online, $n$=75, self-judged)}} \\
-\quad Reset (baseline) & 90.8\% & 86.8\% & --- \\
-\quad Reset + memory & 86.7\% & 80.0\% & $-$4.1pp \\
-\bottomrule
-\end{tabular}
-\caption{WildChat memory results. Memory improves DeepSeek's Reset win rate by +13.8pp when there is headroom; GPT-5-mini's near-ceiling baseline (91\%) leaves no room for improvement. DeepSeek is judged by GPT-5-mini (cross-model) to avoid the self-judge confound. Memory is learned from 25 training turns and frozen for evaluation.}
-\label{tab:wildchat-memory}
-\end{table}
-
-\paragraph{Memory helps most where the baseline is weakest.} On LiC, memory pushes Augment to 90\% on math, exceeding Omit Assistant's 85\% (Table~\ref{tab:lic-memory}). On soft-attention, it closes 65\% of the gap to hard-attention oracles on database. On WildChat, memory improves DeepSeek's Reset win rate from 72.5\% to 86.3\% vs.\ AO---a +13.8pp gain---but has no effect on GPT-5-mini (91\% baseline, ceiling effect). The pattern is consistent: memory is most valuable when the analyzer has room to improve.
-
-\paragraph{Feedback turns show the largest gain.} Breaking down by turn type, feedback turns improve from 70\% to 100\% ($n$=10, +30pp), compared to +12pp on no\_feedback and +6pp on new\_ask. Feedback turns were previously the weakest category for context editing (Section~\ref{sec:collab-results}): the user references specific prior assistant work, and a na\"ive reset discards those details. The learned cheatsheet addresses this directly, learning to preserve user references to prior output and prefer in-place corrections over full resets when the user is building on specific work.
-
-\paragraph{Small training sets suffice.} The WildChat cheatsheet was learned from just 25 training turns in a single Reflect-then-Unify pass and generalized to 51 unseen evaluation turns. This suggests WildChat conversations contain learnable patterns that transfer, and that the memory system is sample-efficient enough to be practical.
-
-\paragraph{Context editing is a learnable skill.} Taken together, these results show that context editing quality improves with experience across benchmarks and model families, without any parameter updates. The analyzer accumulates principles---structured heuristics like ``build a user-only spec first, then overlay assistant suggestions as hypotheses''---that transfer across problem instances and conversation types.
+Gated Reset achieves 55--60\% across two confirmation runs, consistently above the 45--55\% baseline. Diagnostic analysis (Appendix~\ref{app:tau2-diagnostic}) reveals that only 1 of 11 baseline failures shows clear context pollution; the dominant failure modes are missing domain knowledge (4/11) and step budget exhaustion (4/11). Gated Reset's gains come primarily from redirecting the agent toward unexplored diagnostic avenues rather than from removing polluted content.
 
 
 %% ============================================================
@@ -470,9 +332,131 @@ Across hard-attention (Table~\ref{tab:lic-memory}), soft-attention (Table~\ref{t
 
 \subsection{Editing vs.\ removal across settings}
 
-The value of context editing over blanket removal scales with conversation statefulness. On LiC (self-contained tasks), omission is near-optimal; our methods close most of the gap and exceed it on database and math-with-memory. On WildChat (real conversations), editing clearly outperforms both baselines (82--86\% win rates). On tau2-bench (agentic tool use), omission is catastrophic (0\%) while context editing maintains or improves performance (55--60\%).
+The value of context editing over blanket removal scales with conversation statefulness. On LiC (self-contained tasks), omission is near-optimal; our methods close most of the gap and exceed it on database. On WildChat (real conversations), editing clearly outperforms both AO and full context (82--86\% win rates). On tau2-bench (agentic tool use), AO is catastrophic (0\%) while context editing maintains or improves performance (55--60\%).
 
-Across settings, Gated Reset is consistently the best or joint-best strategy, suggesting conservative, gated intervention as a robust default. Rewrite performs comparably on diverse conversations but fails in data-rich agentic settings where summarization loses structured data. Crucially, these gains are not specific to one model: Reset improves 15 of 16 model--task pairs across four architectures (Table~\ref{tab:multi-model}), with smaller models benefiting most (+42pp for Qwen 3.5 vs.\ +20pp for GPT-5).
+Across settings, Gated Reset is consistently the best or joint-best strategy, suggesting conservative, gated intervention as a robust default. Rewrite performs comparably on diverse conversations but fails in data-rich agentic settings where summarization loses structured data. Crucially, these gains are not specific to one model: Reset improves 15 of 16 model--task pairs across four architectures (Table~\ref{tab:multi-model}).
+
+\paragraph{Cost--capability tradeoff.} Our multi-query analysis is substantially more expensive per turn than simply deleting assistant messages (AO) or heuristically resetting the conversation (ERGO). We justify this cost on two grounds. First, AO and ERGO-style resets catastrophically fail in stateful settings (0\% on tau2-bench), while our approach maintains or improves performance across all settings tested. Second, unlike hand-crafted reset heuristics that require per-domain tuning, the analysis uses autoregressive LLM generation to make editing decisions. This makes the analytical capability amenable to self-distillation: reasoning models already produce internal chain-of-thought before responding, so the analysis could in principle be absorbed into the model's own reasoning process, eliminating the external call overhead entirely. We view the current multi-query architecture as a proof of concept for a capability that should ultimately be internalized.
+
+
+\subsection{Conversation analysis ablations}
+\label{sec:analysis-ablations}
+
+We ablate the analyzer architecture to understand which design choices are load-bearing.
+
+\subsubsection{The cognitive hazard}
+\label{sec:cognitive-hazard}
+
+We test whether structural exclusion of assistant messages from Subtask~1 is necessary by progressively ablating the analyzer: removing hard attention (allowing the spec extractor to see assistant messages), then collapsing to a single pass.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Configuration} & \textbf{Math} & \textbf{Code} & \textbf{Database} \\
+\midrule
+Context Edit (Augment) & \textbf{80\%} & \textbf{56\%} & \textbf{32\%} \\
+\quad $-$ hard attention & 40\% & 11\% & 8\% \\
+\quad\quad $-$ subtask decomposition & 55\% & 21\% & 4\% \\
+\midrule
+Baseline (no analysis) & 60\% & 16\% & 4\% \\
+\bottomrule
+\end{tabular}
+\caption{Progressive ablation of analyzer architecture (Augment, no memory). Removing hard attention collapses performance to below baseline; further removing subtask decomposition partially recovers performance.}
+\label{tab:cognitive-hazard}
+\end{table}
+
+\paragraph{Assistant messages are a cognitive hazard.}
+Allowing the spec extractor to see assistant messages collapses performance to \emph{below baseline} on all tasks (Table~\ref{tab:cognitive-hazard}): 40\% vs.\ 60\% on math, 11\% vs.\ 16\% on code. Even a model explicitly tasked as an independent reviewer anchors on the assistant's reasoning.
+
+\paragraph{Contamination amplifies through chained calls.}
+Counterintuitively, collapsing to a single pass \emph{partially recovers} performance (55\% vs.\ 40\% on math). When a contaminated Subtask~1 passes a biased specification to Subtask~2 as authoritative, errors compound. This is a cautionary finding for multi-stage LLM pipelines: decomposition is only beneficial when earlier stages produce clean outputs.
+
+These results have broad implications: any system that uses an LLM to evaluate another LLM's output faces this risk. Multi-stage pipelines cannot rely on prompting for selective attention; structural data flow control is required. The exact mechanism---attention-based anchoring, implicit role consistency, or something else---remains an open question.
+
+\subsubsection{Soft vs.\ hard attention}
+\label{sec:soft-attention}
+
+Structural exclusion of assistant messages (hard attention) exploits a property of LiC: user messages alone fully specify the task. In realistic settings, the task may depend on prior assistant work---for example, when a user says ``sharpen the phrasing in sentence 2,'' the referent exists only in the assistant's output. \citet{huang2026context} observe similar cases where user messages alone are insufficient for understanding the task.
+
+We introduce a \emph{soft-attention} variant where Subtask~1 sees the full conversation but explicitly reasons through source attribution: listing user-stated requirements with provenance, flagging assistant-originated interpretations as hypotheses, and writing the specification from user-grounded requirements only. We call this ``soft attention'' because the model must rely on transformer attention to selectively weight user-grounded information, rather than having polluting content physically removed from its context. We treat this as a harder, more realistic setting and explore whether memory-based learning can mitigate the resulting contamination.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Condition} & \textbf{Math} & \textbf{Code} & \textbf{Database} \\
+\midrule
+\multicolumn{4}{l}{\emph{Augment}} \\
+\quad Soft attention (no memory) & 40\% & 13\% & 31\% \\
+\quad Soft attention + memory & 56\% & 14\% & \textbf{46\%} \\
+\quad Hard attention (oracle) & \textbf{80\%} & \textbf{40\%} & 54\% \\
+\midrule
+\multicolumn{4}{l}{\emph{Reset}} \\
+\quad Soft attention (no memory) & 42\% & 23\% & 31\% \\
+\quad Soft attention + memory & 42\% & 25\% & \textbf{46\%} \\
+\quad Hard attention (oracle) & \textbf{67\%} & \textbf{46\%} & 54\% \\
+\bottomrule
+\end{tabular}
+\caption{Soft- vs.\ hard-attention results on held-out test splits. Memory closes up to 65\% of the gap to hard attention on database.}
+\label{tab:soft-attention}
+\end{table}
+
+Hard attention substantially outperforms soft attention across all tasks (Table~\ref{tab:soft-attention}), confirming that prompting alone cannot substitute for structural exclusion. However, Reset outperforms Augment even with contaminated specs (code: 23\% vs.\ 13\%), confirming that context pollution and spec contamination are separable problems.
+
+Memory-based decontamination (using hard-attention specs as oracle targets to learn decontamination principles via the Dynamic Cheatsheet) shows its strongest effect on database (+15pp), closing 65\% of the gap to hard attention. The learned principles converge on structured heuristics: ``build a user-only spec first, then overlay assistant suggestions as hypotheses.'' Code remains resistant (+1--2pp), suggesting more structurally diverse contamination patterns.
+
+
+\subsection{Memory-based learning}
+\label{sec:memory-discussion}
+
+We evaluate whether the Dynamic Cheatsheet (Section~\ref{sec:memory}) improves analysis quality across settings.
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Strategy} & \textbf{Math} & \textbf{Code} & \textbf{Database} & \textbf{Actions} \\
+\midrule
+Baseline & 60\% & 16\% & 4\% & 35\% \\
+\quad + Memory & 55\% & 21\% & 4\% & 35\% \\
+\midrule
+Augment & 80\% & 56\% & 32\% & 48\% \\
+\quad + Memory & \textbf{90\%} & 68\% & 44\% & 9\% \\
+Reset & 75\% & 61\% & 48\% & 52\% \\
+\quad + Memory & 85\% & 68\% & 44\% & 52\% \\
+\bottomrule
+\end{tabular}
+\caption{Effect of memory on LiC. Memory amplifies analysis-based methods: Augment + Memory achieves 90\% on math, exceeding the AO upper bound of 85\%.}
+\label{tab:lic-memory}
+\end{table}
+
+\begin{table}[t]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Condition} & \textbf{vs AO} & \textbf{vs FC} & \textbf{$\Delta$ vs AO} \\
+\midrule
+\multicolumn{4}{l}{\emph{DeepSeek V3.2 (eval split, $n$=51, judged by GPT-5-mini)}} \\
+\quad Reset (no memory) & 72.5\% & 72.5\% & --- \\
+\quad Reset + memory & \textbf{86.3\%} & \textbf{80.4\%} & \textbf{+13.8pp} \\
+\midrule
+\multicolumn{4}{l}{\emph{GPT-5-mini (online, $n$=75, self-judged)}} \\
+\quad Reset (no memory) & 90.8\% & 86.8\% & --- \\
+\quad Reset + memory & 86.7\% & 80.0\% & $-$4.1pp \\
+\bottomrule
+\end{tabular}
+\caption{WildChat memory results. Memory improves DeepSeek's win rate by +13.8pp when there is headroom; GPT-5-mini's near-ceiling baseline leaves no room for improvement. Memory was learned from one-third of WildChat turns and frozen for evaluation.}
+\label{tab:wildchat-memory}
+\end{table}
+
+\paragraph{Memory amplifies analysis quality when there is headroom.}
+On LiC, memory pushes Augment to 90\% on math (Table~\ref{tab:lic-memory}), exceeding the AO upper bound of 85\%. On WildChat, memory improves DeepSeek's Reset win rate from 72.5\% to 86.3\% vs.\ AO (Table~\ref{tab:wildchat-memory})---a +13.8pp gain---but has no effect on GPT-5-mini (91\% baseline, ceiling effect). On soft attention, memory closes 65\% of the gap to hard-attention oracles on database (Table~\ref{tab:soft-attention}). The pattern is consistent: memory is most valuable when the analyzer has room to improve.
+
+\paragraph{Feedback turns show the largest gain.} Breaking down WildChat by turn type, feedback turns improve from 70\% to 100\% ($n$=10, +30pp), compared to +12pp on no\_feedback and +6pp on new\_ask. Feedback turns are the hardest for context editing: the user references specific prior assistant work, and a na\"ive reset discards those details. The learned cheatsheet addresses this directly, learning to preserve user references to prior output and prefer in-place corrections over full resets when the user is building on specific work.
+
+\paragraph{Context editing is a learnable skill.} Across hard-attention, soft-attention, and real conversations, the Dynamic Cheatsheet consistently improves analysis quality without parameter updates. The analyzer accumulates transferable principles---structured heuristics like ``build a user-only spec first, then overlay assistant suggestions as hypotheses''---that generalize across problem instances and conversation types.
+
 
 \subsection{Executive function as a design pattern}
 \label{sec:exec-function-pattern}
@@ -483,13 +467,9 @@ Recent work on agentic context management~\citep{mei2025thread,zhang2025rlm,sun2
 
 We do not claim the LLM is self-aware in any phenomenological sense. Rather, the system designer's knowledge of context pollution as a systematic failure mode is encoded into the agent architecture---analogous to using an external checklist to compensate for known cognitive biases.
 
-\subsection{Implications of the cognitive hazard}
-
-The cognitive hazard (Table~\ref{tab:cognitive-hazard}) has broad implications: any system that uses an LLM to evaluate another LLM's output faces this risk. Multi-stage pipelines cannot rely on prompting for selective attention; structural data flow control is required. The exact mechanism---attention-based anchoring, implicit role consistency, or something else---remains an open question.
-
 \subsection{Limitations}
 
-This is a preliminary study with modest sample sizes; the multi-turn simulation framework requires $N\times$ more LLM calls than single-turn evaluation (where $N$ is average conversation length), making large-scale runs expensive. Per-condition sample counts are in Appendix~\ref{app:sample-counts}. LiC, CollabLLM, and tau2-bench use simulated users. The multi-model evaluation (Section~\ref{sec:multi-model}) replays conversations originally generated by GPT-5.2, isolating the effect of context editing but not testing each model's own multi-turn generation dynamics. WildChat multi-model evaluation is limited by the self-judge confound (each model judges its own outputs) and structural bias in the judge prompt. WildChat pairwise judgments may be inflated by format bias (see Section~\ref{sec:collab-results}). Long-horizon tasks (multi-file coding, iterative design) remain untested.
+The multi-turn simulation framework requires $N\times$ more LLM calls than single-turn evaluation (where $N$ is average conversation length), making large-scale runs expensive. Per-condition sample counts are in Appendix~\ref{app:sample-counts}. LiC, CollabLLM, and tau2-bench use simulated users. The multi-model evaluation (Section~\ref{sec:multi-model}) replays conversations originally generated by GPT-5.2, isolating the effect of context editing but not testing each model's own multi-turn generation dynamics. WildChat multi-model evaluation is limited by the self-judge confound (each model judges its own outputs). Long-horizon tasks (multi-file coding, iterative design) remain untested.
 
 
 %% ============================================================
@@ -497,7 +477,7 @@ This is a preliminary study with modest sample sizes; the multi-turn simulation 
 \label{sec:conclusion}
 %% ============================================================
 
-We propose context editing via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context editing outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the effect generalizes across four model families spanning proprietary and open-weight architectures at different scales, with smaller models benefiting most (+42pp for 3B-active Qwen vs.\ +20pp for GPT-5); and (4)~context editing is a learnable skill, with memory-based learning improving analysis quality across benchmarks without parameter updates---closing 65\% of the gap to hard-attention oracles on LiC and boosting WildChat win rates by +13.8pp for DeepSeek. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context editing (which can) will only grow.
+We propose context editing via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context editing outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the effect generalizes across four model families spanning proprietary and open-weight architectures at different scales; and (4)~context editing is a learnable skill, with memory-based learning improving analysis quality across benchmarks without parameter updates---closing 65\% of the gap to hard-attention oracles on LiC and boosting WildChat win rates by +13.8pp for DeepSeek. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context editing (which can) will only grow.
 
 
 %% ============================================================
@@ -529,6 +509,11 @@ We propose context editing via externalized executive function to mitigate multi
 \label{app:prompts}
 
 [Key prompts: task spec extraction, approach evaluation, soft-attention CoT, compaction analysis, tau2-bench strategic reflection.]
+
+\section{Agentic adaptation}
+\label{app:agentic-methods}
+
+For tau2-bench, we make three modifications: (1)~the analyzer explicitly tracks environment state (account settings, diagnostic results) revealed through tool calls; (2)~the analysis is reframed as ``strategic reflection,'' identifying unexplored diagnostic avenues rather than just flagging errors; and (3)~resets are gated and capped at 3 per conversation to prevent infinite loops.
 
 \section{Tau2-bench diagnostic analysis}
 \label{app:tau2-diagnostic}
@@ -564,10 +549,15 @@ This finding motivated the shift from pollution-detection framing (v9) to strate
 
 [Annotated examples showing baseline failure $\to$ analysis $\to$ recovery for each task domain and evaluation setting.]
 
+\section{Multi-model evaluation protocol}
+\label{app:multi-model-protocol}
+
+Because stronger models solve easier problems regardless of context pollution, we re-ran the subset selection protocol using GPT-5.2 LiC logs (instead of GPT-5-mini), selecting the 20 hardest true-negative instances per task to ensure a challenging set for this model class. Each model serves as both assistant (final-turn regeneration) and analyzer. All models replay conversations originally generated by GPT-5.2; the Baseline reflects how model $X$ handles GPT-5.2's polluted context, while Reset reflects model $X$ given a clean context derived from its own analysis. User and system agents use GPT-4o-mini throughout. We compare Baseline against unconditional Reset (the best-performing strategy in Section~\ref{sec:lic-results}). Denominators vary slightly for code (14--15 valid samples due to evaluation errors); percentages use valid denominators.
+
 \section{CollabLLM evaluation details}
 \label{app:collabllm}
 
-[Conversation-aware judge design, pass\_rate analysis, implementation differences from CollabLLM paper pipeline.]
+Standard BigCodeBench evaluation uses test-case execution requiring exact function signatures, but the CollabLLM user simulator never conveys these signatures exactly, making pass\_rate systematically zero for all conditions. We develop a conversation-aware LLM judge (GPT-5) that evaluates the assistant's code against the user's actual intent as expressed in the conversation, assessing functional correctness rather than signature conformance.
 
 \section{Extended agentic context management discussion}
 \label{app:agentic-context}
