@@ -580,15 +580,67 @@ Memory-based decontamination (using hard-attention specs as oracle targets to le
 
 We evaluate two learning regimes. \emph{Online}: reflections update the cheatsheet incrementally as problems are solved in batches, so later problems benefit from accumulated principles---a form of continual test-time learning. \emph{Offline}: a set of training trajectories is used to initialize the cheatsheet via a Reflect-then-Unify pipeline (individual reflections followed by a consolidation pass), and the frozen cheatsheet is applied at evaluation time. The offline regime provides a controlled comparison where the only variable is the presence of the cheatsheet. On LiC, we use online learning. On WildChat, we use the offline regime with a train/eval split (one-third training, two-thirds evaluation) to avoid confounding memory quality with ordering effects and to test cross-domain transfer.
 
-\section{Cheatsheet examples}
-\label{app:cheatsheets}
-
-[Beneficial vs.\ harmful content, sanitization. Include learned decontamination principles.]
-
-\section{Trajectory examples}
+\section{Trajectory example: WildChat Maven debugging}
 \label{app:trajectories}
 
-[Annotated examples showing baseline failure $\to$ analysis $\to$ recovery for each task domain and evaluation setting.]
+We present a representative WildChat conversation where context curation (S2) outperforms both full-context (FC) and assistant-omitted (AO) baselines across all evaluated turns. The conversation (\texttt{300289e3...}, 8 rounds, originally GPT-3.5-turbo) involves iterative debugging of a Maven/Java build in GitHub Codespaces.
+
+\subsection{Conversation summary}
+
+The user runs \texttt{mvn clean install} and encounters a sequence of errors. Early turns establish the environment (GitHub Codespaces) and initial diagnosis (JRE vs.\ JDK). By Turn~8, the user reports \emph{``Still getting: Fatal error compiling: error: invalid target release: 17''} after following the assistant's prior suggestion---a classic \texttt{no\_feedback} turn where the user implicitly references the prior assistant response without providing explicit corrective feedback.
+
+\subsection{Turn 8: three conditions compared}
+
+\paragraph{AO (assistant-omitted).} With all prior assistant messages replaced by \texttt{[Response provided]} placeholders, AO re-suggests \texttt{apt-get install} and checking \texttt{java -version}---steps the user has already performed. AO cannot connect ``still getting'' to what was already tried.
+
+\paragraph{FC (full context).} FC sees the full history and includes \texttt{update-alternatives} commands, but still partially repeats earlier suggestions. The model anchors on the same diagnostic approach (checking \texttt{java -version}) rather than recognizing that the user already tried the basic install without resolution.
+
+\paragraph{S2 (context curation).} The analyzer identifies that the prior assistant's diagnostic reasoning was flawed---relying on \texttt{java -version} text parsing rather than checking \texttt{javac} directly---and that the conversation was stuck repeating an insufficient fix. The rewritten context preserves the correct diagnosis (Maven needs a JDK) while removing the flawed reasoning. S2's response:
+\begin{itemize}
+    \item Correctly diagnoses why the error persists: Maven may use a different Java than what \texttt{java -version} reports
+    \item Provides non-redundant steps (does not re-suggest things already tried)
+    \item Includes solutions FC and AO both missed: \texttt{devcontainer.json} configuration, the \texttt{\textless release\textgreater 17\textless /release\textgreater} tag in \texttt{pom.xml}
+\end{itemize}
+
+\paragraph{Analyzer output (abbreviated).}
+\begin{quote}
+\emph{Issue:} The assistant said that seeing ``OpenJDK Runtime Environment'' in \texttt{java -version} means the system has a JRE rather than a JDK. That is not reliable: \texttt{java -version} output often contains ``Runtime Environment'' even when a JDK is installed. The correct checks are presence of \texttt{javac} and the value of \texttt{JAVA\_HOME}.
+
+\emph{Aligned:} Maven's ``No compiler is provided'' message means Maven cannot find \texttt{javac} and needs a JDK. Installing a JDK inside Codespaces is a valid remediation path.
+\end{quote}
+
+\subsection{Judge evaluations}
+
+All three pairwise comparisons were judged by GPT-5:
+
+\begin{itemize}
+    \item \textbf{FC vs.\ AO:} FC wins. ``Both responses correctly diagnose the problem. [FC] is slightly clearer and more prescriptive.''
+    \item \textbf{AO vs.\ S2:} S2 wins. ``[S2] is substantially more complete and actionable.''
+    \item \textbf{FC vs.\ S2:} S2 wins. ``[S2] is significantly more complete and actionable. It gives precise diagnostic commands, exact installation commands, environment variable exports, pom.xml changes, devcontainer recommendations, and verification steps.''
+\end{itemize}
+
+\subsection{Conversation-level results}
+
+Across all 7 evaluated turns, S2 wins every pairwise comparison against both baselines (Table~\ref{tab:traj-turns}). On turns where AO beats FC (turns 2, 10, 12, 14), context pollution hurts more than context loss---but S2 still wins by removing the pollution while preserving useful context.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{clccc}
+\toprule
+\textbf{Turn} & \textbf{User message} & \textbf{FC vs AO} & \textbf{S2 vs AO} & \textbf{S2 vs FC} \\
+\midrule
+2 & ``Why do I keep getting error\ldots'' & AO & S2 & S2 \\
+4 & ``I am using Codespaces'' & FC & S2 & S2 \\
+6 & ``Now I get: [new error]'' & FC & S2 & S2 \\
+8 & ``Still getting [same error]'' & FC & S2 & S2 \\
+10 & ``I do not have a bashrc file'' & AO & S2 & S2 \\
+12 & [Shares GitHub Actions YAML] & AO & S2 & S2 \\
+14 & ``No WAR file generated'' + pom.xml & AO & S2 & S2 \\
+\bottomrule
+\end{tabular}
+\caption{Per-turn winners for the WildChat Maven debugging conversation. S2 wins all 14 pairwise comparisons. On context-dependent turns (4, 6, 8), AO fails because it cannot connect the user's references to prior discussion.}
+\label{tab:traj-turns}
+\end{table}
 
 \section{Multi-model evaluation protocol}
 \label{app:multi-model-protocol}
