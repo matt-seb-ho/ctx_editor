@@ -409,13 +409,58 @@ The learned cheatsheet contained 1026 words. It was learned from 25 train turns 
 
 **6. Train set size was sufficient.** 25 training turns produced a 1026-word cheatsheet that generalized to 51 unseen eval turns. This suggests the WildChat domain has learnable patterns that transfer across conversations, even with modest training data.
 
+### Experiment 3: Judge Sensitivity Matrix
+
+To test whether the memory result is robust across judges, we re-judged the same responses with four different judge models using `scripts/rejudge_memory.py`. The responses are identical across all rows; only the judge changes.
+
+**DeepSeek V3.2 responses (eval set, n=51, S1.5 vs AO quality):**
+
+| Judge | S1.5 baseline | S1.5+memory | Memory delta |
+|---|---|---|---|
+| gpt-5-mini | 72.5% | 86.3% | **+13.8pp** |
+| minimax-m2.7 (OpenRouter) | 33.3% | 41.2% | **+7.8pp** |
+| gpt-5 | 31.4% | 29.4% | -2.0pp |
+| gpt-5.2 | 35.3% | 27.5% | -7.8pp |
+
+**gpt-5-mini responses (S1.5+memory, n=75, vs AO quality):**
+
+| Judge | S1.5 win rate |
+|---|---|
+| gpt-5-mini (self-judge) | 86.7% |
+| minimax-m2.7 | 37.3% |
+| gpt-5.2 | 37.3% |
+| gpt-5 | 29.3% |
+
+**Re-judge outputs:**
+
+| Respondent | Judge | Dir |
+|---|---|---|
+| gpt-5-mini | gpt-5 | `outputs/huang_eval/rejudge_memory/2026-03-31/06-41-26` |
+| DeepSeek | gpt-5 | `outputs/huang_eval/rejudge_memory/2026-03-31/06-41-29` |
+| DeepSeek | gpt-5.2 | `outputs/huang_eval/rejudge_memory/2026-03-31/07-00-58` |
+| DeepSeek | minimax-m2.7 | `outputs/huang_eval/rejudge_memory/2026-03-31/07-01-03` |
+| gpt-5-mini | gpt-5.2 | `outputs/huang_eval/rejudge_memory/2026-03-31/07-01-06` |
+| gpt-5-mini | minimax-m2.7 | `outputs/huang_eval/rejudge_memory/2026-03-31/07-01-08` |
+
+### Judge Sensitivity Analysis
+
+**1. gpt-5-mini is the outlier, not the consensus.** Three independent judges (gpt-5, gpt-5.2, minimax-m2.7) agree that AO responses are preferred over S1.5 responses at ~55-70% win rates. Only gpt-5-mini prefers S1.5 at 73-87%. minimax is a completely unrelated model family (not GPT-based), which rules out GPT-specific bias as the explanation.
+
+**2. The S1.5 vs AO direction is judge-dependent.** On the same DeepSeek responses, S1.5 wins 72.5% (gpt-5-mini) vs 31-35% (all others). This ~40pp swing means the evaluation is measuring judge preference, not intervention quality.
+
+**3. The memory effect is partially robust.** Two judges (gpt-5-mini: +13.8pp, minimax: +7.8pp) show memory helping. Two judges (gpt-5: -2.0pp, gpt-5.2: -7.8pp) show it flat or hurting. The positive direction for minimax (an external, unrelated judge) is a partial signal that memory produces genuinely better analysis, but the effect size is small and the absolute S1.5 win rate is still below 50%.
+
+**4. gpt-5-mini may be less sensitive to the judge-context mismatch.** The structural bias (judge sees original conversation, S1.5 response comes from compacted context) should penalize S1.5 responses that diverge from the conversational flow. gpt-5-mini, being a weaker model, may focus more on surface-level response quality (completeness, helpfulness) and less on conversational coherence, making it less sensitive to this mismatch. Stronger judges (gpt-5, gpt-5.2, minimax) appear to weight coherence more heavily.
+
+**5. Implications for the paper.** The WildChat pairwise evaluation methodology (from Huang et al.) is not robust to judge choice for context-editing interventions. This is a fundamental limitation of using pairwise judging to evaluate context manipulation strategies: the judge's reference frame (the original conversation) is structurally different from the context used to generate the intervention responses. Ground-truth evaluations (like LiC) do not have this problem and should be the primary evidence for context editing effectiveness.
+
 ## Limitations
 
 1. **Single run per condition.** With n=20 for LiC and n=76 for WildChat, differences under ~15pp may not be statistically significant. The consistent direction of effects across all models partially compensates for this.
 
 2. **Replaying foreign conversations.** All LiC models replay gpt-5.2 baseline conversations. S0 results reflect how well each model handles gpt-5.2's polluted context, not its own multi-turn behavior. This is a controlled comparison but may not reflect real deployment scenarios.
 
-3. **Judge-context structural bias on WildChat.** The judge sees the original full conversation but S3/S1.5 responses were generated from compacted context. This structurally favors FC/AO responses that are more coherent with the judge's view. See "Judge-Context Structural Bias" section above. Combined with each model self-judging, this makes the gpt-5 WildChat results unreliable for the paper (see "Paper Recommendation").
+3. **Judge-context structural bias on WildChat.** The judge sees the original full conversation but S3/S1.5 responses were generated from compacted context. A 4-judge sensitivity matrix (Experiment 3) confirms this is not a single-judge anomaly: 3 of 4 judges prefer AO over S1.5, with a ~40pp swing in S1.5 win rates between judges on identical responses. gpt-5-mini is the outlier favoring S1.5. This makes all WildChat pairwise results unreliable as evidence for context editing effectiveness.
 
 4. **Same analyzer prompts for all models.** The v8 analyzer and S3 compaction prompts were developed and tuned using GPT models. They may not be optimal for DeepSeek or Qwen. Prompt sensitivity could explain some of DeepSeek's weaker WildChat results.
 
@@ -429,6 +474,6 @@ Context editing via S1.5 produces large, consistent accuracy gains across four m
 
 On WildChat (with corrected same-model baselines), DeepSeek shows moderate S3/S1.5 gains (S3 62% vs AO 29%), while gpt-5 shows S3/S1.5 losing to baselines (S3 38% vs AO 47%). However, the gpt-5 WildChat result is confounded by gpt-5 serving as both respondent and judge, compounded by a structural bias in the judge prompt that shows the original (uncompacted) conversation as context for both responses. We recommend reporting gpt-5-mini and DeepSeek WildChat results in the paper and excluding or heavily caveating gpt-5. The LiC results for gpt-5 (ground-truth evaluation, no judge) remain valid and show clear S1.5 gains.
 
-The cheatsheet memory system, originally developed for LiC, transfers to WildChat and produces a measurable improvement when there is headroom. DeepSeek S1.5+memory achieves 86.3% win rate vs AO (compared to 72.5% baseline), with feedback turns improving from 70% to 100%. The effect is absent for gpt-5-mini (91% baseline, no headroom). This demonstrates that memory-based learning from a small training set (25 turns) can generalize to unseen conversations in a new domain.
+The cheatsheet memory system shows a positive memory effect for DeepSeek with gpt-5-mini as judge (+13.8pp) and minimax as judge (+7.8pp), but flat or negative with gpt-5/gpt-5.2 as judge. A judge sensitivity matrix across four models (gpt-5-mini, gpt-5, gpt-5.2, minimax-m2.7) reveals that gpt-5-mini is the outlier: three independent judges (including the unrelated minimax) prefer AO over S1.5 at ~55-70%, while gpt-5-mini prefers S1.5 at 73-87%. This ~40pp swing on the same responses demonstrates that Huang et al.'s pairwise evaluation is not robust to judge choice for context-editing interventions, due to the structural mismatch between the judge's reference context (original conversation) and the intervention's generation context (compacted). Ground-truth evaluations (LiC) do not have this problem and should be the primary evidence.
 
 The programmatic template approach (S1.5) is consistently competitive with or better than LLM compaction (S3) across all models and both benchmarks, reinforcing the finding that the primary intervention is context cleanup, not sophisticated rewriting.
