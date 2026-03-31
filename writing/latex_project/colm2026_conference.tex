@@ -274,22 +274,7 @@ Gated Reset achieves 86.1\% win rate vs.\ AO and 83.8\% vs.\ FC while intervenin
 \subsection{Tau2-bench}
 \label{sec:tau2-results}
 
-\begin{table}[t]
-\centering
-\begin{tabular}{lcc}
-\toprule
-\textbf{Strategy} & \textbf{Success Rate} & \textbf{Cost} \\
-\midrule
-Baseline & 45--55\% & \$0.51 \\
-AO & 0\% & \$0.36 \\
-Gated Reset (ours) & \textbf{55--65\%} & \$0.60--0.67 \\
-\bottomrule
-\end{tabular}
-\caption{Tau2-bench \texttt{telecom\_small} results. AO is catastrophically destructive in agentic settings. Gated Reset consistently exceeds the baseline.}
-\label{tab:tau2-main}
-\end{table}
-
-AO achieves \textbf{0\%} (Table~\ref{tab:tau2-main}): stripping assistant messages and tool results causes the agent to lose all diagnostic progress and enter infinite re-lookup loops, confirming that omission-based approaches are fundamentally incompatible with stateful settings. Gated Reset achieves 55--60\% across two confirmation runs, consistently above the 45--55\% baseline. Diagnostic analysis (Appendix~\ref{app:tau2-diagnostic}) reveals that only 1 of 11 baseline failures shows clear context pollution; the dominant failure modes are missing domain knowledge (4/11) and step budget exhaustion (4/11). Gated Reset's gains come primarily from redirecting the agent toward unexplored diagnostic avenues rather than from removing polluted content.
+AO achieves \textbf{0\%} on tau2-bench (Table~\ref{tab:tau2-main}): stripping assistant messages and tool results causes the agent to lose all diagnostic progress and enter infinite re-lookup loops, confirming that omission-based approaches are fundamentally incompatible with stateful settings. Gated Reset achieves 55--60\% across two runs, consistently above the 45--55\% baseline. Gated Reset's gains come primarily from redirecting the agent toward unexplored diagnostic avenues; diagnostic analysis (Appendix~\ref{app:tau2-diagnostic}) reveals that context pollution accounts for only 1 of 11 baseline failures.
 
 
 %% ============================================================
@@ -309,12 +294,8 @@ Across settings, Gated Reset is consistently the best or joint-best strategy, su
 \subsection{Conversation analysis ablations}
 \label{sec:analysis-ablations}
 
-We ablate the analyzer architecture to understand which design choices are load-bearing.
-
-\subsubsection{The cognitive hazard}
+We ablate the analyzer architecture to understand which design choices are load-bearing, testing whether structural exclusion of assistant messages from Subtask~1 is necessary by progressively removing components: hard attention (allowing the spec extractor to see assistant messages), then subtask decomposition (collapsing to a single pass).
 \label{sec:cognitive-hazard}
-
-We test whether structural exclusion of assistant messages from Subtask~1 is necessary by progressively ablating the analyzer: removing hard attention (allowing the spec extractor to see assistant messages), then collapsing to a single pass.
 
 \begin{table}[t]
 \centering
@@ -345,8 +326,6 @@ These results have broad implications: any system that uses an LLM to evaluate a
 \subsection{Memory-based learning}
 \label{sec:memory-discussion}
 
-We evaluate whether the Dynamic Cheatsheet (Section~\ref{sec:memory}) improves analysis quality across settings.
-
 \begin{table}[t]
 \centering
 \begin{tabular}{lcccc}
@@ -372,11 +351,11 @@ Reset & 75\% & 61\% & 48\% & 52\% \\
 \toprule
 \textbf{Condition} & \textbf{vs AO} & \textbf{vs FC} & \textbf{$\Delta$ vs AO} \\
 \midrule
-\multicolumn{4}{l}{\emph{DeepSeek V3.2 (eval split, $n$=51, judged by GPT-5-mini)}} \\
+\multicolumn{4}{l}{\emph{DeepSeek V3.2 (eval split, judged by GPT-5-mini)}} \\
 \quad Reset (no memory) & 72.5\% & 72.5\% & --- \\
 \quad Reset + memory & \textbf{86.3\%} & \textbf{80.4\%} & \textbf{+13.8pp} \\
 \midrule
-\multicolumn{4}{l}{\emph{GPT-5-mini (online, $n$=75, self-judged)}} \\
+\multicolumn{4}{l}{\emph{GPT-5-mini (online, self-judged)}} \\
 \quad Reset (no memory) & 90.8\% & 86.8\% & --- \\
 \quad Reset + memory & 86.7\% & 80.0\% & $-$4.1pp \\
 \bottomrule
@@ -385,26 +364,10 @@ Reset & 75\% & 61\% & 48\% & 52\% \\
 \label{tab:wildchat-memory}
 \end{table}
 
-\paragraph{Memory amplifies analysis quality when there is headroom.}
-On LiC, memory pushes Augment to 90\% on math (Table~\ref{tab:lic-memory}), exceeding the AO upper bound of 85\%. On WildChat, memory improves DeepSeek's Reset win rate from 72.5\% to 86.3\% vs.\ AO (Table~\ref{tab:wildchat-memory})---a +13.8pp gain---but has no effect on GPT-5-mini (91\% baseline, ceiling effect). The pattern is consistent: memory is most valuable when the analyzer has room to improve.
-
-\paragraph{Feedback turns show the largest gain.} Breaking down WildChat by turn type, feedback turns improve from 70\% to 100\% ($n$=10, +30pp), compared to +12pp on no\_feedback and +6pp on new\_ask. Feedback turns are the hardest for context editing: the user references specific prior assistant work, and a na\"ive reset discards those details. The learned cheatsheet addresses this directly, learning to preserve user references to prior output and prefer in-place corrections over full resets when the user is building on specific work.
-
-\paragraph{Context editing is a learnable skill.} Across multiple settings, the Dynamic Cheatsheet consistently improves analysis quality without parameter updates. The analyzer accumulates transferable principles---structured heuristics like ``build a user-only spec first, then overlay assistant suggestions as hypotheses''---that generalize across problem instances and conversation types. We also explore a more realistic \emph{soft-attention} setting where assistant messages are not structurally excluded from the analysis (Appendix~\ref{app:soft-attention}); memory partially closes the gap to hard-attention oracles (up to 65\% on database), but substantial headroom remains, suggesting that more involved approaches are needed for general-purpose decontamination.
+Memory amplifies analysis-based methods when there is headroom for improvement: on LiC, Augment + Memory reaches 90\% on math, exceeding the AO upper bound (Table~\ref{tab:lic-memory}); on WildChat, memory improves DeepSeek's Reset win rate by +13.8pp (Table~\ref{tab:wildchat-memory}), but has no effect on GPT-5-mini whose baseline is already near ceiling. Memory is most helpful on feedback turns---where the user references specific prior assistant work---because the learned cheatsheet teaches the analyzer to preserve those references rather than discarding them in a na\"ive reset. We also explore a more realistic \emph{soft-attention} setting where assistant messages are not structurally excluded from the analysis (Appendix~\ref{app:soft-attention}); memory partially closes the gap to hard-attention oracles (up to 65\% on database), but substantial headroom remains, suggesting that more involved approaches are needed for general-purpose decontamination.
 
 
-\subsection{Executive function as a design pattern}
-\label{sec:exec-function-pattern}
-
-Our approach instantiates a general pattern: \emph{externalized executive function} via an agent that schedules LLM calls with custom context windows. Different subtasks of self-reflection require different context---intent extraction must be shielded from contamination, approach evaluation needs both clean intent and the full history, strategic reflection identifies unexplored alternatives. This pattern generalizes: any setting where an LLM reasons about potentially misleading context (code review, fact-checking) could benefit from structured context control. The executive function framing provides the design vocabulary: what should each reasoning step attend to, and what should it be shielded from?
-
-Recent work on agentic context management~\citep{mei2025thread,zhang2025rlm,sun2025contextfolding,ye2025ufold,li2025memobrain} demonstrates growing interest in LLM-driven context control, though primarily targeting compaction for long-horizon efficiency. Our contribution is orthogonal: we show that even within ample context budgets, the model's own prior outputs constitute pollution that degrades performance, and that addressing this requires analytical capabilities (identifying what is \emph{wrong}, not merely what is \emph{redundant}) distinct from summarization or folding. The two directions are complementary---a system could both compact tool-call histories for efficiency and edit self-induced pollution for correctness.
-
-We do not claim the LLM is self-aware in any phenomenological sense. Rather, the system designer's knowledge of context pollution as a systematic failure mode is encoded into the agent architecture---analogous to using an external checklist to compensate for known cognitive biases.
-
-\subsection{Limitations}
-
-LiC, CollabLLM, and tau2-bench use simulated users. The multi-model evaluation (Section~\ref{sec:multi-model}) replays conversations originally generated by GPT-5.2, isolating the effect of context editing but not testing each model's own multi-turn generation dynamics. WildChat multi-model evaluation is limited by the self-judge confound (each model judges its own outputs). Long-horizon tasks (multi-file coding, iterative design) remain untested.
+Limitations are discussed in Appendix~\ref{app:limitations}.
 
 
 %% ============================================================
@@ -445,8 +408,23 @@ We propose context editing via externalized executive function to mitigate multi
 
 For tau2-bench, we make three modifications: (1)~the analyzer explicitly tracks environment state (account settings, diagnostic results) revealed through tool calls; (2)~the analysis is reframed as ``strategic reflection,'' identifying unexplored diagnostic avenues rather than just flagging errors; and (3)~resets are gated and capped at 3 per conversation to prevent infinite loops.
 
-\section{Tau2-bench diagnostic analysis}
+\section{Tau2-bench results and diagnostic analysis}
 \label{app:tau2-diagnostic}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Strategy} & \textbf{Success Rate} & \textbf{Cost} \\
+\midrule
+Baseline & 45--55\% & \$0.51 \\
+AO & 0\% & \$0.36 \\
+Gated Reset (ours) & \textbf{55--65\%} & \$0.60--0.67 \\
+\bottomrule
+\end{tabular}
+\caption{Tau2-bench \texttt{telecom\_small} results. AO is catastrophically destructive in agentic settings. Gated Reset consistently exceeds the baseline.}
+\label{tab:tau2-main}
+\end{table}
 
 Diagnostic analysis of baseline failures on tau2-bench reveals the distribution of failure modes:
 
@@ -564,6 +542,18 @@ These methods share a common goal: \emph{compaction}---fitting more reasoning in
 U-Fold~\citep{ye2025ufold} targets multi-turn conversation with a two-stage pipeline: intent summarization (creating a TODO-list from conversation history) and data extraction (retaining only relevant tool responses). While structurally similar to our two-query decomposition, U-Fold addresses redundancy in tool responses, not self-induced pollution from the assistant's own reasoning.
 
 MemoBrain~\citep{li2025memobrain} formalizes ``executive memory'' as an online mechanism that constructs a dependency-aware graph of reasoning trajectories and exerts cognitive control over working context. Like our work, it draws on the executive function framework and controls information flow to the reasoning agent. However, MemoBrain's executive control is triggered by approaching budget limits and its operations (folding sub-trajectories into thought units, flushing low-salience nodes) serve long-horizon compaction. Our executive function targets a different deficit: the inability to \emph{disregard} prior reasoning that has been invalidated, even when the model has ample context budget.
+
+\section{Executive function as a design pattern}
+\label{app:exec-function-pattern}
+
+Our approach instantiates a general pattern: \emph{externalized executive function} via an agent that schedules LLM calls with custom context windows. Different subtasks of self-reflection require different context---intent extraction must be shielded from contamination, approach evaluation needs both clean intent and the full history, strategic reflection identifies unexplored alternatives. This pattern generalizes: any setting where an LLM reasons about potentially misleading context (code review, fact-checking) could benefit from structured context control. The executive function framing provides the design vocabulary: what should each reasoning step attend to, and what should it be shielded from?
+
+We do not claim the LLM is self-aware in any phenomenological sense. Rather, the system designer's knowledge of context pollution as a systematic failure mode is encoded into the agent architecture---analogous to using an external checklist to compensate for known cognitive biases.
+
+\section{Limitations}
+\label{app:limitations}
+
+LiC, CollabLLM, and tau2-bench use simulated users. The multi-model evaluation (Section~\ref{sec:multi-model}) replays conversations originally generated by GPT-5.2, isolating the effect of context editing but not testing each model's own multi-turn generation dynamics. WildChat multi-model evaluation is limited by the self-judge confound (each model judges its own outputs). Long-horizon tasks (multi-file coding, iterative design) remain untested.
 
 
 \end{document}
