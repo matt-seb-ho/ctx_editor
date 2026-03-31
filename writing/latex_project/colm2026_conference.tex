@@ -341,38 +341,6 @@ Counterintuitively, collapsing to a single pass \emph{partially recovers} perfor
 
 These results have broad implications: any system that uses an LLM to evaluate another LLM's output faces this risk. Multi-stage pipelines cannot rely on prompting for selective attention; structural data flow control is required. The exact mechanism---attention-based anchoring, implicit role consistency, or something else---remains an open question.
 
-\subsubsection{Soft vs.\ hard attention}
-\label{sec:soft-attention}
-
-Structural exclusion of assistant messages (hard attention) exploits a property of LiC: user messages alone fully specify the task. In realistic settings, the task may depend on prior assistant work---for example, when a user says ``sharpen the phrasing in sentence 2,'' the referent exists only in the assistant's output. \citet{huang2026context} observe similar cases where user messages alone are insufficient for understanding the task.
-
-We introduce a \emph{soft-attention} variant where Subtask~1 sees the full conversation but explicitly reasons through source attribution: listing user-stated requirements with provenance, flagging assistant-originated interpretations as hypotheses, and writing the specification from user-grounded requirements only. We call this ``soft attention'' because the model must rely on transformer attention to selectively weight user-grounded information, rather than having polluting content physically removed from its context. We treat this as a harder, more realistic setting and explore whether memory-based learning can mitigate the resulting contamination.
-
-\begin{table}[t]
-\centering
-\begin{tabular}{lccc}
-\toprule
-\textbf{Condition} & \textbf{Math} & \textbf{Code} & \textbf{Database} \\
-\midrule
-\multicolumn{4}{l}{\emph{Augment}} \\
-\quad Soft attention (no memory) & 40\% & 13\% & 31\% \\
-\quad Soft attention + memory & 56\% & 14\% & \textbf{46\%} \\
-\quad Hard attention (oracle) & \textbf{80\%} & \textbf{40\%} & 54\% \\
-\midrule
-\multicolumn{4}{l}{\emph{Reset}} \\
-\quad Soft attention (no memory) & 42\% & 23\% & 31\% \\
-\quad Soft attention + memory & 42\% & 25\% & \textbf{46\%} \\
-\quad Hard attention (oracle) & \textbf{67\%} & \textbf{46\%} & 54\% \\
-\bottomrule
-\end{tabular}
-\caption{Soft- vs.\ hard-attention results on held-out test splits. Memory closes up to 65\% of the gap to hard attention on database.}
-\label{tab:soft-attention}
-\end{table}
-
-Hard attention substantially outperforms soft attention across all tasks (Table~\ref{tab:soft-attention}), confirming that prompting alone cannot substitute for structural exclusion. However, Reset outperforms Augment even with contaminated specs (code: 23\% vs.\ 13\%), confirming that context pollution and spec contamination are separable problems.
-
-Memory-based decontamination (using hard-attention specs as oracle targets to learn decontamination principles via the Dynamic Cheatsheet) shows its strongest effect on database (+15pp), closing 65\% of the gap to hard attention. The learned principles converge on structured heuristics: ``build a user-only spec first, then overlay assistant suggestions as hypotheses.'' Code remains resistant (+1--2pp), suggesting more structurally diverse contamination patterns.
-
 
 \subsection{Memory-based learning}
 \label{sec:memory-discussion}
@@ -418,11 +386,11 @@ Reset & 75\% & 61\% & 48\% & 52\% \\
 \end{table}
 
 \paragraph{Memory amplifies analysis quality when there is headroom.}
-On LiC, memory pushes Augment to 90\% on math (Table~\ref{tab:lic-memory}), exceeding the AO upper bound of 85\%. On WildChat, memory improves DeepSeek's Reset win rate from 72.5\% to 86.3\% vs.\ AO (Table~\ref{tab:wildchat-memory})---a +13.8pp gain---but has no effect on GPT-5-mini (91\% baseline, ceiling effect). On soft attention, memory closes 65\% of the gap to hard-attention oracles on database (Table~\ref{tab:soft-attention}). The pattern is consistent: memory is most valuable when the analyzer has room to improve.
+On LiC, memory pushes Augment to 90\% on math (Table~\ref{tab:lic-memory}), exceeding the AO upper bound of 85\%. On WildChat, memory improves DeepSeek's Reset win rate from 72.5\% to 86.3\% vs.\ AO (Table~\ref{tab:wildchat-memory})---a +13.8pp gain---but has no effect on GPT-5-mini (91\% baseline, ceiling effect). The pattern is consistent: memory is most valuable when the analyzer has room to improve.
 
 \paragraph{Feedback turns show the largest gain.} Breaking down WildChat by turn type, feedback turns improve from 70\% to 100\% ($n$=10, +30pp), compared to +12pp on no\_feedback and +6pp on new\_ask. Feedback turns are the hardest for context editing: the user references specific prior assistant work, and a na\"ive reset discards those details. The learned cheatsheet addresses this directly, learning to preserve user references to prior output and prefer in-place corrections over full resets when the user is building on specific work.
 
-\paragraph{Context editing is a learnable skill.} Across hard-attention, soft-attention, and real conversations, the Dynamic Cheatsheet consistently improves analysis quality without parameter updates. The analyzer accumulates transferable principles---structured heuristics like ``build a user-only spec first, then overlay assistant suggestions as hypotheses''---that generalize across problem instances and conversation types.
+\paragraph{Context editing is a learnable skill.} Across multiple settings, the Dynamic Cheatsheet consistently improves analysis quality without parameter updates. The analyzer accumulates transferable principles---structured heuristics like ``build a user-only spec first, then overlay assistant suggestions as hypotheses''---that generalize across problem instances and conversation types. We also explore a more realistic \emph{soft-attention} setting where assistant messages are not structurally excluded from the analysis (Appendix~\ref{app:soft-attention}); memory partially closes the gap to hard-attention oracles (up to 65\% on database), but substantial headroom remains, suggesting that more involved approaches are needed for general-purpose decontamination.
 
 
 \subsection{Executive function as a design pattern}
@@ -444,7 +412,7 @@ LiC, CollabLLM, and tau2-bench use simulated users. The multi-model evaluation (
 \label{sec:conclusion}
 %% ============================================================
 
-We propose context editing via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context editing outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the effect generalizes across four model families spanning proprietary and open-weight architectures at different scales; and (4)~context editing is a learnable skill, with memory-based learning improving analysis quality across benchmarks without parameter updates---closing 65\% of the gap to hard-attention oracles on LiC and boosting WildChat win rates by +13.8pp for DeepSeek. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context editing (which can) will only grow.
+We propose context editing via externalized executive function to mitigate multi-turn performance degradation. Our key findings: (1)~context editing outperforms both full context and blanket omission on real conversations (84--86\% win rates on WildChat) and is essential in agentic settings where omission catastrophically fails (0\% on tau2-bench); (2)~assistant messages are a cognitive hazard that degrades even independent reviewer models, requiring structural exclusion; (3)~the effect generalizes across four model families spanning proprietary and open-weight architectures at different scales; and (4)~context editing is a learnable skill, with memory-based learning improving analysis quality across benchmarks without parameter updates, boosting WildChat win rates by +13.8pp for DeepSeek. As LLM interaction increasingly involves long, stateful, multi-turn dialogues, the gap between context removal (which cannot scale) and context editing (which can) will only grow.
 
 
 %% ============================================================
@@ -505,6 +473,38 @@ This finding motivated the shift from pollution-detection framing (v9) to strate
 \label{app:wildchat-turns}
 
 Following \citet{huang2026context}, WildChat turns are classified into three types based on the relationship between the current user message and prior conversation context: \texttt{new\_ask} (the user introduces a new topic or question unrelated to prior turns), \texttt{feedback} (the user provides feedback on or corrections to the assistant's prior response), and \texttt{no\_feedback} (the user continues the conversation without explicitly referencing the assistant's response, e.g., providing additional information or following up on their own prior message). AO is most harmful on \texttt{no\_feedback} turns, where the assistant's prior work contains relevant state that should not be discarded.
+
+\section{Soft vs.\ hard attention}
+\label{app:soft-attention}
+
+Structural exclusion of assistant messages (hard attention) exploits a property of LiC: user messages alone fully specify the task. In realistic settings, the task may depend on prior assistant work---for example, when a user says ``sharpen the phrasing in sentence 2,'' the referent exists only in the assistant's output. \citet{huang2026context} observe similar cases where user messages alone are insufficient for understanding the task.
+
+We introduce a \emph{soft-attention} variant where Subtask~1 sees the full conversation but explicitly reasons through source attribution: listing user-stated requirements with provenance, flagging assistant-originated interpretations as hypotheses, and writing the specification from user-grounded requirements only. We call this ``soft attention'' because the model must rely on transformer attention to selectively weight user-grounded information, rather than having polluting content physically removed from its context.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Condition} & \textbf{Math} & \textbf{Code} & \textbf{Database} \\
+\midrule
+\multicolumn{4}{l}{\emph{Augment}} \\
+\quad Soft attention (no memory) & 40\% & 13\% & 31\% \\
+\quad Soft attention + memory & 56\% & 14\% & \textbf{46\%} \\
+\quad Hard attention (oracle) & \textbf{80\%} & \textbf{40\%} & 54\% \\
+\midrule
+\multicolumn{4}{l}{\emph{Reset}} \\
+\quad Soft attention (no memory) & 42\% & 23\% & 31\% \\
+\quad Soft attention + memory & 42\% & 25\% & \textbf{46\%} \\
+\quad Hard attention (oracle) & \textbf{67\%} & \textbf{46\%} & 54\% \\
+\bottomrule
+\end{tabular}
+\caption{Soft- vs.\ hard-attention results on held-out test splits. Memory closes up to 65\% of the gap to hard attention on database.}
+\label{tab:soft-attention}
+\end{table}
+
+Hard attention substantially outperforms soft attention across all tasks (Table~\ref{tab:soft-attention}), confirming that prompting alone cannot substitute for structural exclusion. However, Reset outperforms Augment even with contaminated specs (code: 23\% vs.\ 13\%), confirming that context pollution and spec contamination are separable problems.
+
+Memory-based decontamination (using hard-attention specs as oracle targets to learn decontamination principles via the Dynamic Cheatsheet) shows its strongest effect on database (+15pp), closing 65\% of the gap to hard attention. The learned principles converge on structured heuristics: ``build a user-only spec first, then overlay assistant suggestions as hypotheses.'' Code remains resistant (+1--2pp), suggesting more structurally diverse contamination patterns that a minimal memory approach cannot address.
 
 \section{Memory-based learning details}
 \label{app:memory-details}
