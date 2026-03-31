@@ -215,7 +215,7 @@ Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--1
 
 \paragraph{Generalization across model families.}
 \label{sec:multi-model}
-We evaluate three additional models---GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)---on a harder problem subset selected to remain challenging for stronger models (protocol details in Appendix~\ref{app:multi-model-protocol}). Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains ranging from +15pp to +70pp across proprietary and open-weight architectures at different scales. The sole exception is GPT-5 on actions, where the baseline is already near ceiling (85\%).
+We evaluate three additional models---GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)---on a harder problem subset selected to remain challenging for stronger models (protocol details in Appendix~\ref{app:multi-model-protocol}). Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains ranging from +15pp to +70pp across proprietary and open-weight architectures at different scales.
 
 \begin{table}[t]
 \centering
@@ -345,26 +345,7 @@ Reset & 75\% & 61\% & 48\% & 52\% \\
 \label{tab:lic-memory}
 \end{table}
 
-\begin{table}[t]
-\centering
-\begin{tabular}{lccc}
-\toprule
-\textbf{Condition} & \textbf{vs AO} & \textbf{vs FC} & \textbf{$\Delta$ vs AO} \\
-\midrule
-\multicolumn{4}{l}{\emph{DeepSeek V3.2 (eval split, judged by GPT-5-mini)}} \\
-\quad Reset (no memory) & 72.5\% & 72.5\% & --- \\
-\quad Reset + memory & \textbf{86.3\%} & \textbf{80.4\%} & \textbf{+13.8pp} \\
-\midrule
-\multicolumn{4}{l}{\emph{GPT-5-mini (online, self-judged)}} \\
-\quad Reset (no memory) & 90.8\% & 86.8\% & --- \\
-\quad Reset + memory & 86.7\% & 80.0\% & $-$4.1pp \\
-\bottomrule
-\end{tabular}
-\caption{WildChat memory results. Memory improves DeepSeek's win rate by +13.8pp when there is headroom; GPT-5-mini's near-ceiling baseline leaves no room for improvement. Memory was learned from one-third of WildChat turns and frozen for evaluation.}
-\label{tab:wildchat-memory}
-\end{table}
-
-Memory amplifies analysis-based methods when there is headroom for improvement: on LiC, Augment + Memory reaches 90\% on math, exceeding the AO upper bound (Table~\ref{tab:lic-memory}); on WildChat, memory improves DeepSeek's Reset win rate by +13.8pp (Table~\ref{tab:wildchat-memory}), but has no effect on GPT-5-mini whose baseline is already near ceiling. Memory is most helpful on feedback turns---where the user references specific prior assistant work---because the learned cheatsheet teaches the analyzer to preserve those references rather than discarding them in a na\"ive reset. We also explore a more realistic \emph{soft-attention} setting where assistant messages are not structurally excluded from the analysis (Appendix~\ref{app:soft-attention}); memory partially closes the gap to hard-attention oracles (up to 65\% on database), but substantial headroom remains, suggesting that more involved approaches are needed for general-purpose decontamination.
+Memory amplifies analysis-based methods when there is headroom for improvement: on LiC, Augment + Memory reaches 90\% on math, exceeding the AO upper bound (Table~\ref{tab:lic-memory}); on WildChat, memory improves DeepSeek's Reset win rate by +13.8pp (Table~\ref{tab:wildchat-memory}), but has no effect on GPT-5-mini whose baseline is already near ceiling. Memory is most helpful on feedback turns, where the learned cheatsheet teaches the analyzer to preserve user references to prior assistant work rather than discarding them. We also explore a more realistic \emph{soft-attention} setting where assistant messages are not structurally excluded from the analysis (Appendix~\ref{app:soft-attention}); memory partially closes the gap to hard-attention oracles, but substantial headroom remains, suggesting more involved approaches are needed.
 
 
 Limitations are discussed in Appendix~\ref{app:limitations}.
@@ -486,6 +467,25 @@ Memory-based decontamination (using hard-attention specs as oracle targets to le
 
 \section{Memory-based learning details}
 \label{app:memory-details}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Condition} & \textbf{vs AO} & \textbf{vs FC} & \textbf{$\Delta$ vs AO} \\
+\midrule
+\multicolumn{4}{l}{\emph{DeepSeek V3.2 (eval split)}} \\
+\quad Reset (no memory) & 72.5\% & 72.5\% & --- \\
+\quad Reset + memory & \textbf{86.3\%} & \textbf{80.4\%} & \textbf{+13.8pp} \\
+\midrule
+\multicolumn{4}{l}{\emph{GPT-5-mini (online)}} \\
+\quad Reset (no memory) & 90.8\% & 86.8\% & --- \\
+\quad Reset + memory & 86.7\% & 80.0\% & $-$4.1pp \\
+\bottomrule
+\end{tabular}
+\caption{WildChat memory results. Memory improves DeepSeek's win rate by +13.8pp when there is headroom; GPT-5-mini's near-ceiling baseline leaves no room for improvement. DeepSeek is judged by GPT-5-mini; GPT-5-mini is self-judged. Memory was learned from one-third of WildChat turns and frozen for evaluation.}
+\label{tab:wildchat-memory}
+\end{table}
 
 We evaluate two learning regimes. \emph{Online}: reflections update the cheatsheet incrementally as problems are solved in batches, so later problems benefit from accumulated principles---a form of continual test-time learning. \emph{Offline}: a set of training trajectories is used to initialize the cheatsheet via a Reflect-then-Unify pipeline (individual reflections followed by a consolidation pass), and the frozen cheatsheet is applied at evaluation time. The offline regime provides a controlled comparison where the only variable is the presence of the cheatsheet. On LiC, we use online learning. On WildChat, we use the offline regime with a train/eval split (one-third training, two-thirds evaluation) to avoid confounding memory quality with ordering effects and to test cross-domain transfer.
 
