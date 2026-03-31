@@ -9,6 +9,36 @@
 \usepackage{multirow}
 \usepackage{xcolor}
 \usepackage{graphicx}
+\usepackage{fancyvrb}
+
+% Define a "prompt" environment with wrapping
+\DefineVerbatimEnvironment{prompt}{Verbatim}{
+  breaklines=true,
+  breakanywhere=true,  % allow breaks inside long words
+  fontsize=\small,     % or \footnotesize if space is tight
+  xleftmargin=2em,     % indent from the left margin
+  commandchars=\\\{\}  % optional: allow \textbf{} inside if you want
+}
+\newcounter{promptctr}
+\newenvironment{numberedprompt}[1]{%
+  \refstepcounter{promptctr}%
+  \paragraph{Prompt \thepromptctr: #1}%
+  \begin{prompt}
+}{%
+  \end{prompt}
+}
+% A command to typeset a prompt from a file, with wrapping
+\newcommand{\promptinput}[2][]{%
+  % #1 = optional extra options, #2 = filename
+  \VerbatimInput[
+    fontsize=\small,        % adjust as you like
+    breaklines=true,        % wrap long lines
+    breakanywhere=true,     % allow breaking in the middle of long tokens
+    obeytabs=true,          % keep indentation
+    tabsize=2,
+    #1
+  ]{#2}%
+}
 
 % NOTE: including geometry package
 % The geometery package modifies some page properties when used. This can dramatically change the page margins, aleading to severe template violation, and potential desk rejection. If the package is required, it can be used with the "pass" flag to skip the default page modifications, as in the following line:
@@ -374,15 +404,125 @@ We propose context editing via externalized executive function to mitigate multi
 %% ============================================================
 \appendix
 
-\section{User simulator quality control}
+\section{LiC evaluation adjustments}
 \label{app:user-sim-qc}
 
-[Detail the false negative analysis: user sim sufficiency check, samples excluded per task, methodology.]
+We make task-specific adjustments to the LiC evaluation protocol to reduce false negatives caused by overly strict extraction and ambiguous formatting, and apply a post-hoc false negative identification procedure across all tasks.
+
+\subsection{Task-specific prompt and extraction changes}
+\label{app:eval-adjustments}
+
+\paragraph{Math.} The original LiC math evaluator uses symbolic answer extraction that is overly strict, producing frequent false negatives when the assistant's final answer is correct but formatted unexpectedly. Since GSM8K problems have integer-only solutions, we simplify extraction by requiring a standardized answer prefix. The v2 system prompt (Prompt~\ref{prompt:math-v2}) adds the instruction \texttt{**ANSWER: <number>**}, making extraction a simple regex match on a known prefix. This eliminates false negatives from formatting variation while remaining faithful to the original task.
+
+\paragraph{Code.} The original HumanEval system prompt does not specify how the assistant should structure its code output. In the multi-turn setting, the assistant sometimes omits the function definition entirely (inlining the logic), or assumes input comes from \texttt{stdin} rather than function parameters, because the sharded problem description does not always convey the expected function signature. The v2 system prompt (Prompt~\ref{prompt:code-v2}) explicitly requires: (1)~exactly one top-level function definition, (2)~inputs as function arguments rather than \texttt{stdin}, and (3)~a markdown Python code fence for the final answer. We also relaxed the extraction code to handle minor formatting variations (e.g., extra whitespace, trailing comments).
+
+\paragraph{Database.} Similar to code, the original database prompt does not specify an output format, making SQL extraction fragile. The v2 prompt (Prompt~\ref{prompt:db-v2}) requires the final query in a \texttt{```sql} markdown code fence, with the constraint that only one such fence should be used for the final answer.
+
+\paragraph{Actions (function calling).} This is the only LiC task that expects multiple output artifacts (a list of function calls). Because shards are revealed incrementally, the assistant sometimes reasonably assumes it does not need to repeat previously established function calls in its final response---but evaluation only considers the last assistant message. The v2 system prompt (Prompt~\ref{prompt:actions-v2}) adds an explicit instruction to output all function calls needed to fulfill the user's complete request at each turn, ensuring the evaluated response contains the full set.
+
+\subsection{False negative identification}
+\label{app:false-neg}
+
+Through manual trace analysis, we found that the user simulator model (which converts problem shards into natural-language user messages) sometimes rephrases shards in ways that subtly distort the original meaning---introducing ambiguity, altering constraints, or omitting critical details. While LiC controls for the \emph{sharding} process by verifying that concatenated-shard performance approximates single-turn performance, it does not control for the user simulator's \emph{rephrasing} and \emph{ordering} of those shards.
+
+We account for this with a post-hoc false negative identification procedure applied to all tasks. For each instance where the assistant fails, we collate all user simulator messages and compare them against the original single-turn question. We query GPT-5 with the prompt in Prompt~\ref{prompt:fn-check} to determine whether the user simulator's messages, taken as a union, provide sufficient information to solve the original problem.
+
+Instances flagged as insufficient are excluded from accuracy calculations, as the assistant's failure is attributable to the evaluation setup rather than to context pollution or the intervention strategy. Manual analysis of the classifier's outputs finds it to be higher-precision, lower-recall: it conservatively flags only clear cases of information loss or distortion. We consider this acceptable because we prefer to allow some ambiguity to the assistant (counting borderline cases as valid) rather than overly invalidating results.
 
 \section{Prompt templates}
 \label{app:prompts}
 
-[Key prompts: task spec extraction, approach evaluation, soft-attention CoT, compaction analysis, tau2-bench strategic reflection.]
+We provide the full text of all prompts used in our system. Template variables are shown in braces (e.g., \texttt{\{system\_message\}}).
+
+\subsection{Task system prompts}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Math system prompt (original LiC).}
+\label{prompt:math-v1}
+\promptinput{assets/prompts/math_system_v1.txt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Math system prompt (v2, ours).}
+\label{prompt:math-v2}
+\promptinput{assets/prompts/math_system_v2.txt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Code system prompt (original LiC).}
+\label{prompt:code-v1}
+\promptinput{assets/prompts/code_system_v1.txt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Code system prompt (v2, ours).}
+\label{prompt:code-v2}
+\promptinput{assets/prompts/code_system_v2.txt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Database system prompt (original LiC).}
+\label{prompt:db-v1}
+\promptinput{assets/prompts/database_system_v1.txt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Database system prompt (v2, ours).}
+\label{prompt:db-v2}
+\promptinput{assets/prompts/database_system_v2.txt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Actions system prompt (original LiC).}
+\label{prompt:actions-v1}
+\promptinput{assets/prompts/actions_system_v1.txt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Actions system prompt (v2, ours).}
+\label{prompt:actions-v2}
+\promptinput{assets/prompts/actions_system_v2.txt}
+
+\subsection{Conversation analysis prompts}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Subtask 1 --- Task specification extraction (hard attention).}
+\label{prompt:query1}
+\promptinput{assets/prompts/analyzer_query1_task_spec.txt}
+
+The analyzer sees \emph{only} the system message and user messages---assistant messages are structurally excluded. This is the ``hard attention'' design described in Section~\ref{sec:cognitive-hazard}.
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Subtask 2 --- Approach evaluation.}
+\label{prompt:query2}
+\promptinput{assets/prompts/analyzer_query2_compare.txt}
+
+Subtask~2 receives the clean task specification from Subtask~1 and the full conversation (including assistant messages). It evaluates alignment and identifies issues.
+
+\subsection{Context compaction prompt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Context compaction (used by Reset and Gated Reset).}
+\label{prompt:compaction}
+\promptinput{assets/prompts/context_compaction.txt}
+
+When the edit decision is affirmative, this prompt produces the replacement context that the assistant sees in place of the original conversation history.
+
+\subsection{False negative identification prompt}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: User simulator sufficiency check.}
+\label{prompt:fn-check}
+\promptinput{assets/prompts/false_negative_check.txt}
+
+\subsection{Memory-based learning prompts}
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Trajectory reflection (Reflect step).}
+\label{prompt:reflect}
+\promptinput{assets/prompts/reflect_takeaways.txt}
+
+After each trajectory, this prompt extracts transferable analysis principles. The output is a bullet list of takeaways grounded in the specific trajectory but generalizable across domains.
+
+\refstepcounter{promptctr}
+\paragraph{Prompt \thepromptctr: Cheatsheet unification (Unify step).}
+\label{prompt:unify}
+\promptinput{assets/prompts/unify_takeaways.txt}
+
+The Unify step integrates individual trajectory takeaways into a single coherent cheatsheet, capped at 1500 words to prevent unbounded growth. The cheatsheet is then injected into the analyzer's context via the \texttt{\{memory\_section\}} template variable in Prompts~\ref{prompt:query1} and~\ref{prompt:query2}.
 
 \section{Agentic adaptation}
 \label{app:agentic-methods}
