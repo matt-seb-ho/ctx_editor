@@ -144,8 +144,7 @@ async def process_failure_turn(
                 turns, turn_index, fc_response, s15_response, "fc", "s15",
                 model_client, judge_model, rng,
             )
-            result["s15_response"] = s15_response[:1000]
-            result["s15_analysis"] = s15_analysis
+            result["s15_response"] = s15_response            result["s15_analysis"] = s15_analysis
             result["judgments"]["ao_vs_s15"] = {
                 "quality_winner": ao_vs_s15.quality_winner,
                 "ontopic_winner": ao_vs_s15.ontopic_winner,
@@ -174,8 +173,7 @@ async def process_failure_turn(
                 turns, turn_index, fc_response, s2_response, "fc", "s2",
                 model_client, judge_model, rng,
             )
-            result["s2_response"] = s2_response[:1000]
-            result["s2_analysis"] = s2_analysis
+            result["s2_response"] = s2_response            result["s2_analysis"] = s2_analysis
             result["judgments"]["ao_vs_s2"] = {
                 "quality_winner": ao_vs_s2.quality_winner,
                 "ontopic_winner": ao_vs_s2.ontopic_winner,

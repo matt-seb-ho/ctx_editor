@@ -201,10 +201,10 @@ async def run_s15_batch(
             "turn_index": turn_index,
             "turn_type": orig.get("turn_type", "unknown"),
             "split": label,
-            "s15_response": s15_response[:1000],
+            "s15_response": s15_response,
             "s15_analysis": s15_analysis,
-            "ao_response": ao_response[:1000],
-            "fc_response": fc_response[:1000],
+            "ao_response": ao_response,
+            "fc_response": fc_response,
             "memory_version": memory.version if memory else -1,
             "judgments": {
                 "ao_vs_s15": {
