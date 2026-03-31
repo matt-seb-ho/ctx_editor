@@ -48,9 +48,49 @@ Compressed the following to reclaim ~35 lines:
 - **Discussion "editing vs removal":** Compressed 2 paragraphs to 1, removing repetition of results already in tables
 - **Cost-capability tradeoff:** Tightened from 6 sentences to 4
 
-### Space budget assessment
+### Space budget assessment (after commit 1)
 
-The formalization adds ~25 lines (problem setting) + ~15 lines (algorithm). Compressions reclaim ~35-40 lines. Net effect should be roughly neutral, but the paper was already at the page limit so it will be tight. If we go over, candidates for appendix migration:
-- The tau2-bench results paragraph (Section 5.4) could be shortened to 2 sentences with details in appendix
-- The CollabLLM results (Section 5.2) are already very brief but could be appendix-only
-- The cognitive hazard discussion (Section 6.2) could be compressed, with the "contamination amplifies through chained calls" finding moved to appendix
+The formalization adds ~25 lines (problem setting) + ~15 lines (algorithm). Compressions reclaim ~35-40 lines. Net effect should be roughly neutral, but the paper was already at the page limit so it will be tight.
+
+---
+
+## 2026-03-31 (commit 2): Space recovery and appendix reorganization
+
+### 7. Algorithm moved to appendix
+
+Algorithm 1 moved from between Sections 3.3-3.4 to Appendix A. Main body now references it as "Algorithm~1 (Appendix A)". Saves ~18 lines of vertical float space.
+
+### 8. Models paragraph removed
+
+Removed standalone `\paragraph{Models.}` from Experiments section. Replaced with a single opening line: "Unless otherwise noted, GPT-5-mini serves as both assistant and analyzer throughout." The model list (GPT-5, DeepSeek V3.2, Qwen 3.5) is now mentioned only in the multi-model appendix subsection where it belongs.
+
+### 9. Additional main-body compressions
+
+- **Tau2-bench results (Section 5.4):** Compressed from 3 sentences to 2, removing redundant restatement about "fundamentally incompatible with stateful settings"
+- **Memory methods opening (Section 3.4):** Cut from 3 sentences to 2, removing "While various approaches with varying degrees of complexity exist"
+- **WildChat results paragraph:** Removed "see Appendix for turn type definitions" parenthetical, tightened gating description
+
+### 10. Appendix reorganized
+
+**New structure:**
+- **A. Algorithm** — pseudocode (moved from main body)
+- **B. Evaluation details** (umbrella `\section` with `\subsection`s):
+  - B.1 LiC evaluation adjustments (task-specific changes + false negative ID)
+  - B.2 Multi-model evaluation protocol
+  - B.3 CollabLLM evaluation details
+  - B.4 WildChat turn type definitions
+  - B.5 Tau2-bench agentic adaptation
+  - B.6 Tau2-bench results and diagnostic analysis
+- **C. Prompt templates** (analysis, compaction, memory prompts)
+- **D. Soft vs. hard attention**
+- **E. Memory-based learning details**
+- **F. Trajectory example: WildChat Maven debugging**
+- **G. Additional related work**
+- **H. Extended agentic context management discussion**
+- **I. Executive function as a design pattern**
+
+**Rationale:** All benchmark-specific evaluation details are now grouped under one umbrella section, making it easy for reviewers to find methodology details for any specific benchmark. Method supplements (algorithm, prompts) come first, then evaluation, then analysis extensions, then examples, then additional related work/discussion.
+
+### Space budget assessment (after commit 2)
+
+Compared to the post-formalization state: moved algorithm to appendix (~18 lines), removed Models paragraph (~2 lines), additional compressions (~8 lines). Total recovery: ~28 lines. Combined with the ~35 lines recovered in commit 1, this should comfortably offset the ~25-line formalization addition and bring us back to the page limit.

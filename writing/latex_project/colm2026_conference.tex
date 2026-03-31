@@ -179,31 +179,12 @@ The analysis produces a structured artifact $(\hat{\mathcal{T}}, \texttt{aligned
 
 \paragraph{Gating.} Any intervention can be applied unconditionally or \emph{gated}, triggered only when the analyzer detects substantive issues (Algorithm~\ref{alg:context-edit}, lines 6--8). Gating reduces cost and avoids disrupting conversations that are already on track, which is critical in agentic settings where resets discard expensive-to-reobtain tool results.
 
-The analytical core (Section~\ref{sec:decomposition}) is the contribution; the intervention strategy is a design choice. We use unconditional Reset for short, self-contained LiC tasks; Gated Reset for long agentic conversations; and Rewrite for diverse open-domain conversations.
-
-\begin{algorithm}[t]
-\caption{Context Editing via Externalized Executive Function}
-\label{alg:context-edit}
-\begin{algorithmic}[1]
-\REQUIRE Conversation context $C_t = (u_1, a_1, \ldots, u_t)$, gating flag $g$
-\STATE \textbf{// Subtask 1: Selective attention (spec extraction)}
-\STATE $U_t \leftarrow (u_1, \ldots, u_t)$ \hfill $\triangleright$ Structurally exclude $A_{t-1}$
-\STATE $\hat{\mathcal{T}} \leftarrow \textsc{Analyze}(U_t)$ \hfill $\triangleright$ Extract clean task specification
-\STATE \textbf{// Subtask 2: Error monitoring (approach evaluation)}
-\STATE $(\texttt{aligned}, \texttt{issues}) \leftarrow \textsc{Evaluate}(\hat{\mathcal{T}}, C_t)$
-\IF{$g$ \AND $\texttt{issues} = \emptyset$}
-    \RETURN $C_t$ \hfill $\triangleright$ No edit needed (gated pass-through)
-\ENDIF
-\STATE \textbf{// Apply editing operator $\mathcal{E}$}
-\STATE $C'_t \leftarrow \textsc{Intervene}(\hat{\mathcal{T}}, \texttt{aligned}, \texttt{issues}, C_t)$
-\RETURN $C'_t$
-\end{algorithmic}
-\end{algorithm}
+The analytical core (Section~\ref{sec:decomposition}) is the contribution; the intervention strategy is a design choice. We use unconditional Reset for short, self-contained LiC tasks; Gated Reset for long agentic conversations; and Rewrite for diverse open-domain conversations. Pseudocode for the full pipeline is in Algorithm~\ref{alg:context-edit} (Appendix~\ref{app:algorithm}).
 
 \subsection{Memory-based learning}
 \label{sec:memory}
 
-We explore whether conversation analysis for context editing can be learned via lightweight memory-based methods. While various approaches with varying degrees of complexity exist (Appendix~\ref{app:additional-related}), we aim to isolate the impact of memory-based learning from experience by experimenting with a minimal design. We adapt the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet}, which represents memory as a single text artifact that is globally updated with a single query and has no retrieval mechanism.
+We explore whether context editing can be learned from experience via lightweight memory. To isolate the impact of memory-based learning, we adapt the Dynamic Cheatsheet~\citep{suzgun2025cheatsheet}, a minimal design that represents memory as a single text artifact updated globally with no retrieval mechanism.
 
 After each problem instance, a reflection query examines the analysis and outcome, abstracting transferable takeaways (e.g., common pitfalls, effective consolidation strategies). These update a cheatsheet $M$, a plain-text memory of strategies and pitfalls accumulated across instances. The cheatsheet is injected into the analyzer's approach evaluation (Subtask~2) on subsequent problems, providing learned priors that improve the quality of $\mathcal{E}$. We cap cheatsheet length at 1500 words to prevent unbounded growth from degrading quality. Implementation details on update strategies and evaluation protocols are in Appendix~\ref{app:memory-details}.
 
@@ -213,7 +194,7 @@ After each problem instance, a reflection query examines the analysis and outcom
 \label{sec:experiments}
 %% ============================================================
 
-We use GPT-5-mini as the primary assistant and analyzer throughout, with additional models tested for generalization.
+Unless otherwise noted, GPT-5-mini serves as both assistant and analyzer throughout.
 
 \paragraph{Lost in Conversation (LiC).}
 We evaluate on the LiC framework~\citep{laban2025lost}, where each instance is a fully-specified question sharded into pieces revealed incrementally by a simulated user. We test four domains: math, code, database (SQL), and function calling (``actions''). To isolate intervention effects, all strategies share the same baseline conversation prefix and only the final turns are regenerated (replay mode). We compare against Assistant Messages Omitted (AO;~\citealt{huang2026context}) and Concatenate User (ERGO-style;~\citealt{khalid2025ergo}). Because LiC tasks are self-contained (user messages alone fully specify the problem), AO and Concatenate User collapse the multi-turn setting to single-turn, serving as upper bounds rather than realistic baselines.
@@ -226,9 +207,6 @@ We reproduce the evaluation of \citet{huang2026context} on WildChat-1M conversat
 
 \paragraph{Tau2-bench.}
 As a preliminary exploration of the agentic setting, we evaluate on the \texttt{telecom\_small} subset of tau2-bench~\citep{yao2024tau}. This setting demonstrates that omitting assistant messages in stateful, tool-use conversations is catastrophically destructive. Agentic adaptation details are in Appendix~\ref{app:agentic-methods}.
-
-\paragraph{Models.} GPT-5-mini is used as the primary assistant and analyzer. We additionally evaluate GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active, open-weight) on LiC and WildChat.
-
 
 %% ============================================================
 \section{Results}
@@ -320,13 +298,13 @@ Rewrite & 178 & 82.6\% & 80.3\% & 68.5\% & 84.3\% \\
 \end{table}
 
 \paragraph{Context editing outperforms both AO and full context.}
-Gated Reset achieves 86.1\% win rate vs.\ AO and 83.8\% vs.\ FC while intervening on only 72\% of turns (Table~\ref{tab:wildchat-quality}). Its gating is intelligent: the edit rate on \texttt{no\_feedback} turns (62.7\%) is lower than on \texttt{new\_ask} (78.1\%) and \texttt{feedback} (78.6\%) turns (see Appendix~\ref{app:wildchat-turns} for turn type definitions), correctly intervening less on stateful turns. On turns where Huang et al.\ identify AO as actively harmful, Gated Reset achieves a 93.3\% win rate vs.\ AO. DeepSeek V3.2 (serving as respondent and analyzer) shows consistent gains in the same direction: Rewrite wins 61.8\% vs.\ AO 28.9\%, and Reset wins 59.2\% vs.\ AO 31.6\%.
+Gated Reset achieves 86.1\% win rate vs.\ AO and 83.8\% vs.\ FC while intervening on only 72\% of turns (Table~\ref{tab:wildchat-quality}). Its gating is intelligent, intervening less on stateful \texttt{no\_feedback} turns (62.7\%) than on \texttt{new\_ask} (78.1\%) and \texttt{feedback} (78.6\%) turns (Appendix~\ref{app:wildchat-turns}). On turns where AO is actively harmful, Gated Reset achieves 93.3\% vs.\ AO. DeepSeek V3.2 shows consistent gains: Rewrite wins 61.8\% vs.\ AO 28.9\%, and Reset wins 59.2\% vs.\ AO 31.6\%.
 
 
 \subsection{Tau2-bench}
 \label{sec:tau2-results}
 
-AO achieves \textbf{0\%} on tau2-bench (Table~\ref{tab:tau2-main}): stripping assistant messages and tool results causes the agent to lose all diagnostic progress and enter infinite re-lookup loops, confirming that omission-based approaches are fundamentally incompatible with stateful settings. Gated Reset achieves 55--60\% across two runs, consistently above the 45--55\% baseline. Gated Reset's gains come primarily from redirecting the agent toward unexplored diagnostic avenues; diagnostic analysis (Appendix~\ref{app:tau2-diagnostic}) reveals that context pollution accounts for only 1 of 11 baseline failures.
+AO achieves \textbf{0\%} on tau2-bench (Table~\ref{tab:tau2-main}), as stripping assistant messages causes the agent to lose all diagnostic progress and enter infinite re-lookup loops. Gated Reset achieves 55--60\%, consistently above the 45--55\% baseline, with gains coming primarily from redirecting the agent toward unexplored diagnostic avenues rather than correcting pollution per se (Appendix~\ref{app:tau2-diagnostic}).
 
 
 %% ============================================================
@@ -424,12 +402,38 @@ We propose context editing via externalized executive function to mitigate multi
 %% ============================================================
 \appendix
 
-\section{LiC evaluation adjustments}
+\section{Algorithm}
+\label{app:algorithm}
+
+\begin{algorithm}[h]
+\caption{Context Editing via Externalized Executive Function}
+\label{alg:context-edit}
+\begin{algorithmic}[1]
+\REQUIRE Conversation context $C_t = (u_1, a_1, \ldots, u_t)$, gating flag $g$
+\STATE \textbf{// Subtask 1: Selective attention (spec extraction)}
+\STATE $U_t \leftarrow (u_1, \ldots, u_t)$ \hfill $\triangleright$ Structurally exclude $A_{t-1}$
+\STATE $\hat{\mathcal{T}} \leftarrow \textsc{Analyze}(U_t)$ \hfill $\triangleright$ Extract clean task specification
+\STATE \textbf{// Subtask 2: Error monitoring (approach evaluation)}
+\STATE $(\texttt{aligned}, \texttt{issues}) \leftarrow \textsc{Evaluate}(\hat{\mathcal{T}}, C_t)$
+\IF{$g$ \AND $\texttt{issues} = \emptyset$}
+    \RETURN $C_t$ \hfill $\triangleright$ No edit needed (gated pass-through)
+\ENDIF
+\STATE \textbf{// Apply editing operator $\mathcal{E}$}
+\STATE $C'_t \leftarrow \textsc{Intervene}(\hat{\mathcal{T}}, \texttt{aligned}, \texttt{issues}, C_t)$
+\RETURN $C'_t$
+\end{algorithmic}
+\end{algorithm}
+
+
+\section{Evaluation details}
+\label{app:eval-details}
+
+\subsection{LiC evaluation adjustments}
 \label{app:user-sim-qc}
 
 We make task-specific adjustments to the LiC evaluation protocol to reduce false negatives caused by overly strict extraction and ambiguous formatting, and apply a post-hoc false negative identification procedure across all tasks.
 
-\subsection{Task-specific prompt and extraction changes}
+\subsubsection{Task-specific prompt and extraction changes}
 \label{app:eval-adjustments}
 
 \paragraph{Math.} The original LiC math evaluator uses symbolic answer extraction that is overly strict, producing frequent false negatives when the assistant's final answer is correct but formatted unexpectedly. Since GSM8K problems have integer-only solutions, we simplify extraction by requiring a standardized answer prefix. Our v2 system prompt adds the instruction \texttt{**ANSWER: <number>**}, making extraction a simple regex match on a known prefix. This eliminates false negatives from formatting variation while remaining faithful to the original task.
@@ -440,7 +444,7 @@ We make task-specific adjustments to the LiC evaluation protocol to reduce false
 
 \paragraph{Actions (function calling).} This is the only LiC task that expects multiple output artifacts (a list of function calls). Because shards are revealed incrementally, the assistant sometimes reasonably assumes it does not need to repeat previously established function calls in its final response, but evaluation only considers the last assistant message. Our v2 system prompt adds an explicit instruction to output all function calls needed to fulfill the user's complete request at each turn, ensuring the evaluated response contains the full set.
 
-\subsection{False negative identification}
+\subsubsection{False negative identification}
 \label{app:false-neg}
 
 Through manual trace analysis, we found that the user simulator model (which converts problem shards into natural-language user messages) sometimes rephrases shards in ways that subtly distort the original meaning, introducing ambiguity, altering constraints, or omitting critical details. While LiC controls for the \emph{sharding} process by verifying that concatenated-shard performance approximates single-turn performance, it does not control for the user simulator's \emph{rephrasing} and \emph{ordering} of those shards.
@@ -448,6 +452,80 @@ Through manual trace analysis, we found that the user simulator model (which con
 We account for this with a post-hoc false negative identification procedure applied to all tasks. For each instance where the assistant fails, we collate all user simulator messages and compare them against the original single-turn question. We query GPT-5 (prompt provided in supplemental materials) to determine whether the user simulator's messages, taken as a union, provide sufficient information to solve the original problem.
 
 Instances flagged as insufficient are excluded from accuracy calculations, as the assistant's failure is attributable to the evaluation setup rather than to context pollution or the intervention strategy. Manual analysis of the classifier's outputs finds it to be higher-precision, lower-recall: it conservatively flags only clear cases of information loss or distortion. We consider this acceptable because we prefer to allow some ambiguity to the assistant (counting borderline cases as valid) rather than overly invalidating results.
+
+\subsection{Multi-model evaluation protocol}
+\label{app:multi-model-protocol}
+
+Because stronger models solve easier problems regardless of context pollution, we re-ran the subset selection protocol using GPT-5.2 LiC logs (instead of GPT-5-mini), selecting the 20 hardest true-negative instances per task to ensure a challenging set for this model class. Each model serves as both assistant (final-turn regeneration) and analyzer. All models replay conversations originally generated by GPT-5.2; the Baseline reflects how model $X$ handles GPT-5.2's polluted context, while Reset reflects model $X$ given a clean context derived from its own analysis. User and system agents use GPT-4o-mini throughout. We compare Baseline against unconditional Reset (the best-performing strategy in Section~\ref{sec:lic-results}). Denominators vary slightly for code (14--15 valid samples due to evaluation errors); percentages use valid denominators. We additionally evaluate GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active, open-weight).
+
+\subsection{CollabLLM evaluation details}
+\label{app:collabllm}
+
+Standard BigCodeBench evaluation uses test-case execution requiring exact function signatures, but the CollabLLM user simulator never conveys these signatures exactly, making pass\_rate systematically zero for all conditions. We develop a conversation-aware LLM judge (GPT-5) that evaluates the assistant's code against the user's actual intent as expressed in the conversation, assessing functional correctness rather than signature conformance.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lccc}
+\toprule
+\textbf{Task} & \textbf{Baseline} & \textbf{Rewrite} & \textbf{$\Delta$} \\
+\midrule
+MATH-Hard (LLM judge) & 40.0\% & \textbf{45.0\%} & +5.0pp \\
+BigCodeBench (conv.\ judge) & 62.5\% & \textbf{82.5\%} & +20.0pp \\
+\bottomrule
+\end{tabular}
+\caption{CollabLLM results. Rewrite uses single-pass full-conversation analysis (no structural exclusion).}
+\label{tab:collabllm}
+\end{table}
+
+\subsection{WildChat turn type definitions}
+\label{app:wildchat-turns}
+
+Following \citet{huang2026context}, WildChat turns are classified into three types based on the relationship between the current user message and prior conversation context: \texttt{new\_ask} (the user introduces a new topic or question unrelated to prior turns), \texttt{feedback} (the user provides feedback on or corrections to the assistant's prior response), and \texttt{no\_feedback} (the user continues the conversation without explicitly referencing the assistant's response, e.g., providing additional information or following up on their own prior message). AO is most harmful on \texttt{no\_feedback} turns, where the assistant's prior work contains relevant state that should not be discarded.
+
+\subsection{Tau2-bench agentic adaptation}
+\label{app:agentic-methods}
+
+For tau2-bench, we make three modifications: (1)~the analyzer explicitly tracks environment state (account settings, diagnostic results) revealed through tool calls; (2)~the analysis is reframed as ``strategic reflection,'' identifying unexplored diagnostic avenues rather than just flagging errors; and (3)~resets are gated and capped at 3 per conversation to prevent infinite loops.
+
+\subsection{Tau2-bench results and diagnostic analysis}
+\label{app:tau2-diagnostic}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lcc}
+\toprule
+\textbf{Strategy} & \textbf{Success Rate} & \textbf{Cost} \\
+\midrule
+Baseline & 45--55\% & \$0.51 \\
+AO & 0\% & \$0.36 \\
+Gated Reset (ours) & \textbf{55--65\%} & \$0.60--0.67 \\
+\bottomrule
+\end{tabular}
+\caption{Tau2-bench \texttt{telecom\_small} results. AO is catastrophically destructive in agentic settings. Gated Reset consistently exceeds the baseline.}
+\label{tab:tau2-main}
+\end{table}
+
+Diagnostic analysis of baseline failures on tau2-bench reveals the distribution of failure modes:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrl}
+\toprule
+\textbf{Category} & \textbf{Count} & \textbf{Description} \\
+\midrule
+Task too hard & 4 & Agent never tries the right fix \\
+Step budget / Hard persona & 4 & Correct approach but runs out of turns \\
+Context pollution & 1 & Agent stuck in repetitive loop \\
+User sim issue & 1 & User stopped after first message \\
+Premature transfer & 1 & Agent transfers instead of troubleshooting \\
+\bottomrule
+\end{tabular}
+\caption{Baseline failure mode breakdown (11 failures). Context pollution is not the dominant failure mode in tau2-bench.}
+\label{tab:tau2-failure-modes}
+\end{table}
+
+This finding motivated the shift from pollution-detection framing (v9) to strategic-reflection framing (v10), which addresses the dominant failure mode of missing domain knowledge by redirecting the agent toward unexplored diagnostic avenues.
+
 
 \section{Prompt templates}
 \label{app:prompts}
@@ -495,54 +573,6 @@ After each trajectory, this prompt extracts transferable analysis principles. Th
 
 The Unify step integrates individual trajectory takeaways into a single coherent cheatsheet, capped at 1500 words to prevent unbounded growth. The cheatsheet is then injected into the analyzer's context via the \texttt{\{memory\_section\}} template variable in Prompts~\ref{prompt:query1} and~\ref{prompt:query2}.
 
-\section{Agentic adaptation}
-\label{app:agentic-methods}
-
-For tau2-bench, we make three modifications: (1)~the analyzer explicitly tracks environment state (account settings, diagnostic results) revealed through tool calls; (2)~the analysis is reframed as ``strategic reflection,'' identifying unexplored diagnostic avenues rather than just flagging errors; and (3)~resets are gated and capped at 3 per conversation to prevent infinite loops.
-
-\section{Tau2-bench results and diagnostic analysis}
-\label{app:tau2-diagnostic}
-
-\begin{table}[h]
-\centering
-\begin{tabular}{lcc}
-\toprule
-\textbf{Strategy} & \textbf{Success Rate} & \textbf{Cost} \\
-\midrule
-Baseline & 45--55\% & \$0.51 \\
-AO & 0\% & \$0.36 \\
-Gated Reset (ours) & \textbf{55--65\%} & \$0.60--0.67 \\
-\bottomrule
-\end{tabular}
-\caption{Tau2-bench \texttt{telecom\_small} results. AO is catastrophically destructive in agentic settings. Gated Reset consistently exceeds the baseline.}
-\label{tab:tau2-main}
-\end{table}
-
-Diagnostic analysis of baseline failures on tau2-bench reveals the distribution of failure modes:
-
-\begin{table}[h]
-\centering
-\begin{tabular}{lrl}
-\toprule
-\textbf{Category} & \textbf{Count} & \textbf{Description} \\
-\midrule
-Task too hard & 4 & Agent never tries the right fix \\
-Step budget / Hard persona & 4 & Correct approach but runs out of turns \\
-Context pollution & 1 & Agent stuck in repetitive loop \\
-User sim issue & 1 & User stopped after first message \\
-Premature transfer & 1 & Agent transfers instead of troubleshooting \\
-\bottomrule
-\end{tabular}
-\caption{Baseline failure mode breakdown (11 failures). Context pollution is not the dominant failure mode in tau2-bench.}
-\label{tab:tau2-failure-modes}
-\end{table}
-
-This finding motivated the shift from pollution-detection framing (v9) to strategic-reflection framing (v10), which addresses the dominant failure mode of missing domain knowledge by redirecting the agent toward unexplored diagnostic avenues.
-
-\section{WildChat turn type definitions}
-\label{app:wildchat-turns}
-
-Following \citet{huang2026context}, WildChat turns are classified into three types based on the relationship between the current user message and prior conversation context: \texttt{new\_ask} (the user introduces a new topic or question unrelated to prior turns), \texttt{feedback} (the user provides feedback on or corrections to the assistant's prior response), and \texttt{no\_feedback} (the user continues the conversation without explicitly referencing the assistant's response, e.g., providing additional information or following up on their own prior message). AO is most harmful on \texttt{no\_feedback} turns, where the assistant's prior work contains relevant state that should not be discarded.
 
 \section{Soft vs.\ hard attention}
 \label{app:soft-attention}
@@ -599,6 +629,7 @@ Memory-based decontamination (using hard-attention specs as oracle targets to le
 \end{table}
 
 We evaluate two learning regimes. \emph{Online}: reflections update the cheatsheet incrementally as problems are solved in batches, so later problems benefit from accumulated principles, a form of continual test-time learning. \emph{Offline}: a set of training trajectories is used to initialize the cheatsheet via a Reflect-then-Unify pipeline (individual reflections followed by a consolidation pass), and the frozen cheatsheet is applied at evaluation time. The offline regime provides a controlled comparison where the only variable is the presence of the cheatsheet. On LiC, we use online learning. On WildChat, we use the offline regime with a train/eval split (one-third training, two-thirds evaluation) to avoid confounding memory quality with ordering effects and to test cross-domain transfer.
+
 
 \section{Trajectory example: WildChat Maven debugging}
 \label{app:trajectories}
@@ -662,29 +693,6 @@ Across all 7 evaluated turns, S2 wins every pairwise comparison against both bas
 \label{tab:traj-turns}
 \end{table}
 
-\section{Multi-model evaluation protocol}
-\label{app:multi-model-protocol}
-
-Because stronger models solve easier problems regardless of context pollution, we re-ran the subset selection protocol using GPT-5.2 LiC logs (instead of GPT-5-mini), selecting the 20 hardest true-negative instances per task to ensure a challenging set for this model class. Each model serves as both assistant (final-turn regeneration) and analyzer. All models replay conversations originally generated by GPT-5.2; the Baseline reflects how model $X$ handles GPT-5.2's polluted context, while Reset reflects model $X$ given a clean context derived from its own analysis. User and system agents use GPT-4o-mini throughout. We compare Baseline against unconditional Reset (the best-performing strategy in Section~\ref{sec:lic-results}). Denominators vary slightly for code (14--15 valid samples due to evaluation errors); percentages use valid denominators.
-
-\section{CollabLLM evaluation details}
-\label{app:collabllm}
-
-Standard BigCodeBench evaluation uses test-case execution requiring exact function signatures, but the CollabLLM user simulator never conveys these signatures exactly, making pass\_rate systematically zero for all conditions. We develop a conversation-aware LLM judge (GPT-5) that evaluates the assistant's code against the user's actual intent as expressed in the conversation, assessing functional correctness rather than signature conformance.
-
-\begin{table}[h]
-\centering
-\begin{tabular}{lccc}
-\toprule
-\textbf{Task} & \textbf{Baseline} & \textbf{Rewrite} & \textbf{$\Delta$} \\
-\midrule
-MATH-Hard (LLM judge) & 40.0\% & \textbf{45.0\%} & +5.0pp \\
-BigCodeBench (conv.\ judge) & 62.5\% & \textbf{82.5\%} & +20.0pp \\
-\bottomrule
-\end{tabular}
-\caption{CollabLLM results. Rewrite uses single-pass full-conversation analysis (no structural exclusion).}
-\label{tab:collabllm}
-\end{table}
 
 \section{Additional related work}
 \label{app:additional-related}
