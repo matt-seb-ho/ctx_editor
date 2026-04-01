@@ -82,7 +82,7 @@ We propose \emph{context editing via externalized executive function}: a separat
 Although the transformer's attention mechanism~\citep{Vaswani+2017} computes relevance weights over all tokens, multi-turn settings expose cases where this mechanism fails at the \emph{cognitive} task of selective attention: deciding which prior reasoning to rely on and which to suppress.
 Our approach uses additional LLM calls at test time to draw hard lines around what content the assistant can see, extending test-time scaling~\citep{wei2022chain,wang2023selfconsistency,yao2024tree,snell2024scalettc} to multi-turn settings on a perceptual level.
 
-A further challenge is that prior assistant messages act as a \emph{cognitive hazard}: even a model prompted as an independent reviewer produces degraded analysis when exposed to them, collapsing performance to baseline or worse (Section~\ref{sec:cognitive-hazard}). Context pollution therefore impairs not just the conversational assistant, but \emph{any model processing the same context}, requiring structural exclusion by design.
+A further challenge is that context pollution is \emph{contagious}: even a separate model tasked as an independent reviewer produces degraded analysis when exposed to the assistant's prior reasoning (Section~\ref{sec:cognitive-hazard}). This means the analysis pipeline itself must be structurally shielded from the content it aims to correct.
 
 % \paragraph{Contributions.}
 % \begin{itemize}
@@ -180,7 +180,7 @@ The analysis produces a structured artifact $(\hat{\mathcal{T}}, \texttt{aligned
 
 \paragraph{Reset.} The artifact populates a template that \emph{replaces} the entire conversation: $C'_t = \textsc{Template}(\hat{\mathcal{T}}, \texttt{aligned})$. Because the analysis maps deterministically to the replacement context (no additional LLM call), this is the cheapest intervention that achieves explicit removal. It also eliminates a source of error: the rewrite step itself can introduce inaccuracies, so bypassing it can improve fidelity (Section~\ref{sec:lic-results}).
 
-\paragraph{Rewrite.} An additional LLM call generates a restructured context: $C'_t \sim p_\theta(\cdot \mid \hat{\mathcal{T}}, \texttt{aligned}, \texttt{issues}, C_t)$. This is the most flexible intervention---unconstrained by any hand-crafted template, it can produce arbitrary context restructurings. Current results show that this flexibility comes at the cost of occasional detail loss through summarization, but as model capabilities improve, the ceiling for learned rewriting is strictly higher than for deterministic mapping.
+\paragraph{Rewrite.} An additional LLM call generates a restructured context: $C'_t \sim p_\theta(\cdot \mid \hat{\mathcal{T}}, \texttt{aligned}, \texttt{issues}, C_t)$. This is the most flexible intervention---unconstrained by any hand-crafted template, it can produce arbitrary context restructurings. Current results show that this flexibility comes at the cost of occasional detail loss through summarization, but we expect the ceiling for learned rewriting to exceed that of deterministic mapping as model capabilities improve.
 
 \paragraph{Gating.} Any intervention can be applied unconditionally or \emph{gated}, triggered only when the analyzer detects substantive issues (Algorithm~\ref{alg:context-edit}, lines 6--8). Gating reduces cost and avoids disrupting conversations that are already on track, which is critical in agentic settings where resets discard expensive-to-reobtain tool results.
 
