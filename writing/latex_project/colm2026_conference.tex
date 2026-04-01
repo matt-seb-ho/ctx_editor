@@ -79,12 +79,9 @@ What is missing is fine-grained context management that targets pollution specif
 
 We propose \emph{context editing via externalized executive function}: a separate self-review agent identifies where the assistant has diverged from the user's intent, where errors have been carried forward, and where unproductive reasoning has accumulated, then rewrites the context to preserve correct work while removing what is harmful (Figure~\ref{fig:method}).
 
-Although the transformer's attention mechanism~\citep{Vaswani+2017} computes relevance weights over all tokens, multi-turn settings with changing state and requirements expose cases where this mechanism fails at the \emph{cognitive} task of selective attention: deciding which prior reasoning to rely on and which to suppress.
-Our approach uses additional LLM calls at test time to make these deliberate decisions and draw hard lines around what content the assistant can even see. 
-% This can be viewed as extending test-time scaling~\citep{wei2022chain,wang2023selfconsistency,yao2024tree} from single-turn settings (scaling compute within one generation) to multi-turn settings (editing the accumulated context presented to the model).
-This can be viewed as extending test-time scaling~\citep{wei2022chain,wang2023selfconsistency,yao2024tree,snell2024scalettc} to multi-turn settings on a perceptual level.
-
-A further challenge is that prior assistant messages act as a \emph{cognitive hazard}: even a model prompted as an independent reviewer produces degraded analysis when exposed to them, collapsing performance to baseline or worse (Section~\ref{sec:cognitive-hazard}). Context pollution therefore impairs not just the conversational assistant, where we might expect the assistant model to bias toward consistency with its prior messages, but \emph{any model processing the same context}, requiring structural exclusion by design.
+Although the transformer's attention mechanism~\citep{Vaswani+2017} computes relevance weights over all tokens, multi-turn settings expose cases where this mechanism fails at the \emph{cognitive} task of selective attention: deciding which prior reasoning to rely on and which to suppress.
+Our approach uses additional LLM calls at test time to draw hard lines around what content the assistant can see, extending test-time scaling~\citep{wei2022chain,wang2023selfconsistency,yao2024tree,snell2024scalettc} to multi-turn settings on a perceptual level.
+A key challenge is that prior assistant messages act as a \emph{cognitive hazard}: even a model prompted as an independent reviewer anchors on them, collapsing performance to baseline or worse (Section~\ref{sec:cognitive-hazard}). Context pollution impairs \emph{any model processing the same context}, not just the conversational assistant, requiring structural exclusion by design.
 
 % \paragraph{Contributions.}
 % \begin{itemize}
@@ -117,7 +114,7 @@ A further challenge is that prior assistant messages act as a \emph{cognitive ha
 \citet{laban2025lost} introduced the Lost in Conversation (LiC) framework, showing that multi-turn performance drops 39\% on average across 15 LLMs, driven by increased unreliability (+112\%) in addition to reduced capability ($-$16\%). \citet{huang2026context} termed this \emph{context pollution} and showed that simply omitting all assistant messages (assistant omission, AO) recovers much of the lost performance, establishing that the assistant's own outputs are the primary source of degradation. \citet{khalid2025ergo} proposed ERGO, which monitors token-level entropy and triggers context resets. Critically, both approaches treat context as \emph{uniformly harmful}: they discard all assistant messages without distinguishing correct work from polluting content. This is effective only when the model can re-derive answers from user messages alone. We build on their diagnostic finding while treating context as \emph{heterogeneous}, selectively preserving useful assistant content and removing what is harmful, and showing that blanket omission fails catastrophically in agentic settings where such re-derivation is impossible.
 
 \paragraph{Executive function in cognitive science.}
-Executive function refers to the cognitive processes that regulate attention, suppress inappropriate responses, and update working representations~\citep{miyake2000unity}, with three core components: inhibitory control, working memory updating, and cognitive flexibility~\citep{diamond2013executive}. We use this framework to characterize what LLMs lack in multi-turn settings. The connection is functional, not mechanistic: the \emph{behavioral} failures align with executive function deficits, though we do not claim LLMs share human cognitive architecture.
+Executive function encompasses the cognitive processes that regulate attention, suppress inappropriate responses, and update working representations~\citep{miyake2000unity,diamond2013executive}. We use this framework to characterize what LLMs lack in multi-turn settings. The connection is functional, not mechanistic: the \emph{behavioral} failures align with executive function deficits, though we do not claim LLMs share human cognitive architecture.
 
 \paragraph{Agentic context management.}
 A growing body of work uses LLM-driven context manipulation for long-horizon tasks: THREAD~\citep{schroeder2025thread} spawns sub-agents with summarized results, Recursive Language Models~\citep{zhang2025rlm} treat context as a programmatically manipulated variable, and Context Folding~\citep{sun2025contextfolding} trains agents to branch and collapse sub-trajectories. These methods target \emph{compaction}, fitting more reasoning into bounded context. Our work addresses a different problem: \emph{context pollution}, where the assistant's own prior outputs actively mislead future generation even within ample context. Compaction preserves information while reducing tokens; we selectively \emph{remove} information that is harmful.
@@ -152,24 +149,16 @@ Consider a multi-turn conversation between a user and an LLM assistant. At turn 
 
 Let $\mathcal{T}^*$ denote the true task specification, which the user reveals incrementally across messages $U_t = (u_1, \ldots, u_t)$.  In principle, $U_t$ provides a progressively more complete view of $\mathcal{T}^*$.  However, the assistant tokens $A_{t-1} = (a_1, \ldots, a_{t-1})$ encode latent assumptions $\hat{\mathcal{T}}_i$ that may diverge from $\mathcal{T}^*$ as new user messages refine or contradict earlier interpretations.  This creates a \emph{distribution shift}: the model conditions on $C_t = (U_t, A_{t-1})$, but $A_{t-1}$ biases the posterior toward stale assumptions, so that $p_\theta(\text{correct} \mid U_t, A_{t-1}) < p_\theta(\text{correct} \mid U_t)$---the assistant's own prior outputs \emph{reduce} the probability of a correct response. \citet{huang2026context} empirically confirm this inequality: simply omitting $A_{t-1}$ (assistant omission) recovers much of the lost accuracy.
 
-However, omission is a blunt instrument. In stateful settings, $A_{t-1}$ contains essential information (e.g., tool-call results, agreed-upon decisions) that cannot be re-derived from $U_t$ alone. We seek an \emph{editing operator} $\mathcal{E}$ that produces a modified context $C'_t = \mathcal{E}(C_t)$ satisfying two properties:
-\begin{enumerate}
-    \item \textbf{Decontamination.} $C'_t$ suppresses the biasing effect of stale assumptions in $A_{t-1}$, so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid C_t)$.
-    \item \textbf{Preservation.} $C'_t$ retains task-relevant information from both $U_t$ and $A_{t-1}$, so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid U_t)$ whenever $A_{t-1}$ contains useful state.
-\end{enumerate}
+However, omission is a blunt instrument. In stateful settings, $A_{t-1}$ contains essential information (e.g., tool-call results, agreed-upon decisions) that cannot be re-derived from $U_t$ alone. We seek an \emph{editing operator} $\mathcal{E}$ that produces a modified context $C'_t = \mathcal{E}(C_t)$ satisfying: (1)~\textbf{Decontamination}---$C'_t$ suppresses stale assumptions so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid C_t)$; and (2)~\textbf{Preservation}---$C'_t$ retains task-relevant information from both $U_t$ and $A_{t-1}$, so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid U_t)$ whenever $A_{t-1}$ contains useful state.
 
 We implement $\mathcal{E}$ as LLM operations that analyze the conversation history and edit the context before each assistant turn. The analysis identifies where the assistant's approach has diverged from $\mathcal{T}^*$; the edit surgically removes or restructures the polluting content while preserving correct work. Algorithm~\ref{alg:context-edit} gives the full procedure.
 
 \subsection{Conversation analysis via subtask decomposition}
 \label{sec:decomposition}
 
-Implementing the editing operator $\mathcal{E}$ requires answering a prior question: \emph{how do you identify context pollution in the first place?} Context pollution is content that biases the model toward an incorrect approach---but ``incorrect'' is only meaningful relative to some ground truth. In multi-turn conversation, the user's messages are the primary source of truth: an approach becomes invalidated when it rests on assumptions contradicted by subsequent user messages. However, two complications make this identification non-trivial:
+Implementing $\mathcal{E}$ requires answering a prior question: \emph{how do you identify context pollution?} ``Incorrect'' is only meaningful relative to ground truth. In multi-turn conversation, the user's messages are the primary source of truth: an approach becomes invalidated when it rests on assumptions contradicted by subsequent user messages. But this identification is non-trivial. New user information may \emph{appear} compatible with the current approach while actually requiring a fundamentally different one---the very pollution we aim to detect primes the model to assimilate new information into the existing frame. Moreover, users may revise or correct earlier requirements across turns, so the true task specification must be \emph{consolidated} from all user messages.
 
-\emph{Subtlety of contradiction.} New user information may \emph{appear} compatible with the assistant's current approach while actually requiring a fundamentally different one. The very context pollution we aim to detect makes it harder to detect: a model reading the assistant's confident prior reasoning is primed to assimilate new information into the existing frame rather than recognizing it as a pivot.
-
-\emph{Fragmentation of user intent.} The user may not be a perfectly reliable narrator---they may introduce requirements that they revise or correct in later turns, or reference assistant-generated content (e.g., ``fix the bug in your solution''). The true task specification must therefore be \emph{consolidated} from all user messages, accounting for refinements and corrections across turns.
-
-These observations yield two design pressures. First, identifying pollution requires a clean understanding of the task specification, which means the analysis must be \emph{grounded} in the user's requirements rather than derived from the assistant's interpretation. This aligns with findings on LLM self-correction: \citet{kamoi2024criticalselfcorrect} show that intrinsic self-correction---where the model lacks any external source of feedback or grounding---is largely ineffective. Our user-grounded specification provides exactly this missing anchor. Second, the specification itself must be extracted \emph{without} exposure to the assistant's reasoning, lest the extraction process fall victim to the same pollution it aims to detect. These pressures motivate a two-subtask decomposition (Algorithm~\ref{alg:context-edit}, lines 2--5), ablated in Section~\ref{sec:cognitive-hazard}.
+These observations yield two design pressures. First, identifying pollution requires a task specification \emph{grounded} in user requirements, not derived from the assistant's interpretation. This aligns with \citet{kamoi2024criticalselfcorrect}, who show that intrinsic self-correction without external feedback is largely ineffective; our user-grounded specification provides the missing anchor. Second, the specification must be extracted \emph{without} exposure to the assistant's reasoning, lest the extraction itself fall victim to pollution. These pressures motivate a two-subtask decomposition (Algorithm~\ref{alg:context-edit}, lines 2--5), ablated in Section~\ref{sec:cognitive-hazard}.
 
 \paragraph{Subtask 1: Task specification extraction (selective attention).}
 The model sees only $U_t$ (user messages and system message), with $A_{t-1}$ structurally excluded, and produces a consolidated task specification $\hat{\mathcal{T}}$. The system message grounds the output format (e.g., SQL schema, function signatures). By physically excluding assistant messages, we implement attentional control that the model cannot perform internally.
@@ -190,7 +179,7 @@ The analysis produces a structured artifact $(\hat{\mathcal{T}}, \texttt{aligned
 
 \paragraph{Gating.} Any intervention can be applied unconditionally or \emph{gated}, triggered only when the analyzer detects substantive issues (Algorithm~\ref{alg:context-edit}, lines 6--8). Gating reduces cost and avoids disrupting conversations that are already on track, which is critical in agentic settings where resets discard expensive-to-reobtain tool results.
 
-The analytical core (Section~\ref{sec:decomposition}) is the contribution; the intervention strategy is a design choice. We use unconditional Reset for short, self-contained LiC tasks; Gated Reset for long agentic conversations; and Rewrite for diverse open-domain conversations. Pseudocode for the full pipeline is in Algorithm~\ref{alg:context-edit} (Appendix~\ref{app:algorithm}).
+The analytical core (Section~\ref{sec:decomposition}) is the contribution; the intervention strategy is a design choice. We use Reset for self-contained LiC tasks, Gated Reset for agentic conversations, and Rewrite for open-domain conversations. Full pseudocode is in Algorithm~\ref{alg:context-edit} (Appendix~\ref{app:algorithm}).
 
 \subsection{Memory-based learning}
 \label{sec:memory}
@@ -253,34 +242,11 @@ Gated Reset (ours) & 75\% & 72\% & 44\% & 74\% \\
 On math, Augment reaches 80\%, closing 80\% of the 25pp gap between baseline and AO (Table~\ref{tab:lic-main}). On code, Gated Reset reaches 72\%, closing 90\% of the gap. On database, Reset (48\%) \emph{exceeds} both upper bounds (32\%), because intelligent consolidation outperforms na\"ive message removal when fragmented user messages require schema-grounded assembly.
 
 \paragraph{Context removal provides additional benefit.}
-Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--16pp) using identical analysis. The difference is whether the assistant sees the polluted history or a clean context, confirming that anchoring on prior responses is separable from intent fragmentation.
+Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--16pp) using identical analysis, confirming that anchoring on prior responses is separable from intent fragmentation.
 
 \paragraph{Generalization across model families.}
 \label{sec:multi-model}
-We evaluate three additional models (GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)) on a harder problem subset selected to remain challenging for stronger models (protocol details in Appendix~\ref{app:multi-model-protocol}). Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains ranging from +15pp to +70pp across proprietary and open-weight architectures at different scales.
-
-\begin{table}[t]
-\centering
-\begin{tabular}{llccccc}
-\toprule
-\textbf{Model} & \textbf{Strategy} & \textbf{Math} & \textbf{Code} & \textbf{Database} & \textbf{Actions} & \textbf{Avg.\ $\Delta$} \\
-\midrule
-\multirow{2}{*}{GPT-5-mini} & Baseline & 20\% & 10\% & 5\% & 60\% & \\
- & Reset & \textbf{55\%} & \textbf{25\%} & \textbf{40\%} & \textbf{80\%} & +26pp \\
-\midrule
-\multirow{2}{*}{GPT-5} & Baseline & 40\% & 21\% & 27\% & 85\% & \\
- & Reset & \textbf{70\%} & \textbf{47\%} & \textbf{65\%} & 70\% & +20pp \\
-\midrule
-\multirow{2}{*}{DeepSeek V3.2} & Baseline & 50\% & 7\% & 10\% & 35\% & \\
- & Reset & \textbf{80\%} & \textbf{62\%} & \textbf{45\%} & \textbf{70\%} & +39pp \\
-\midrule
-\multirow{2}{*}{Qwen 3.5 35B} & Baseline & 55\% & 21\% & 5\% & 45\% & \\
- & Reset & \textbf{75\%} & \textbf{64\%} & \textbf{75\%} & \textbf{80\%} & +42pp \\
-\bottomrule
-\end{tabular}
-\caption{Multi-model LiC results on a hard subset selected via high baseline failure rate by GPT-5.2. Reset improves accuracy for 15 of 16 model--task pairs across four architectures.}
-\label{tab:multi-model}
-\end{table}
+We evaluate three additional models (GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active)) on a harder problem subset (Appendix~\ref{app:multi-model-protocol}). Reset improves accuracy in 15 of 16 model--task pairs (Table~\ref{tab:multi-model}), with gains of +20--42pp on average across closed and open-weight architectures at different scales.
 
 
 \subsection{CollabLLM}
@@ -328,7 +294,7 @@ AO achieves \textbf{0\%} on tau2-bench (Table~\ref{tab:tau2-main}), as stripping
 
 The value of context editing over blanket removal scales with conversation statefulness: on LiC, omission is near-optimal and our methods close most of the gap; on WildChat, editing outperforms both AO and full context (82--86\% win rates); on tau2-bench, AO is catastrophic (0\%) while editing maintains or improves performance. Gated Reset is consistently the best or joint-best strategy across all settings, suggesting conservative, gated intervention as a robust default. These gains generalize across four model families (Table~\ref{tab:multi-model}).
 
-\paragraph{Cost--capability tradeoff.} The analyzer adds 2 LLM calls per turn (spec extraction + approach evaluation), plus 1 for Rewrite, increasing tau2-bench cost from \$0.51 to \$0.60--0.67 per task (Table~\ref{tab:tau2-main}). We justify this cost on two grounds. First, cheaper alternatives fail: both \citet{huang2026context} and \citet{khalid2025ergo} explore lightweight detection mechanisms (embedding-based classifiers, entropy heuristics), but these cannot perform the fine-grained semantic analysis needed to distinguish correct from polluting content, and both resort to blanket removal---which catastrophically fails in stateful settings (AO achieves 0\% on tau2-bench). Second, unlike hand-crafted heuristics, the analysis uses autoregressive LLM generation, making it amenable to self-distillation~\citep{zhao2026selfdistillreason,hubotter2026rlselfdistill,shenfeld2026selfdistill}: reasoning models could in principle absorb the analysis into their own chain-of-thought, eliminating the external call overhead. We view the current multi-query architecture as a proof of concept for a capability that should ultimately be internalized.
+\paragraph{Cost--capability tradeoff.} The analyzer adds 2 LLM calls per turn (spec extraction + approach evaluation), plus 1 for Rewrite, increasing tau2-bench cost from \$0.51 to \$0.60--0.67 per task (Table~\ref{tab:tau2-main}). We justify this cost on two grounds. First, cheaper alternatives fail: both \citet{huang2026context} and \citet{khalid2025ergo} explore lightweight detection mechanisms (embedding-based classifiers, entropy heuristics), but these cannot perform the fine-grained semantic analysis needed to distinguish correct from polluting content, and both resort to blanket removal---which catastrophically fails in stateful settings (AO achieves 0\% on tau2-bench). Second, unlike hand-crafted heuristics, the analysis uses autoregressive LLM generation, making it amenable to self-distillation~\citep{zhao2026selfdistillreason,hubotter2026rlselfdistill,shenfeld2026selfdistill}: reasoning models could in principle absorb the analysis into their own chain-of-thought, eliminating the external call overhead.
 
 
 \subsection{Conversation analysis ablations}
@@ -360,7 +326,7 @@ Allowing the spec extractor to see assistant messages collapses performance to \
 \paragraph{Contamination amplifies through chained calls.}
 Counterintuitively, collapsing to a single pass \emph{partially recovers} performance (55\% vs.\ 40\% on math). When a contaminated Subtask~1 passes a biased specification to Subtask~2 as authoritative, errors compound. This is a cautionary finding for multi-stage LLM pipelines: decomposition is only beneficial when earlier stages produce clean outputs.
 
-These results have broad implications: any system that uses an LLM to evaluate another LLM's output faces this risk. Multi-stage pipelines cannot rely on prompting for selective attention; structural data flow control is required. The exact mechanism (attention-based anchoring, implicit role consistency, or something else) remains an open question.
+These results generalize beyond our setting: any multi-stage LLM pipeline where one model evaluates another's output faces this risk. Structural data flow control, not prompting, is required for selective attention.
 
 
 \subsection{Memory-based learning}
@@ -469,6 +435,29 @@ Instances flagged as insufficient are excluded from accuracy calculations, as th
 \label{app:multi-model-protocol}
 
 Because stronger models solve easier problems regardless of context pollution, we re-ran the subset selection protocol using GPT-5.2 LiC logs (instead of GPT-5-mini), selecting the 20 hardest true-negative instances per task to ensure a challenging set for this model class. Each model serves as both assistant (final-turn regeneration) and analyzer. All models replay conversations originally generated by GPT-5.2; the Baseline reflects how model $X$ handles GPT-5.2's polluted context, while Reset reflects model $X$ given a clean context derived from its own analysis. User and system agents use GPT-4o-mini throughout. We compare Baseline against unconditional Reset (the best-performing strategy in Section~\ref{sec:lic-results}). Denominators vary slightly for code (14--15 valid samples due to evaluation errors); percentages use valid denominators. We additionally evaluate GPT-5, DeepSeek V3.2 (37B active, open-weight), and Qwen 3.5 35B-A3B (3B active, open-weight).
+
+\begin{table}[h]
+\centering
+\begin{tabular}{llccccc}
+\toprule
+\textbf{Model} & \textbf{Strategy} & \textbf{Math} & \textbf{Code} & \textbf{Database} & \textbf{Actions} & \textbf{Avg.\ $\Delta$} \\
+\midrule
+\multirow{2}{*}{GPT-5-mini} & Baseline & 20\% & 10\% & 5\% & 60\% & \\
+ & Reset & \textbf{55\%} & \textbf{25\%} & \textbf{40\%} & \textbf{80\%} & +26pp \\
+\midrule
+\multirow{2}{*}{GPT-5} & Baseline & 40\% & 21\% & 27\% & 85\% & \\
+ & Reset & \textbf{70\%} & \textbf{47\%} & \textbf{65\%} & 70\% & +20pp \\
+\midrule
+\multirow{2}{*}{DeepSeek V3.2} & Baseline & 50\% & 7\% & 10\% & 35\% & \\
+ & Reset & \textbf{80\%} & \textbf{62\%} & \textbf{45\%} & \textbf{70\%} & +39pp \\
+\midrule
+\multirow{2}{*}{Qwen 3.5 35B} & Baseline & 55\% & 21\% & 5\% & 45\% & \\
+ & Reset & \textbf{75\%} & \textbf{64\%} & \textbf{75\%} & \textbf{80\%} & +42pp \\
+\bottomrule
+\end{tabular}
+\caption{Multi-model LiC results on a hard subset selected via high baseline failure rate by GPT-5.2. Reset improves accuracy for 15 of 16 model--task pairs across four architectures.}
+\label{tab:multi-model}
+\end{table}
 
 \subsection{CollabLLM evaluation details}
 \label{app:collabllm}
