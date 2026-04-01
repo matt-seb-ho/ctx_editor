@@ -149,7 +149,11 @@ Consider a multi-turn conversation between a user and an LLM assistant. At turn 
 
 Let $\mathcal{T}^*$ denote the true task specification, which the user reveals incrementally across messages $U_t = (u_1, \ldots, u_t)$.  In principle, $U_t$ provides a progressively more complete view of $\mathcal{T}^*$.  However, the assistant tokens $A_{t-1} = (a_1, \ldots, a_{t-1})$ encode latent assumptions $\hat{\mathcal{T}}_i$ that may diverge from $\mathcal{T}^*$ as new user messages refine or contradict earlier interpretations.  This creates a \emph{distribution shift}: the model conditions on $C_t = (U_t, A_{t-1})$, but $A_{t-1}$ biases the posterior toward stale assumptions, so that $p_\theta(\text{correct} \mid U_t, A_{t-1}) < p_\theta(\text{correct} \mid U_t)$---the assistant's own prior outputs \emph{reduce} the probability of a correct response. \citet{huang2026context} empirically confirm this inequality: simply omitting $A_{t-1}$ (assistant omission) recovers much of the lost accuracy.
 
-However, omission is a blunt instrument. In stateful settings, $A_{t-1}$ contains essential information (e.g., tool-call results, agreed-upon decisions) that cannot be re-derived from $U_t$ alone. We seek an \emph{editing operator} $\mathcal{E}$ that produces a modified context $C'_t = \mathcal{E}(C_t)$ satisfying: (1)~\textbf{Decontamination}---$C'_t$ suppresses stale assumptions so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid C_t)$; and (2)~\textbf{Preservation}---$C'_t$ retains task-relevant information from both $U_t$ and $A_{t-1}$, so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid U_t)$ whenever $A_{t-1}$ contains useful state.
+However, omission is a blunt instrument. In stateful settings, $A_{t-1}$ contains essential information (e.g., tool-call results, agreed-upon decisions) that cannot be re-derived from $U_t$ alone. We seek an \emph{editing operator} $\mathcal{E}$ that produces a modified context $C'_t = \mathcal{E}(C_t)$ satisfying two properties:
+\begin{enumerate}
+    \item \textbf{Decontamination.} $C'_t$ suppresses the biasing effect of stale assumptions in $A_{t-1}$, so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid C_t)$.
+    \item \textbf{Preservation.} $C'_t$ retains task-relevant information from both $U_t$ and $A_{t-1}$, so that $p_\theta(\text{correct} \mid C'_t) \geq p_\theta(\text{correct} \mid U_t)$ whenever $A_{t-1}$ contains useful state.
+\end{enumerate}
 
 We implement $\mathcal{E}$ as LLM operations that analyze the conversation history and edit the context before each assistant turn. The analysis identifies where the assistant's approach has diverged from $\mathcal{T}^*$; the edit surgically removes or restructures the polluting content while preserving correct work. Algorithm~\ref{alg:context-edit} gives the full procedure.
 
@@ -242,7 +246,7 @@ Gated Reset (ours) & 75\% & 72\% & 44\% & 74\% \\
 On math, Augment reaches 80\%, closing 80\% of the 25pp gap between baseline and AO (Table~\ref{tab:lic-main}). On code, Gated Reset reaches 72\%, closing 90\% of the gap. On database, Reset (48\%) \emph{exceeds} both upper bounds (32\%), because intelligent consolidation outperforms na\"ive message removal when fragmented user messages require schema-grounded assembly.
 
 \paragraph{Context removal provides additional benefit.}
-Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--16pp) using identical analysis. Since the only difference is whether polluting content is removed or merely annotated, identifying pollution is not enough---the model must also be prevented from seeing it.
+Reset and Gated Reset outperform Augment on code (+5--16pp) and database (+12--16pp) using identical analysis. The difference is whether the assistant sees the polluted history or a clean context, confirming that anchoring on prior responses is separable from intent fragmentation.
 
 \paragraph{Generalization across model families.}
 \label{sec:multi-model}
