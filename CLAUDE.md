@@ -76,6 +76,12 @@ Samples from `data/` → `ConversationSimulator` runs turns → each turn: UserA
 - `docs/plans/` for multi-session implementation plans; completed plans go to `docs/plans/completed/`
 - Update docs after substantial changes to keep them accurate
 
+## Paper editing
+
+- The active NeurIPS draft now lives in `writing/overleaf_repo/neurips/neurips_2026_conference.tex`. This directory is a clone of the Overleaf project's connected GitHub repo, so edits made here sync to Overleaf via that repo (no manual upload).
+- Always apply paper revision/editing requests to that file. The older standalone copy at `writing/neurips_project/neurips_2026_conference.tex` is now stale and should not be edited; treat it as a historical reference only.
+- The COLM draft equivalent is `writing/overleaf_repo/colm/colm2026_conference.tex` if a COLM revision is requested.
+
 ## Git
 
 - after a fix or feature is complete, please make a git commit to make state tracking/rolling back even easier
