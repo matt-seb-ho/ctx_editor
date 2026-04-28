@@ -82,6 +82,32 @@ Samples from `data/` → `ConversationSimulator` runs turns → each turn: UserA
 - Always apply paper revision/editing requests to that file. The older standalone copy at `writing/neurips_project/neurips_2026_conference.tex` is now stale and should not be edited; treat it as a historical reference only.
 - The COLM draft equivalent is `writing/overleaf_repo/colm/colm2026_conference.tex` if a COLM revision is requested.
 
+### Repo boundary
+
+- `writing/overleaf_repo/` is a **separate git repository** (the Overleaf-connected GitHub clone). It is gitignored from the outer ctx_editor repo on purpose. Submodules were considered and rejected: Overleaf pushes from collaborators would constantly outdate a pinned submodule SHA, generating noise without benefit.
+- The outer repo's history should never contain commits that touch paths under `writing/overleaf_repo/`. If a `git status` from the outer repo ever shows `writing/overleaf_repo/` as modified or as a new gitlink, something has gone wrong; do not `git add` it.
+- Each repo gets its own commit history. Conventional Commits style applies in both.
+
+### Push/pull workflow for the paper repo
+
+- **Run all paper-repo git commands from inside the inner repo**, e.g. `git -C writing/overleaf_repo <command>`. Do not `cd` out of the outer repo for an unrelated paper edit.
+- **Pull before editing.** Lianhui or Michel may have pushed from Overleaf since the last sync:
+  ```bash
+  git -C writing/overleaf_repo pull origin main
+  ```
+- **Edit, then commit inside the inner repo** (not the outer one). Use the same conventional-commits style:
+  ```bash
+  git -C writing/overleaf_repo add <files>
+  git -C writing/overleaf_repo commit -m "fix: ..."
+  ```
+- **Push to GitHub when ready** so Overleaf picks the changes up:
+  ```bash
+  git -C writing/overleaf_repo push origin main
+  ```
+  Confirm with the user before pushing if the changes are non-trivial — pushes are visible to collaborators on Overleaf.
+- **Asset files (PNG, PDF, etc.) belong inside `writing/overleaf_repo/assets/`** and should be tracked in the inner repo so Overleaf has them. Project-root in Overleaf is `writing/overleaf_repo/`, so figure paths in `.tex` are written as `assets/<file>`.
+- **Do not edit the stale `writing/neurips_project/` copy.** It is intentionally not synced.
+
 ## Git
 
 - after a fix or feature is complete, please make a git commit to make state tracking/rolling back even easier
