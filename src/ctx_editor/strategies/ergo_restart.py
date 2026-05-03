@@ -1,15 +1,23 @@
 """ERGO-style strategy: rewrite user messages into consolidated prompt, restart conversation.
 
-Based on Khalid et al. (2025). The original ERGO uses entropy-based triggering;
-we simplify to a turn-count threshold (same as our compaction strategy) since
-we don't have logprob access for all models.
+Based on Khalid et al. (2025). ERGO triggers on entropy spikes; in our replay-mode
+evaluation we trigger unconditionally before the final turn, which is functionally
+equivalent for the reset's effect on the assistant's last response (the only thing
+graded). The reset itself is faithful to ERGO:
 
-The key operation: collect all user messages, pass through an LLM to produce
-a single consolidated prompt, then reset the conversation with just the
-system message + rewritten prompt. All assistant work is discarded.
+  1. Collect all prior user messages, formatted as "User Instruction N: <msg>".
+  2. Send them to a rewriter LLM with ERGO's exact system + user prompt
+     (`/home/agent/ergo/core/{ergo.py,prompts.py}`), asking the LLM to produce
+     a single optimally-ordered rewrite without answering.
+  3. Reset the conversation to [original system message, rewritten user message].
+
+We omit ERGO's per-task few-shot demonstrations (their `prompts.py` ships
+GSM8K/Code/DB/D2T exemplars). The exemplars in their codebase exist mainly to
+support smaller open-weight models; gpt-5-mini follows the zero-shot rewrite
+instruction reliably. The algorithm and the prompt wording are otherwise
+identical.
 """
 
-from collections import defaultdict
 from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
@@ -25,6 +33,13 @@ if TYPE_CHECKING:
 logger = get_logger("ergo")
 
 _PROMPT_DIR = Path(__file__).parent / "prompts"
+
+# Verbatim from /home/agent/ergo/core/prompts.py (system message used across all
+# task-specific rewrite prompts).
+_REWRITER_SYSTEM = (
+    "You are a prompt rewriter whose main goal is to rewrite the prompt given "
+    "by the user in the most optimal way without losing any information in them."
+)
 
 
 def _load_prompt(name: str) -> str:
@@ -64,9 +79,28 @@ class ERGORestartStrategy(BaseStrategy):
 
         self._rewrite_template = _load_prompt("ergo_rewrite")
 
-    async def _generate(self, prompt: str, model_client: "ModelClient") -> str:
+    @staticmethod
+    def _format_user_instructions(trace: "ConversationTrace") -> str:
+        """Format user messages as ERGO does: 'User Instruction N: <msg>' lines.
+
+        Mirrors `Ergo.rewrite_prompt` in /home/agent/ergo/core/ergo.py.
+        """
+        all_msgs = trace.to_messages(include_system=False, active_only=False)
+        user_msgs = [m for m in all_msgs if m.role == "user"]
+        seen: set[str] = set()
+        unique: list[str] = []
+        for m in user_msgs:
+            content = m.content.strip()
+            if content not in seen:
+                seen.add(content)
+                unique.append(content)
+        return "\n".join(f"User Instruction {i+1}: {c}" for i, c in enumerate(unique))
+
+    async def _generate_messages(
+        self, messages: list[dict], model_client: "ModelClient"
+    ) -> str:
         generate_kwargs: dict = {
-            "messages": [{"role": "user", "content": prompt}],
+            "messages": messages,
             "model": self.model,
             "temperature": 0.0,
             "timeout": self.timeout,
@@ -84,12 +118,13 @@ class ERGORestartStrategy(BaseStrategy):
         model_client: "ModelClient",
     ) -> str:
         """Collect all user messages and rewrite into a single consolidated prompt."""
-        user_messages_str = trace.get_user_messages_string(all_unique=True)
-
-        prompt = self._rewrite_template.format_map(
-            defaultdict(str, {"user_messages": user_messages_str})
-        )
-        return await self._generate(prompt, model_client)
+        user_messages_str = self._format_user_instructions(trace)
+        user_content = self._rewrite_template.format(user_messages=user_messages_str)
+        messages = [
+            {"role": "system", "content": _REWRITER_SYSTEM},
+            {"role": "user", "content": user_content},
+        ]
+        return await self._generate_messages(messages, model_client)
 
     @staticmethod
     def _build_restarted_context(
