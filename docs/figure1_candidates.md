@@ -1,244 +1,184 @@
-# Figure 1 Candidates: Context Pollution Illustration
+# Figure 1 Overhaul — Candidate Examples
 
-## Requirements
+**Goal**: Two subfigures. (a) Context pollution — outdated assumption persists and misleads. (b) Statefulness — AO destroys essential accumulated state, leaving the assistant stranded. Ideally both use the same example.
 
-Single-column conference paper figure (short and wide). Shows an abbreviated multi-turn conversation illustrating the "lost in conversation" / context pollution problem, with annotations on the right explaining the failure.
-
-### Pattern
-
-1. **Turn 1 User:** General ask (underspecified)
-2. **Turn 1 Assistant:** Establishes initial approach, makes assumption(s) in response to underspecification
-3. **... (possible intervening turns)**
-4. **Turn N User:** Introduces a new constraint that subtly invalidates the assistant's earlier assumption and requires a fundamentally different approach (no small patch suffices)
-5. **Turn N Assistant:** Attempts a patch fix on the existing solution instead of rethinking
-
-### Key criteria
-
-- Easy to understand for a broad audience
-- Abbreviable to 2-3 turns (~4-6 messages), with ellipsis for skipped turns if needed
-- The error must be clearly caused by **context history** (anchoring on old approach), not by lack of model capability. The same model given the full spec in one shot would get it right.
-- Must NOT read as: (a) instruction-following failure (model ignoring the user), (b) knowledge error (model doesn't understand the concept), or (c) user's fault for being unclear.
+**Key shift from prior version**: We now need agentic/SWE-bench/tau2-bench style examples (tool use, file edits, environment state) rather than pure code-generation or math examples. The example must motivate *selective* context curation — not just AO — by showing both the pollution problem AND the statefulness problem.
 
 ---
 
-## Candidate 1: Build steps - Sorting vs. dependency ordering (CODE) **[STRONG]**
+## Candidate 1: SWE-bench style — Debugging a test failure **(recommended)**
 
-### Setup
-User needs to order build steps. Initially just wants alphabetical, then reveals dependency constraints.
+### Subfigure (a): Context Pollution
 
-### Conversation
+```
+Turn 1 [User]:  CI is failing. test_process_order raises
+                TypeError: unsupported operand '+' for Decimal and float
 
-**User:** I have a list of build steps, each with a name. Can you write a function that returns them in a readable order?
+Turn 1 [Asst]:  [read tests/test_orders.py] → sees Decimal("9.99") + tax_rate
+                The error is a type mismatch — tax_rate is a float but the
+                prices are Decimal. Converting tax_rate to Decimal in
+                compute_total():
+                [edit orders.py:47] tax = price * Decimal(str(tax_rate))
+                ✓ This should fix the type error.
 
-**Assistant:**
-```python
-def order_steps(steps):
-    return sorted(steps, key=lambda s: s['name'])
+Turn 2 [User]:  That fixed the TypeError, but now the same test fails with:
+                AssertionError: expected Decimal("10.79") got Decimal("10.78").
+                Actually — we changed the rounding policy to ROUND_CEILING
+                last sprint for tax calculations.
+
+Turn 3 [Asst]:  [read orders.py] → sees quantize(Decimal("0.01"))
+                [edit orders.py:48] ...quantize(..., rounding=ROUND_CEILING)
+                ✓ Fixed. Tax now rounds up per the new policy.
+                                     ⋮
+Turn N [User]:  test_apply_discount is also failing now.
+
+Turn N [Asst]:  This is likely another Decimal/float mismatch in the discount
+                path. Let me check if discount_rate also needs the Decimal
+                conversion...
+                [read orders.py:60-80] → discount_rate is already Decimal ✓
+                Hmm, maybe the rounding mode is wrong here too...
 ```
 
-**...** *(possible intervening turns clarifying format, etc.)*
+**Pollution mechanism**: The Turn 1 "type mismatch" framing persists — the assistant keeps hunting for Decimal/float issues and rounding problems, when `test_apply_discount` actually fails because the discount is applied *after* tax instead of before (a logic ordering bug unrelated to types).
 
-**User:** Oh, I should mention - each step can depend on other steps that must run first. E.g. `{'name': 'test', 'needs': ['compile']}`. The ordering has to respect that.
+### Subfigure (b): Why AO is destructive (same conversation)
 
-**Assistant:**
-```python
-def order_steps(steps):
-    result = sorted(steps, key=lambda s: s['name'])
-    for i, step in enumerate(result):
-        for dep in step.get('needs', []):
-            j = next(k for k, s in enumerate(result)
-                     if s['name'] == dep)
-            if j > i:
-                result.insert(i, result.pop(j))
-    return result
+Under Assistant-Omitted, at Turn N the model sees:
+
+```
+Turn 1 [User]:  CI is failing. test_process_order raises TypeError...
+Turn 1 [Asst]:  [omitted]
+Turn 2 [User]:  That fixed the TypeError, but now... we changed the
+                rounding policy to ROUND_CEILING last sprint.
+Turn 2 [Asst]:  [omitted]
+                                     ⋮
+Turn N [User]:  test_apply_discount is also failing now.
 ```
 
-### Why it works as an illustration
+The assistant doesn't know:
+- It already edited `orders.py` **twice** (those changes are on disk)
+- What the current state of the file looks like
+- Which fixes were already applied and verified
+- What diagnostic steps were already taken
 
-- **Assumption made:** "This is a sorting problem" (alphabetical ordering)
-- **What invalidates it:** Dependencies make this a **graph problem** (topological sort), not a sorting problem
-- **How the model patches:** Keeps `sorted()` as the backbone, swaps items to fix violations. Breaks for transitive chains (A needs B needs C), diamond dependencies, cycles.
-- **Why context causes this:** Given the full spec in one shot ("order build steps respecting dependencies"), any model immediately reaches for topological sort. The incremental reveal traps it in the sorting frame.
+It's **stranded** — forced to re-read files it already modified, potentially confused by its own uncommitted changes, and may try to re-apply fixes that already exist.
 
-### Possible annotations
-- Arrow on A1: "Commits to sorting-based approach"
-- Arrow on A2: "Patches sorted list with swaps instead of switching to topological sort. Breaks for transitive dependencies."
+### Strengths
+- Software engineering audience will immediately grok it
+- Pollution is visceral — "type mismatch" is a specific frame, and you can see exactly how it biases Turn N
+- Statefulness is concrete — file edits on disk, test results observed, diagnostic state accumulated
+- Both subfigures use the same conversation
+
+### Weaknesses
+- Somewhat dense for a figure — the Decimal/float detail may take a moment to parse
+- The "rounding" middle turn adds realism but also complexity
 
 ---
 
-## Candidate 2: Pizza problem - Per-group vs. combined total (MATH)
+## Candidate 2: Tau2-bench style — Telecom troubleshooting
 
-*Based on real gpt-5.2 failure: LazyGSM8K/1066*
+### Subfigure (a): Context Pollution
 
-### Setup
-User asks how many pizzas are left. Info about two groups arrives incrementally.
+```
+Turn 1 [User]:  My phone can't connect to mobile data.
 
-### Conversation
+Turn 1 [Asst]:  [tool: lookup_account(id=5827)]
+                → plan: prepaid, balance: $0.00, data: enabled
+                Your prepaid balance is $0 — data service is
+                suspended. Please add funds to restore connectivity.
 
-**User:** How many pizzas are still left?
+Turn 2 [User]:  I switched to a postpaid plan at the store
+                yesterday. Can you check again?
 
-**Assistant:** I need more information. How many pizzas were there, and how many were eaten?
+Turn 3 [Asst]:  [tool: lookup_account(id=5827)]
+                → plan: postpaid, balance: n/a, data: enabled
+                You're right, the plan shows postpaid now. But the
+                data service configuration may not have migrated
+                cleanly.
+                [tool: reprovision_data(id=5827)]  ✓ Reprovisioned.
+                Try restarting your phone.
+                                     ⋮
+Turn N [User]:  Still not working. And I also can't send MMS.
 
-**User:** The glee club ordered 20 pizzas and ate 70% of them.
+Turn N [Asst]:  MMS also requires an active data balance. Since your
+                account showed $0 earlier, MMS would be blocked as
+                well. Let me check if the balance...
+```
 
-**Assistant:** 70% of 20 = 14 eaten. 20 - 14 = **6 pizzas are left.**
+**Pollution mechanism**: The Turn 1 "$0 balance / prepaid" framing anchors the assistant. At Turn N it reverts to the balance explanation even though the account is now postpaid (where balance is irrelevant). The actual issue is likely airplane mode or a SIM reseat — things requiring user-side action.
 
-**...** *(assistant has committed to "6" as the answer)*
+### Subfigure (b): Why AO is destructive (same conversation)
 
-**User:** The football team also ordered twice as many pizzas and ate 80% of theirs.
+Under AO, the assistant at Turn N doesn't know:
+- It already ran `reprovision_data` — running it again could cause a **double-provision error**
+- The account lookup results from Turn 3 (plan=postpaid, data=enabled)
+- That the user already tried restarting (per Turn 3's suggestion)
+- What diagnostic steps have been exhausted
 
-**Assistant:** Football team ordered 2 x 20 = 40 pizzas. They ate 80% = 32. So the football team has **8 pizzas left.**
+### Strengths
+- Directly mirrors tau2-bench's telecom domain (cited in the paper)
+- Tool call results are the clearest example of irreplaceable state
+- Accessible to non-SWE readers — everyone has called tech support
+- The "double-provision" risk makes AO's danger very concrete
 
-### Why it works as an illustration
-
-- **Assumption made:** The question is about one group's pizzas. Model gives a complete answer (6) at turn 2.
-- **What invalidates it:** A second group exists. "How many pizzas are left" means the *combined* total across all groups.
-- **How the model patches:** Computes the new group in isolation (8) without revisiting the total. Reports 8 instead of 6+8=14.
-- **Why context causes this:** The model already answered "6 pizzas are left" as a complete answer. The new info gets processed as a parallel sub-problem rather than triggering a revision of the original answer.
-
-### Concerns
-- Could read as "forgetting to combine" rather than "approach invalidation." The structural issue is subtle: the model frames it as two independent questions rather than one combined question.
-- A reader might think "the user should have said everything upfront" (blaming the user).
-
-### Possible improvements
-- Reframe so the combined total is more clearly what was asked for. E.g., "How many pizzas are left *for the after-party*?" makes combination obviously required.
-- Make the second group's info change the *computation* for the first group (not just add a parallel group).
+### Weaknesses
+- Tool-call notation takes more figure space
+- Telecom-specific details (prepaid/postpaid, MMS, SIM) may be less familiar to some ML readers
 
 ---
 
-## Candidate 3: Tomato growing - Individual vs. household demand (MATH)
+## Candidate 3: Config migration debugging (simpler, less dramatic)
 
-*Based on real gpt-5.2 failure: LazyGSM8K/234*
+### Subfigure (a): Context Pollution
 
-### Setup
-User asks how many tomato vines to plant. Initially seems like just one person's needs, then a second person's consumption is revealed.
+```
+Turn 1 [User]:  App crashes on startup after upgrading to v3.
+                Error: KeyError: 'db_host'
 
-### Conversation
+Turn 1 [Asst]:  [read config.yaml] → sees db_host, db_port, db_name
+                The config uses the old flat key format. V3 expects
+                nested keys:
+                [edit config.yaml] database: {host: ..., port: ..., name: ...}
 
-**User:** How many vines does Steve need to grow his cherry tomatoes?
+Turn 2 [User]:  Still crashes — same KeyError. Oh wait, I have a
+                config override in /etc/app/config.local.yaml too.
+                                     ⋮
+Turn N [User]:  Now I'm getting ConnectionRefused on port 5432.
 
-**Assistant:** I need to know how much he eats and how much each vine produces.
+Turn N [Asst]:  The database config migration likely left the port
+                in the old flat format. Let me check if 'db_port'
+                needs to be nested too...
+```
 
-**User:** He eats 6 tomatoes a day. Each vine produces 3 tomatoes per week.
+**Pollution mechanism**: The "config format migration" frame from Turn 1 persists. At Turn N the assistant assumes ConnectionRefused is another config formatting issue, when the actual problem is the database server isn't running.
 
-**Assistant:** 6/day x 7 = 42/week. 42 / 3 = **14 vines.**
+### Subfigure (b): Why AO is destructive
 
-**...** *(model has locked in 14 as the answer)*
+Under AO:
+- The assistant doesn't know it already edited `config.yaml`
+- The current file state on disk reflects edits it has no memory of
+- It may try to re-apply the same migration or make conflicting edits
 
-**User:** Oh, and Steve eats twice as many tomatoes as his girlfriend.
+### Strengths
+- Very concise — fewer turns needed
+- Simple to follow
 
-**Assistant:** So his girlfriend eats 6 / 2 = 3 tomatoes per day. That's consistent with Steve eating twice as much.
-
-### Why it works as an illustration
-
-- **Assumption made:** "Steve's demand = total demand." Model computes 14 vines and treats the problem as solved.
-- **What invalidates it:** The girlfriend also eats tomatoes from the same garden. Total demand is 6+3=9/day = 63/week. Need 63/3 = **21 vines.**
-- **How the model patches:** Absorbs the girlfriend info as a *derived fact* ("she eats 3/day, consistent!") without recognizing it changes the total. The 14-vine answer is never revisited.
-- **Why context causes this:** The model's "14 vines" answer is sitting in context as a completed solution. New info gets interpreted through the lens of "what does this add to what I already know" rather than "does this change my answer."
-
-### Concerns
-- Similar to pizza: could read as "forgetting to include" rather than approach invalidation.
-- The girlfriend reveal is natural but the model's failure to add her demand feels like it should be obvious.
-
-### Possible improvements
-- Make the second person's consumption not simply additive but structurally change the computation. E.g., "they take turns eating from the garden on alternating weeks" or some constraint that changes how you calculate vine yield.
+### Weaknesses
+- Pollution is less dramatic — ConnectionRefused → config format is a plausible (if wrong) hypothesis, so it doesn't feel as clearly "anchored"
+- Only one file edit, so statefulness argument is weaker
 
 ---
 
-## Candidate 4: Direct lookup vs. graph search (CODE)
+## Comparison
 
-### Setup
-User needs to check relationships between users. Initially direct, then transitive.
+| Criterion                        | Candidate 1 (SWE-bench) | Candidate 2 (Telecom) | Candidate 3 (Config) |
+|----------------------------------|------------------------|-----------------------|---------------------|
+| Audience fit                     | SWE / ML researchers   | General               | SWE / ML researchers |
+| Pollution clarity                | High — "type mismatch" frame persists into unrelated bug | High — "prepaid $0" persists after plan change | Medium — plausible misdiagnosis |
+| Statefulness clarity             | High — file edits on disk, test results | High — tool calls, double-provision risk | Medium — just one file edit |
+| Conciseness for figure           | ~5 turns + ellipsis    | ~4 turns + ellipsis   | ~3 turns + ellipsis |
+| Same example for both subfigs    | ✓                      | ✓                     | ✓ |
+| Benchmark alignment              | SWE-bench              | Tau2-bench            | Neither specifically |
+| Risk of reading as capability failure | Low — type mismatch is a *frame*, not ignorance | Low — clear anchoring on stale data | Medium — could seem like model doesn't know DB basics |
 
-### Conversation
-
-**User:** Write a function that checks if two users are friends.
-
-**Assistant:**
-```python
-def are_connected(user_a, user_b, friends):
-    return user_b in friends.get(user_a, [])
-```
-
-**...** *(possible clarifying turns)*
-
-**User:** I need to know if they're connected through any chain of mutual friends, not just directly.
-
-**Assistant:**
-```python
-def are_connected(user_a, user_b, friends):
-    if user_b in friends.get(user_a, []):
-        return True
-    for friend in friends.get(user_a, []):
-        if user_b in friends.get(friend, []):
-            return True
-    return False
-```
-
-### Why it works as an illustration
-
-- **Assumption made:** "This is a lookup problem" (O(1) set membership)
-- **What invalidates it:** Transitive connectivity requires **graph traversal** (BFS/DFS with visited set), a fundamentally different algorithm
-- **How the model patches:** Extends the lookup one hop deeper (friends-of-friends) instead of switching to graph search. Misses paths of length 3+.
-- **Why context causes this:** The "check membership in a list" pattern is anchored. Model extends it rather than replacing it.
-
-### Concerns
-- Requires some CS knowledge to appreciate (graph traversal vs. lookup).
-- The friends-of-friends patch is a reasonable intermediate step; reader might think "just add more hops" rather than seeing the structural issue.
-
----
-
-## Candidate 5: Flat rate vs. progressive brackets (MATH/CODE)
-
-### Setup
-User asks about tax calculation. Initially flat rate, then progressive.
-
-### Conversation
-
-**User:** Write a function that calculates income tax. The rate is 25%.
-
-**Assistant:**
-```python
-def calc_tax(income):
-    return income * 0.25
-```
-
-**User:** Sorry, it's actually a progressive tax: 10% on the first $50K, 25% on $50K-$100K, and 35% above $100K.
-
-**Assistant:**
-```python
-def calc_tax(income):
-    if income <= 50000:
-        rate = 0.10
-    elif income <= 100000:
-        rate = 0.25
-    else:
-        rate = 0.35
-    return income * rate
-```
-
-### Why it works as an illustration
-
-- **Assumption made:** Tax is `income * rate` (one multiplication)
-- **What invalidates it:** Progressive brackets require summing marginal contributions per bracket
-- **How the model patches:** Selects the correct rate for the bracket but applies it to the *entire* income. For $120K: gives $42,000 instead of correct $24,500.
-- **`income * rate` framework survives** when it should be replaced by bracket iteration.
-
-### Concerns
-- **Could read as a knowledge error** ("model doesn't understand progressive tax") rather than a context-anchoring error. This is the main weakness. A reader's takeaway might be about model capability, not conversation dynamics.
-
----
-
-## Rankings and Notes
-
-| # | Domain | Structural change | Context-caused? | Accessible? | Compact? |
-|---|--------|-------------------|-----------------|-------------|----------|
-| 1 | Code | Sort → topological sort | Very clear | CS audience yes | Yes (4 msgs) |
-| 2 | Math | Per-group → combined | Moderate | Universal | Yes (6 msgs) |
-| 3 | Math | Individual → household | Moderate | Universal | Needs trimming |
-| 4 | Code | Lookup → graph BFS | Clear | CS audience | Yes (4 msgs) |
-| 5 | Code/Math | Flat → progressive | Clear | Universal | Yes (4 msgs) |
-
-**Current recommendation:** Candidate 1 (build steps) is the strongest overall. Clean structural invalidation, clearly context-caused, compact. If the audience skews less CS, Candidate 2 (pizza, improved version) is the most universally accessible.
-
-**Open question:** Should we try to construct more candidates that blend math accessibility with code-level structural change? E.g., a word problem where the model sets up an equation structure that becomes fundamentally wrong.
+**Recommendation**: Candidate 1 for SWE-focused venues, Candidate 2 for broader ML audience. Candidate 1 has the strongest pollution mechanism because "type mismatch" is a very specific diagnostic frame that clearly wouldn't arise in a single-turn setting given the full history.
