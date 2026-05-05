@@ -1,5 +1,23 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-05 12:10 UTC — Method-name macros (`\method`, `\methodfull`)
+
+The team considers "Agentic Context Curation" / "ACC" a placeholder name (too generic) and wants to be able to rename in one place. Defined `\methodfull` and `\method` (using `xspace`) in the preamble:
+
+```latex
+\usepackage{xspace}
+\newcommand{\methodfull}{Agentic Context Curation\xspace}
+\newcommand{\method}{ACC\xspace}
+```
+
+Replaced every body-text occurrence with the macros. Variant strategy names (`ACC-Augment`, `ACC-Reset`, `ACC-Gated-Reset`, `ACC-Rewrite`) become `\method-Augment`, etc.; `xspace`'s default exception list includes `-`, so the hyphen joins cleanly without needing explicit `{}`.
+
+To rename: edit only lines 25--26 of the preamble.
+
+Inner-repo commit: `6d5ff86`.
+
+---
+
 ## 2026-05-05 11:35 UTC — Abstract follow-up (single paragraph, terminology fixes, em-dash sweep)
 
 User feedback after the first abstract pass:
