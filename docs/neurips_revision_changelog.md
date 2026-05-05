@@ -1,5 +1,27 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-05 11:35 UTC — Abstract follow-up (single paragraph, terminology fixes, em-dash sweep)
+
+User feedback after the first abstract pass:
+1. Abstract should be a single paragraph (was three).
+2. "multi-turn LLM use" → "multi-turn LLM interaction".
+3. "The standard mitigation discards all assistant messages" → "Previous proposed interventions discard all assistant messages" (more honest about provenance, less authoritative tone).
+4. Contextualize the analyzer at first introduction — call it a "subagent" so a reader unfamiliar with the term has a hook.
+5. "reconstruct the task" → "consolidate a clean, unified specification" (reflects the actual operation; aligns with how we describe Subtask 1 in the body).
+6. "must structurally see only the slice of history its role requires" — too jargon-y. Find an elegant, easy-to-understand phrasing.
+7. **General writing-style note (applies beyond the abstract):** stop overusing em dashes. Lately em-dash overuse reads as evidence of pure AI-generated text, which this paper is not (lots of human-in-the-loop turns).
+
+### Changes
+- Collapsed the abstract to a single paragraph.
+- Applied the terminology fixes above. The analyzer is now introduced as "a separate \emph{analyzer} subagent."
+- Replaced the slice-of-history sentence with: "we therefore tailor each subagent's input to its role, removing what it should not see rather than asking it to ignore what is in front of it." Same idea, plain English.
+- Em-dash sweep across the prose I added/edited in the previous batch. Replaced with parens, semicolons, colons, or commas as appropriate. Touched: intro contributions paragraph (analyzer steps; structural exclusion sentence), Section 2 referential-turns paragraph (the in-line examples now in parens), Methods opener (the "user actually asked for" parenthetical), Discussion EF post-hoc subsection (the "did not start from this framing" aside), Conclusion (the "and increasingly agentic, stateful" aside), the contamination-verification subsection, and Related Work (the "self-contained, a setting LiC was designed to test" aside). Pre-existing legitimate em dashes (LaTeX comments, table cell "no value" markers, paragraph headings) left intact.
+- Standing rule for future revisions: prefer parens, colons, semicolons, or commas over em dashes. Reserve `---` for tables / typographic conventions only.
+
+### Final abstract word count: ~280 (was ~350 in pre-Michel-batch, ~290 first-pass, now ~280).
+
+---
+
 ## 2026-05-05 10:58 UTC — Feedback from Michel (round 2) and Philippe (LiC lead author)
 
 Inner-repo commits: `9c723f5` (main batch), plus follow-up abstract revision (commit pending).
