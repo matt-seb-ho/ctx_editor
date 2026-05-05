@@ -1,5 +1,83 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-05 10:58 UTC — Feedback from Michel (round 2) and Philippe (LiC lead author)
+
+Inner-repo commits: `9c723f5` (main batch), plus follow-up abstract revision (commit pending).
+
+### 1. Abstract — meta opening, drop direct LiC `\citep`, drop EF prominence, end punchier
+**Why:** Michel: don't cite LiC paper directly in abstract; needs to read for both LiC-aware and unaware readers; ending on the memory-based system "reads as a secondary contribution—let's end with something punchier"; the analyzer should be evident if referenced.
+
+**First pass (committed in `9c723f5`):** Replaced the EF-forward opening, removed `\citep{huang2026context}`, made "analyzer" explicit, replaced the memory-based ending with a "blanket-removal-vs-curation will only grow" line. Still ~290 words.
+
+**Second pass (today, after Michel's note):** Michel flagged that the new opening ("Large language models degrade in long multi-turn conversations…") still wasn't clear about whether the failure mode was being presented as our claim or as established prior work, and asked for a more *meta* opening. Rewrote para 1 to lead with "A growing body of work has identified a systematic failure mode in multi-turn LLM use…" — establishing context pollution as a documented phenomenon before our method enters. Compressed paras 2 and 3 (~290 → ~265 words). Kept the punchier closer ("selective curation, not blanket removal, is what scales").
+
+### 2. Intro — shorter, references Fig 1, less prior work, less EF
+**Why:** Michel: methods section starts on page 4 (intro too long). Reference the hero Figure 1 in the intro contributions paragraph; don't open a sentence on a pronoun ("This is not a capability gap"); too much prior-work scaffolding; give LiC more credit for the context-pollution phenomenon (LiC says "mistakes carry forward and compound" — the inferential leap to "pollution" is small) and reserve the *naming* for Huang.
+
+**Changes:**
+- Cut the EF-driven paragraph ("In cognitive science, this regulatory capacity…") from the intro entirely. EF moved to a post-hoc Discussion subsection (item 5 below).
+- Cut the "context engineering literature splits along two axes" paragraph that surveyed prior work in the intro.
+- Removed the pronoun-led "The cause is not a raw capability gap" opening.
+- Rewrote the contribution paragraph so it now references `Figure~\ref{fig:story}` and explicitly names AO (Huang et al.) as the prior fix being extended.
+- Re-attributed: now LiC gets credit for identifying the compounding-error dynamic; Huang gets credit for *naming* it "context pollution" and for AO.
+
+### 3. New Section 2 "Problem Setting" (Fig 2 + formulation move here)
+**Why:** Michel: Figure 2 (the pollution illustration, formerly Fig 1) doesn't fit cleanly in the intro after the figure reshuffle, but is too important to drop; introduce a new Section 2 that owns the problem statement, with Fig 2 + the formal formulation + qualitative discussion. This also helps the page-budget by relieving the intro of formulation prose.
+
+**Changes:**
+- Created new `\section{Problem Setting}` between Introduction and Methods.
+- Moved Figure 2 (`fig:problem`) into the new section as the section-opener.
+- Moved the problem formulation block (notation; distribution-shift inequality; AO inadequacy on referential turns; editing-operator desiderata) here from `\subsection{Problem formulation}` of Methods.
+- Methods section now opens directly with the analyzer pipeline, pointing back to Section 2 for the formal setup.
+- All `Section~\ref{sec:problem-setting}` references continue to resolve (label moved with the content).
+
+### 4. Terminology: stateless/stateful → self-contained/referential
+**Why:** Philippe (LiC lead): "stateless/stateful" is overloaded — it means something slightly different in systems work. Suggested options: (a) referential vs. self-contained; (b) contextualized vs. decontextualized (borrowing Choi 2021); (c) entangled/disentangled; (d) coupled/decoupled. We picked (a) — Philippe's first preference, and it works for both individual utterances ("a referential turn") and conversations as a whole ("a referential conversation"). Reserved "stateful" for genuine system-state contexts (tau2-bench tool calls), where the conventional meaning still applies.
+
+**Changes:**
+- Replaced occurrences across abstract, intro, problem setting, intervention strategies, experiments roadmap, results sections, discussion, related work, and Table 1 caption.
+- Added a footnote in the new Section 2 explaining the choice (and crediting Choi).
+- Kept "stateful" in: tau2-bench descriptions; the "Default choice" note (Gated Reset for stateful agentic settings); conclusion (the future is "long, referential, multi-turn dialogues — and increasingly agentic, stateful settings").
+- Added `choi2021decontextualization` to the bibliography.
+
+### 5. EF moved to post-hoc Discussion subsection
+**Why:** Michel: "want to be less forceful/forward of the executive function/cognitive science angle … the original idea was to unite a bunch of disparate ideas (selective attention, working memory, planning) under EF, but we really zoomed in on selective attention so the analogy is less useful framing-wise. Make EF more post-hoc (problem → solution → link to EF)."
+
+**Changes:**
+- Removed EF from the abstract (already done in item 1).
+- Removed the EF paragraph from the introduction (item 2).
+- Added new Discussion subsection `\subsection{Post-hoc connection to executive function}` (`sec:exec-function-discussion`). Phrasing explicitly disclaims that EF was load-bearing motivation: "We did not start from this framing — each design choice was driven directly by a specific failure mode — but the correspondence is hard to miss in retrospect."
+- Trimmed the Related Work EF subsection (was a standalone block); now folded into a short pointer at the end of the agentic context-management subsection: "We discuss our (post-hoc) connection to executive function in [Discussion + Appendix]."
+- Appendix `\section{Executive function as a design pattern}` retained as-is (lives at the end, post-Conclusion appendix; appropriate for design-pattern recap).
+
+### 6. Contamination ablation reframed as "core verification"
+**Why:** Philippe: "I really like the finding around contamination, it's very fun, perhaps right now it's undersold as an ablation. This is really a core verification of the proposed method and not really an ablation."
+
+**Changes:**
+- Renamed Discussion subsection from `Conversation analysis ablations` → `Verifying the design: contamination is contagious`.
+- Rewrote the introductory paragraph to position this as the core verification of whether structural exclusion is load-bearing or stylistic: "We treat this as a *core verification* of the proposed design rather than a peripheral ablation, because the answer determines whether the analyzer is a coherent solution or itself part of the problem."
+- Updated the closing line to "These results verify the central design claim…" instead of the previous "These results suggest that any multi-stage LLM pipeline…"
+- Also added a corresponding pointer in the introduction's contagion paragraph: "We position this as a core verification of the proposed design rather than a peripheral ablation."
+
+### 7. Figure 1 caption compressed
+**Why:** Michel: keep Figure 1 as the hero figure (it's "the overall arc of the paper — fine grained management is robust to increasing statefulness"), but compress the caption — currently it (plus Fig 2) takes too much vertical space and is part of why the methods section starts on page 4.
+
+**Changes:** Caption rewritten more tersely. Removed the "schematic; curves illustrate qualitative trends" parenthetical, dropped the per-benchmark sentence-by-sentence walkthrough, kept the AO/ACC/full-context contrast in compressed form.
+
+### 8. Tau2-bench sub-table margin fix
+**Why:** The (d) sub-table for tau2-bench was overflowing the right margin (NeurIPS doesn't allow this).
+
+**Changes:** Dropped the `Cost` column from sub-table (d). Numbers are now reported in the prose: tau2-bench Results section now reads "Gated Reset achieves 55--65% vs. the 45--55% baseline, at a per-task cost of $0.60--0.67 vs. $0.51 for the baseline (AO is the cheapest at $0.36, but its 0% success rate makes the comparison moot)." Caption updated to point readers to the prose for cost numbers.
+
+### Items NOT addressed in this batch (deferred / out of scope for NeurIPS deadline)
+
+- **Philippe: WildChat referentiality statistics.** He proposed running an LLM-based classifier over a WildChat subset to report "in practice, XX% of real-world Human-AI conversations have at least 1 referential user utterance." Skipped due to time. Huang et al. already classify turns into `new_ask`/`feedback`/`no_feedback` and we report those distributions in App. WildChat — that's a partial proxy.
+- **Philippe: precompute rollouts.** He noted our setup tests "recovery" more than "prevention" — would prefer per-turn analysis to demonstrate prevention. We acknowledge this in the Limitations appendix already; full prevention experiments are post-NeurIPS work.
+- **Philippe: 4-dataset critique → single controlled "vary referentialness" benchmark.** Explicitly future work for the summer (Philippe co-managing the intern); not for this submission.
+- **Philippe-suggested experiments on per-turn analysis** (run with method for first K turns, then without). Out of scope for the deadline.
+
+---
+
 ## 2026-04-20 — Feedback from Lianhui (17 Apr) and Michel (19 Apr)
 
 ---
