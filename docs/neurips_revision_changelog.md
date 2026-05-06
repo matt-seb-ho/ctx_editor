@@ -1,5 +1,28 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-06 (round 2) — Agentic framing, least-privilege, subtler verification framing
+
+User feedback on the prior round:
+
+1. **"Subagent routine" or "agentic pipeline" instead of "analyzer pipeline"; do not say "short sequence of LLM calls".** The "LLM calls" gloss flattens the method to "just prompting"; reviewers will tag that. Lean on the *agentic* keyword to deflect.
+2. **"We therefore tailor/restrict" still clunky.** Try a *least-privilege* (security / HIPAA "minimum necessary") frame. Convey "deliberate, designed visibility controls for individual agents in the curation routine."
+3. **Bring Tyen back near Kamoi in Methods §3.2.** Useful as a second prior result motivating the external anchor.
+4. **Compaction-vs-ours framing too one-axis.** Two distinctions: (a) goal: efficiency (target redundancy) vs. correctness (target pollution); (b) setting: user provides full task spec in one message vs. multi-turn user--agent dialogue with incrementally revealed intent.
+5. **"Non-obvious" repeats between abstract and intro.** Stands out.
+6. **Literal "we treat this as a core verification rather than a peripheral ablation" reads heavy-handed.** Convey the framing through structure and surrounding language, not via a meta-declaration sentence.
+
+### Changes
+- **Subagent terminology.** Abstract: `analyzer pipeline` -> `analyzer (an agentic subagent routine)`. Intro: `an analyzer pipeline: a short sequence of LLM calls that...` -> `an agentic analyzer pipeline that...`. Both abstract and intro now lead with the *agentic* keyword; the abstract additionally contextualizes the analyzer as a "subagent routine" (pluralizable), and the intro relies on the same idea via "pipeline." The "LLM calls" gloss is gone.
+- **"We therefore tailor" -> least-privilege framing.** Abstract: "We therefore impose a *least-privilege* policy on the pipeline: each subagent sees only the conversation slices its role requires, controlled by what we route in rather than by prompt instructions to ignore content." Intro: "We therefore design the pipeline around a *least-privilege* principle: each subagent's view of the conversation is restricted to exactly what its role requires, with the boundaries imposed by what we route in rather than by prompt-level instructions to ignore content (which Section §contamination shows is insufficient)." Same idea, two surface forms, both anchored on least-privilege.
+- **Tyen restored near Kamoi.** Methods §3.2 now reads: "This aligns with prior findings on intrinsic self-correction: \citet{kamoi2024criticalselfcorrect} show that LLMs cannot reliably self-correct without external feedback, and \citet{tyen2024errors} show that LLMs cannot locate their own reasoning errors but can correct them given the error location. Our user-grounded specification provides the external anchor those results identify as missing."
+- **Compaction distinction expanded to two axes.** Replaced the single sentence with: "Two contrasts distinguish this from prior agentic context-management work. By goal, we target correctness through pollution removal, rather than efficiency through redundancy compaction~[refs]. By setting, we focus on multi-turn user--agent dialogue with incrementally revealed intent, rather than agentic trajectories spawned by a single user request (Section §related)."
+- **"Non-obvious" decoupled.** Intro's "This design is constrained by a non-obvious finding" -> "An empirical wrinkle further constrains the design". Abstract still leads its contagion sentence with "A non-obvious finding falls out of the design"; only one occurrence now.
+- **Literal "core verification" sentences dropped (subtler framing).** In intro, the closing sentence "We treat this as a core verification of the proposed design rather than a peripheral ablation" is removed entirely; the new least-privilege sentence already implies the load-bearing nature, with a forward pointer to Section §contamination. In Discussion §contamination, the opening "We treat this as a *core verification* of the proposed design rather than a peripheral ablation, because the answer determines whether the analyzer is a coherent solution or itself part of the problem" is replaced with "The answer determines whether the analyzer is a coherent solution or itself part of the problem, so we test it directly." The closing line "These results verify the central design claim:..." -> "Removing the contamination at the prompt level is therefore not enough;...". The framing now comes from the subsection title ("Verifying the design: contamination is contagious") and surrounding emphasis, not from a meta-declaration.
+
+Inner-repo commit: `f1793c0` (on top of `0890582`).
+
+---
+
 ## 2026-05-06 — Macros redo on top of user's pulled abstract/intro edits
 
 Context: the prior macro commit (`6d5ff86`) was made before user pulled the previous batch into Overleaf. User then edited the abstract and intro on Overleaf and pushed. To avoid a messy merge, I reset local back to `acb9208` (dropping the macro commit), pulled the Overleaf edits (`0a55bba`, `661b66d`), and reapplied the macros — now bound to the new working method name "Agentic Conversation Context Curation" / "AC3" (placeholder for ACC).
