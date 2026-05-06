@@ -1,5 +1,27 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-06 (round 3) — "agentic subroutine"; drop least-privilege from abstract; prior+concurrent
+
+User feedback on round 2:
+1. **"Agentic subagent" is redundant.** Use "agentic subroutine".
+2. **Least-privilege does not belong in the abstract.** It was a post-hoc analogy, not a core design principle (just realized somewhat related to "minimum necessary"). The "prompting is insufficient" parenthetical also feels clunky when included twice.
+3. **Compaction contrast: prefer "prior *and concurrent*" (active field); add explicit "see Section §X for further discussion"; drop the awkward "By goal... By setting" two-axis structure.**
+4. **"Empirical wrinkle" sounds weird.** Find another way.
+5. **Core verification vs. peripheral ablation:** asked for my preference (justified) and to make the call.
+
+### Decisions
+- **My preference on "core verification" framing: keep the subtler version.** The terms "core verification" and "peripheral ablation" are NeurIPS-reviewer shorthand — they declare importance without demonstrating it. The current Discussion opening ("The answer determines whether the analyzer is a coherent solution or itself part of the problem, so we test it directly") makes the case rather than asserting it; the subsection title ("Verifying the design: contamination is contagious") preserves Philippe's framing intent at the structural level. Keeping the subtler version in both intro and Discussion.
+
+### Changes
+- **Abstract.** "an agentic subagent routine" -> "an agentic subroutine". The least-privilege framing is dropped; replaced with: "We therefore route each subagent only the conversation slices its role requires, deliberately keeping the rest out of view." Concise and direct. The "prompt instructions are insufficient" parenthetical is also dropped from the abstract — it stays in the intro (deeper version) where it has more room to breathe.
+- **Intro: compaction contrast rewritten as a single "While... we..." sentence.** New form: "While prior and concurrent agentic context-management work [refs] compacts an agent's own reasoning trajectory to support efficient long-horizon execution, we focus on multi-turn user--agent dialogue and remove pollution to improve correctness (see Section §related for further discussion)." Adds "and concurrent" and the explicit forward pointer; drops the "By goal / By setting" parallel construction.
+- **Intro contagion lead.** "An empirical wrinkle further constrains the design" -> "But the analyzer is itself susceptible to the failure it diagnoses". The new opener naturally motivates the immediate follow-up sentence about a separate model also anchoring on assistant reasoning, and avoids both "non-obvious" (echoing abstract) and "empirical wrinkle" (awkward).
+- **Intro least-privilege language replaced with prose.** "We therefore design the pipeline around a *least-privilege* principle: each subagent's view of the conversation is restricted to exactly what its role requires..." -> "We therefore route each subagent only the conversation slices its role requires, with the boundaries imposed by what we provide as input rather than by prompt instructions to ignore content (which alone is insufficient)." Same concept, no security-jargon framing.
+
+Inner-repo commit: `894cf06` (on top of `f1793c0`).
+
+---
+
 ## 2026-05-06 (round 2) — Agentic framing, least-privilege, subtler verification framing
 
 User feedback on the prior round:
