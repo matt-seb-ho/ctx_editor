@@ -1,5 +1,33 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-06 (round 4) — Intro contagion lead, compaction contrast restructure, structure decision
+
+User feedback on round 3:
+1. "But the analyzer is itself susceptible to the failure it diagnoses" feels like it comes out of nowhere. Want it framed as an interesting finding without repeating "non-obvious" from abstract.
+2. "We therefore route each subagent only the conversation slices its role requires, deliberately keeping the rest out of view" still clunky. Convey: we have to do context management for even the subagents handling context management, and this is a deliberate piece of the design.
+3. Compaction contrast: be explicit about the two ways our work diverges (efficiency/compaction vs. correctness/pollution removal; agent-only trajectory after single user request vs. multi-turn user-agent dialogue). Also add "prior *and concurrent*" since the field is active. And add explicit "see Section X for further discussion."
+4. Where does the contrast belong? Asked to be intentional about intro structure: P1 problem, P2 gap, P3 method, etc.
+5. Least-privilege replacement in intro is also clunky. Split off "prompting is insufficient" into a second sentence.
+
+### Structure decision (intro)
+
+Settled on: P1 problem -> P2 gap -> **P3 method + positioning** (test-time scaling + compaction contrast both belong here) -> P4 contagion-driven design choice -> P5 results.
+
+Rationale: P3 already does double duty as "introduce method + position it among related work" — the test-time scaling pointer is positioning to one body of work and the compaction contrast is positioning to another. Both belong together at the end of P3. P2 is about the *problem space* (referential vs. self-contained), not the *method space*; mixing in compaction-vs-correctness there would conflate levels. P4 is the contagion + visibility paragraph; inserting prior work would derail.
+
+### Changes
+- **Compaction contrast (end of P3) restructured.** "While prior and concurrent..." single-sentence conflation -> three parallel sentences. First names the two-axis distinction; second covers setting; third covers goal. No "By X" labels. Final form:
+  > "This differs from prior and concurrent context-management work [refs] in two ways. Those methods address an agent's own reasoning trajectory (tool calls and iterations) following a single user request, while we address ongoing multi-turn user--agent dialogue. They compact tokens for efficient long-horizon execution, while we selectively remove pollution to improve correctness (see Section §related for further discussion)."
+- **Contagion paragraph (P4) rewritten.** Replaces the abrupt "But the analyzer is itself susceptible..." opener and the single-sentence visibility-policy clause. Now four sentences carrying distinct beats:
+  1. Frame as an interesting finding: *"This design is also shaped by an unexpected finding: pollution is contagious."*
+  2. Body: *"Even a separate model tasked with auditing the conversation anchors on the assistant's prior reasoning if exposed to it; pipelines that do not account for this perform worse than no intervention at all."*
+  3. The recursive design move: *"Context management therefore extends to the analyzer subagents themselves: each is given only the conversation slices its role requires, determined by what we route in as input."*
+  4. Prompting-insufficient as a standalone sentence: *"Asking the model to ignore content through prompting alone would not suffice (Section §contamination)."*
+
+Inner-repo commit: `d39fceb`.
+
+---
+
 ## 2026-05-06 (round 3) — "agentic subroutine"; drop least-privilege from abstract; prior+concurrent
 
 User feedback on round 2:
