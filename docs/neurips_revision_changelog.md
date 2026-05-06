@@ -1,5 +1,23 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-06 (round 5) — P3 closer: (1)/(2) numbering, inter alia, "thinking and execution trajectory"
+
+User feedback on round 4:
+- Adopt explicit `(1)`/`(2)` numbering to make the two contrast axes unmistakable.
+- Prefer "thinking and execution trajectory" over "reasoning trajectory (tool calls and iterations)" — clearer for non-experts.
+- Add *inter alia* to the citation postnote to signal the cited cluster is not exhaustive.
+
+### Justifications I gave the user
+- **`(1)`/`(2)` over `(a)`/`(b)`:** more conventional for enumerating distinct items; `(a)`/`(b)` reads as alternatives or sub-options. Both are defensible.
+- **"Those methods" over "other methods":** demonstrative back-reference to the just-named "prior and concurrent context-management work" cluster; "other methods" would be looser and could include any non-ours method (test-time scaling, AO, etc.).
+
+### Final P3 closer form
+> "This differs from prior and concurrent context-management work~\citep[][\emph{inter alia}]{schroeder2025thread,zhang2025rlm,sun2025contextfolding} in two ways. (1) Those methods address an agent's own thinking and execution trajectory following a single user request, while we address ongoing multi-turn user--agent dialogue. (2) They compact tokens for efficient long-horizon execution, while we selectively remove pollution to improve correctness and reliability (see Section §related for further discussion)."
+
+Inner-repo commit: `9c23ede`.
+
+---
+
 ## 2026-05-06 (round 4) — Intro contagion lead, compaction contrast restructure, structure decision
 
 User feedback on round 3:
