@@ -1,5 +1,36 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-06 (round 6) — Length tightening across abstract + intro
+
+User flagged that abstract+intro had crept slightly long. Targeted compressions:
+
+### Abstract
+- AO description compressed: "Previous proposed interventions discard assistant messages, resetting the conversation and deriving a new answer from user turns alone. This works when user turns by themselves contain sufficient information, but..." -> "Previous proposed interventions discard assistant messages and rely on user turns containing sufficient information. However, more complex interactive applications..." The "reset conversation and re-derive answer" consequence is implied by "discard assistant messages"; explicit-ness is unnecessary in the abstract.
+- Contagion pair compressed: drop the "We therefore route each subagent only the conversation slices its role requires, deliberately keeping the rest out of view." sentence. Replace with appended clause to the previous sentence: "...drops below doing nothing, motivating context management for the context-management subagents themselves." One fewer sentence; recursive design move conveyed in a clause.
+
+### Intro
+
+P1:
+- "autonomous agents like OpenClaw that orchestrate email, calendars, and APIs" -> "general-purpose computer-use agents like OpenClaw". Drops the activity list; "general-purpose computer-use" carries the role.
+
+P2:
+- "the user's utterances" -> "user utterances".
+- "we call this *self-contained* (or alternatively, ``decontextualized'' following Choi)" -> "in other words: *self-contained* (alternatively: ``decontextualized'' as in Choi)". Smoother and shorter.
+- Drop "However" at start of "Many real interactions are referential".
+- Drop "also" from "the agent also manipulates environmental state".
+- "simpler chat settings" -> "plain chat settings".
+- Drop the closing "What is missing from the literature is a fine-grained edit..." sentence. The previous sentence ("removing assistant messages leaves subsequent turns uninterpretable") already establishes the gap; the explicit "what is missing" recap is redundant.
+
+P3:
+- "a separate agentic analyzer pipeline" -> "an agentic analyzer pipeline". The earlier "runs inside the agent harness" already conveys the pipeline is distinct from the main assistant.
+- "from the user's messages alone" -> "from the user's messages". The subsequent text already describes structural exclusion.
+- "prior and concurrent context-management work" -> "prior context-management work" (per user, reverting the "and concurrent" added in round 3).
+- "(1) Those methods" -> "(1) Prior methods" — accepts the small repetition with "prior context-management work" in the lead-in for cleaner back-reference.
+
+Inner-repo commit: `bc8e0fd`.
+
+---
+
 ## 2026-05-06 (round 5) — P3 closer: (1)/(2) numbering, inter alia, "thinking and execution trajectory"
 
 User feedback on round 4:
