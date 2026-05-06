@@ -1,5 +1,26 @@
 # NeurIPS Revision Changelog
 
+## 2026-05-06 — Macros redo on top of user's pulled abstract/intro edits
+
+Context: the prior macro commit (`6d5ff86`) was made before user pulled the previous batch into Overleaf. User then edited the abstract and intro on Overleaf and pushed. To avoid a messy merge, I reset local back to `acb9208` (dropping the macro commit), pulled the Overleaf edits (`0a55bba`, `661b66d`), and reapplied the macros — now bound to the new working method name "Agentic Conversation Context Curation" / "AC3" (placeholder for ACC).
+
+User feedback addressed in this round:
+
+- **Subagent terminology mismatch.** Abstract had introduced "a separate \emph{analyzer} subagent" (singular), then later said "each subagent's input" (plural). Resolved by switching the umbrella term from "analyzer subagent" to "analyzer pipeline." The pipeline is a sequence of steps; each step gets its own restricted view of the conversation. Same idea, but the noun matches the plurality of what we describe later. Applied to both abstract and intro, with intro adding "a short sequence of LLM calls" as an in-line gloss so a reader unfamiliar with "pipeline" still has a hook.
+- **"We therefore tailor" repeated in abstract and intro.** Replaced with two distinct phrasings: abstract uses "we therefore restrict each step's input to just what its role calls for, removing the rest at the data layer rather than relying on prompt instructions"; intro uses "We therefore narrow each step's view of the conversation to just what its role calls for, with these visibility boundaries enforced at the input level (the rest is structurally absent) rather than via prompt instructions (which we show is insufficient)."
+- **Tyen citation in intro looked orphaned.** Dropped. The same "user-grounded spec catches errors that intrinsic self-correction misses" claim is supported in Methods §3.2 via Kamoi (`kamoi2024criticalselfcorrect`).
+- **Bring back compaction-vs-pollution distinction in intro (1--2 sentences).** Added one sentence at the end of the intro method paragraph: "Unlike most prior context-management work, which compacts an agent's own reasoning trajectory for efficiency [refs], we target the multi-turn user--agent dialogue itself and aim for correctness through selective removal rather than compression (Section [related])."
+- **Intro reads too similarly to abstract in the latter half.** Method intro paragraph rewritten as prose (single sentence with embedded actions) rather than the (1)(2)(3) list the abstract uses. Contagion paragraph reframed to lead with "This design is constrained by a non-obvious finding..." (vs. abstract's "A non-obvious finding falls out of the design...") and expanded with the intuition that a separate model still anchors on assistant reasoning when exposed.
+- **Typo fix.** "early errors about the user intent gets recorded ... biases later turns" -> "early errors about the user's intent get recorded ... bias later turns."
+
+Inner-repo commit: `0890582`. Builds on `661b66d` (user's Overleaf push).
+
+Items deferred to user decision (not edited):
+- Abstract sentence "...may only exist in assistant turns, but referenced in later turns by the user and assistant alike" reads ungrammatical (missing auxiliary "are"). Suggesting "may only exist in assistant turns but are referenced in later turns by the user and assistant alike."
+- Blanket-removal vs. AO consistency: keeping the lexical variation, since it avoids repetition while the technical referent (any approach that discards all assistant messages) is consistent.
+
+---
+
 ## 2026-05-05 12:10 UTC — Method-name macros (`\method`, `\methodfull`)
 
 The team considers "Agentic Context Curation" / "ACC" a placeholder name (too generic) and wants to be able to rename in one place. Defined `\methodfull` and `\method` (using `xspace`) in the preamble:
