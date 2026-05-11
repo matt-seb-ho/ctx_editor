@@ -21,12 +21,19 @@ if TYPE_CHECKING:
     from ..models.base import ModelClient
 
 
-class ContextEditV2Strategy(BaseStrategy):
-    """S2: Analysis-driven context editing.
+class AC3ResetStrategy(BaseStrategy):
+    """AC3-Reset / AC3-Gated-Reset: analysis-driven context reset.
 
-    Runs the conversation analyzer before each turn (past min_turns threshold).
-    When the analysis indicates a pivot is needed, rewrites the conversation
-    context using the analysis output. Otherwise, passes through like baseline.
+    Historically known as ``ContextEditV2Strategy`` (paper-era "S2"). Runs the
+    conversation analyzer before each turn (past ``min_turns`` threshold). When
+    the analysis indicates a pivot is needed, rewrites the conversation context
+    using the analysis output. Otherwise, passes through like baseline.
+
+    The "Gated-Reset" variant in the paper is this same class configured with
+    ``min_turns`` and ``max_resets`` set (the production setting). Pure "Reset"
+    is the same class with gating disabled (very large ``max_resets``).
+
+    See docs/strategy_name_history.md for the full rename map.
     """
 
     def __init__(
@@ -179,3 +186,7 @@ class ContextEditV2Strategy(BaseStrategy):
 
         trace.reset_conversation(new_messages, label="context_edit")
         return trace.get_active_messages()
+
+
+# Backwards-compatible alias. Predates the AC3-* naming convention.
+ContextEditV2Strategy = AC3ResetStrategy

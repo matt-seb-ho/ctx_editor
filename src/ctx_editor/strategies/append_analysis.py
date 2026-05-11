@@ -38,11 +38,14 @@ ANALYSIS_PREAMBLE = (
 )
 
 
-class AppendAnalysisStrategy(BaseStrategy):
-    """S1: Append conversation analysis without modifying history.
+class AC3AugmentStrategy(BaseStrategy):
+    """AC3-Augment: append conversation analysis without modifying history.
 
-    For each turn past min_turns, generates a structured analysis and appends
+    Historically known as ``AppendAnalysisStrategy`` (paper-era "S1").
+    For each turn past ``min_turns``, generates a structured analysis and appends
     it to the last user message. The assistant sees full history + analysis.
+
+    See docs/strategy_name_history.md for the full rename map.
     """
 
     def __init__(
@@ -166,3 +169,7 @@ class AppendAnalysisStrategy(BaseStrategy):
                 messages.append(analysis_msg)
 
         return messages
+
+
+# Backwards-compatible alias. Predates the AC3-* naming convention.
+AppendAnalysisStrategy = AC3AugmentStrategy

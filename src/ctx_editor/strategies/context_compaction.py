@@ -31,15 +31,22 @@ def _load_prompt(name: str) -> str:
     return path.read_text()
 
 
-class ContextCompactionStrategy(BaseStrategy):
-    """S3: Single-query analysis + unconditional context compaction.
+class AC3RewriteStrategy(BaseStrategy):
+    """AC3-Rewrite: single-query analysis + unconditional LLM context compaction.
 
-    Every turn past min_turns:
-    1. Run a single-query analysis prompt (independent reviewer framing)
-       that produces task_spec, aligned, and issues sections.
+    Historically known as ``ContextCompactionStrategy`` (paper-era "S3"). Every
+    turn past ``min_turns``:
+
+    1. Run a single-query analysis prompt (independent reviewer framing) that
+       produces ``task_spec``, ``aligned``, and ``issues`` sections.
     2. Feed the analysis + full conversation into the context compaction prompt
        to produce compacted context.
     3. Reset the trace with compacted context.
+
+    Unlike AC3-Reset (which only rewrites on detected issues), this strategy
+    rewrites unconditionally after the threshold.
+
+    See docs/strategy_name_history.md for the full rename map.
     """
 
     def __init__(
@@ -229,3 +236,7 @@ class ContextCompactionStrategy(BaseStrategy):
         trace.reset_conversation(new_messages, label="context_compaction")
 
         return trace.get_active_messages()
+
+
+# Backwards-compatible alias. Predates the AC3-* naming convention.
+ContextCompactionStrategy = AC3RewriteStrategy
