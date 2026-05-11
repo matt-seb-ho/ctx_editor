@@ -76,6 +76,19 @@ Samples from `data/` → `ConversationSimulator` runs turns → each turn: UserA
 - `docs/plans/` for multi-session implementation plans; completed plans go to `docs/plans/completed/`
 - Update docs after substantial changes to keep them accurate
 
+### Maintaining `docs/index.md`
+
+`docs/index.md` is the canonical doc map for the project — it's organized topically and chronologically and is what readers (including future you) hit first when looking for "where did we write about X." Keep it current:
+
+- **Whenever you create a new file under `docs/`** (any extension, but in practice Markdown), add an entry to `docs/index.md` in the same change:
+  1. Slot it into the appropriate topical section (or add a section if none fits).
+  2. Append it to the **Chronological log** table at today's date with a ≤ 12-word one-liner. Use absolute dates (e.g. `2026-05-11`), not relative ones.
+- **Whenever you delete or rename a doc**, remove or update its entry in both places.
+- The chronological log is newest-first; insert new rows at the top.
+- One-liners describe what the file *contains* (e.g. "N=3 Gated-Reset replay reruns; paper variance row"), not what it was used for that week. They should still make sense a year later.
+- If `docs/index.md` becomes substantially stale (e.g. you discover several missing entries during normal work), backfill them in one pass rather than leaving the drift to grow.
+- For `docs/reports/` and `docs/plans/` subdirectories, link the individual files in the index rather than the directory — readers should land on the actual content.
+
 ## Paper editing
 
 - The active NeurIPS draft now lives in `writing/overleaf_repo/neurips/neurips_2026_conference.tex`. This directory is a clone of the Overleaf project's connected GitHub repo, so edits made here sync to Overleaf via that repo (no manual upload).
