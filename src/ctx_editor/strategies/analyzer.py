@@ -22,6 +22,12 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Optional
 
 from ..utils.logging import get_logger
+from .analyzer_prompts import (
+    ANALYZER_PROMPT_REGISTRY,
+    DEFAULT_ANALYZER_VERSION,
+    AnalyzerPromptVersion,
+    get_version,
+)
 
 if TYPE_CHECKING:
     from ..core.trace import ConversationTrace
@@ -129,17 +135,18 @@ class AnalysisResult:
 class ConversationAnalyzer:
     """Generates structured analysis of multi-turn conversations.
 
-    v6/v7/v8: Two-query architecture for hard attention separation.
-      Query 1 — only sees user messages, produces clean task spec.
-      Query 2 — compares task spec against full conversation.
-      The edit decision is implicit: substantive content in <issues> = edit needed.
+    The set of supported prompt versions and the flow each uses lives in
+    :mod:`ctx_editor.strategies.analyzer_prompts`. To add a new version
+    (e.g. ``v12``), add an entry to ``ANALYZER_PROMPT_REGISTRY`` there — no
+    changes to this class are needed unless you also introduce a new *flow*.
 
-    v8_single: Single-query ablation — combines task spec + comparison in one
-      prompt. The model sees the full conversation (including assistant messages)
-      when building the task spec. Tests whether two-query hard attention matters.
+    Flows currently supported (see ``AnalyzerFlow``):
 
-    Older versions (v4, v5) use a single query and are supported for
-    backward compatibility.
+    - ``two_query`` (v6/v7/v8/v9/v11): hard-attention; Q1 sees user msgs only.
+    - ``two_query_soft`` (v8_soft, v8_soft_cot): Q1 sees full conversation.
+    - ``single_query_combined`` (v8_single): one prompt does spec + comparison.
+    - ``single_query_s1`` (s1): simplified header-format, content-filter safe.
+    - ``single_query_legacy`` (v4, v5): original single-prompt format.
     """
 
     def __init__(
@@ -148,7 +155,7 @@ class ConversationAnalyzer:
         timeout: int = 300,
         max_tokens: Optional[int] = None,
         reasoning_effort: Optional[str] = None,
-        prompt_version: str = "v8",
+        prompt_version: str = DEFAULT_ANALYZER_VERSION,
     ):
         self.model = model
         self.timeout = timeout
@@ -156,33 +163,19 @@ class ConversationAnalyzer:
         self.reasoning_effort = reasoning_effort
         self.prompt_version = prompt_version
 
-        if prompt_version in ("v6", "v7", "v8", "v9", "v11"):
-            # v9 and v11 reuse v8 task spec prompt, only the compare prompt differs
-            task_spec_version = "v8" if prompt_version in ("v9", "v11") else prompt_version
-            self._task_spec_template = _load_prompt(f"analyzer_{task_spec_version}_task_spec")
-            self._compare_template = _load_prompt(f"analyzer_{prompt_version}_compare")
-        elif prompt_version == "v8_soft":
-            # Soft attention ablation: two queries, but Query 1 sees full conversation
-            # (user + assistant messages) instead of user messages only.
-            self._task_spec_template = _load_prompt("analyzer_v8_soft_spec")
-            self._compare_template = _load_prompt("analyzer_v8_compare")
-        elif prompt_version == "v8_soft_cot":
-            # Soft attention with explicit CoT for decontamination.
-            # Query 1 sees full conversation but uses chain-of-thought to separate
-            # user requirements from assistant assumptions before writing the spec.
-            self._task_spec_template = _load_prompt("analyzer_v8_soft_spec_cot")
-            self._compare_template = _load_prompt("analyzer_v8_compare")
-        elif prompt_version == "v8_single":
-            # Single-query ablation: combined task spec + comparison in one prompt.
-            # Tests whether the two-query "hard attention" separation matters.
-            self._single_combined_template = _load_prompt("analyzer_v8_single")
-        elif prompt_version == "s1":
-            # Simplified single-query analysis without XML tags.
-            # Avoids Azure content filter jailbreak detection.
-            self._prompt_template = _load_prompt("s1_analysis")
-        else:
-            # Single-query prompt (v4, v5)
-            self._prompt_template = _load_prompt(f"analyzer_{prompt_version}")
+        # Look up the version in the registry; raises if unknown.
+        self._version_spec: AnalyzerPromptVersion = get_version(prompt_version)
+
+        # Load templates based on the flow. Each flow uses a different subset
+        # of fields on the version spec; the spec encodes which are required.
+        flow = self._version_spec.flow
+        if flow in ("two_query", "two_query_soft"):
+            self._task_spec_template = _load_prompt(self._version_spec.task_spec_template)
+            self._compare_template = _load_prompt(self._version_spec.compare_template)
+        elif flow == "single_query_combined":
+            self._single_combined_template = _load_prompt(self._version_spec.single_template)
+        elif flow in ("single_query_s1", "single_query_legacy"):
+            self._prompt_template = _load_prompt(self._version_spec.single_template)
 
     async def _generate(self, prompt: str, model_client: "ModelClient") -> str:
         """Run a single LLM generation."""
@@ -575,20 +568,21 @@ class ConversationAnalyzer:
         memory_target_query: "compare" (default), "spec", or "both".
         enforce_compliance: if True, append compliance rules to Query 2 prompt.
         """
-        if self.prompt_version in ("v6", "v7", "v8", "v9", "v11"):
+        flow = self._version_spec.flow
+        if flow == "two_query":
             return await self._analyze_v6(
                 trace, model_client, memory, spec_only=spec_only,
                 memory_target_query=memory_target_query,
                 enforce_compliance=enforce_compliance,
             )
-        if self.prompt_version in ("v8_soft", "v8_soft_cot"):
+        if flow == "two_query_soft":
             return await self._analyze_v8_soft(
                 trace, model_client, memory, spec_only=spec_only,
                 memory_target_query=memory_target_query,
             )
-        if self.prompt_version == "v8_single":
+        if flow == "single_query_combined":
             return await self._analyze_v8_single(trace, model_client, memory)
-        if self.prompt_version == "s1":
+        if flow == "single_query_s1":
             return await self._analyze_s1(trace, model_client, memory)
         return await self._analyze_single(trace, model_client, memory)
 

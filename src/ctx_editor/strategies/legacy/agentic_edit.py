@@ -4,16 +4,16 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from ..core.types import Message
-from .base import BaseStrategy
-from .baseline import BaselineStrategy
+from ...core.types import Message
+from ..base import BaseStrategy
+from ..baseline import BaselineStrategy
 from .context_edit import ContextEditStrategy, DEFAULT_EDITOR_PROMPT, MEMORY_SECTION_TEMPLATE
-from .prompt_registry import get_decision_prompt
+from ..prompt_registry import get_decision_prompt
 
 if TYPE_CHECKING:
-    from ..core.trace import ConversationTrace
-    from ..memory.base import MemoryModule
-    from ..models.base import ModelClient
+    from ...core.trace import ConversationTrace
+    from ...memory.base import MemoryModule
+    from ...models.base import ModelClient
 
 
 DECISION_PROMPT = """\

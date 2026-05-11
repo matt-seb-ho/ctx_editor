@@ -85,6 +85,18 @@ Phase 1 (analyzer prompt registry) is the highest-leverage real refactor — eve
 
 Phases 2–4 are bigger surface area and warrant explicit alignment before starting. In particular, Phase 4(a) involves moving real working code between repos and shouldn't happen mid-experiment.
 
+## Phase 1 — analyzer prompt registry (completed)
+
+- ✅ New module `src/ctx_editor/strategies/analyzer_prompts.py` is the single source of truth for analyzer prompt versions. Each entry in `ANALYZER_PROMPT_REGISTRY` records the version's flow (`two_query` / `two_query_soft` / `single_query_combined` / `single_query_s1` / `single_query_legacy`) and which template files it pulls from `strategies/prompts/`.
+- ✅ `ConversationAnalyzer.__init__` and `analyze()` now dispatch on the registry's `flow` field instead of a hand-written if/elif over version strings. Adding a future `v12` is a one-line registry entry — no analyzer code changes if it reuses an existing flow.
+- ✅ Bad version names produce a clear error listing the valid options.
+- ✅ `huang_eval/replay.py` `generate_s3` and `generate_s15` now accept `analyzer_prompt_version` (default `"v8"`, matches prior behavior). They were the last two hardcoded version strings outside the registry.
+- ✅ All 11 currently-registered versions instantiate cleanly; every analyzer version referenced by `config/experiment/*.yaml` resolves in the registry.
+
+Out of scope for Phase 1 (still on the plan):
+- Tau2's inline prompts (`/home/agent/tau2-bench/ctx_edit/analyzer.py`) — separate repo, deferred per user decision.
+- The legacy editor/decision prompts in `strategies/prompt_registry.py` — these belong to `ContextEditStrategy` v1 / `AgenticEditStrategy` (now under `strategies/legacy/`). Could move to `legacy/prompt_registry.py` in a future pass, but no live caller depends on the location.
+
 ## Phase 0 — completed in this pass
 
 - ✅ Legacy strategies moved to `src/ctx_editor/strategies/legacy/` (`AgenticEditStrategy`, `ContextEditStrategy` v1, `ReflectionStrategy`). Re-exported from `ctx_editor.strategies` for backwards compatibility — every existing Hydra `_target_:` string still resolves.

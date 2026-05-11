@@ -166,6 +166,7 @@ async def generate_s3(
     model_client: "ModelClient",
     respondent_model: str,
     analyzer_model: str,
+    analyzer_prompt_version: str = "v8",
 ) -> tuple[str, dict[str, Any]]:
     """Generate S3 response: analyzer-driven surgical context editing.
 
@@ -173,6 +174,9 @@ async def generate_s3(
     2. Run ConversationAnalyzer to get task_spec/aligned/issues
     3. Feed analysis + conversation into compaction prompt (LLM compaction)
     4. Generate response from compacted context
+
+    ``analyzer_prompt_version`` selects the registered analyzer prompt set;
+    see :mod:`ctx_editor.strategies.analyzer_prompts` for the registry.
 
     Returns:
         Tuple of (response_text, analysis_metadata).
@@ -186,7 +190,7 @@ async def generate_s3(
     analyzer = ConversationAnalyzer(
         model=analyzer_model,
         timeout=120,
-        prompt_version="v8",
+        prompt_version=analyzer_prompt_version,
     )
     analysis = await analyzer.analyze(trace, model_client)
 
@@ -411,11 +415,15 @@ async def generate_s15(
     respondent_model: str,
     analyzer_model: str,
     memory: Optional[Any] = None,
+    analyzer_prompt_version: str = "v8",
 ) -> tuple[str, dict[str, Any]]:
     """Generate S1.5 response: analyzer output programmatically templated into context.
 
     Same as S3 but without the LLM compaction step -- analysis fields are
     directly templated into the compacted context.
+
+    ``analyzer_prompt_version`` selects the registered analyzer prompt set;
+    see :mod:`ctx_editor.strategies.analyzer_prompts` for the registry.
 
     Args:
         memory: Optional MemoryModule to inject into analyzer compare query.
@@ -432,7 +440,7 @@ async def generate_s15(
     analyzer = ConversationAnalyzer(
         model=analyzer_model,
         timeout=120,
-        prompt_version="v8",
+        prompt_version=analyzer_prompt_version,
     )
     analysis = await analyzer.analyze(trace, model_client, memory=memory)
 

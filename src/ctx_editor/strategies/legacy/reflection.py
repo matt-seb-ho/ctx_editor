@@ -2,14 +2,14 @@
 
 from typing import TYPE_CHECKING, Optional
 
-from ..core.types import Message
-from ..utils.helpers import load_prompt
-from .base import BaseStrategy
+from ...core.types import Message
+from ...utils.helpers import load_prompt
+from ..base import BaseStrategy
 
 if TYPE_CHECKING:
-    from ..core.trace import ConversationTrace
-    from ..memory.base import MemoryModule
-    from ..models.base import ModelClient
+    from ...core.trace import ConversationTrace
+    from ...memory.base import MemoryModule
+    from ...models.base import ModelClient
 
 
 DEFAULT_REFLECTION_PROMPT = """\

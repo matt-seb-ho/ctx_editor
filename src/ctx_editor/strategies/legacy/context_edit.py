@@ -3,15 +3,15 @@
 import re
 from typing import TYPE_CHECKING, Optional
 
-from ..core.types import Message
-from ..utils.helpers import load_prompt
-from .base import BaseStrategy
-from .prompt_registry import get_editor_prompt
+from ...core.types import Message
+from ...utils.helpers import load_prompt
+from ..base import BaseStrategy
+from ..prompt_registry import get_editor_prompt
 
 if TYPE_CHECKING:
-    from ..core.trace import ConversationTrace
-    from ..memory.base import MemoryModule
-    from ..models.base import ModelClient
+    from ...core.trace import ConversationTrace
+    from ...memory.base import MemoryModule
+    from ...models.base import ModelClient
 
 
 DEFAULT_EDITOR_PROMPT = """\
