@@ -85,6 +85,22 @@ Phase 1 (analyzer prompt registry) is the highest-leverage real refactor — eve
 
 Phases 2–4 are bigger surface area and warrant explicit alignment before starting. In particular, Phase 4(a) involves moving real working code between repos and shouldn't happen mid-experiment.
 
+## Phase 3 — Hydra-ify Huang + cross-benchmark schema (completed)
+
+- ✅ `huang_eval/run_phase1.py` and `huang_eval/run_phase2.py` are now Hydra entry points (configs: `config/huang_phase1.yaml`, `config/huang_phase2.yaml`). Argparse removed. CLI shape: `python -m ctx_editor.huang_eval.run_phase2 phase1_dir=... variants.s15=true`.
+- ✅ Multi-seed/multi-config sweeps via Hydra's built-in `--multirun` — no separate sweep system needed.
+- ✅ Console scripts in `pyproject.toml`: `ctx-editor-huang-phase1`, `ctx-editor-huang-phase2`. The four benchmark CLIs (`ctx-editor`, `ctx-editor-collabllm`, `ctx-editor-huang-phase1`, `ctx-editor-huang-phase2`) now share a uniform convention.
+- ✅ `variants` is a Hydra-overridable dict: `variants.augment=true variants.s15=true variants.s2=true` toggle each AC3 variant independently. Defaults preserve legacy behavior (S3 on, others off).
+- ✅ Per-variant analyzer prompt versions are now Hydra-configurable: `analyzer_prompt_versions.s2=v11 analyzer_prompt_versions.s3=v8` — pulls from the Phase 1 registry.
+- ✅ **AC3-Augment** is now CLI-exposed for Huang eval (`variants.augment=true`). The Phase 2 plumbing made the strategy callable from Python; Phase 3 wires it through the runner.
+- ✅ Cross-benchmark output schema: every Hydra-driven run writes `run_summary.json` with `{benchmark, experiment_name, metrics, output_dir, timestamp, …}`. LiC's pre-existing `results.json` (per-sample list) is unchanged — the new file lives alongside it so older tooling that reads LiC `results.json` doesn't break.
+- ✅ `scripts/aggregate_results.py` reads `run_summary.json` across run directories (with metrics.json fallback for legacy runs) and produces a unified table or CSV. Smoke-tested on the existing LiC runs.
+
+Out of scope for Phase 3 (still on the plan):
+- `scripts/run_wildchat_memory.py` is still argparse — it's a research-only script that already has its own complex flow; Hydra-ifying it is low-value churn.
+- LiC and CollabLLM don't yet write `run_summary.json` — the aggregator handles this via the fallback path. They could write it natively in a follow-up to remove the fallback.
+- Tau2 stays federated per the earlier decision.
+
 ## Phase 2 — unify AC3 contract across benchmarks (Huang) (completed)
 
 - ✅ New module `src/ctx_editor/huang_eval/strategies.py` defines `HuangAC3AugmentStrategy`, `HuangAC3ResetStrategy`, `HuangAC3GatedResetStrategy`, `HuangAC3RewriteStrategy` — all implementing the standard `ContextStrategy` protocol.

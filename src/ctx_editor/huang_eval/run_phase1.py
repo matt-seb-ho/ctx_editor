@@ -4,23 +4,27 @@
 Identifies AO failure cases (turns where FC > AO on quality) for Phase 2.
 
 Usage:
-    python -m ctx_editor.huang_eval.run_phase1 \
-        --num-conversations 100 \
-        --respondent-model gpt-5-mini \
-        --judge-model gpt-5 \
-        --max-concurrent 5
+    python -m ctx_editor.huang_eval.run_phase1 \\
+        num_conversations=100 \\
+        respondent_model=gpt-5-mini \\
+        max_concurrent=5
+
+Or for a multi-seed sweep:
+    python -m ctx_editor.huang_eval.run_phase1 --multirun seed=42,43,44
+
+See ``ctx_editor/config/huang_phase1.yaml`` for all knobs.
 """
 
-import argparse
 import asyncio
 import json
 import logging
 import random
-import sys
 from datetime import datetime
 from pathlib import Path
 
+import hydra
 from dotenv import load_dotenv
+from omegaconf import DictConfig, OmegaConf
 
 load_dotenv(Path(__file__).parent.parent.parent.parent / ".env")
 
@@ -118,11 +122,10 @@ async def process_conversation(
     return turn_results
 
 
-async def run_phase1(args):
-    """Main Phase 1 execution."""
+async def run_phase1(cfg: DictConfig) -> Path:
+    """Main Phase 1 execution. ``cfg`` is the Hydra config from huang_phase1.yaml."""
     # Setup output directory
-    timestamp = datetime.now().strftime("%Y-%m-%d/%H-%M-%S")
-    output_dir = Path(args.output_dir.format(timestamp=timestamp))
+    output_dir = Path(cfg.logging.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     conv_dir = output_dir / "conversations"
     conv_dir.mkdir(exist_ok=True)
@@ -137,21 +140,26 @@ async def run_phase1(args):
         ],
     )
 
-    # Save config
-    config = vars(args)
-    config["timestamp"] = timestamp
+    # Save the fully-resolved config in BOTH formats:
+    #   - config.yaml  (Hydra-native, cross-benchmark standard)
+    #   - config.json  (legacy, preserved for tooling that parses it)
+    timestamp = datetime.now().strftime("%Y-%m-%d/%H-%M-%S")
+    with open(output_dir / "config.yaml", "w") as f:
+        f.write(OmegaConf.to_yaml(cfg, resolve=True))
+    config_json = OmegaConf.to_container(cfg, resolve=True)
+    config_json["timestamp"] = timestamp
     with open(output_dir / "config.json", "w") as f:
-        json.dump(config, f, indent=2)
+        json.dump(config_json, f, indent=2)
 
     logger.info(f"Phase 1 output: {output_dir}")
 
     # Load data
     logger.info("Loading WildChat conversations...")
     conversations = load_wildchat_conversations(
-        limit=args.num_conversations,
-        seed=args.seed,
-        max_scan=args.max_scan,
-        dataset_name=args.dataset,
+        limit=cfg.num_conversations,
+        seed=cfg.seed,
+        max_scan=cfg.max_scan,
+        dataset_name=cfg.dataset,
     )
     logger.info(f"Loaded {len(conversations)} conversations")
 
@@ -161,15 +169,15 @@ async def run_phase1(args):
             json.dump(conv, f, indent=2)
 
     # Setup model client
-    model_client = get_model_client(args.respondent_model)
+    model_client = get_model_client(cfg.respondent_model)
 
     # Results file
     results_file = output_dir / "turn_results.jsonl"
     results_file.touch()
 
     # Process conversations with concurrency limit
-    semaphore = asyncio.Semaphore(args.max_concurrent)
-    rng = random.Random(args.seed)
+    semaphore = asyncio.Semaphore(cfg.max_concurrent)
+    rng = random.Random(cfg.seed)
     all_results = []
 
     async def process_with_semaphore(conv):
@@ -177,8 +185,8 @@ async def run_phase1(args):
             logger.info(f"Processing conversation {conv['conversation_id'][:30]}... "
                         f"({conv['metadata']['num_rounds']} rounds)")
             return await process_conversation(
-                conv, model_client, args.respondent_model, args.judge_model,
-                args.classifier_model, results_file, rng,
+                conv, model_client, cfg.respondent_model, cfg.judge_model,
+                cfg.classifier_model, results_file, rng,
             )
 
     tasks = [process_with_semaphore(conv) for conv in conversations]
@@ -215,6 +223,24 @@ async def run_phase1(args):
     with open(output_dir / "summary.txt", "w") as f:
         f.write(summary)
 
+    # Cross-benchmark-standard run summary. Written to ``run_summary.json``
+    # rather than ``results.json`` because LiC's ``results.json`` is a list of
+    # per-sample dicts (legacy schema). The cross-benchmark aggregator in
+    # ``scripts/aggregate_results.py`` prefers ``run_summary.json`` and falls
+    # back to per-benchmark conventions when it's missing.
+    run_summary = {
+        "benchmark": "huang_phase1",
+        "experiment_name": cfg.experiment_name,
+        "num_conversations": cfg.num_conversations,
+        "num_turns": len(all_results),
+        "num_ao_failures": len(ao_failures),
+        "metrics": metrics,
+        "output_dir": str(output_dir),
+        "timestamp": timestamp,
+    }
+    with open(output_dir / "run_summary.json", "w") as f:
+        json.dump(run_summary, f, indent=2)
+
     print(summary)
     logger.info(f"Phase 1 complete. Results in {output_dir}")
     logger.info(f"AO failure turns: {len(ao_failures)} -- use these for Phase 2")
@@ -222,30 +248,17 @@ async def run_phase1(args):
     return output_dir
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Phase 1: FC+AO evaluation on WildChat conversations"
-    )
-    parser.add_argument("--num-conversations", type=int, default=100,
-                        help="Number of conversations to evaluate")
-    parser.add_argument("--respondent-model", default="gpt-5-mini",
-                        help="Model for generating responses")
-    parser.add_argument("--judge-model", default="gpt-5",
-                        help="Model for pairwise judging")
-    parser.add_argument("--classifier-model", default="gpt-5",
-                        help="Model for turn classification")
-    parser.add_argument("--max-concurrent", type=int, default=5,
-                        help="Max concurrent conversations")
-    parser.add_argument("--seed", type=int, default=42)
-    parser.add_argument("--max-scan", type=int, default=10000,
-                        help="Max rows to scan from WildChat")
-    parser.add_argument("--dataset", default="allenai/WildChat-1M",
-                        help="HuggingFace dataset name")
-    parser.add_argument("--output-dir", default="outputs/huang_eval/phase1/{timestamp}",
-                        help="Output directory (supports {timestamp})")
+@hydra.main(config_path="../config", config_name="huang_phase1", version_base=None)
+def main(cfg: DictConfig) -> None:
+    """Hydra entry point for Phase 1.
 
-    args = parser.parse_args()
-    asyncio.run(run_phase1(args))
+    Example invocations:
+        python -m ctx_editor.huang_eval.run_phase1
+        python -m ctx_editor.huang_eval.run_phase1 num_conversations=30 seed=42
+        python -m ctx_editor.huang_eval.run_phase1 --multirun seed=42,43,44
+    """
+    print(f"\nOutput directory: {cfg.logging.output_dir}\n")
+    asyncio.run(run_phase1(cfg))
 
 
 if __name__ == "__main__":

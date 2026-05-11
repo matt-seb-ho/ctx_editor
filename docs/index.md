@@ -140,6 +140,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-11 | `index.md` | This file. Topical + chronological doc map. |
 | 2026-05-11 | `paper_experiments_provenance.md` | Paper Table 1 row → strategy/prompt/config mapping. (Phase 2 add) |
 | 2026-05-11 | `experiment_organization_audit.md` | Cross-benchmark audit + phased refactor plan. (Phase 0 add) |
 | 2026-05-11 | `ac3_variants_per_benchmark.md` | AC3 coverage matrix per benchmark. (Phase 0 add) |

@@ -24,13 +24,14 @@ One-stop reference for the four benchmarks the paper reports on. Keep this short
 ## WildChat (Huang eval reproduction)
 
 - **Where**: this repo, `src/ctx_editor/huang_eval/`
-- **Entry points** (argparse, not Hydra):
-  - `python -m ctx_editor.huang_eval.run_phase1 …` — produces AO-failure-turn list
-  - `python -m ctx_editor.huang_eval.run_phase2 …` — runs S1.5/S2/S3 on those failures *(currently has a syntax error from commit `22b2f3b`; needs fix before re-running on this machine)*
-  - `python scripts/run_wildchat_memory.py …` — post-hoc memory variant on phase2 outputs
-- **Outputs**: `outputs/huang_eval/phase{1,2}/{date}/{time}/`
-- **AC3 coverage**: Reset (S1.5), Gated-Reset (S2, v11), Rewrite (S3), and **Augment** (new in Phase 2 — `generate_augment` / `HuangAC3AugmentStrategy`). Not yet exposed via a `run_phase2.py` CLI flag, but callable from Python.
-- **Implementation**: AC3 ops now live in `huang_eval/strategies.py` as `ContextStrategy` subclasses. The `generate_*` functions in `replay.py` are thin wrappers preserving the paper-era message layout.
+- **Entry points** (Hydra; console scripts):
+  - `ctx-editor-huang-phase1` (or `python -m ctx_editor.huang_eval.run_phase1`) — produces AO-failure-turn list. Config: `config/huang_phase1.yaml`.
+  - `ctx-editor-huang-phase2` (or `python -m ctx_editor.huang_eval.run_phase2`) — runs the requested AC3 variants. Config: `config/huang_phase2.yaml`.
+  - `python scripts/run_wildchat_memory.py …` — post-hoc memory variant (still argparse).
+- **Outputs**: `outputs/huang_eval/phase{1,2}/{YYYY-MM-DD}/{HH-MM-SS}/` (Hydra-managed)
+- **AC3 coverage**: Augment (`variants.augment=true`), Reset (`variants.s15=true`), Gated-Reset (`variants.s2=true`, v11), Rewrite (`variants.s3=true`, default-on). All four switchable per run.
+- **Multi-seed sweep**: `ctx-editor-huang-phase2 phase1_dir=... --multirun seed=42,43,44` (Hydra built-in).
+- **Implementation**: AC3 ops live in `huang_eval/strategies.py` as `ContextStrategy` subclasses; `replay.py` `generate_*` functions are thin wrappers preserving the paper-era message layout.
 - **Deep docs**: [`reports/huang_eval_*.md`](reports/)
 
 ## Tau2 (telecom_small)
@@ -52,3 +53,12 @@ One-stop reference for the four benchmarks the paper reports on. Keep this short
 - [`ac3_variants_per_benchmark.md`](ac3_variants_per_benchmark.md) — which AC3 variants each benchmark actually implements
 - [`experiment_organization_audit.md`](experiment_organization_audit.md) — code-organization audit + proposed refactor phases
 - [`strategy_name_history.md`](strategy_name_history.md) — rename map and historical name decoder
+
+### Cross-benchmark sweep & aggregation (new in Phase 3)
+
+- **Run a sweep**: every benchmark uses Hydra, so `--multirun` works uniformly. Examples:
+  - LiC: `ctx-editor --multirun task=math,code experiment=context_edit_v2 seed=42,43,44`
+  - CollabLLM: `ctx-editor-collabllm --multirun experiment=collabllm_compaction seed=42,43,44`
+  - Huang Phase 2: `ctx-editor-huang-phase2 --multirun phase1_dir=... variants.s15=true,false seed=42,43,44`
+- **Cross-benchmark schema**: every Hydra-driven run writes a `run_summary.json` with a uniform `{benchmark, experiment_name, metrics, output_dir, timestamp, …}` shape. LiC's older `results.json` (per-sample list) is unchanged; the new file lives alongside it.
+- **Aggregate across runs**: `python scripts/aggregate_results.py outputs/ outputs/huang_eval/` walks every run directory, reads `run_summary.json` (falling back to `metrics.json` + Hydra overrides for legacy runs), and emits a single table or CSV. Filter with `--filter benchmark=huang_phase2`.

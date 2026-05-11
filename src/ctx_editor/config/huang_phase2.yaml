@@ -1,0 +1,53 @@
+defaults:
+  - _self_
+
+# ─── Huang/WildChat eval, Phase 2 ──────────────────────────────────────────
+# Hydra-ified version of the legacy argparse entry point. Runs the AC3
+# variants against the AO-failure turns identified in Phase 1.
+# Usage:
+#   python -m ctx_editor.huang_eval.run_phase2 phase1_dir=outputs/huang_eval/phase1/2026-...
+#   python -m ctx_editor.huang_eval.run_phase2 phase1_dir=... variants.s15=true variants.s2=true
+#   python -m ctx_editor.huang_eval.run_phase2 phase1_dir=... variants.augment=true   # new in Phase 2 of cleanup
+
+experiment_name: huang_phase2_${respondent_model}
+
+# Required: Phase 1 output directory
+phase1_dir: ???
+
+# Models
+respondent_model: gpt-5-mini
+judge_model: gpt-5-mini
+analyzer_model: gpt-5-mini
+
+# Which AC3 variants to evaluate. S3 (Rewrite) defaults to true to match
+# the legacy CLI behavior; the others are opt-in.
+variants:
+  s3: true        # AC3-Rewrite     (HuangAC3RewriteStrategy)
+  s15: false      # AC3-Reset       (HuangAC3ResetStrategy)
+  s2: false       # AC3-Gated-Reset (HuangAC3GatedResetStrategy)
+  augment: false  # AC3-Augment     (HuangAC3AugmentStrategy) — new variant from Phase 2 cleanup
+
+# Per-variant analyzer prompt versions (defaults match paper protocol; see
+# strategies/analyzer_prompts.py for the registry of valid version names).
+analyzer_prompt_versions:
+  s3: v8
+  s15: v8
+  s2: v11
+  augment: v8
+
+# S2 has an additional min-turns gate before reset can fire
+min_turns_s2: 2
+
+# Sample selection
+max_turns: null            # cap on number of failure turns processed; null = all
+turns_file: null           # optional path overriding phase1's ao_failure_turns.json
+regenerate_baselines: false  # if true, re-generate AO/FC rather than using Phase 1's cache
+
+# Execution
+max_concurrent: 5
+seed: 42
+
+# Logging
+logging:
+  output_dir: outputs/huang_eval/phase2/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  verbose: false

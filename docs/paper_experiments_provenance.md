@@ -73,20 +73,34 @@ Pairwise win rates over 30 WildChat conversations (n=173–178 turns per row). A
 
 Phase 2 of the refactor (this commit) replaced the inline `generate_*` implementations with `ContextStrategy` subclasses in `huang_eval/strategies.py`. The `generate_*` functions are now thin wrappers that preserve the original message layout bit-for-bit (the paper's pairwise judges were scored against the original layout — changing it would invalidate stored judgments). New in Phase 2 (not in the paper): `HuangAC3AugmentStrategy` / `generate_augment` provides AC3-Augment for Huang eval — available for future runs but not used in the published numbers.
 
-Reproduction (Phase-1-era):
+Reproduction (post-Phase-3 Hydra CLI):
+
+```bash
+ctx-editor-huang-phase1 \
+    num_conversations=30 respondent_model=gpt-5-mini \
+    judge_model=gpt-5-mini classifier_model=gpt-5-mini \
+    max_concurrent=5 max_scan=10000 seed=42
+
+ctx-editor-huang-phase2 \
+    phase1_dir=outputs/huang_eval/phase1/<DATE>/<TIME> \
+    respondent_model=gpt-5-mini judge_model=gpt-5-mini \
+    analyzer_model=gpt-5-mini max_concurrent=5 \
+    variants.s15=true variants.s2=true seed=42
+```
+
+Pre-Phase-3 (argparse) form, for decoding older project memory / docs:
 
 ```bash
 python -m ctx_editor.huang_eval.run_phase1 \
-    --num-conversations 30 \
-    --respondent-model gpt-5-mini --judge-model gpt-5-mini \
-    --classifier-model gpt-5-mini --max-concurrent 5 \
-    --max-scan 10000 --seed 42
+    --num-conversations 30 --respondent-model gpt-5-mini \
+    --judge-model gpt-5-mini --classifier-model gpt-5-mini \
+    --max-concurrent 5 --max-scan 10000 --seed 42
 
 python -m ctx_editor.huang_eval.run_phase2 \
     --phase1-dir outputs/huang_eval/phase1/<DATE>/<TIME> \
     --respondent-model gpt-5-mini --judge-model gpt-5-mini \
-    --analyzer-model gpt-5-mini \
-    --max-concurrent 5 --run-s15 --run-s2 --seed 42
+    --analyzer-model gpt-5-mini --max-concurrent 5 \
+    --run-s15 --run-s2 --seed 42
 ```
 
 The WildChat memory ablation (Appendix table) used:
