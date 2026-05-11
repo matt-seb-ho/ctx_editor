@@ -65,11 +65,11 @@ async def process_failure_turn(
     judge_model: str,
     analyzer_model: str,
     run_s15: bool,
-    memory=None,
     run_s2: bool,
     regenerate_baselines: bool,
     results_file: Path,
     rng: random.Random,
+    memory=None,
 ) -> dict | None:
     """Process a single AO failure turn with S3 (and optionally S1.5 and/or S2)."""
     turns = conversation["turns"]

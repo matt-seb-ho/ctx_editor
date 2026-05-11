@@ -85,6 +85,24 @@ Phase 1 (analyzer prompt registry) is the highest-leverage real refactor — eve
 
 Phases 2–4 are bigger surface area and warrant explicit alignment before starting. In particular, Phase 4(a) involves moving real working code between repos and shouldn't happen mid-experiment.
 
+## Phase 2 — unify AC3 contract across benchmarks (Huang) (completed)
+
+- ✅ New module `src/ctx_editor/huang_eval/strategies.py` defines `HuangAC3AugmentStrategy`, `HuangAC3ResetStrategy`, `HuangAC3GatedResetStrategy`, `HuangAC3RewriteStrategy` — all implementing the standard `ContextStrategy` protocol.
+- ✅ All four satisfy `isinstance(strategy, ContextStrategy)` (runtime protocol check).
+- ✅ Adds **AC3-Augment for Huang eval** (it was missing — the paper's WildChat numbers don't include it, but it's plumbed for future runs).
+- ✅ `huang_eval/replay.py` `generate_s2`/`generate_s3`/`generate_s15` are now thin wrappers around the strategy classes; behavior is bit-for-bit preserved (paper judges scored against the original message layout, must not change).
+- ✅ New `generate_augment` exposes the new variant via the same calling convention.
+- ✅ Pre-existing `SyntaxError` in `run_phase2.py` (`memory=None` before `run_s2: bool`) fixed by reordering keyword args. Caller passes by keyword so the change is safe.
+- ✅ Dead code in replay.py (`_extract_tag`, `_COMPACTION_PROMPT_PATH`, unused imports) removed.
+- ✅ Paper-experiments-to-code mapping documented in [paper_experiments_provenance.md](paper_experiments_provenance.md).
+
+Verified: full package walk-import succeeds; every analyzer prompt version in `config/experiment/*.yaml` resolves; all four Huang AC3 classes instantiate and satisfy the `ContextStrategy` protocol at runtime.
+
+Out of scope for Phase 2 (still on the plan):
+- LiC strategy classes are not modified — the Huang classes are separate because the compacted-message layout is benchmark-specific (paper judges have already scored against the Huang layout). Unification into a shared message-formatter is a Phase-2.5 candidate.
+- Adding AC3-Augment configs/Hydra wiring to `run_phase2.py` CLI flags (currently the `--run-augment` flag doesn't exist — the function is available but only callable from Python).
+- Tau2 boundary work (deferred per user).
+
 ## Phase 1 — analyzer prompt registry (completed)
 
 - ✅ New module `src/ctx_editor/strategies/analyzer_prompts.py` is the single source of truth for analyzer prompt versions. Each entry in `ANALYZER_PROMPT_REGISTRY` records the version's flow (`two_query` / `two_query_soft` / `single_query_combined` / `single_query_s1` / `single_query_legacy`) and which template files it pulls from `strategies/prompts/`.

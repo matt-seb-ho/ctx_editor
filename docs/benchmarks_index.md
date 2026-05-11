@@ -29,8 +29,8 @@ One-stop reference for the four benchmarks the paper reports on. Keep this short
   - `python -m ctx_editor.huang_eval.run_phase2 …` — runs S1.5/S2/S3 on those failures *(currently has a syntax error from commit `22b2f3b`; needs fix before re-running on this machine)*
   - `python scripts/run_wildchat_memory.py …` — post-hoc memory variant on phase2 outputs
 - **Outputs**: `outputs/huang_eval/phase{1,2}/{date}/{time}/`
-- **AC3 coverage**: Reset (S1.5), Gated-Reset (S2, v11), Rewrite (S3). **No AC3-Augment** in this pipeline.
-- **Caveats**: AC3 ops are inline functions in `huang_eval/replay.py`, not `ContextStrategy` subclasses. Adding a new variant means editing replay.py rather than swapping a config.
+- **AC3 coverage**: Reset (S1.5), Gated-Reset (S2, v11), Rewrite (S3), and **Augment** (new in Phase 2 — `generate_augment` / `HuangAC3AugmentStrategy`). Not yet exposed via a `run_phase2.py` CLI flag, but callable from Python.
+- **Implementation**: AC3 ops now live in `huang_eval/strategies.py` as `ContextStrategy` subclasses. The `generate_*` functions in `replay.py` are thin wrappers preserving the paper-era message layout.
 - **Deep docs**: [`reports/huang_eval_*.md`](reports/)
 
 ## Tau2 (telecom_small)
@@ -48,6 +48,7 @@ One-stop reference for the four benchmarks the paper reports on. Keep this short
 
 ## Cross-cutting
 
+- [`paper_experiments_provenance.md`](paper_experiments_provenance.md) — which `(strategy, prompt version, config)` produced each paper result
 - [`ac3_variants_per_benchmark.md`](ac3_variants_per_benchmark.md) — which AC3 variants each benchmark actually implements
 - [`experiment_organization_audit.md`](experiment_organization_audit.md) — code-organization audit + proposed refactor phases
 - [`strategy_name_history.md`](strategy_name_history.md) — rename map and historical name decoder
