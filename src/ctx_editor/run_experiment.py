@@ -4,6 +4,7 @@
 import asyncio
 import json
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -704,6 +705,27 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     # Save final memory
     if memory and cfg.memory.get("save_path"):
         memory.save(cfg.memory.save_path)
+
+    # Cross-benchmark-standard run summary. The pre-existing ``results.json``
+    # is a list of per-sample dicts; ``run_summary.json`` is the uniform
+    # ``{benchmark, experiment_name, metrics, …}`` shape consumed by
+    # ``scripts/aggregate_results.py`` across all four benchmarks.
+    run_summary = {
+        "benchmark": "lic",
+        "experiment_name": cfg.get("experiment_name", cfg.experiment.name),
+        "strategy": cfg.experiment.name,
+        "task": cfg.task.name,
+        "model": cfg.model.name,
+        "user_mode": cfg.user_mode.name,
+        "samples": total,
+        "metrics": metrics,
+        "total_cost_usd": total_cost,
+        "average_turns": avg_turns,
+        "output_dir": str(output_dir),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    with open(output_dir / "run_summary.json", "w") as f:
+        json.dump(run_summary, f, indent=2)
 
     logger.info(f"Results saved to {output_dir}")
 

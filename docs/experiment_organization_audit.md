@@ -85,6 +85,21 @@ Phase 1 (analyzer prompt registry) is the highest-leverage real refactor — eve
 
 Phases 2–4 are bigger surface area and warrant explicit alignment before starting. In particular, Phase 4(a) involves moving real working code between repos and shouldn't happen mid-experiment.
 
+## Phase 1.5 — Demote legacy prompt registry (completed)
+
+- ✅ `strategies/prompt_registry.py` moved to `strategies/legacy/prompt_registry.py`. The two callers (`legacy/agentic_edit.py`, `legacy/context_edit.py`) now do `from .prompt_registry import …` (sibling import within `legacy/`). Top-level `strategies/` is now purely the current AC3 lineup + `analyzer_prompts.py` registry.
+
+## Run summary backfill — LiC + CollabLLM (completed)
+
+- ✅ Both `run_experiment.py` (LiC) and `run_collabllm.py` (CollabLLM) now emit `run_summary.json` with the standardized `{benchmark, experiment_name, metrics, output_dir, timestamp, …}` shape. The aggregator's fallback path (read `metrics.json` + Hydra overrides) is no longer needed for new runs, only for historical ones from before this commit.
+- All four in-repo benchmark entry points (LiC, CollabLLM, Huang phase1, Huang phase2) now write the same cross-benchmark summary file.
+
+## Items intentionally not done
+
+- **Phase 2.5 — shared message-formatter between LiC AC3 classes and Huang AC3 classes.** The paper's pairwise judges have already scored against the Huang-specific compacted-message layout. Unifying it into a shared formatter risks subtly altering the layout, which would invalidate stored judgments. The aesthetic win (one fewer class) doesn't justify the behavior risk, and both class families already implement the same `ContextStrategy` protocol, so a sweep harness sees them as interchangeable. Revisit only if a concrete need pushes the layouts to converge.
+- **`scripts/run_wildchat_memory.py` Hydra port.** A one-off research script with its own train/eval split + memory persistence flow (~400 lines of argparse glue). Hydra-ifying is low-value churn until we actually start scaling memory experiments and the argparse interface becomes painful.
+- **Phase 4 — Tau2 boundary (federate vs absorb).** Deferred per user decision while Tau2's S3 result remains net-negative; revisit when Tau2 has a clearer scaling story.
+
 ## Phase 3 — Hydra-ify Huang + cross-benchmark schema (completed)
 
 - ✅ `huang_eval/run_phase1.py` and `huang_eval/run_phase2.py` are now Hydra entry points (configs: `config/huang_phase1.yaml`, `config/huang_phase2.yaml`). Argparse removed. CLI shape: `python -m ctx_editor.huang_eval.run_phase2 phase1_dir=... variants.s15=true`.

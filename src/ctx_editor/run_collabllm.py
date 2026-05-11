@@ -11,6 +11,7 @@ Similar to run_experiment.py but uses CollabLLM's simulation protocol:
 import asyncio
 import json
 from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
@@ -322,6 +323,25 @@ async def run_collabllm_experiment(cfg: DictConfig) -> dict[str, Any]:
 
     if memory and cfg.memory.get("save_path"):
         memory.save(cfg.memory.save_path)
+
+    # Cross-benchmark-standard run summary (see ``run_experiment.py`` for the
+    # rationale on the filename).
+    run_summary = {
+        "benchmark": "collabllm",
+        "experiment_name": cfg.get("experiment_name", cfg.experiment.name),
+        "strategy": cfg.experiment.name,
+        "task": cfg.task.name,
+        "dataset_name": dataset_name,
+        "model": cfg.model.name,
+        "samples": total,
+        "metrics": metrics,
+        "total_cost_usd": total_cost,
+        "average_turns": avg_turns,
+        "output_dir": str(output_dir),
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+    }
+    with open(output_dir / "run_summary.json", "w") as f:
+        json.dump(run_summary, f, indent=2)
 
     logger.info(f"Results saved to {output_dir}")
     return metrics
