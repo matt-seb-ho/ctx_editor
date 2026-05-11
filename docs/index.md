@@ -11,6 +11,7 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 ### Start here
 - [`README.md`](README.md) — Quickstart, CLI examples, code map.
 - [`benchmarks_index.md`](benchmarks_index.md) — One-stop reference for the four benchmarks (LiC, CollabLLM, WildChat/Huang, Tau2).
+- [`scaling_experiments.md`](scaling_experiments.md) — How to run new experiments + sweeps with the post-Phase-3 setup.
 - [`index.md`](index.md) — This file.
 
 ### Core method & architecture
@@ -21,10 +22,12 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`newleaf_refactor.md`](newleaf_refactor.md) — Option 2 rendering + S0/S1/S2 introduction.
 - [`newer_leaf_refactor.md`](newer_leaf_refactor.md) — Two-query analyzer (v6) + `AnalysisResult` redesign.
 
-### Cleanup pass — May 2026 (Phases 0/1/2)
+### Cleanup pass — May 2026 (Phases 0–3)
 - [`ac3_variants_per_benchmark.md`](ac3_variants_per_benchmark.md) — Which AC3 variants each benchmark actually implements.
 - [`experiment_organization_audit.md`](experiment_organization_audit.md) — Code-organization audit + phased refactor plan.
 - [`paper_experiments_provenance.md`](paper_experiments_provenance.md) — `(strategy, prompt version, config)` for every paper result.
+- [`scaling_experiments.md`](scaling_experiments.md) — Recipes for sweeps / new variants / new benchmarks after Phase 3.
+- [`tau2_absorption_decision.md`](tau2_absorption_decision.md) — Whether to absorb tau2-bench/ctx_edit into this repo (recommendation: hybrid).
 
 ### Per-benchmark
 - [`lost_in_conversation_paper.md`](lost_in_conversation_paper.md) — LiC paper summary.
@@ -140,6 +143,8 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-11 | `tau2_absorption_decision.md` | Absorb-vs-federate analysis for Tau2; recommends hybrid. |
+| 2026-05-11 | `scaling_experiments.md` | How to run new experiments and sweeps after Phase 3. |
 | 2026-05-11 | `index.md` | This file. Topical + chronological doc map. |
 | 2026-05-11 | `paper_experiments_provenance.md` | Paper Table 1 row → strategy/prompt/config mapping. (Phase 2 add) |
 | 2026-05-11 | `experiment_organization_audit.md` | Cross-benchmark audit + phased refactor plan. (Phase 0 add) |
