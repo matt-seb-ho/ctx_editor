@@ -242,4 +242,11 @@ def load_agentic_prompt(version: str, slot: AgenticSlot) -> str:
             f"Agentic prompt version {version!r} has no {slot!r} slot defined."
         )
     path = _PROMPTS_DIR / "agentic" / f"{filename}.txt"
-    return path.read_text()
+    # ``Path.read_text`` includes the file's trailing newline; the inline
+    # python-string forms these prompts replaced typically don't. Strip the
+    # single trailing newline so swapping between the file-loaded form and
+    # an inline form is byte-identical for downstream ``str.format()`` calls.
+    text = path.read_text()
+    if text.endswith("\n"):
+        text = text[:-1]
+    return text
