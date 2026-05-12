@@ -217,12 +217,13 @@ source=<path>  →  return CheatsheetMemory.load(source)
 
 | Strategy | `use_memory` effect |
 |----------|------------------------|
-| S0 (`BaselineStrategy`) | Injects into system or user message once at turn 1 |
-| S1 (`AppendAnalysisStrategy`) | Provides memory to the analyzer's Q2 (comparison) prompt via `{memory_section}` |
-| S2 (`ContextEditV2Strategy`) | Same as S1 — memory targets the analyzer's comparison query |
-| Legacy `ContextEditStrategy` | Provides memory to the editor LLM in its prompt |
-| Legacy `AgenticEditStrategy` | Passes memory to both the decision-maker and the editor |
-| Legacy `ReflectionStrategy` | Includes memory content in the reflection generation prompt |
+| `BaselineStrategy` | Injects into system or user message once at turn 1 |
+| `AC3AugmentStrategy` (alias `AppendAnalysisStrategy`) | Provides memory to the analyzer's Q2 (comparison) prompt via `{memory_section}` |
+| `AC3ResetStrategy` (alias `ContextEditV2Strategy`) | Same as AC3-Augment — memory targets the analyzer's comparison query |
+| `AC3RewriteStrategy` (alias `ContextCompactionStrategy`) | Memory available to both the single-query analyzer and the LLM compaction step |
+| Legacy `ContextEditStrategy` (in `strategies/legacy/`) | Provides memory to the editor LLM in its prompt |
+| Legacy `AgenticEditStrategy` (in `strategies/legacy/`) | Passes memory to both the decision-maker and the editor |
+| Legacy `ReflectionStrategy` (in `strategies/legacy/`) | Includes memory content in the reflection generation prompt |
 
 ### Execution modes and update cadence
 

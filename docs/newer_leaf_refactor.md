@@ -2,6 +2,8 @@
 
 Branch: `newleaf2`
 
+> **Historical doc.** This is a point-in-time snapshot of the v6 two-query analyzer refactor; class names and file paths are as they were at that time. For current names see [`strategy_name_history.md`](strategy_name_history.md); for the active analyzer architecture (now driven by [`analyzer_prompts.py`](../src/ctx_editor/strategies/analyzer_prompts.py) registry, default `v8`), see [`context_strategies.md`](context_strategies.md).
+
 Builds on the newleaf refactor. This round redesigns the analyzer prompt and architecture based on a first-principles review of the LiC failure modes and comparison with related work (ERGO, Huang et al.).
 
 ## 1. Two-Query Analyzer Architecture (v6)

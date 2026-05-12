@@ -2,6 +2,8 @@
 
 Branch: `newleaf`
 
+> **Historical doc.** Point-in-time snapshot of the S0/S1/S2 introduction. The strategy classes named here (`AppendAnalysisStrategy`, `ContextEditV2Strategy`, etc.) have since been renamed to the `AC3-*` family — see [`strategy_name_history.md`](strategy_name_history.md). For the current architecture see [`context_strategies.md`](context_strategies.md).
+
 ## Summary of Changes
 
 ### 1. Conversation Format (Option 2)
