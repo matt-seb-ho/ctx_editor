@@ -20,7 +20,10 @@ See ``docs/strategy_name_history.md`` for the rename map and
 """
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
+
+_PROMPTS_DIR = Path(__file__).parent / "prompts"
 
 # Flows supported by ``ConversationAnalyzer``. Each maps to one private
 # ``_analyze_*`` method on the analyzer class.
@@ -153,3 +156,90 @@ def get_version(name: str) -> AnalyzerPromptVersion:
 def list_versions() -> list[str]:
     """Return all registered analyzer prompt versions, sorted."""
     return sorted(ANALYZER_PROMPT_REGISTRY)
+
+
+# ── Agentic prompt registry (separate from ANALYZER_PROMPT_REGISTRY) ────────
+#
+# Tau2 (and any future agentic benchmark that uses tool calls + backend state)
+# uses an analyzer with a different prompt shape: placeholders like
+# ``{system_message}``, ``{tool_names}``, and an ``{environment_state}`` slot
+# in the rewrite step that the conversational registry's flows don't model.
+# Rather than crowbar these into ``ANALYZER_PROMPT_REGISTRY`` (and risk a
+# tau2 prompt being picked up by ``ConversationAnalyzer`` with wrong slot
+# expectations), we keep them in a parallel registry.
+#
+# The prompt texts live under ``strategies/prompts/agentic/``; the registry
+# below is the single source of truth for which slot maps to which file.
+# Tau2-side code reads these via ``load_agentic_prompt(version, slot)`` so
+# updates to the text files propagate without code changes on the tau2 side.
+
+AgenticSlot = Literal["task_spec", "compare_s2", "compare_s3", "context_rewrite"]
+
+
+@dataclass(frozen=True)
+class AgenticPromptVersion:
+    """Specification for one agentic analyzer prompt version (e.g. tau2 v10).
+
+    Each ``slot`` field is a filename stem (without ``.txt``) under
+    ``strategies/prompts/agentic/`` — or ``None`` if the slot is not defined
+    for this version (e.g. earlier versions without a separate S3 prompt).
+    """
+
+    name: str
+    task_spec: str | None = None
+    compare_s2: str | None = None
+    compare_s3: str | None = None
+    context_rewrite: str | None = None
+    description: str = ""
+
+
+AGENTIC_PROMPT_REGISTRY: dict[str, AgenticPromptVersion] = {
+    "tau2_v10": AgenticPromptVersion(
+        name="tau2_v10",
+        task_spec="tau2_v10_task_spec",
+        compare_s2="tau2_v10_compare_s2",
+        compare_s3="tau2_v10_compare_s3",
+        context_rewrite="tau2_v10_context_rewrite",
+        description=(
+            "Tau2-bench v10 prompts (mid-task reflection framing for "
+            "tool-using customer-service agents). S2 emits "
+            "strategic_direction; S3 keeps the same shape but is "
+            "consumed by a separate context-rewrite step."
+        ),
+    ),
+}
+
+
+def get_agentic_version(name: str) -> AgenticPromptVersion:
+    """Look up an agentic prompt version. Raises ``ValueError`` on unknown name."""
+    if name not in AGENTIC_PROMPT_REGISTRY:
+        available = ", ".join(sorted(AGENTIC_PROMPT_REGISTRY))
+        raise ValueError(
+            f"Unknown agentic prompt version {name!r}. Available: {available}"
+        )
+    return AGENTIC_PROMPT_REGISTRY[name]
+
+
+def list_agentic_versions() -> list[str]:
+    """Return all registered agentic prompt versions, sorted."""
+    return sorted(AGENTIC_PROMPT_REGISTRY)
+
+
+def load_agentic_prompt(version: str, slot: AgenticSlot) -> str:
+    """Load the raw prompt template text for ``(version, slot)``.
+
+    Used by external benchmarks (e.g. tau2-bench's ``ctx_edit/analyzer.py``)
+    that want to share prompt definitions with ctx_editor without depending
+    on ``ConversationAnalyzer`` itself.
+
+    Raises ``ValueError`` if the version is unknown or the slot is undefined
+    for this version.
+    """
+    spec = get_agentic_version(version)
+    filename = getattr(spec, slot, None)
+    if filename is None:
+        raise ValueError(
+            f"Agentic prompt version {version!r} has no {slot!r} slot defined."
+        )
+    path = _PROMPTS_DIR / "agentic" / f"{filename}.txt"
+    return path.read_text()
