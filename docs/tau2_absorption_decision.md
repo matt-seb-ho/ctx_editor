@@ -46,14 +46,14 @@ Federation framing the user proposed — "tau machinery is too complex for us to
 
 Ordered by reversibility. Each step is a small, separate commit so we can stop at any point.
 
-1. **Make ctx_editor pip-installable from outside.** It already is (`pip install -e .`). Sanity check by installing into the tau2-bench venv.
-2. **In tau2-bench/ctx_edit/, replace inline `v10`/`v10.4` analyzer prompts with entries in ctx_editor's `analyzer_prompts.py` registry.** Add a new flow `agentic_two_query` to the registry if needed (mirror of `two_query` but with the tool-aware framing). Tau2's analyzer becomes a thin sync wrapper around the existing ConversationAnalyzer pattern.
-3. **Adopt the cross-benchmark schema.** Have tau2-bench/ctx_edit/run_parallel.py write `run_summary.json` alongside its existing `config.json` and `results.json`. Use `{benchmark: "tau2", experiment_name, metrics, …}`.
-4. **Update `scripts/aggregate_results.py` to recognize `tau2-bench/ctx_edit/outputs/exp*` as run dirs.** Already supports multiple input paths; just need to point it at the tau2 outputs in addition to `outputs/`.
-5. **Hydra-ify tau2-bench/ctx_edit/run_parallel.py** so `--multirun seed=42,43,44` works. Configs live in tau2-bench/ctx_edit/config/, not in ctx_editor's config tree, but use the same Hydra pattern.
-6. **Document the dependency arrow in CLAUDE.md** (or a tau2-bench/CLAUDE.md): tau2-bench/ctx_edit depends on a specific commit of ctx_editor; updates are one-way.
+1. **Make ctx_editor pip-installable from outside.** It already is (`pip install -e .`). Sanity check by installing into the tau2-bench venv. ✅ *(structurally done; verified in next session)*
+2. **In tau2-bench/ctx_edit/, replace inline `v10` analyzer prompts with entries in ctx_editor's `analyzer_prompts.py` registry.** A new parallel registry `AGENTIC_PROMPT_REGISTRY` was added on the ctx_editor side (kept separate from the conversational `ANALYZER_PROMPT_REGISTRY` because placeholders differ). Tau2's analyzer.py now does `try: from ctx_editor.strategies.analyzer_prompts import load_agentic_prompt` and falls back to its inline strings if ctx_editor is not installed, so the change is backwards-compatible. ✅ — ctx_editor commits `ed57ccc`, `96cef10`; tau2-bench commit `0be4563`.
+3. **Adopt the cross-benchmark schema.** tau2-bench/ctx_edit/run_parallel.py now writes `run_summary.json` alongside its existing `config.json` and `results.json`. ✅ — tau2-bench commit `9372fce`.
+4. **Update `scripts/aggregate_results.py` to recognize tau2-bench output dirs.** Reads `run_summary.json` natively from new runs, reconstructs from `config.json + results.json` for legacy runs. ✅ — ctx_editor commit `d3b53a8`. Verified: 23 legacy tau2 runs flow through the aggregator; `exp11_v10_revert_3trials` recovers `s2=0.483 (n=60)` matching the paper.
+5. **Hydra-ify tau2-bench/ctx_edit/run_parallel.py** so `--multirun seed=42,43,44` works. Configs live in tau2-bench/ctx_edit/config/, not in ctx_editor's config tree, but use the same Hydra pattern. *(Not yet done. Independently valuable but bigger refactor — defer until the first time we actually want a Tau2 sweep across many seeds.)*
+6. **Document the dependency arrow.** ctx_editor's `docs/tau2_absorption_decision.md` (this file) records the contract; tau2-bench commits reference it. *(Done implicitly via the commit messages.)*
 
-Steps 1–3 are independently valuable and can ship without committing to 4–6. Steps 4–5 give us the Tau2-multirun-via-Hydra story.
+Steps 1–4 ship as four small commits across two repos. Step 5 is the only remaining open item.
 
 ## When to revisit
 

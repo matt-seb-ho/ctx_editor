@@ -44,8 +44,8 @@ One-stop reference for the four benchmarks the paper reports on. Keep this short
 - **Configs**: per-run `config.json` saved alongside `results.json` in each output dir
 - **Outputs**: `/home/agent/tau2-bench/ctx_edit/outputs/exp*` and `traces/`
 - **AC3 coverage**: S0/AO/S2(Reset)/S3(Rewrite). **No Augment, no separate Gated-Reset.** S3 is currently net-negative due to LLM rewrite losing tool result fidelity.
-- **Caveats**: fully parallel codebase — does not import `ctx_editor`. Custom synchronous analyzer in `ctx_edit/analyzer.py`, custom agent classes in `ctx_edit/agents.py`. Memory via offline cheatsheet builder `build_cheatsheet.py`.
-- **Deep docs**: [`tau2.md`](tau2.md), `/home/agent/tau2-bench/ctx_edit/EXPERIMENT_LOG.md`
+- **Caveats**: parallel codebase by design (hybrid integration per [`tau2_absorption_decision.md`](tau2_absorption_decision.md)). `ctx_edit/analyzer.py` and `ctx_edit/agents.py` live in the tau2-bench fork; v10 prompt strings are sourced from `ctx_editor.strategies.analyzer_prompts.AGENTIC_PROMPT_REGISTRY` when ctx_editor is pip-installed in tau2's venv (inline fallback otherwise). New runs emit `run_summary.json` so they aggregate alongside the other benchmarks via `scripts/aggregate_results.py`.
+- **Deep docs**: [`tau2.md`](tau2.md), [`tau2_absorption_decision.md`](tau2_absorption_decision.md), `/home/agent/tau2-bench/ctx_edit/EXPERIMENT_LOG.md`
 
 ## Cross-cutting
 

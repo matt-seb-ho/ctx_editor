@@ -85,6 +85,19 @@ Phase 1 (analyzer prompt registry) is the highest-leverage real refactor — eve
 
 Phases 2–4 are bigger surface area and warrant explicit alignment before starting. In particular, Phase 4(a) involves moving real working code between repos and shouldn't happen mid-experiment.
 
+## Phase 4 — Tau2 hybrid integration (steps 1–4 completed)
+
+User chose Option C (federate code in tau2-bench fork; share abstractions via pip-installed ctx_editor — see [tau2_absorption_decision.md](tau2_absorption_decision.md)).
+
+- ✅ **ctx_editor side**: new `AGENTIC_PROMPT_REGISTRY` in `strategies/analyzer_prompts.py` exposing tau2's v10 prompts as a shareable resource (commit `ed57ccc`). Loader returns byte-identical text to the inline forms (`96cef10`).
+- ✅ **ctx_editor side**: `scripts/aggregate_results.py` understands tau2 output dirs both via the new `run_summary.json` schema and via reconstruction from legacy `config.json + results.json` (commit `d3b53a8`). Verified across all 23 historical tau2 runs.
+- ✅ **tau2-bench side** (in `matt-seb-ho/tau2_ctxe.git`): `ctx_edit/run_parallel.py` emits `run_summary.json` for cross-benchmark aggregation (commit `9372fce`). `ctx_edit/analyzer.py` sources v10 prompts from ctx_editor when installed, with byte-identical inline fallbacks when not (commit `0be4563`).
+
+Net effect: prompt updates land once in ctx_editor and propagate to tau2 transparently. Aggregator pulls all four benchmarks (LiC / CollabLLM / Huang / Tau2) into one table with a single command. Cross-repo dependency is one-way (tau2-bench/ctx_edit depends on ctx_editor; the reverse does not hold).
+
+Out of scope (still on the plan):
+- Hydra-ifying tau2-bench/ctx_edit/run_parallel.py so `--multirun seed=42,43,44` works there too. Independently valuable but bigger refactor — defer until the first multi-seed Tau2 sweep is actually wanted.
+
 ## Phase 1.5 — Demote legacy prompt registry (completed)
 
 - ✅ `strategies/prompt_registry.py` moved to `strategies/legacy/prompt_registry.py`. The two callers (`legacy/agentic_edit.py`, `legacy/context_edit.py`) now do `from .prompt_registry import …` (sibling import within `legacy/`). Top-level `strategies/` is now purely the current AC3 lineup + `analyzer_prompts.py` registry.
