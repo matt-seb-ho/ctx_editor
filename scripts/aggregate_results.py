@@ -89,10 +89,60 @@ def _find_runs(root: Path) -> Iterable[Path]:
             continue
 
 
+def _tau2_summary_from_legacy(run_dir: Path) -> Optional[dict[str, Any]]:
+    """Reconstruct a run-summary-shaped dict from a legacy tau2-bench run.
+
+    Tau2 runs written before the run_summary.json change have config.json
+    (run-level args) and results.json (per-task list). Both files exist
+    side-by-side; the absence of a Hydra .hydra/ dir distinguishes them
+    from older LiC runs.
+    """
+    config = _read_json(run_dir / "config.json")
+    results = _read_json(run_dir / "results.json")
+    if not isinstance(config, dict) or not isinstance(results, list):
+        return None
+    if "agent_llm" not in config or "strategies" not in config:
+        return None  # not a tau2 config.json
+
+    # Compute per-strategy success rates from the per-task list.
+    per_strategy: dict[str, Any] = {}
+    for r in results:
+        if "error" in r:
+            continue
+        strat = r.get("strategy")
+        reward = r.get("reward")
+        if strat is None or reward is None:
+            continue
+        bucket = per_strategy.setdefault(strat, {"n": 0, "n_success": 0, "total_cost_usd": 0.0, "rewards": []})
+        bucket["n"] += 1
+        if reward > 0:
+            bucket["n_success"] += 1
+        bucket["total_cost_usd"] += r.get("total_cost", 0) or 0
+        bucket["rewards"].append(reward)
+    for strat, b in per_strategy.items():
+        b["success_rate"] = b["n_success"] / b["n"] if b["n"] else 0
+        b["avg_reward"] = sum(b["rewards"]) / len(b["rewards"]) if b["rewards"] else 0
+        del b["rewards"]
+
+    return {
+        "benchmark": "tau2",
+        "experiment_name": run_dir.name,
+        "strategies": config.get("strategies"),
+        "num_trials": config.get("num_trials"),
+        "metrics": per_strategy,
+        "num_results": len(results),
+        "output_dir": str(run_dir),
+        "timestamp": config.get("timestamp"),
+    }
+
+
 def _row_for(run_dir: Path) -> Optional[dict[str, Any]]:
     """Extract one row's worth of summary fields from a run directory."""
     # Prefer the cross-benchmark standard file.
     summary = _read_json(run_dir / "run_summary.json")
+    if not isinstance(summary, dict):
+        # Tau2 legacy: config.json + results.json (no Hydra dir).
+        summary = _tau2_summary_from_legacy(run_dir)
     if not isinstance(summary, dict):
         # Fall back: reconstruct from metrics.json + Hydra config/overrides.
         # (LiC's results.json is a per-sample list; not used here.)
@@ -132,12 +182,20 @@ def _summarize_metrics(metrics: dict) -> str:
         if k in metrics:
             pieces.append(f"{k}={metrics[k]:.3f}" if isinstance(metrics[k], float) else f"{k}={metrics[k]}")
     # Huang style: per-pair win rates inside metrics["fc_vs_ao"], etc.
-    for pair_key, sub in metrics.items():
+    # Tau2 style: per-strategy {success_rate, n_success, n, ...} blobs.
+    for sub_key, sub in metrics.items():
         if not isinstance(sub, dict):
             continue
         win_rate = sub.get("win_rate") or sub.get("quality_win_rate")
         if win_rate is not None and isinstance(win_rate, (int, float)):
-            pieces.append(f"{pair_key}={win_rate:.3f}")
+            pieces.append(f"{sub_key}={win_rate:.3f}")
+            continue
+        success_rate = sub.get("success_rate")
+        if success_rate is not None and isinstance(success_rate, (int, float)):
+            n = sub.get("n")
+            pieces.append(
+                f"{sub_key}={success_rate:.3f}" + (f" (n={n})" if n else "")
+            )
     return ", ".join(pieces) if pieces else json.dumps(metrics)[:80]
 
 
