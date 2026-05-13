@@ -54,19 +54,40 @@ def make_azure_identity_token_provider(
 
 @dataclass
 class ManagedEndpoint:
-    """An endpoint with its client and concurrency control."""
+    """An endpoint with its client and per-model concurrency control."""
 
     config: EndpointConfig
     client: Union[AsyncOpenAI, AsyncAzureOpenAI]
-    semaphore: asyncio.Semaphore
-    active_requests: int = 0
-    total_requests: int = 0
-    failed_requests: int = 0
+    # Per-model semaphores + counters: each (endpoint, model) pair has its own
+    # concurrency cap, so e.g. dl-openai-1 can hold 40 in-flight gpt-5.4 requests
+    # while only allowing 10 in-flight gpt-5 requests.
+    model_semaphores: dict[str, asyncio.Semaphore] = field(default_factory=dict)
+    model_active: dict[str, int] = field(default_factory=dict)
+    model_total: dict[str, int] = field(default_factory=dict)
+    model_failed: dict[str, int] = field(default_factory=dict)
 
     @property
-    def load(self) -> float:
-        """Current load as fraction of max capacity."""
-        return self.active_requests / self.config.max_concurrent if self.config.max_concurrent > 0 else 0.0
+    def active_requests(self) -> int:
+        """Sum of in-flight requests across all models on this endpoint."""
+        return sum(self.model_active.values())
+
+    @property
+    def total_requests(self) -> int:
+        return sum(self.model_total.values())
+
+    @property
+    def failed_requests(self) -> int:
+        return sum(self.model_failed.values())
+
+    def load_for(self, model: str) -> float:
+        """Per-model load as fraction of that model's capacity on this endpoint."""
+        cap = self.config.get_model_capacities().get(model, self.config.max_concurrent)
+        if cap <= 0:
+            return 1.0
+        return self.model_active.get(model, 0) / cap
+
+    def capacity_for(self, model: str) -> int:
+        return self.config.get_model_capacities().get(model, self.config.max_concurrent)
 
 
 class EndpointLoadBalancer:
@@ -90,20 +111,24 @@ class EndpointLoadBalancer:
         """Create clients for all configured endpoints."""
         for ep_config in self.config.endpoints:
             client = self._create_client(ep_config)
+            capacities = ep_config.get_model_capacities()
+            model_semaphores = {m: asyncio.Semaphore(cap) for m, cap in capacities.items()}
             managed = ManagedEndpoint(
                 config=ep_config,
                 client=client,
-                semaphore=asyncio.Semaphore(ep_config.max_concurrent),
+                model_semaphores=model_semaphores,
+                model_active={m: 0 for m in capacities},
+                model_total={m: 0 for m in capacities},
+                model_failed={m: 0 for m in capacities},
             )
             self.endpoints.append(managed)
             logger.info(
                 f"Initialized endpoint '{ep_config.name}' "
-                f"(type={ep_config.type}, max_concurrent={ep_config.max_concurrent}, "
-                f"models={ep_config.supported_models})"
+                f"(type={ep_config.type}, models={capacities})"
             )
 
             # Build model -> endpoints mapping
-            for model in ep_config.supported_models:
+            for model in ep_config.model_names():
                 if model not in self._model_to_endpoints:
                     self._model_to_endpoints[model] = []
                     self._round_robin_counters[model] = 0
@@ -217,13 +242,15 @@ class EndpointLoadBalancer:
                 return endpoint
 
         elif strategy == "least_loaded":
-            # Find endpoint with lowest current load
-            return min(endpoints, key=lambda ep: ep.load)
+            # Find endpoint with lowest per-model load. With unequal per-model
+            # capacities (e.g. dl-openai-1 has 4x gpt-5.4 quota of dl-openai-3),
+            # this naturally yields traffic split proportional to those caps.
+            return min(endpoints, key=lambda ep: ep.load_for(model))
 
         elif strategy == "priority":
             # Return first available (already sorted by priority)
             for ep in endpoints:
-                if ep.active_requests < ep.config.max_concurrent:
+                if ep.model_active.get(model, 0) < ep.capacity_for(model):
                     return ep
             # All at capacity, return first (highest priority)
             return endpoints[0]
@@ -272,23 +299,30 @@ class EndpointLoadBalancer:
                 break
             tried_endpoints.add(endpoint.config.name)
 
+            sem = endpoint.model_semaphores.get(model)
+            if sem is None:
+                # Defensive: model should have been registered in init; fall through.
+                last_error = ValueError(
+                    f"Endpoint '{endpoint.config.name}' has no semaphore for model '{model}'"
+                )
+                continue
             try:
-                async with endpoint.semaphore:
-                    endpoint.active_requests += 1
+                async with sem:
+                    endpoint.model_active[model] = endpoint.model_active.get(model, 0) + 1
                     try:
                         logger.debug(
-                            f"Executing on endpoint '{endpoint.config.name}' "
-                            f"(active={endpoint.active_requests}/{endpoint.config.max_concurrent})"
+                            f"Executing '{model}' on '{endpoint.config.name}' "
+                            f"(active={endpoint.model_active[model]}/{endpoint.capacity_for(model)})"
                         )
                         result = await operation(endpoint.client, **kwargs)
-                        endpoint.total_requests += 1
+                        endpoint.model_total[model] = endpoint.model_total.get(model, 0) + 1
                         return result
                     finally:
-                        endpoint.active_requests -= 1
+                        endpoint.model_active[model] -= 1
 
             except Exception as e:
                 last_error = e
-                endpoint.failed_requests += 1
+                endpoint.model_failed[model] = endpoint.model_failed.get(model, 0) + 1
                 logger.warning(
                     f"Request failed on endpoint '{endpoint.config.name}': {e}"
                 )
@@ -305,16 +339,25 @@ class EndpointLoadBalancer:
         )
 
     def get_stats(self) -> dict[str, Any]:
-        """Get statistics for all endpoints."""
+        """Get statistics for all endpoints, including per-model breakdown."""
         return {
             ep.config.name: {
                 "type": ep.config.type,
-                "supported_models": ep.config.supported_models,
+                "model_capacities": ep.config.get_model_capacities(),
                 "max_concurrent": ep.config.max_concurrent,
                 "active_requests": ep.active_requests,
                 "total_requests": ep.total_requests,
                 "failed_requests": ep.failed_requests,
-                "load": ep.load,
+                "per_model": {
+                    m: {
+                        "capacity": ep.capacity_for(m),
+                        "active": ep.model_active.get(m, 0),
+                        "total": ep.model_total.get(m, 0),
+                        "failed": ep.model_failed.get(m, 0),
+                        "load": ep.load_for(m),
+                    }
+                    for m in ep.config.model_names()
+                },
             }
             for ep in self.endpoints
         }

@@ -41,13 +41,16 @@ endpoints:
     endpoint: "https://dl-openai-1.openai.azure.com"
     api_version: "2024-10-21"
     auth_method: "azure_cli"
-    max_concurrent: 10
+    max_concurrent: 10  # fallback for models without explicit cap below
     priority: 1
+    # Per-model concurrency caps. gpt-5.4 has 4x quota here vs dl-openai-3
+    # (10000 RPM / 1M TPM vs 2500 RPM / 250K TPM), so cap it higher; with
+    # routing_strategy=least_loaded this naturally yields a 4:1 traffic split.
     supported_models:
-      - "gpt-4o"
-      # - "gpt-4o-mini"
-      - "gpt-5"
-      - "gpt-5-mini"
+      gpt-4o: 10
+      gpt-5: 10
+      gpt-5-mini: 10
+      gpt-5.4: 40
 
   - name: "dl-openai-3"
     type: "azure"
@@ -57,14 +60,14 @@ endpoints:
     max_concurrent: 10
     priority: 1
     supported_models:
-      - "gpt-4o"
-      # - "gpt-4o-mini"
-      - "gpt-5"
-      - "gpt-5-chat"
-      - "gpt-5-mini"
-      - "gpt-5-nano"
-      - "gpt-5.2"
-      - "gpt-5.2-chat"
+      gpt-4o: 10
+      gpt-5: 10
+      gpt-5-chat: 10
+      gpt-5-mini: 10
+      gpt-5-nano: 10
+      gpt-5.2: 10
+      gpt-5.2-chat: 10
+      gpt-5.4: 10
 
   - name: "fxdata-eastus2"
     type: "azure"
@@ -99,7 +102,7 @@ endpoints:
 # - "round_robin": Fair distribution across endpoints (default)
 # - "least_loaded": Route to endpoint with lowest current load
 # - "priority": Prefer endpoints with lower priority number
-routing_strategy: "round_robin"
+routing_strategy: "least_loaded"
 
 # Try other endpoints if one fails
 fallback_enabled: true
