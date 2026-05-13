@@ -28,6 +28,7 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`paper_experiments_provenance.md`](paper_experiments_provenance.md) — `(strategy, prompt version, config)` for every paper result.
 - [`scaling_experiments.md`](scaling_experiments.md) — Recipes for sweeps / new variants / new benchmarks after Phase 3.
 - [`tau2_absorption_decision.md`](tau2_absorption_decision.md) — Whether to absorb tau2-bench/ctx_edit into this repo (recommendation: hybrid).
+- [`reports/2026-05-12_local_main_cleanup.md`](reports/2026-05-12_local_main_cleanup.md) — Backup-branch + replay cleanup of local `main` before pulling the infra refactor.
 
 ### Per-benchmark
 - [`lost_in_conversation_paper.md`](lost_in_conversation_paper.md) — LiC paper summary.
@@ -147,6 +148,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-12 | `reports/2026-05-12_local_main_cleanup.md` | Cleanup writeup: backup-branch + replay process to land the infra pull. |
 | 2026-05-12 | `archive/v12_attempt/notes.md` | v12 analyzer-prompt attempt archive + port hints for new infra. |
 | 2026-05-12 | `archive/v12_attempt/azure_jailbreak_filter_triggers.md` | Azure prompt-injection filter trip rates; archived alongside v12. |
 | 2026-05-11 | `tau2_absorption_decision.md` | Absorb-vs-federate analysis for Tau2; recommends hybrid. |
