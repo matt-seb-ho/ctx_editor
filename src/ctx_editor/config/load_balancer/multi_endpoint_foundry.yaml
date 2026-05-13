@@ -1,0 +1,63 @@
+# Multi-endpoint load balancer with Azure AI Foundry for non-OpenAI models.
+#
+# Enable with: ctx-editor load_balancer=multi_endpoint_foundry
+#
+# Routing:
+# - Azure AI Foundry (mgalley-foundry2) serves non-OpenAI models (DeepSeek, grok,
+#   Kimi, Llama, Phi, Mistral). Auth is an AAD bearer token via
+#   AzureCliCredential -> ManagedIdentityCredential, mirroring scripts/test_non_oai.py.
+# - Regular Azure OpenAI endpoints serve gpt-4o / gpt-4o-mini / gpt-5* for the
+#   user/system roles (the Foundry endpoint does not host OpenAI models).
+
+endpoints:
+  - name: "mgalley-foundry2"
+    type: "azure_foundry"
+    endpoint: "https://mgalley-foundry2.services.ai.azure.com/openai/v1/"
+    auth_method: "azure_identity"
+    max_concurrent: 10
+    priority: 1
+    supported_models:
+      - "DeepSeek-V3.2"
+      - "DeepSeek-V3.1"
+      - "DeepSeek-V3.2-Speciale"
+      - "DeepSeek-V4-Flash"
+      - "DeepSeek-R1-0528"
+      - "grok-4-1-fast-non-reasoning"
+      - "grok-4-1-fast-reasoning"
+      - "grok-4-20-non-reasoning"
+      - "grok-4-20-reasoning"
+      - "Kimi-K2.6"
+      - "Llama-3.3-70B-Instruct"
+      - "Phi-4"
+      - "Phi-4-reasoning"
+      - "Mistral-Large-3"
+
+  - name: "dl-openai-3"
+    type: "azure"
+    endpoint: "https://dl-openai-3.openai.azure.com"
+    api_version: "2024-10-21"
+    auth_method: "azure_cli"
+    max_concurrent: 10
+    priority: 1
+    supported_models:
+      - "gpt-4o"
+      - "gpt-4o-mini"
+      - "gpt-5"
+      - "gpt-5-mini"
+      - "gpt-5-nano"
+
+  - name: "fxdata-shared"
+    type: "azure"
+    endpoint: "https://fxdata-shared.openai.azure.com"
+    api_version: "2024-10-21"
+    auth_method: "azure_cli"
+    max_concurrent: 10
+    priority: 2
+    supported_models:
+      - "gpt-4o"
+      - "gpt-4o-mini"
+      - "gpt-5"
+
+routing_strategy: "round_robin"
+fallback_enabled: true
+max_retries_per_endpoint: 2

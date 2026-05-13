@@ -9,7 +9,7 @@ class EndpointConfig:
     """Configuration for a single API endpoint."""
 
     name: str
-    type: Literal["azure", "openai", "openrouter"]
+    type: Literal["azure", "openai", "openrouter", "azure_foundry"]
     supported_models: list[str]
     max_concurrent: int = 10
     priority: int = 1  # Lower = higher priority
@@ -20,7 +20,11 @@ class EndpointConfig:
     # Azure-specific
     endpoint: Optional[str] = None
     api_version: str = "2024-10-21"
-    auth_method: Literal["azure_cli", "api_key"] = "azure_cli"
+    auth_method: Literal["azure_cli", "api_key", "azure_identity"] = "azure_cli"
+
+    # Azure Foundry-specific: AAD scope to request bearer tokens for.
+    # Defaults to Cognitive Services / AI Services scope used by Foundry.
+    aad_scope: str = "https://cognitiveservices.azure.com/.default"
 
 
 @dataclass

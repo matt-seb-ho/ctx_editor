@@ -13,14 +13,20 @@ def OpenAIModelClient(
     load_balancer_config: LoadBalancerConfig | None = None,
     base_url: str | None = None,
     api_key_env: str | None = None,
+    auth_method: str = "api_key",
+    aad_scope: str = "https://cognitiveservices.azure.com/.default",
 ):
     """Get OpenAI model client (lazy import).
 
     Args:
         load_balancer_config: Optional load balancer configuration for
             multi-endpoint support.
-        base_url: Optional base URL for OpenAI-compatible APIs (e.g. OpenRouter).
-        api_key_env: Environment variable name for the API key when using base_url.
+        base_url: Optional base URL for OpenAI-compatible APIs (e.g. OpenRouter,
+            Azure AI Foundry).
+        api_key_env: Environment variable name for the API key when using base_url
+            with ``auth_method="api_key"``.
+        auth_method: ``"api_key"`` (default) or ``"azure_identity"`` (for Foundry).
+        aad_scope: AAD scope for ``auth_method="azure_identity"``.
     """
     global _openai_client_cls
     if _openai_client_cls is None:
@@ -31,6 +37,8 @@ def OpenAIModelClient(
         load_balancer_config=load_balancer_config,
         base_url=base_url,
         api_key_env=api_key_env,
+        auth_method=auth_method,
+        aad_scope=aad_scope,
     )
 
 

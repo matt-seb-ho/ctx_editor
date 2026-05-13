@@ -151,9 +151,9 @@ class RoleUsageStats:
         # reasoning_tokens would come from response if available
         if response.raw_response and "usage" in response.raw_response:
             usage = response.raw_response["usage"]
-            if "completion_tokens_details" in usage:
-                details = usage["completion_tokens_details"]
-                self.reasoning_tokens += details.get("reasoning_tokens", 0)
+            details = usage.get("completion_tokens_details")
+            if details:
+                self.reasoning_tokens += details.get("reasoning_tokens", 0) or 0
         self.cost_usd += response.total_usd
 
     def to_dict(self) -> dict[str, Any]:

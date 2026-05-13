@@ -3,6 +3,7 @@
 import asyncio
 import logging
 import os
+import time
 from dataclasses import dataclass, field
 from typing import Any, Callable, Optional, Union
 
@@ -11,6 +12,44 @@ from openai import AsyncAzureOpenAI, AsyncOpenAI
 from .endpoint_config import EndpointConfig, LoadBalancerConfig
 
 logger = logging.getLogger("ctx_editor.load_balancer")
+
+
+def make_azure_identity_token_provider(
+    scope: str = "https://cognitiveservices.azure.com/.default",
+    refresh_skew_seconds: int = 300,
+) -> Callable[[], Any]:
+    """Return an async callable that yields a cached AAD bearer token.
+
+    Mirrors the auth pattern used in scripts/test_non_oai.py: a chained
+    AzureCliCredential -> ManagedIdentityCredential. The returned callable is
+    suitable as the ``api_key`` argument to ``openai.AsyncOpenAI``, which
+    invokes it to populate the Authorization header on each request.
+    """
+    from azure.identity import (
+        AzureCliCredential,
+        ChainedTokenCredential,
+        ManagedIdentityCredential,
+    )
+
+    credential = ChainedTokenCredential(
+        AzureCliCredential(),
+        ManagedIdentityCredential(),
+    )
+
+    cache: dict[str, Any] = {"token": None, "expires_on": 0}
+    lock = asyncio.Lock()
+
+    async def _provider() -> str:
+        async with lock:
+            now = time.time()
+            if cache["token"] is None or now >= cache["expires_on"] - refresh_skew_seconds:
+                # get_token is sync; offload so we don't block the event loop.
+                access = await asyncio.to_thread(credential.get_token, scope)
+                cache["token"] = access.token
+                cache["expires_on"] = access.expires_on
+            return cache["token"]
+
+    return _provider
 
 
 @dataclass
@@ -89,6 +128,27 @@ class EndpointLoadBalancer:
                     f"env var '{config.api_key_env or 'OPENAI_API_KEY'}' not set"
                 )
             return AsyncOpenAI(api_key=api_key)
+
+        elif config.type == "azure_foundry":
+            # Azure AI Foundry exposes an OpenAI-v1 compatible endpoint at
+            # {endpoint}/openai/v1/. Auth is an AAD bearer token (the OpenAI
+            # client uses it as the api_key, becoming the Authorization header).
+            if not config.endpoint:
+                raise ValueError(
+                    f"azure_foundry endpoint '{config.name}' requires 'endpoint' to be set"
+                )
+            base_url = config.endpoint if config.endpoint.endswith("/") else config.endpoint + "/"
+            if config.auth_method == "api_key":
+                api_key = os.environ.get(config.api_key_env or "AZURE_FOUNDRY_API_KEY")
+                if not api_key:
+                    raise ValueError(
+                        f"API key not found for Azure Foundry endpoint '{config.name}': "
+                        f"env var '{config.api_key_env or 'AZURE_FOUNDRY_API_KEY'}' not set"
+                    )
+                return AsyncOpenAI(api_key=api_key, base_url=base_url)
+            # Default: AAD identity (CLI -> Managed Identity)
+            token_provider = make_azure_identity_token_provider(scope=config.aad_scope)
+            return AsyncOpenAI(api_key=token_provider, base_url=base_url)
 
         elif config.type == "openrouter":
             api_key = os.environ.get(config.api_key_env or "OPENROUTER_API_KEY")

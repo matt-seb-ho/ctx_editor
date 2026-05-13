@@ -87,6 +87,8 @@ class OpenAIModelClient(BaseModelClient):
         load_balancer_config: Optional[LoadBalancerConfig] = None,
         base_url: Optional[str] = None,
         api_key_env: Optional[str] = None,
+        auth_method: str = "api_key",
+        aad_scope: str = "https://cognitiveservices.azure.com/.default",
     ):
         """Initialize the OpenAI client.
 
@@ -94,8 +96,16 @@ class OpenAIModelClient(BaseModelClient):
             load_balancer_config: Optional load balancer configuration.
                 If provided with endpoints, enables multi-endpoint load balancing.
                 If None, uses single-endpoint mode (backward compatible).
-            base_url: Optional base URL for OpenAI-compatible APIs (e.g. OpenRouter).
-            api_key_env: Environment variable name for the API key when using base_url.
+            base_url: Optional base URL for OpenAI-compatible APIs (e.g. OpenRouter,
+                Azure AI Foundry).
+            api_key_env: Environment variable name for the API key when using base_url
+                with ``auth_method="api_key"``.
+            auth_method: Either ``"api_key"`` (default) or ``"azure_identity"``. The
+                latter is for Azure AI Foundry's OpenAI-v1 endpoint: a chained
+                AzureCliCredential -> ManagedIdentityCredential is used to fetch a
+                bearer token, refreshed on demand.
+            aad_scope: AAD scope to request bearer tokens for when using
+                ``auth_method="azure_identity"``.
         """
         self.load_balancer: Optional[EndpointLoadBalancer] = None
         self.client: Optional[Union[AsyncOpenAI, AsyncAzureOpenAI]] = None
@@ -104,13 +114,20 @@ class OpenAIModelClient(BaseModelClient):
             # Multi-endpoint mode
             self.load_balancer = EndpointLoadBalancer(load_balancer_config)
         elif base_url:
-            # Custom base URL mode (e.g. OpenRouter)
-            api_key = os.environ.get(api_key_env or "OPENAI_API_KEY")
-            if not api_key:
-                raise ValueError(
-                    f"API key not found: env var '{api_key_env or 'OPENAI_API_KEY'}' not set"
-                )
-            self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+            # Custom base URL mode (e.g. OpenRouter, Azure AI Foundry)
+            if auth_method == "azure_identity":
+                from .load_balancer import make_azure_identity_token_provider
+
+                base_url_normalized = base_url if base_url.endswith("/") else base_url + "/"
+                token_provider = make_azure_identity_token_provider(scope=aad_scope)
+                self.client = AsyncOpenAI(api_key=token_provider, base_url=base_url_normalized)
+            else:
+                api_key = os.environ.get(api_key_env or "OPENAI_API_KEY")
+                if not api_key:
+                    raise ValueError(
+                        f"API key not found: env var '{api_key_env or 'OPENAI_API_KEY'}' not set"
+                    )
+                self.client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         else:
             # Single-endpoint mode (backward compatible)
             if os.getenv("USE_AZURE_OAI", "false").lower() == "true":
