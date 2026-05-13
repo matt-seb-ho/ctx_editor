@@ -65,11 +65,11 @@ async def process_failure_turn(
     judge_model: str,
     analyzer_model: str,
     run_s15: bool,
-    memory=None,
     run_s2: bool,
     regenerate_baselines: bool,
     results_file: Path,
     rng: random.Random,
+    memory=None,
 ) -> dict | None:
     """Process a single AO failure turn with S3 (and optionally S1.5 and/or S2)."""
     turns = conversation["turns"]
@@ -144,7 +144,8 @@ async def process_failure_turn(
                 turns, turn_index, fc_response, s15_response, "fc", "s15",
                 model_client, judge_model, rng,
             )
-            result["s15_response"] = s15_response            result["s15_analysis"] = s15_analysis
+            result["s15_response"] = s15_response
+            result["s15_analysis"] = s15_analysis
             result["judgments"]["ao_vs_s15"] = {
                 "quality_winner": ao_vs_s15.quality_winner,
                 "ontopic_winner": ao_vs_s15.ontopic_winner,
@@ -173,7 +174,8 @@ async def process_failure_turn(
                 turns, turn_index, fc_response, s2_response, "fc", "s2",
                 model_client, judge_model, rng,
             )
-            result["s2_response"] = s2_response            result["s2_analysis"] = s2_analysis
+            result["s2_response"] = s2_response
+            result["s2_analysis"] = s2_analysis
             result["judgments"]["ao_vs_s2"] = {
                 "quality_winner": ao_vs_s2.quality_winner,
                 "ontopic_winner": ao_vs_s2.ontopic_winner,

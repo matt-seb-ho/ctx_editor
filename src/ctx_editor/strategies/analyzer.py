@@ -161,6 +161,14 @@ class ConversationAnalyzer:
             task_spec_version = "v8" if prompt_version in ("v9", "v11") else prompt_version
             self._task_spec_template = _load_prompt(f"analyzer_{task_spec_version}_task_spec")
             self._compare_template = _load_prompt(f"analyzer_{prompt_version}_compare")
+        elif prompt_version == "v12":
+            # Two-query analysis with markdown-only delimiters and no system-message
+            # framing in the analyzer input. Designed to avoid Azure prompt-injection
+            # content filters that fire on <system_message>/<task_spec>/<conversation>
+            # XML wrapping. Output uses header-based parsing (TASK SPECIFICATION:,
+            # ALIGNED:, ISSUES:) like s1.
+            self._task_spec_template = _load_prompt("analyzer_v12_task_spec")
+            self._compare_template = _load_prompt("analyzer_v12_compare")
         elif prompt_version == "v8_soft":
             # Soft attention ablation: two queries, but Query 1 sees full conversation
             # (user + assistant messages) instead of user messages only.
@@ -527,6 +535,110 @@ class ConversationAnalyzer:
             raw_output=f"--- S1 ANALYSIS ---\n{output}",
         )
 
+    # --- v12: two-query flow with content-filter-resilient prompts ---
+
+    async def _analyze_v12(
+        self,
+        trace: "ConversationTrace",
+        model_client: "ModelClient",
+        memory: Optional["MemoryModule"] = None,
+        spec_only: bool = False,
+        memory_target_query: str = "compare",
+        enforce_compliance: bool = False,
+    ) -> AnalysisResult:
+        """Two-query analysis preserving v6's hard-attention design but with
+        markdown delimiters and no system-message wrapping. The original system
+        message is dropped from the analyzer's input entirely (it tends to be
+        role-defining boilerplate that trips Azure's prompt-injection filter
+        when embedded in a user-role message). Output uses header sections
+        parseable by regex (TASK SPECIFICATION:, ALIGNED:, ISSUES:).
+        """
+        user_messages_str = trace.get_user_messages_string(all_unique=True)
+        # Drop the original system message from the conversation passed to
+        # the analyzer. This is the main jailbreak-filter trigger.
+        conversation_str = trace.get_conversation_string(skip_system=True)
+        conversation_str = self._strip_edit_notes(conversation_str)
+
+        spec_memory_section = ""
+        if memory and memory.content and memory_target_query in ("spec", "both"):
+            spec_memory_section = MEMORY_SECTION_TEMPLATE.format(
+                memory_content=memory.content
+            )
+
+        # Query 1: spec from user messages only
+        spec_prompt = self._task_spec_template.format_map(
+            defaultdict(str, {
+                "user_messages": user_messages_str,
+                "memory_section": spec_memory_section,
+            })
+        )
+        spec_output = await self._generate(spec_prompt, model_client)
+
+        spec_match = re.search(
+            r"TASK SPECIFICATION:\s*\n(.*?)\Z", spec_output, re.DOTALL
+        )
+        task_spec = spec_match.group(1).strip() if spec_match else spec_output.strip()
+        if not spec_match:
+            logger.warning(
+                "v12 task spec extraction: TASK SPECIFICATION: header not found, "
+                f"using raw output. Preview: {spec_output[:150]!r}"
+            )
+
+        if spec_only:
+            return AnalysisResult(
+                user_intent=task_spec,
+                aligned="",
+                issues="",
+                raw_output=f"--- V12 TASK SPEC (spec_only) ---\n{spec_output}",
+            )
+
+        compare_memory_section = ""
+        if memory and memory.content and memory_target_query in ("compare", "both"):
+            compare_memory_section = MEMORY_SECTION_TEMPLATE.format(
+                memory_content=memory.content
+            )
+        if enforce_compliance:
+            compare_memory_section += "\n" + COMPLIANCE_RULES
+
+        # Query 2: compare against the conversation
+        compare_prompt = self._compare_template.format_map(
+            defaultdict(str, {
+                "task_spec": task_spec,
+                "conversation": conversation_str,
+                "memory_section": compare_memory_section,
+            })
+        )
+        compare_output = await self._generate(compare_prompt, model_client)
+
+        aligned = ""
+        issues = ""
+        aligned_match = re.search(
+            r"ALIGNED:\s*\n(.*?)(?=\nISSUES:|\Z)", compare_output, re.DOTALL
+        )
+        if aligned_match:
+            aligned = aligned_match.group(1).strip()
+        issues_match = re.search(
+            r"ISSUES:\s*\n(.*?)\Z", compare_output, re.DOTALL
+        )
+        if issues_match:
+            issues = issues_match.group(1).strip()
+
+        if not aligned and not issues:
+            logger.warning(
+                "v12 comparison extraction: ALIGNED:/ISSUES: headers not found. "
+                f"Output preview: {compare_output[:200]!r}"
+            )
+
+        return AnalysisResult(
+            user_intent=task_spec,
+            aligned=aligned,
+            issues=issues,
+            raw_output=(
+                f"--- V12 TASK SPEC ---\n{spec_output}\n\n"
+                f"--- V12 COMPARE ---\n{compare_output}"
+            ),
+        )
+
     # --- single-query flow (v4, v5) ---
 
     async def _analyze_single(
@@ -577,6 +689,12 @@ class ConversationAnalyzer:
         """
         if self.prompt_version in ("v6", "v7", "v8", "v9", "v11"):
             return await self._analyze_v6(
+                trace, model_client, memory, spec_only=spec_only,
+                memory_target_query=memory_target_query,
+                enforce_compliance=enforce_compliance,
+            )
+        if self.prompt_version == "v12":
+            return await self._analyze_v12(
                 trace, model_client, memory, spec_only=spec_only,
                 memory_target_query=memory_target_query,
                 enforce_compliance=enforce_compliance,
