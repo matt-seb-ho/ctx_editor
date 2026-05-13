@@ -118,8 +118,8 @@ async def process_failure_turn(
             "turn_index": turn_index,
             "turn_type": turn_type,
             "user_message": turns[turn_index]["content"][:500],
-            "ao_response": ao_response[:1000],
-            "fc_response": fc_response[:1000],
+            "ao_response": ao_response,
+            "fc_response": fc_response,
             "judgments": {},
             "timestamp": datetime.now().isoformat(),
         }
@@ -136,7 +136,7 @@ async def process_failure_turn(
                 judge_pairwise(turns, turn_index, fc_response, s3_response, "fc", "s3",
                                model_client, judge_model, rng),
             )
-            result["s3_response"] = s3_response[:1000]
+            result["s3_response"] = s3_response
             result["s3_analysis"] = s3_analysis
             result["judgments"]["ao_vs_s3"] = _judgment_dict(ao_vs_s3)
             result["judgments"]["fc_vs_s3"] = _judgment_dict(fc_vs_s3)
@@ -154,7 +154,7 @@ async def process_failure_turn(
                 judge_pairwise(turns, turn_index, fc_response, s15_response, "fc", "s15",
                                model_client, judge_model, rng),
             )
-            result["s15_response"] = s15_response[:1000]
+            result["s15_response"] = s15_response
             result["s15_analysis"] = s15_analysis
             result["judgments"]["ao_vs_s15"] = _judgment_dict(ao_vs_s15)
             result["judgments"]["fc_vs_s15"] = _judgment_dict(fc_vs_s15)
@@ -172,7 +172,7 @@ async def process_failure_turn(
                 judge_pairwise(turns, turn_index, fc_response, s2_response, "fc", "s2",
                                model_client, judge_model, rng),
             )
-            result["s2_response"] = s2_response[:1000]
+            result["s2_response"] = s2_response
             result["s2_analysis"] = s2_analysis
             result["judgments"]["ao_vs_s2"] = _judgment_dict(ao_vs_s2)
             result["judgments"]["fc_vs_s2"] = _judgment_dict(fc_vs_s2)
@@ -190,7 +190,7 @@ async def process_failure_turn(
                 judge_pairwise(turns, turn_index, fc_response, augment_response, "fc", "augment",
                                model_client, judge_model, rng),
             )
-            result["augment_response"] = augment_response[:1000]
+            result["augment_response"] = augment_response
             result["augment_analysis"] = augment_analysis
             result["judgments"]["ao_vs_augment"] = _judgment_dict(ao_vs_aug)
             result["judgments"]["fc_vs_augment"] = _judgment_dict(fc_vs_aug)

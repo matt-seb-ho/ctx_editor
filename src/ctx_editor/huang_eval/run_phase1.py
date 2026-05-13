@@ -95,8 +95,8 @@ async def process_conversation(
                     "confidence": classification.confidence,
                 },
                 "user_message": turns[turn_idx]["content"][:500],
-                "fc_response": fc_response[:1000],
-                "ao_response": ao_response[:1000],
+                "fc_response": fc_response,
+                "ao_response": ao_response,
                 "judgments": {
                     "fc_vs_ao": {
                         "quality_winner": judgment.quality_winner,
