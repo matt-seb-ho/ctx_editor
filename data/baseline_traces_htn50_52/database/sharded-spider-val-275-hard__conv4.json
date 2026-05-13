@@ -1,0 +1,181 @@
+{
+  "sample_id": "sharded-spider-val-275-hard",
+  "task_name": "database",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 00:12:03",
+  "lic_conv_id": "6997ed23175c5382b0944d68",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are helping a user write SQL queries to a database. If something is not clear, you can ask the user to clarify what they need. The schema for the database being accessed is the following:\n        \nCREATE TABLE employee (\n    Employee_ID INT   PRIMARY KEY,\n    Name TEXT,\n    Age INT,\n    City TEXT,\n    UNIQUE (Employee_ID)\n);\n\nCREATE TABLE shop (\n    Shop_ID INT   PRIMARY KEY,\n    Name TEXT,\n    Location TEXT,\n    District TEXT,\n    Number_products INT,\n    Manager_name TEXT,\n    UNIQUE (Shop_ID)\n);\n\nCREATE TABLE hiring (\n    Shop_ID INT,\n    Employee_ID INT   PRIMARY KEY,\n    Start_from TEXT,\n    Is_full_time bool,\n    UNIQUE (Employee_ID),\n    FOREIGN KEY (Employee_ID) REFERENCES employee(Employee_ID),\n    FOREIGN KEY (Shop_ID) REFERENCES shop(Shop_ID)\n);\n\nCREATE TABLE evaluation (\n    Employee_ID TEXT   PRIMARY KEY,\n    Year_awarded TEXT   PRIMARY KEY,\n    Bonus REAL,\n    PRIMARY KEY (Employee_ID, Year_awarded),\n    UNIQUE (Employee_ID, Year_awarded),\n    FOREIGN KEY (Employee_ID) REFERENCES employee(Employee_ID)\n);",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "stores with many products",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\n-- Stores with a high number of products (most products first)\nSELECT\n  Shop_ID,\n  Name,\n  Location,\n  District,\n  Number_products\nFROM shop\nORDER BY Number_products DESC;\n```\n\nIf you mean \u201cmany\u201d as in \u201cabove a threshold\u201d, tell me the cutoff (e.g., > 1000) and I\u2019ll adapt it.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "many means having more than some specific number",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\n-- Replace :min_products with your specific number (e.g., 1000)\nSELECT\n  Shop_ID,\n  Name,\n  Location,\n  District,\n  Number_products\nFROM shop\nWHERE Number_products > :min_products\nORDER BY Number_products DESC;\n```\n\nIf you tell me the exact number, I can plug it in directly.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "a lot of products means more than the average across all stores",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT\n  Shop_ID,\n  Name,\n  Location,\n  District,\n  Number_products\nFROM shop\nWHERE Number_products > (SELECT AVG(Number_products) FROM shop)\nORDER BY Number_products DESC;\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "also need the store names that have many products",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT\n  Name\nFROM shop\nWHERE Number_products > (SELECT AVG(Number_products) FROM shop)\nORDER BY Number_products DESC, Name;\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "stores focus on how many products they have",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\n-- Each store, focusing on product counts (and how it compares to the average)\nSELECT\n  Shop_ID,\n  Name,\n  Number_products,\n  (SELECT AVG(Number_products) FROM shop) AS avg_products,\n  Number_products - (SELECT AVG(Number_products) FROM shop) AS above_avg_by\nFROM shop\nORDER BY Number_products DESC, Name;\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  Shop_ID,\n  Name,\n  Location,\n  District,\n  Number_products\nFROM shop\nORDER BY Number_products DESC;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  Shop_ID,\n  Name,\n  Location,\n  District,\n  Number_products\nFROM shop\nWHERE Number_products > :min_products\nORDER BY Number_products DESC;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  Shop_ID,\n  Name,\n  Location,\n  District,\n  Number_products\nFROM shop\nWHERE Number_products > (SELECT AVG(Number_products) FROM shop)\nORDER BY Number_products DESC;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  Name\nFROM shop\nWHERE Number_products > (SELECT AVG(Number_products) FROM shop)\nORDER BY Number_products DESC, Name;",
+          "is_correct": null,
+          "score": 1.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  Shop_ID,\n  Name,\n  Number_products,\n  (SELECT AVG(Number_products) FROM shop) AS avg_products,\n  Number_products - (SELECT AVG(Number_products) FROM shop) AS above_avg_by\nFROM shop\nORDER BY Number_products DESC, Name;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

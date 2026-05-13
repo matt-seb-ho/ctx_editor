@@ -1,0 +1,305 @@
+{
+  "sample_id": "sharded-livecodebench/2866",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 20:09:39",
+  "lic_conv_id": "6997b457175c5393aef16d49",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "longest subarray meeting conditions?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr=None, k=None, conditions=None):\n    \"\"\"\n    Longest subarray meeting conditions (common patterns supported).\n\n    Usage patterns:\n    1) Longest subarray with sum <= k (non-negative numbers only):\n        longest_subarray_meeting_conditions(arr, k, \"sum_leq_k_nonneg\")\n\n    2) Longest subarray with sum == k (any integers):\n        longest_subarray_meeting_conditions(arr, k, \"sum_eq_k\")\n\n    3) Longest subarray where max - min <= k (any numbers):\n        longest_subarray_meeting_conditions(arr, k, \"max_minus_min_leq_k\")\n\n    Returns: (best_len, (l, r)) where l..r is inclusive; if best_len==0 -> (0, (-1,-1))\n\n    If called with no args, returns a dictionary of ready-to-use solvers (each is a function).\n    \"\"\"\n    # If no args: expose solver functions in a single top-level function as requested.\n    if arr is None and k is None and conditions is None:\n        def sum_leq_k_nonneg(a, kk):\n            n = len(a)\n            l = 0\n            s = 0\n            best_len = 0\n            best_lr = (-1, -1)\n            for r, x in enumerate(a):\n                s += x\n                while l <= r and s > kk:\n                    s -= a[l]\n                    l += 1\n                if r - l + 1 > best_len:\n                    best_len = r - l + 1\n                    best_lr = (l, r)\n            return best_len, best_lr\n\n        def sum_eq_k(a, kk):\n            pref = 0\n            first = {0: -1}  # prefix sum -> earliest index\n            best_len = 0\n            best_lr = (-1, -1)\n            for i, x in enumerate(a):\n                pref += x\n                need = pref - kk\n                if need in first:\n                    l = first[need] + 1\n                    if i - l + 1 > best_len:\n                        best_len = i - l + 1\n                        best_lr = (l, i)\n                if pref not in first:\n                    first[pref] = i\n            return best_len, best_lr\n\n        def max_minus_min_leq_k(a, kk):\n            # Monotonic deques implemented with lists + head indices (no extra top-level funcs).\n            n = len(a)\n            minq, maxq = [], []\n            hmin = hmax = 0\n            l = 0\n            best_len = 0\n            best_lr = (-1, -1)\n\n            for r, x in enumerate(a):\n                while len(minq) > hmin and a[minq[-1]] > x:\n                    minq.pop()\n                minq.append(r)\n                while len(maxq) > hmax and a[maxq[-1]] < x:\n                    maxq.pop()\n                maxq.append(r)\n\n                while l <= r and a[maxq[hmax]] - a[minq[hmin]] > kk:\n                    l += 1\n                    if minq[hmin] < l:\n                        hmin += 1\n                    if maxq[hmax] < l:\n                        hmax += 1\n\n                if r - l + 1 > best_len:\n                    best_len = r - l + 1\n                    best_lr = (l, r)\n\n                # Optional cleanup to keep memory bounded\n                if hmin > 64 and hmin * 2 > len(minq):\n                    minq = minq[hmin:]\n                    hmin = 0\n                if hmax > 64 and hmax * 2 > len(maxq):\n                    maxq = maxq[hmax:]\n                    hmax = 0\n\n            return best_len, best_lr\n\n        return {\n            \"sum_leq_k_nonneg\": sum_leq_k_nonneg,\n            \"sum_eq_k\": sum_eq_k,\n            \"max_minus_min_leq_k\": max_minus_min_leq_k,\n        }\n\n    # Normal call path: pick a supported condition and solve.\n    if conditions is None:\n        raise ValueError(\"Provide 'conditions' (e.g., 'sum_eq_k', 'sum_leq_k_nonneg', 'max_minus_min_leq_k').\")\n\n    solvers = longest_subarray_meeting_conditions()\n    if conditions not in solvers:\n        raise ValueError(f\"Unknown conditions={conditions!r}. Supported: {sorted(solvers)}\")\n\n    return solvers[conditions](arr, k)\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the subarray should start with an even number",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, k=None, conditions=\"start_even\"):\n    \"\"\"\n    Longest subarray whose first element is even.\n\n    Returns: (best_len, (l, r)) with inclusive indices; if none -> (0, (-1, -1)).\n\n    Notes:\n    - With only the constraint \"start even\", the longest valid subarray starts at the\n      earliest even index and ends at the end of the array.\n    - If you also want an additional constraint, pass:\n        conditions=\"start_even_and_sum_eq_k\"\n        conditions=\"start_even_and_sum_leq_k_nonneg\"\n        conditions=\"start_even_and_max_minus_min_leq_k\"\n      and provide k.\n    \"\"\"\n    n = len(arr)\n\n    def earliest_even_start():\n        for i, x in enumerate(arr):\n            if x % 2 == 0:\n                return i\n        return -1\n\n    if conditions == \"start_even\":\n        l = earliest_even_start()\n        if l == -1:\n            return 0, (-1, -1)\n        return n - l, (l, n - 1)\n\n    # ---- Combined constraints below (optional) ----\n    if k is None:\n        raise ValueError(\"k must be provided for combined constraints.\")\n\n    if conditions == \"start_even_and_sum_eq_k\":\n        best_len = 0\n        best_lr = (-1, -1)\n        # prefix sums per starting point parity constraint (O(n) using map of prefix sums,\n        # but we must restrict starts to even elements; we do this by inserting prefix\n        # sums at positions i where arr[i] is even as potential starts.)\n        # Let prefix P[j] = sum(arr[:j]) (P[0]=0). Sum(i..r)=P[r+1]-P[i].\n        pref = 0\n        P = [0] * (n + 1)\n        for i, x in enumerate(arr):\n            pref += x\n            P[i + 1] = pref\n\n        # For each r, need P[i] = P[r+1]-k with i being a valid start (arr[i] even).\n        # Store earliest i for each P[i] among valid starts.\n        first = {}\n        for r in range(n):\n            # Add start candidate i=r if arr[r] even BEFORE querying for subarrays ending at >= r\n            # But for subarray ending at r, starts i can be <= r. So add i=r after query? Actually i=r is allowed.\n            # We'll add i=r before querying at r to allow length 1.\n            if arr[r] % 2 == 0:\n                val = P[r]\n                if val not in first:\n                    first[val] = r\n\n            need = P[r + 1] - k\n            if need in first:\n                l = first[need]\n                if l <= r:\n                    length = r - l + 1\n                    if length > best_len:\n                        best_len = length\n                        best_lr = (l, r)\n\n        return best_len, best_lr\n\n    if conditions == \"start_even_and_sum_leq_k_nonneg\":\n        # Non-negative required for sliding window correctness.\n        l = 0\n        while l < n and arr[l] % 2 != 0:\n            l += 1\n        if l == n:\n            return 0, (-1, -1)\n\n        s = 0\n        best_len = 0\n        best_lr = (-1, -1)\n        for r in range(l, n):\n            s += arr[r]\n            while l <= r and (s > k or (arr[l] % 2 != 0)):\n                s -= arr[l]\n                l += 1\n                while l <= r and arr[l] % 2 != 0:\n                    l += 1  # ensure start even\n            if l <= r and arr[l] % 2 == 0:\n                length = r - l + 1\n                if length > best_len:\n                    best_len = length\n                    best_lr = (l, r)\n        return best_len, best_lr\n\n    if conditions == \"start_even_and_max_minus_min_leq_k\":\n        # Monotonic deques with start-even enforcement by advancing l to next even.\n        minq, maxq = [], []\n        hmin = hmax = 0\n\n        l = 0\n        while l < n and arr[l] % 2 != 0:\n            l += 1\n        if l == n:\n            return 0, (-1, -1)\n\n        best_len = 0\n        best_lr = (-1, -1)\n\n        for r in range(l, n):\n            x = arr[r]\n            while len(minq) > hmin and arr[minq[-1]] > x:\n                minq.pop()\n            minq.append(r)\n            while len(maxq) > hmax and arr[maxq[-1]] < x:\n                maxq.pop()\n            maxq.append(r)\n\n            while l <= r and (arr[maxq[hmax]] - arr[minq[hmin]] > k or (arr[l] % 2 != 0)):\n                l += 1\n                while l <= r and arr[l] % 2 != 0:\n                    l += 1\n                if hmin < len(minq) and minq[hmin] < l:\n                    while hmin < len(minq) and minq[hmin] < l:\n                        hmin += 1\n                if hmax < len(maxq) and maxq[hmax] < l:\n                    while hmax < len(maxq) and maxq[hmax] < l:\n                        hmax += 1\n\n            if l <= r and arr[l] % 2 == 0:\n                length = r - l + 1\n                if length > best_len:\n                    best_len = length\n                    best_lr = (l, r)\n\n            if hmin > 64 and hmin * 2 > len(minq):\n                minq = minq[hmin:]\n                hmin = 0\n            if hmax > 64 and hmax * 2 > len(maxq):\n                maxq = maxq[hmax:]\n                hmax = 0\n\n        return best_len, best_lr\n\n    raise ValueError(\n        f\"Unknown conditions={conditions!r}. Supported: \"\n        \"'start_even', 'start_even_and_sum_eq_k', 'start_even_and_sum_leq_k_nonneg', \"\n        \"'start_even_and_max_minus_min_leq_k'\"\n    )\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the numbers in the subarray should alternate between even and odd.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, start_parity=None):\n    \"\"\"\n    Longest contiguous subarray whose elements strictly alternate parity (even/odd/even/odd...).\n\n    Args:\n      arr: list of integers\n      start_parity: optional, force starting parity:\n        - None: no restriction\n        - 0: must start even\n        - 1: must start odd\n\n    Returns:\n      (best_len, (l, r)) inclusive indices; if none -> (0, (-1, -1))\n    \"\"\"\n    n = len(arr)\n    if n == 0:\n        return 0, (-1, -1)\n\n    best_len = 0\n    best_lr = (-1, -1)\n\n    l = 0\n    # enforce starting parity if requested\n    if start_parity is not None:\n        while l < n and (arr[l] & 1) != (start_parity & 1):\n            l += 1\n        if l == n:\n            return 0, (-1, -1)\n\n    cur_l = l\n    prev_par = arr[l] & 1\n    best_len = 1\n    best_lr = (l, l)\n\n    for r in range(l + 1, n):\n        p = arr[r] & 1\n        if p != prev_par:\n            # still alternating\n            prev_par = p\n        else:\n            # break in alternation; new segment must start at r (or earlier if start_parity forbids)\n            cur_l = r\n            prev_par = p\n\n        # If starting parity is constrained, ensure cur_l respects it by moving forward as needed\n        if start_parity is not None and (arr[cur_l] & 1) != (start_parity & 1):\n            # only possible fix is to start at next index (which is r if cur_l==r; otherwise shift to r)\n            cur_l = r\n            # if still doesn't match, keep advancing until it does (rare, but safe)\n            while cur_l < n and (arr[cur_l] & 1) != (start_parity & 1):\n                cur_l += 1\n            if cur_l >= n:\n                break\n            prev_par = arr[cur_l] & 1\n            # reset r to at least cur_l by rebuilding state: simplest is to restart scan from cur_l\n            # but we must keep single function; do it with a small local loop.\n            rr = cur_l + 1\n            while rr < n:\n                pp = arr[rr] & 1\n                if pp == prev_par:\n                    break\n                prev_par = pp\n                length = rr - cur_l + 1\n                if length > best_len:\n                    best_len = length\n                    best_lr = (cur_l, rr)\n                rr += 1\n            # continue outer loop from rr-1 because state already advanced\n            if rr >= n:\n                return best_len, best_lr\n            # set up for outer loop to continue at rr\n            # We have a break at rr where parity repeats, so next segment starts at rr.\n            cur_l = rr\n            prev_par = arr[rr] & 1\n            continue\n\n        length = r - cur_l + 1\n        if length > best_len:\n            best_len = length\n            best_lr = (cur_l, r)\n\n    return best_len, best_lr\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the numbers also have to be less than or equal to a certain threshold",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, threshold, start_parity=None):\n    \"\"\"\n    Longest contiguous subarray such that:\n      1) Every element <= threshold\n      2) Parities strictly alternate (even/odd/even/odd...)\n      3) Optional: the subarray must start with a given parity:\n           start_parity=None (no restriction), 0 (even), 1 (odd)\n\n    Returns: (best_len, (l, r)) inclusive indices; if none -> (0, (-1, -1))\n    \"\"\"\n    n = len(arr)\n    best_len = 0\n    best_lr = (-1, -1)\n\n    # Current valid alternating segment start and previous parity\n    cur_l = None\n    prev_par = None\n\n    for i, x in enumerate(arr):\n        if x > threshold:\n            # barrier: cannot include this element\n            cur_l = None\n            prev_par = None\n            continue\n\n        p = x & 1\n\n        if cur_l is None:\n            # start new segment at i if allowed by start_parity\n            if start_parity is None or p == (start_parity & 1):\n                cur_l = i\n                prev_par = p\n                if best_len < 1:\n                    best_len = 1\n                    best_lr = (i, i)\n            else:\n                # can't start here due to starting parity restriction\n                cur_l = None\n                prev_par = None\n            continue\n\n        # We have an active segment. If alternating holds, extend; else restart at i (if allowed).\n        if p != prev_par:\n            prev_par = p\n            length = i - cur_l + 1\n            if length > best_len:\n                best_len = length\n                best_lr = (cur_l, i)\n        else:\n            # alternation break: best possible segment ending at i starts at i (length 1)\n            if start_parity is None or p == (start_parity & 1):\n                cur_l = i\n                prev_par = p\n                if best_len < 1:\n                    best_len = 1\n                    best_lr = (i, i)\n            else:\n                cur_l = None\n                prev_par = None\n\n    return best_len, best_lr\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the output should be the length of the longest subarray that fits",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, threshold, start_parity=None):\n    \"\"\"\n    Return the length of the longest contiguous subarray such that:\n      - every element <= threshold\n      - parities strictly alternate\n      - optional: subarray must start with parity start_parity (0 even, 1 odd)\n\n    If no valid element exists, returns 0.\n    \"\"\"\n    best = 0\n    cur_len = 0\n    prev_par = None\n    active = False  # whether we have an active valid segment\n\n    for x in arr:\n        if x > threshold:\n            active = False\n            cur_len = 0\n            prev_par = None\n            continue\n\n        p = x & 1\n\n        if not active:\n            if start_parity is None or p == (start_parity & 1):\n                active = True\n                cur_len = 1\n                prev_par = p\n                if best < 1:\n                    best = 1\n            else:\n                # can't start here due to starting parity restriction\n                continue\n        else:\n            if p != prev_par:\n                cur_len += 1\n                prev_par = p\n                if cur_len > best:\n                    best = cur_len\n            else:\n                # alternation breaks; restart at this element if allowed\n                if start_parity is None or p == (start_parity & 1):\n                    cur_len = 1\n                    prev_par = p\n                    active = True\n                    if best < 1:\n                        best = 1\n                else:\n                    active = False\n                    cur_len = 0\n                    prev_par = None\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the setup gives you an array and a threshold number",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, threshold):\n    \"\"\"\n    Given an array and a threshold, return the length of the longest contiguous subarray\n    where:\n      - every element <= threshold\n      - elements alternate parity (even/odd/even/odd... or odd/even/odd/even...)\n    \"\"\"\n    best = 0\n    cur = 0\n    prev_par = None\n\n    for x in arr:\n        if x > threshold:\n            cur = 0\n            prev_par = None\n            continue\n\n        p = x & 1\n        if cur == 0:\n            cur = 1\n            prev_par = p\n        else:\n            if p != prev_par:\n                cur += 1\n                prev_par = p\n            else:\n                # restart at current element (still <= threshold)\n                cur = 1\n                prev_par = p\n\n        if cur > best:\n            best = cur\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Just to clarify, the input is an array and a number that serves as a threshold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, threshold):\n    best = 0\n    cur = 0\n    prev_parity = 0  # only meaningful when cur > 0\n\n    for x in arr:\n        if x > threshold:\n            cur = 0\n            continue\n\n        p = x & 1\n        if cur == 0:\n            cur = 1\n        else:\n            if p != prev_parity:\n                cur += 1\n            else:\n                cur = 1\n        prev_parity = p\n        if cur > best:\n            best = cur\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the array can be up to 100 in length",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, threshold):\n    # O(n) time, O(1) space; works for n up to 100 (and far beyond).\n    best = 0\n    cur = 0\n    prev_parity = 0  # valid only when cur > 0\n\n    for x in arr:\n        if x > threshold:\n            cur = 0\n            continue\n\n        p = x & 1\n        if cur == 0:\n            cur = 1\n        else:\n            cur = cur + 1 if p != prev_parity else 1\n\n        prev_parity = p\n        if cur > best:\n            best = cur\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "an example would be for the array [3,2,5,4] and a threshold of 5, the longest subarray length that fits the conditions is 3.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, threshold):\n    best = 0\n    cur = 0\n    prev_parity = 0  # only used when cur > 0\n\n    for x in arr:\n        if x > threshold:\n            cur = 0\n            continue\n\n        p = x & 1\n        if cur == 0:\n            cur = 1\n        else:\n            cur = cur + 1 if p != prev_parity else 1\n\n        prev_parity = p\n        if cur > best:\n            best = cur\n\n    return best\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr=None, k=None, conditions=None):\n    \"\"\"\n    Longest subarray meeting conditions (common patterns supported).\n\n    Usage patterns:\n    1) Longest subarray with sum <= k (non-negative numbers only):\n        longest_subarray_meeting_conditions(arr, k, \"sum_leq_k_nonneg\")\n\n    2) Longest subarray with sum == k (any integers):\n        longest_subarray_meeting_conditions(arr, k, \"sum_eq_k\")\n\n    3) Longest subarray where max - min <= k (any numbers):\n        longest_subarray_meeting_conditions(arr, k, \"max_minus_min_leq_k\")\n\n    Returns: (best_len, (l, r)) where l..r is inclusive; if best_len==0 -> (0, (-1,-1))\n\n    If called with no args, returns a dictionary of ready-to-use solvers (each is a function).\n    \"\"\"\n    # If no args: expose solver functions in a single top-level function as requested.\n    if arr is None and k is None and conditions is None:\n        def sum_leq_k_nonneg(a, kk):\n            n = len(a)\n            l = 0\n            s = 0\n            best_len = 0\n            best_lr = (-1, -1)\n            for r, x in enumerate(a):\n                s += x\n                while l <= r and s > kk:\n                    s -= a[l]\n                    l += 1\n                if r - l + 1 > best_len:\n                    best_len = r - l + 1\n                    best_lr = (l, r)\n            return best_len, best_lr\n\n        def sum_eq_k(a, kk):\n            pref = 0\n            first = {0: -1}  # prefix sum -> earliest index\n            best_len = 0\n            best_lr = (-1, -1)\n            for i, x in enumerate(a):\n                pref += x\n                need = pref - kk\n                if need in first:\n                    l = first[need] + 1\n                    if i - l + 1 > best_len:\n                        best_len = i - l + 1\n                        best_lr = (l, i)\n                if pref not in first:\n                    first[pref] = i\n            return best_len, best_lr\n\n        def max_minus_min_leq_k(a, kk):\n            # Monotonic deques implemented with lists + head indices (no extra top-level funcs).\n            n = len(a)\n            minq, maxq = [], []\n            hmin = hmax = 0\n            l = 0\n            best_len = 0\n            best_lr = (-1, -1)\n\n            for r, x in enumerate(a):\n                while len(minq) > hmin and a[minq[-1]] > x:\n                    minq.pop()\n                minq.append(r)\n                while len(maxq) > hmax and a[maxq[-1]] < x:\n                    maxq.pop()\n                maxq.append(r)\n\n                while l <= r and a[maxq[hmax]] - a[minq[hmin]] > kk:\n                    l += 1\n                    if minq[hmin] < l:\n                        hmin += 1\n                    if maxq[hmax] < l:\n                        hmax += 1\n\n                if r - l + 1 > best_len:\n                    best_len = r - l + 1\n                    best_lr = (l, r)\n\n                # Optional cleanup to keep memory bounded\n                if hmin > 64 and hmin * 2 > len(minq):\n                    minq = minq[hmin:]\n                    hmin = 0\n                if hmax > 64 and hmax * 2 > len(maxq):\n                    maxq = maxq[hmax:]\n                    hmax = 0\n\n            return best_len, best_lr\n\n        return {\n            \"sum_leq_k_nonneg\": sum_leq_k_nonneg,\n            \"sum_eq_k\": sum_eq_k,\n            \"max_minus_min_leq_k\": max_minus_min_leq_k,\n        }\n\n    # Normal call path: pick a supported condition and solve.\n    if conditions is None:\n        raise ValueError(\"Provide 'conditions' (e.g., 'sum_eq_k', 'sum_leq_k_nonneg', 'max_minus_min_leq_k').\")\n\n    solvers = longest_subarray_meeting_conditions()\n    if conditions not in solvers:\n        raise ValueError(f\"Unknown conditions={conditions!r}. Supported: {sorted(solvers)}\")\n\n    return solvers[conditions](arr, k)",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, k=None, conditions=\"start_even\"):\n    \"\"\"\n    Longest subarray whose first element is even.\n\n    Returns: (best_len, (l, r)) with inclusive indices; if none -> (0, (-1, -1)).\n\n    Notes:\n    - With only the constraint \"start even\", the longest valid subarray starts at the\n      earliest even index and ends at the end of the array.\n    - If you also want an additional constraint, pass:\n        conditions=\"start_even_and_sum_eq_k\"\n        conditions=\"start_even_and_sum_leq_k_nonneg\"\n        conditions=\"start_even_and_max_minus_min_leq_k\"\n      and provide k.\n    \"\"\"\n    n = len(arr)\n\n    def earliest_even_start():\n        for i, x in enumerate(arr):\n            if x % 2 == 0:\n                return i\n        return -1\n\n    if conditions == \"start_even\":\n        l = earliest_even_start()\n        if l == -1:\n            return 0, (-1, -1)\n        return n - l, (l, n - 1)\n\n    # ---- Combined constraints below (optional) ----\n    if k is None:\n        raise ValueError(\"k must be provided for combined constraints.\")\n\n    if conditions == \"start_even_and_sum_eq_k\":\n        best_len = 0\n        best_lr = (-1, -1)\n        # prefix sums per starting point parity constraint (O(n) using map of prefix sums,\n        # but we must restrict starts to even elements; we do this by inserting prefix\n        # sums at positions i where arr[i] is even as potential starts.)\n        # Let prefix P[j] = sum(arr[:j]) (P[0]=0). Sum(i..r)=P[r+1]-P[i].\n        pref = 0\n        P = [0] * (n + 1)\n        for i, x in enumerate(arr):\n            pref += x\n            P[i + 1] = pref\n\n        # For each r, need P[i] = P[r+1]-k with i being a valid start (arr[i] even).\n        # Store earliest i for each P[i] among valid starts.\n        first = {}\n        for r in range(n):\n            # Add start candidate i=r if arr[r] even BEFORE querying for subarrays ending at >= r\n            # But for subarray ending at r, starts i can be <= r. So add i=r after query? Actually i=r is allowed.\n            # We'll add i=r before querying at r to allow length 1.\n            if arr[r] % 2 == 0:\n                val = P[r]\n                if val not in first:\n                    first[val] = r\n\n            need = P[r + 1] - k\n            if need in first:\n                l = first[need]\n                if l <= r:\n                    length = r - l + 1\n                    if length > best_len:\n                        best_len = length\n                        best_lr = (l, r)\n\n        return best_len, best_lr\n\n    if conditions == \"start_even_and_sum_leq_k_nonneg\":\n        # Non-negative required for sliding window correctness.\n        l = 0\n        while l < n and arr[l] % 2 != 0:\n            l += 1\n        if l == n:\n            return 0, (-1, -1)\n\n        s = 0\n        best_len = 0\n        best_lr = (-1, -1)\n        for r in range(l, n):\n            s += arr[r]\n            while l <= r and (s > k or (arr[l] % 2 != 0)):\n                s -= arr[l]\n                l += 1\n                while l <= r and arr[l] % 2 != 0:\n                    l += 1  # ensure start even\n            if l <= r and arr[l] % 2 == 0:\n                length = r - l + 1\n                if length > best_len:\n                    best_len = length\n                    best_lr = (l, r)\n        return best_len, best_lr\n\n    if conditions == \"start_even_and_max_minus_min_leq_k\":\n        # Monotonic deques with start-even enforcement by advancing l to next even.\n        minq, maxq = [], []\n        hmin = hmax = 0\n\n        l = 0\n        while l < n and arr[l] % 2 != 0:\n            l += 1\n        if l == n:\n            return 0, (-1, -1)\n\n        best_len = 0\n        best_lr = (-1, -1)\n\n        for r in range(l, n):\n            x = arr[r]\n            while len(minq) > hmin and arr[minq[-1]] > x:\n                minq.pop()\n            minq.append(r)\n            while len(maxq) > hmax and arr[maxq[-1]] < x:\n                maxq.pop()\n            maxq.append(r)\n\n            while l <= r and (arr[maxq[hmax]] - arr[minq[hmin]] > k or (arr[l] % 2 != 0)):\n                l += 1\n                while l <= r and arr[l] % 2 != 0:\n                    l += 1\n                if hmin < len(minq) and minq[hmin] < l:\n                    while hmin < len(minq) and minq[hmin] < l:\n                        hmin += 1\n                if hmax < len(maxq) and maxq[hmax] < l:\n                    while hmax < len(maxq) and maxq[hmax] < l:\n                        hmax += 1\n\n            if l <= r and arr[l] % 2 == 0:\n                length = r - l + 1\n                if length > best_len:\n                    best_len = length\n                    best_lr = (l, r)\n\n            if hmin > 64 and hmin * 2 > len(minq):\n                minq = minq[hmin:]\n                hmin = 0\n            if hmax > 64 and hmax * 2 > len(maxq):\n                maxq = maxq[hmax:]\n                hmax = 0\n\n        return best_len, best_lr\n\n    raise ValueError(\n        f\"Unknown conditions={conditions!r}. Supported: \"\n        \"'start_even', 'start_even_and_sum_eq_k', 'start_even_and_sum_leq_k_nonneg', \"\n        \"'start_even_and_max_minus_min_leq_k'\"\n    )",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, start_parity=None):\n    \"\"\"\n    Longest contiguous subarray whose elements strictly alternate parity (even/odd/even/odd...).\n\n    Args:\n      arr: list of integers\n      start_parity: optional, force starting parity:\n        - None: no restriction\n        - 0: must start even\n        - 1: must start odd\n\n    Returns:\n      (best_len, (l, r)) inclusive indices; if none -> (0, (-1, -1))\n    \"\"\"\n    n = len(arr)\n    if n == 0:\n        return 0, (-1, -1)\n\n    best_len = 0\n    best_lr = (-1, -1)\n\n    l = 0\n    # enforce starting parity if requested\n    if start_parity is not None:\n        while l < n and (arr[l] & 1) != (start_parity & 1):\n            l += 1\n        if l == n:\n            return 0, (-1, -1)\n\n    cur_l = l\n    prev_par = arr[l] & 1\n    best_len = 1\n    best_lr = (l, l)\n\n    for r in range(l + 1, n):\n        p = arr[r] & 1\n        if p != prev_par:\n            # still alternating\n            prev_par = p\n        else:\n            # break in alternation; new segment must start at r (or earlier if start_parity forbids)\n            cur_l = r\n            prev_par = p\n\n        # If starting parity is constrained, ensure cur_l respects it by moving forward as needed\n        if start_parity is not None and (arr[cur_l] & 1) != (start_parity & 1):\n            # only possible fix is to start at next index (which is r if cur_l==r; otherwise shift to r)\n            cur_l = r\n            # if still doesn't match, keep advancing until it does (rare, but safe)\n            while cur_l < n and (arr[cur_l] & 1) != (start_parity & 1):\n                cur_l += 1\n            if cur_l >= n:\n                break\n            prev_par = arr[cur_l] & 1\n            # reset r to at least cur_l by rebuilding state: simplest is to restart scan from cur_l\n            # but we must keep single function; do it with a small local loop.\n            rr = cur_l + 1\n            while rr < n:\n                pp = arr[rr] & 1\n                if pp == prev_par:\n                    break\n                prev_par = pp\n                length = rr - cur_l + 1\n                if length > best_len:\n                    best_len = length\n                    best_lr = (cur_l, rr)\n                rr += 1\n            # continue outer loop from rr-1 because state already advanced\n            if rr >= n:\n                return best_len, best_lr\n            # set up for outer loop to continue at rr\n            # We have a break at rr where parity repeats, so next segment starts at rr.\n            cur_l = rr\n            prev_par = arr[rr] & 1\n            continue\n\n        length = r - cur_l + 1\n        if length > best_len:\n            best_len = length\n            best_lr = (cur_l, r)\n\n    return best_len, best_lr",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, threshold, start_parity=None):\n    \"\"\"\n    Longest contiguous subarray such that:\n      1) Every element <= threshold\n      2) Parities strictly alternate (even/odd/even/odd...)\n      3) Optional: the subarray must start with a given parity:\n           start_parity=None (no restriction), 0 (even), 1 (odd)\n\n    Returns: (best_len, (l, r)) inclusive indices; if none -> (0, (-1, -1))\n    \"\"\"\n    n = len(arr)\n    best_len = 0\n    best_lr = (-1, -1)\n\n    # Current valid alternating segment start and previous parity\n    cur_l = None\n    prev_par = None\n\n    for i, x in enumerate(arr):\n        if x > threshold:\n            # barrier: cannot include this element\n            cur_l = None\n            prev_par = None\n            continue\n\n        p = x & 1\n\n        if cur_l is None:\n            # start new segment at i if allowed by start_parity\n            if start_parity is None or p == (start_parity & 1):\n                cur_l = i\n                prev_par = p\n                if best_len < 1:\n                    best_len = 1\n                    best_lr = (i, i)\n            else:\n                # can't start here due to starting parity restriction\n                cur_l = None\n                prev_par = None\n            continue\n\n        # We have an active segment. If alternating holds, extend; else restart at i (if allowed).\n        if p != prev_par:\n            prev_par = p\n            length = i - cur_l + 1\n            if length > best_len:\n                best_len = length\n                best_lr = (cur_l, i)\n        else:\n            # alternation break: best possible segment ending at i starts at i (length 1)\n            if start_parity is None or p == (start_parity & 1):\n                cur_l = i\n                prev_par = p\n                if best_len < 1:\n                    best_len = 1\n                    best_lr = (i, i)\n            else:\n                cur_l = None\n                prev_par = None\n\n    return best_len, best_lr",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, threshold, start_parity=None):\n    \"\"\"\n    Return the length of the longest contiguous subarray such that:\n      - every element <= threshold\n      - parities strictly alternate\n      - optional: subarray must start with parity start_parity (0 even, 1 odd)\n\n    If no valid element exists, returns 0.\n    \"\"\"\n    best = 0\n    cur_len = 0\n    prev_par = None\n    active = False  # whether we have an active valid segment\n\n    for x in arr:\n        if x > threshold:\n            active = False\n            cur_len = 0\n            prev_par = None\n            continue\n\n        p = x & 1\n\n        if not active:\n            if start_parity is None or p == (start_parity & 1):\n                active = True\n                cur_len = 1\n                prev_par = p\n                if best < 1:\n                    best = 1\n            else:\n                # can't start here due to starting parity restriction\n                continue\n        else:\n            if p != prev_par:\n                cur_len += 1\n                prev_par = p\n                if cur_len > best:\n                    best = cur_len\n            else:\n                # alternation breaks; restart at this element if allowed\n                if start_parity is None or p == (start_parity & 1):\n                    cur_len = 1\n                    prev_par = p\n                    active = True\n                    if best < 1:\n                        best = 1\n                else:\n                    active = False\n                    cur_len = 0\n                    prev_par = None\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, threshold):\n    \"\"\"\n    Given an array and a threshold, return the length of the longest contiguous subarray\n    where:\n      - every element <= threshold\n      - elements alternate parity (even/odd/even/odd... or odd/even/odd/even...)\n    \"\"\"\n    best = 0\n    cur = 0\n    prev_par = None\n\n    for x in arr:\n        if x > threshold:\n            cur = 0\n            prev_par = None\n            continue\n\n        p = x & 1\n        if cur == 0:\n            cur = 1\n            prev_par = p\n        else:\n            if p != prev_par:\n                cur += 1\n                prev_par = p\n            else:\n                # restart at current element (still <= threshold)\n                cur = 1\n                prev_par = p\n\n        if cur > best:\n            best = cur\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, threshold):\n    best = 0\n    cur = 0\n    prev_parity = 0  # only meaningful when cur > 0\n\n    for x in arr:\n        if x > threshold:\n            cur = 0\n            continue\n\n        p = x & 1\n        if cur == 0:\n            cur = 1\n        else:\n            if p != prev_parity:\n                cur += 1\n            else:\n                cur = 1\n        prev_parity = p\n        if cur > best:\n            best = cur\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, threshold):\n    # O(n) time, O(1) space; works for n up to 100 (and far beyond).\n    best = 0\n    cur = 0\n    prev_parity = 0  # valid only when cur > 0\n\n    for x in arr:\n        if x > threshold:\n            cur = 0\n            continue\n\n        p = x & 1\n        if cur == 0:\n            cur = 1\n        else:\n            cur = cur + 1 if p != prev_parity else 1\n\n        prev_parity = p\n        if cur > best:\n            best = cur\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, threshold):\n    best = 0\n    cur = 0\n    prev_parity = 0  # only used when cur > 0\n\n    for x in arr:\n        if x > threshold:\n            cur = 0\n            continue\n\n        p = x & 1\n        if cur == 0:\n            cur = 1\n        else:\n            cur = cur + 1 if p != prev_parity else 1\n\n        prev_parity = p\n        if cur > best:\n            best = cur\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

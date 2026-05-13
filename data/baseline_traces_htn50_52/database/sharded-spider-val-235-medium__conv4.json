@@ -1,0 +1,142 @@
+{
+  "sample_id": "sharded-spider-val-235-medium",
+  "task_name": "database",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 04:26:22",
+  "lic_conv_id": "699828be175c5382b0945849",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are helping a user write SQL queries to a database. If something is not clear, you can ask the user to clarify what they need. The schema for the database being accessed is the following:\n        \nCREATE TABLE airlines (\n    uid INTEGER   PRIMARY KEY,\n    Airline TEXT,\n    Abbreviation TEXT,\n    Country TEXT\n);\n\nCREATE TABLE airports (\n    City TEXT,\n    AirportCode TEXT   PRIMARY KEY,\n    AirportName TEXT,\n    Country TEXT,\n    CountryAbbrev TEXT,\n    UNIQUE (AirportCode)\n);\n\nCREATE TABLE flights (\n    Airline INTEGER   PRIMARY KEY,\n    FlightNo INTEGER   PRIMARY KEY,\n    SourceAirport TEXT,\n    DestAirport TEXT,\n    PRIMARY KEY (Airline, FlightNo),\n    UNIQUE (Airline, FlightNo),\n    FOREIGN KEY (DestAirport) REFERENCES airports(AirportCode),\n    FOREIGN KEY (SourceAirport) REFERENCES airports(AirportCode)\n);",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "help me find the right airlines",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "What do you mean by \u201cthe right airlines\u201d? Tell me what you\u2019re trying to filter by, and I can write the exact SQL.\n\nCommon options (pick one or more):\n1) Airlines by **country** (e.g., \u201call airlines in Canada\u201d)\n2) Airlines that **fly between two airports** (source/destination)\n3) Airlines that **serve a given airport** (as source or destination)\n4) Airlines matching a **name/abbreviation** search (partial text)\n\nHere are SQL templates for each:\n\n### 1) Airlines by country\n```sql\nSELECT uid, Airline, Abbreviation, Country\nFROM airlines\nWHERE Country = :country;\n```\n\n### 2) Airlines that fly from A to B\n```sql\nSELECT DISTINCT al.uid, al.Airline, al.Abbreviation, al.Country\nFROM flights f\nJOIN airlines al ON al.uid = f.Airline\nWHERE f.SourceAirport = :source\n  AND f.DestAirport = :dest;\n```\n\n### 3) Airlines that serve an airport (either direction)\n```sql\nSELECT DISTINCT al.uid, al.Airline, al.Abbreviation, al.Country\nFROM flights f\nJOIN airlines al ON al.uid = f.Airline\nWHERE f.SourceAirport = :airport\n   OR f.DestAirport = :airport;\n```\n\n### 4) Search by airline name/abbreviation (partial match)\n```sql\nSELECT uid, Airline, Abbreviation, Country\nFROM airlines\nWHERE Airline LIKE '%' || :q || '%'\n   OR Abbreviation LIKE '%' || :q || '%';\n```\n\nReply with what you have (country? airport code(s)? search text?), e.g.:\n- \u201cairlines that fly from LAX to JFK\u201d\n- \u201cairlines in Japan\u201d\n- \u201cairlines serving SFO\u201d\n- \u201cairlines with \u2018delta\u2019 in the name\u201d",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I need airlines that are arriving specifically at airport AHD.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT DISTINCT al.uid, al.Airline, al.Abbreviation, al.Country\nFROM flights f\nJOIN airlines al ON al.uid = f.Airline\nWHERE f.DestAirport = 'AHD'\nORDER BY al.Airline;\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "just need airlines that land at AHD",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT DISTINCT al.Airline\nFROM flights f\nJOIN airlines al ON al.uid = f.Airline\nWHERE f.DestAirport = 'AHD'\nORDER BY al.Airline;\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "you should focus on airlines that operate flights to that airport.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT DISTINCT al.uid, al.Airline, al.Abbreviation, al.Country\nFROM flights f\nJOIN airlines al ON al.uid = f.Airline\nWHERE f.DestAirport = 'AHD'\nORDER BY al.Airline;\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "clarification",
+          "is_answer_attempt": false
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT DISTINCT al.uid, al.Airline, al.Abbreviation, al.Country\nFROM flights f\nJOIN airlines al ON al.uid = f.Airline\nWHERE f.DestAirport = 'AHD'\nORDER BY al.Airline;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT DISTINCT al.Airline\nFROM flights f\nJOIN airlines al ON al.uid = f.Airline\nWHERE f.DestAirport = 'AHD'\nORDER BY al.Airline;",
+          "is_correct": null,
+          "score": 1.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT DISTINCT al.uid, al.Airline, al.Abbreviation, al.Country\nFROM flights f\nJOIN airlines al ON al.uid = f.Airline\nWHERE f.DestAirport = 'AHD'\nORDER BY al.Airline;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

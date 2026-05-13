@@ -97,6 +97,7 @@ Huang / WildChat:
 
 Hard subset / multi-model:
 - [`htn20_52_subset.md`](htn20_52_subset.md)
+- [`htn50_52_subset.md`](htn50_52_subset.md) — Top-50 expansion of the htn20_52 high-TN subset.
 - [`reports/htn20_52_experiment_results.md`](reports/htn20_52_experiment_results.md)
 - [`reports/htn20_52_multi_model_results.md`](reports/htn20_52_multi_model_results.md)
 - [`reports/multi_model_generalization.md`](reports/multi_model_generalization.md)
@@ -148,6 +149,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-12 | `htn50_52_subset.md` | Top-50 hard subset (TN>=1) from gpt-5.2 LiC logs. |
 | 2026-05-12 | `reports/2026-05-12_local_main_cleanup.md` | Cleanup writeup: backup-branch + replay process to land the infra pull. |
 | 2026-05-12 | `archive/v12_attempt/notes.md` | v12 analyzer-prompt attempt archive + port hints for new infra. |
 | 2026-05-12 | `archive/v12_attempt/azure_jailbreak_filter_triggers.md` | Azure prompt-injection filter trip rates; archived alongside v12. |

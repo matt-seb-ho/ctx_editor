@@ -1,0 +1,119 @@
+{
+  "sample_id": "sharded-livecodebench/2955",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": true,
+  "score": 1.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 08:26:49",
+  "lic_conv_id": "69986119175c537babc69cee",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "bank balance left after a purchase?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef bank_balance_left_after_purchase(*args, **kwargs):\n    \"\"\"\n    Returns remaining bank balance after a purchase.\n\n    Supported call styles:\n      1) bank_balance_left_after_purchase(balance, purchase)\n      2) bank_balance_left_after_purchase(balances, purchases)  # sequences; returns list\n      3) bank_balance_left_after_purchase(text)                  # parses numbers from a string\n\n    Rules:\n      - Remaining = balance - purchase\n      - If multiple pairs, computed elementwise.\n      - If parsed from text, uses the first two numbers found (balance, purchase).\n    \"\"\"\n    import re\n\n    def to_number(x):\n        if isinstance(x, (int, float)):\n            return x\n        if isinstance(x, str):\n            s = x.strip().replace(\",\", \"\")\n            # allow $ prefix/suffix and basic whitespace\n            s = re.sub(r\"[^0-9.\\-eE+]\", \"\", s)\n            if s in (\"\", \"-\", \".\", \"+\"):\n                raise ValueError(\"Could not parse number.\")\n            return float(s) if any(c in s for c in \".eE\") else int(s)\n        raise TypeError(\"Unsupported type for numeric conversion.\")\n\n    if args and len(args) == 1 and isinstance(args[0], str) and not kwargs:\n        nums = re.findall(r\"[-+]?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?\", args[0].replace(\",\", \"\"))\n        if len(nums) < 2:\n            raise ValueError(\"Need at least two numbers (balance and purchase) in the text.\")\n        balance = float(nums[0]) if \".\" in nums[0] or \"e\" in nums[0].lower() else int(nums[0])\n        purchase = float(nums[1]) if \".\" in nums[1] or \"e\" in nums[1].lower() else int(nums[1])\n        return balance - purchase\n\n    if len(args) == 2 and not kwargs:\n        a, b = args\n        # elementwise for sequences\n        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):\n            if len(a) != len(b):\n                raise ValueError(\"balances and purchases must have the same length.\")\n            return [to_number(x) - to_number(y) for x, y in zip(a, b)]\n        return to_number(a) - to_number(b)\n\n    # keyword support\n    if kwargs:\n        if \"balance\" in kwargs and \"purchase\" in kwargs:\n            return to_number(kwargs[\"balance\"]) - to_number(kwargs[\"purchase\"])\n        if \"balances\" in kwargs and \"purchases\" in kwargs:\n            a, b = kwargs[\"balances\"], kwargs[\"purchases\"]\n            if len(a) != len(b):\n                raise ValueError(\"balances and purchases must have the same length.\")\n            return [to_number(x) - to_number(y) for x, y in zip(a, b)]\n\n    raise TypeError(\"Unsupported arguments. Provide (balance, purchase), sequences, or a text string.\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the store rounds the purchase amount to the nearest 10 bucks",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef bank_balance_left_after_purchase(*args, **kwargs):\n    \"\"\"\n    Remaining bank balance after a purchase, where the store rounds the PURCHASE\n    amount to the nearest $10 before charging.\n\n    Supported call styles:\n      1) f(balance, purchase)\n      2) f(balances, purchases)  # sequences -> list\n      3) f(text)                 # parses first two numbers in text: balance, purchase\n\n    Rounding rule:\n      - charge = round(purchase / 10) * 10\n      - remaining = balance - charge\n      - Uses \"half up\" behavior at exact $5 boundaries (e.g., 15 -> 20, 25 -> 30).\n    \"\"\"\n    import re\n    from decimal import Decimal, ROUND_HALF_UP\n\n    def to_decimal(x):\n        if isinstance(x, Decimal):\n            return x\n        if isinstance(x, (int, float)):\n            # use string conversion to avoid float artifacts as much as possible\n            return Decimal(str(x))\n        if isinstance(x, str):\n            s = x.strip().replace(\",\", \"\")\n            # keep digits, sign, decimal point, exponent\n            s = re.sub(r\"[^0-9.\\-eE+]\", \"\", s)\n            if s in (\"\", \"-\", \".\", \"+\"):\n                raise ValueError(\"Could not parse number.\")\n            return Decimal(s)\n        raise TypeError(\"Unsupported type for numeric conversion.\")\n\n    def round_to_nearest_10(purchase_dec):\n        # nearest 10 with half-up ties\n        return (purchase_dec / Decimal(\"10\")).quantize(Decimal(\"1\"), rounding=ROUND_HALF_UP) * Decimal(\"10\")\n\n    def remaining(balance, purchase):\n        bal = to_decimal(balance)\n        pur = to_decimal(purchase)\n        charge = round_to_nearest_10(pur)\n        res = bal - charge\n        # return int when exact, else float\n        return int(res) if res == res.to_integral_value() else float(res)\n\n    if args and len(args) == 1 and isinstance(args[0], str) and not kwargs:\n        nums = re.findall(r\"[-+]?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?\", args[0].replace(\",\", \"\"))\n        if len(nums) < 2:\n            raise ValueError(\"Need at least two numbers (balance and purchase) in the text.\")\n        return remaining(nums[0], nums[1])\n\n    if len(args) == 2 and not kwargs:\n        a, b = args\n        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):\n            if len(a) != len(b):\n                raise ValueError(\"balances and purchases must have the same length.\")\n            return [remaining(x, y) for x, y in zip(a, b)]\n        return remaining(a, b)\n\n    if kwargs:\n        if \"balance\" in kwargs and \"purchase\" in kwargs:\n            return remaining(kwargs[\"balance\"], kwargs[\"purchase\"])\n        if \"balances\" in kwargs and \"purchases\" in kwargs:\n            a, b = kwargs[\"balances\"], kwargs[\"purchases\"]\n            if len(a) != len(b):\n                raise ValueError(\"balances and purchases must have the same length.\")\n            return [remaining(x, y) for x, y in zip(a, b)]\n\n    raise TypeError(\"Unsupported arguments. Provide (balance, purchase), sequences, or a text string.\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the starting balance is 100 bucks",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef bank_balance_left_after_purchase(purchase):\n    \"\"\"\n    Starting balance is $100. The store rounds the purchase amount to the\n    nearest $10 (half-up) before charging.\n\n    Returns the remaining balance.\n    \"\"\"\n    from decimal import Decimal, ROUND_HALF_UP\n\n    p = Decimal(str(purchase))\n    charged = (p / Decimal(\"10\")).quantize(Decimal(\"1\"), rounding=ROUND_HALF_UP) * Decimal(\"10\")\n    remaining = Decimal(\"100\") - charged\n    return int(remaining) if remaining == remaining.to_integral_value() else float(remaining)\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import re\n\ndef bank_balance_left_after_purchase(*args, **kwargs):\n    \"\"\"\n    Returns remaining bank balance after a purchase.\n\n    Supported call styles:\n      1) bank_balance_left_after_purchase(balance, purchase)\n      2) bank_balance_left_after_purchase(balances, purchases)  # sequences; returns list\n      3) bank_balance_left_after_purchase(text)                  # parses numbers from a string\n\n    Rules:\n      - Remaining = balance - purchase\n      - If multiple pairs, computed elementwise.\n      - If parsed from text, uses the first two numbers found (balance, purchase).\n    \"\"\"\n    import re\n\n    def to_number(x):\n        if isinstance(x, (int, float)):\n            return x\n        if isinstance(x, str):\n            s = x.strip().replace(\",\", \"\")\n            # allow $ prefix/suffix and basic whitespace\n            s = re.sub(r\"[^0-9.\\-eE+]\", \"\", s)\n            if s in (\"\", \"-\", \".\", \"+\"):\n                raise ValueError(\"Could not parse number.\")\n            return float(s) if any(c in s for c in \".eE\") else int(s)\n        raise TypeError(\"Unsupported type for numeric conversion.\")\n\n    if args and len(args) == 1 and isinstance(args[0], str) and not kwargs:\n        nums = re.findall(r\"[-+]?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?\", args[0].replace(\",\", \"\"))\n        if len(nums) < 2:\n            raise ValueError(\"Need at least two numbers (balance and purchase) in the text.\")\n        balance = float(nums[0]) if \".\" in nums[0] or \"e\" in nums[0].lower() else int(nums[0])\n        purchase = float(nums[1]) if \".\" in nums[1] or \"e\" in nums[1].lower() else int(nums[1])\n        return balance - purchase\n\n    if len(args) == 2 and not kwargs:\n        a, b = args\n        # elementwise for sequences\n        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):\n            if len(a) != len(b):\n                raise ValueError(\"balances and purchases must have the same length.\")\n            return [to_number(x) - to_number(y) for x, y in zip(a, b)]\n        return to_number(a) - to_number(b)\n\n    # keyword support\n    if kwargs:\n        if \"balance\" in kwargs and \"purchase\" in kwargs:\n            return to_number(kwargs[\"balance\"]) - to_number(kwargs[\"purchase\"])\n        if \"balances\" in kwargs and \"purchases\" in kwargs:\n            a, b = kwargs[\"balances\"], kwargs[\"purchases\"]\n            if len(a) != len(b):\n                raise ValueError(\"balances and purchases must have the same length.\")\n            return [to_number(x) - to_number(y) for x, y in zip(a, b)]\n\n    raise TypeError(\"Unsupported arguments. Provide (balance, purchase), sequences, or a text string.\")",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import re\nfrom decimal import Decimal, ROUND_HALF_UP\n\ndef bank_balance_left_after_purchase(*args, **kwargs):\n    \"\"\"\n    Remaining bank balance after a purchase, where the store rounds the PURCHASE\n    amount to the nearest $10 before charging.\n\n    Supported call styles:\n      1) f(balance, purchase)\n      2) f(balances, purchases)  # sequences -> list\n      3) f(text)                 # parses first two numbers in text: balance, purchase\n\n    Rounding rule:\n      - charge = round(purchase / 10) * 10\n      - remaining = balance - charge\n      - Uses \"half up\" behavior at exact $5 boundaries (e.g., 15 -> 20, 25 -> 30).\n    \"\"\"\n    import re\n    from decimal import Decimal, ROUND_HALF_UP\n\n    def to_decimal(x):\n        if isinstance(x, Decimal):\n            return x\n        if isinstance(x, (int, float)):\n            # use string conversion to avoid float artifacts as much as possible\n            return Decimal(str(x))\n        if isinstance(x, str):\n            s = x.strip().replace(\",\", \"\")\n            # keep digits, sign, decimal point, exponent\n            s = re.sub(r\"[^0-9.\\-eE+]\", \"\", s)\n            if s in (\"\", \"-\", \".\", \"+\"):\n                raise ValueError(\"Could not parse number.\")\n            return Decimal(s)\n        raise TypeError(\"Unsupported type for numeric conversion.\")\n\n    def round_to_nearest_10(purchase_dec):\n        # nearest 10 with half-up ties\n        return (purchase_dec / Decimal(\"10\")).quantize(Decimal(\"1\"), rounding=ROUND_HALF_UP) * Decimal(\"10\")\n\n    def remaining(balance, purchase):\n        bal = to_decimal(balance)\n        pur = to_decimal(purchase)\n        charge = round_to_nearest_10(pur)\n        res = bal - charge\n        # return int when exact, else float\n        return int(res) if res == res.to_integral_value() else float(res)\n\n    if args and len(args) == 1 and isinstance(args[0], str) and not kwargs:\n        nums = re.findall(r\"[-+]?\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?\", args[0].replace(\",\", \"\"))\n        if len(nums) < 2:\n            raise ValueError(\"Need at least two numbers (balance and purchase) in the text.\")\n        return remaining(nums[0], nums[1])\n\n    if len(args) == 2 and not kwargs:\n        a, b = args\n        if isinstance(a, (list, tuple)) and isinstance(b, (list, tuple)):\n            if len(a) != len(b):\n                raise ValueError(\"balances and purchases must have the same length.\")\n            return [remaining(x, y) for x, y in zip(a, b)]\n        return remaining(a, b)\n\n    if kwargs:\n        if \"balance\" in kwargs and \"purchase\" in kwargs:\n            return remaining(kwargs[\"balance\"], kwargs[\"purchase\"])\n        if \"balances\" in kwargs and \"purchases\" in kwargs:\n            a, b = kwargs[\"balances\"], kwargs[\"purchases\"]\n            if len(a) != len(b):\n                raise ValueError(\"balances and purchases must have the same length.\")\n            return [remaining(x, y) for x, y in zip(a, b)]\n\n    raise TypeError(\"Unsupported arguments. Provide (balance, purchase), sequences, or a text string.\")",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from decimal import Decimal, ROUND_HALF_UP\n\ndef bank_balance_left_after_purchase(purchase):\n    \"\"\"\n    Starting balance is $100. The store rounds the purchase amount to the\n    nearest $10 (half-up) before charging.\n\n    Returns the remaining balance.\n    \"\"\"\n    from decimal import Decimal, ROUND_HALF_UP\n\n    p = Decimal(str(purchase))\n    charged = (p / Decimal(\"10\")).quantize(Decimal(\"1\"), rounding=ROUND_HALF_UP) * Decimal(\"10\")\n    remaining = Decimal(\"100\") - charged\n    return int(remaining) if remaining == remaining.to_integral_value() else float(remaining)",
+          "is_correct": true,
+          "score": 1
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

@@ -1,0 +1,367 @@
+{
+  "sample_id": "sharded-livecodebench/2979",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 00:50:32",
+  "lic_conv_id": "6997f628175c537babc68eef",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "how much gold can I make from house offers?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Expect: n m k\n    # then m house offers: (g x) meaning pay g gold, costs x capacity\n    # then k queries: each query is capacity C -> output max gold achievable (0..C)\n    #\n    # If input doesn't match this format, we try a simpler fallback:\n    # n offers, then n pairs (g x), then one capacity C.\n    try:\n        n = int(next(it))\n        m = int(next(it))\n        k = int(next(it))\n        offers = []\n        for _ in range(m):\n            g = int(next(it)); x = int(next(it))\n            offers.append((x, g))\n        queries = [int(next(it)) for _ in range(k)]\n    except Exception:\n        # Fallback: n, then n pairs, then capacity\n        it = iter(data)\n        n = int(next(it))\n        offers = []\n        for _ in range(n):\n            g = int(next(it)); x = int(next(it))\n            offers.append((x, g))\n        queries = [int(next(it))] if True else []\n\n    # 0/1 knapsack over capacity = max query\n    maxC = max(queries) if queries else 0\n    dp = [0] * (maxC + 1)\n    for w, val in offers:\n        if w <= maxC:\n            for c in range(maxC, w - 1, -1):\n                nv = dp[c - w] + val\n                if nv > dp[c]:\n                    dp[c] = nv\n\n    out = []\n    for C in queries:\n        out.append(str(dp[C] if 0 <= C <= maxC else 0))\n    sys.stdout.write(\"\\n\".join(out))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I need to figure out the best way to sell the houses to make the most gold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Assumed format:\n    # n k\n    # then n offers: price_i deadline_i\n    # Goal: maximize gold by accepting at most one offer per day,\n    # and offer i must be scheduled on some day <= deadline_i.\n    #\n    # Output: maximum total gold.\n    #\n    # (Classic job sequencing with deadlines: sort by deadline, keep best prices in a min-heap.)\n    n = int(next(it))\n    _maybe = None\n    try:\n        k = int(next(it))\n        _maybe = k\n    except StopIteration:\n        k = None\n\n    # If \"k\" exists but input actually only had n (rare), we\u2019ll treat it as n offers start;\n    # but typical tasks are \"n\" then n pairs. If there are exactly 2*n remaining tokens,\n    # then the second number was actually the first price, not k.\n    remaining = list(it)\n    if _maybe is not None and len(remaining) == 2 * n:\n        # second value was not k; it was first offer's price\n        # reconstruct iterator including it\n        remaining = [str(_maybe).encode()] + remaining\n        k = None\n    it = iter(remaining)\n\n    offers = []\n    for _ in range(n):\n        try:\n            price = int(next(it))\n            deadline = int(next(it))\n        except StopIteration:\n            break\n        offers.append((deadline, price))\n\n    offers.sort()  # by deadline\n\n    import heapq\n    heap = []\n    total = 0\n    for d, p in offers:\n        heapq.heappush(heap, p)\n        total += p\n        if len(heap) > d:\n            total -= heapq.heappop(heap)\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the offers are ranges for houses and how much gold buyers will pay for them.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, heapq\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input format assumed:\n    # n m\n    # then m offers: l r gold\n    # Houses are indexed 1..n. Each house can be sold at most once.\n    # An offer (l,r,g) buys exactly one house within [l,r] for g gold.\n    # Maximize total gold.\n    #\n    # Greedy: sweep houses from left to right, add offers starting at i to a max-heap by gold,\n    # discard offers whose r < i, pick best gold offer to sell house i (or skip).\n    n = int(next(it))\n    m = int(next(it))\n\n    offers_by_l = [[] for _ in range(n + 2)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > n or r < 1:\n            continue\n        if l < 1: l = 1\n        if r > n: r = n\n        if l <= r:\n            offers_by_l[l].append((r, g))\n\n    # max-heap via (-gold, r)\n    heap = []\n    total = 0\n\n    for i in range(1, n + 1):\n        for r, g in offers_by_l[i]:\n            heapq.heappush(heap, (-g, r))\n\n        # remove expired offers\n        while heap and heap[0][1] < i:\n            heapq.heappop(heap)\n\n        if heap:\n            gneg, r = heapq.heappop(heap)\n            total += -gneg  # sell house i to this buyer\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "buyers can't share houses, so each house can only be sold once.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, heapq\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # n m\n    # m lines: l r g\n    # Each offer buys exactly ONE house in [l,r] for g gold.\n    # Each house can be sold at most once. Maximize total gold.\n    #\n    # Greedy sweep over houses: for each house i, consider all offers with l <= i,\n    # among those not expired (r >= i) pick the one with highest g to assign to house i.\n    # This ensures each chosen offer is used once, and each house is used once.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers_by_l = [[] for _ in range(n + 2)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 1 or l > n:\n            continue\n        if l < 1: l = 1\n        if r > n: r = n\n        if l <= r:\n            offers_by_l[l].append((r, g))\n\n    heap = []  # (-gold, r)\n    total = 0\n\n    for i in range(1, n + 1):\n        for r, g in offers_by_l[i]:\n            heapq.heappush(heap, (-g, r))\n\n        while heap and heap[0][1] < i:\n            heapq.heappop(heap)\n\n        if heap:\n            gneg, r = heapq.heappop(heap)\n            total += -gneg\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "we have a total of n houses lined up, numbered from 0 to n-1.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, heapq\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers: l r g  (0-based, inclusive range [l, r])\n    #\n    # Each offer buys exactly ONE house in [l,r] for g gold.\n    # Each house can be sold at most once; each offer can be used at most once.\n    # Maximize total gold.\n    #\n    # Greedy sweep i=0..n-1:\n    # add offers whose l==i to a max-heap by gold; discard offers with r<i;\n    # if heap non-empty, assign the best offer to house i.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers_by_l = [[] for _ in range(n + 1)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0: l = 0\n        if r >= n: r = n - 1\n        if l <= r:\n            offers_by_l[l].append((r, g))\n\n    heap = []  # (-gold, r)\n    total = 0\n\n    for i in range(n):\n        for r, g in offers_by_l[i]:\n            heapq.heappush(heap, (-g, r))\n\n        while heap and heap[0][1] < i:\n            heapq.heappop(heap)\n\n        if heap:\n            gneg, r = heapq.heappop(heap)\n            total += -gneg\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example given 5 houses and the offers are [[0,0,1],[0,2,2],[1,3,2]], I can get 3 as the max profit",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input format:\n    # n m\n    # then m offers: l r g  (0-based inclusive)\n    #\n    # Each offer buys exactly ONE house in [l,r] for g gold.\n    # Each house can be sold at most once and each offer can be used at most once.\n    #\n    # This is a maximum weight matching between offers (intervals) and house positions.\n    # Solve via min-cost max-flow on a line graph:\n    # 0..n positions with edges i->i+1 capacity=INF cost=0\n    # for each offer (l,r,g): edge l->r+1 cap=1 cost=-g\n    # send up to n units from 0 to n, maximizing profit => minimizing negative cost.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0: l = 0\n        if r >= n: r = n - 1\n        if l <= r:\n            offers.append((l, r, g))\n\n    N = n + 1\n    INF = 10**18\n\n    # adjacency list with edges: to, rev, cap, cost\n    gph = [[] for _ in range(N)]\n\n    def add_edge(u, v, cap, cost):\n        gph[u].append([v, len(gph[v]), cap, cost])\n        gph[v].append([u, len(gph[u]) - 1, 0, -cost])\n\n    # move along houses without selling: unlimited flow, cost 0\n    for i in range(n):\n        add_edge(i, i + 1, n, 0)\n\n    # selling via an offer consumes one \"house-slot\" in [l,r] because it skips from l to r+1\n    for l, r, gold in offers:\n        add_edge(l, r + 1, 1, -gold)\n\n    # min-cost flow: send up to n units from 0 to n\n    s, t = 0, n\n    flow = 0\n    cost = 0\n\n    # potentials for reduced costs (costs can be negative)\n    pi = [0] * N\n\n    import heapq\n    while flow < n:\n        dist = [INF] * N\n        prev_v = [-1] * N\n        prev_e = [-1] * N\n        dist[s] = 0\n        pq = [(0, s)]\n        while pq:\n            d, v = heapq.heappop(pq)\n            if d != dist[v]:\n                continue\n            for ei, e in enumerate(gph[v]):\n                to, rev, cap, c = e\n                if cap <= 0:\n                    continue\n                nd = d + c + pi[v] - pi[to]\n                if nd < dist[to]:\n                    dist[to] = nd\n                    prev_v[to] = v\n                    prev_e[to] = ei\n                    heapq.heappush(pq, (nd, to))\n\n        if dist[t] == INF:\n            break\n\n        for v in range(N):\n            if dist[v] < INF:\n                pi[v] += dist[v]\n\n        # augment 1 unit each time (all special edges are cap 1; this is fine for constraints up to ~2e5 offers with n up to ~2e5)\n        addf = n - flow\n        v = t\n        while v != s:\n            u = prev_v[v]\n            ei = prev_e[v]\n            if u < 0:\n                addf = 0\n                break\n            addf = min(addf, gph[u][ei][2])\n            v = u\n        if addf == 0:\n            break\n\n        v = t\n        while v != s:\n            u = prev_v[v]\n            ei = prev_e[v]\n            e = gph[u][ei]\n            e[2] -= addf\n            gph[v][e[1]][2] += addf\n            cost += addf * e[3]\n            v = u\n\n        flow += addf\n\n    # maximize profit == -min_cost\n    sys.stdout.write(str(-cost))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for the problem with offers, there's a limit on the number of houses and offers; it could be up to 100,000 for each",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # n m\n    # m offers: l r g (0-based inclusive)\n    # Each offer can be used once to sell ONE house within [l,r].\n    # Each house can be sold at most once.\n    # Max profit.\n    #\n    # Efficient solution (O((n+m) log (n+m))):\n    # Sweep r from 0..n-1, keep offers whose right endpoint == r in a list.\n    # Maintain a segment tree over positions 0..n-1 with value = max gold among offers\n    # starting at that position (currently available by right endpoint), and we pick the\n    # global best offer each time we decide to sell a house to some buyer.\n    #\n    # But we must also ensure an offer selects an unused house within its range.\n    # Standard approach: sort offers by gold descending, and for each offer pick the\n    # leftmost available house in its interval using DSU \"next\" pointers.\n    # This is optimal: always take highest gold remaining offer, assign it any available\n    # house it can take; choosing the leftmost keeps future flexibility.\n    #\n    # Complexity: sort offers O(m log m), DSU operations ~ O((n+m) alpha(n)).\n\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0: l = 0\n        if r >= n: r = n - 1\n        if l <= r:\n            offers.append((g, l, r))\n\n    offers.sort(reverse=True)  # by gold desc\n\n    # DSU to find next available house index >= x.\n    parent = list(range(n + 1))  # n is sentinel meaning \"no house available\"\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    def use(x):\n        # mark house x as used: union with x+1\n        parent[x] = find(x + 1)\n\n    total = 0\n    for g, l, r in offers:\n        x = find(l)\n        if x <= r:\n            total += g\n            use(x)\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "each offer consists of three numbers: the low end, the high end, and how much gold is being offered.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers: l r gold   (0-based, inclusive)\n    #\n    # Each offer buys exactly ONE house within [l, r] for 'gold'.\n    # Each house can be sold at most once; each offer can be accepted at most once.\n    # Maximize total gold.\n    #\n    # Greedy: take offers in descending gold and assign each to the leftmost still-available\n    # house in its range (DSU \"next available\" structure). This is optimal.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0: l = 0\n        if r >= n: r = n - 1\n        if l <= r:\n            offers.append((g, l, r))\n\n    offers.sort(reverse=True)  # highest gold first\n\n    parent = list(range(n + 1))  # parent[n] is sentinel (no house available)\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g, l, r in offers:\n        x = find(l)\n        if x <= r:\n            total += g\n            parent[x] = find(x + 1)  # mark house x used\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Every offer indicates the range of houses it covers and how much gold the buyer is willing to pay for them.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m lines: l r gold   (houses are 0..n-1, [l,r] inclusive)\n    #\n    # Each offer can be accepted at most once, and buys exactly ONE house within its range.\n    # Each house can be sold at most once. Maximize total gold.\n    #\n    # Optimal greedy:\n    # process offers in descending gold; for each offer, assign it the leftmost available\n    # house in [l,r] (if any). Use DSU \"next available index\" to find/occupy houses fast.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0:\n            l = 0\n        if r >= n:\n            r = n - 1\n        if l <= r:\n            offers.append((g, l, r))\n\n    offers.sort(reverse=True)  # by gold desc\n\n    parent = list(range(n + 1))  # n is sentinel: no available house\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g, l, r in offers:\n        x = find(l)\n        if x <= r:\n            total += g\n            parent[x] = find(x + 1)  # occupy x\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the offer ranges actually fit within the house numbers",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # then m offers: l r gold, where 0 <= l <= r < n\n    #\n    # Each offer can be taken at most once and buys exactly ONE house within [l, r].\n    # Each house can be sold at most once.\n    # Maximize total gold.\n    #\n    # Greedy optimal:\n    # Sort offers by gold descending; for each offer, assign it the leftmost available\n    # house in its range (if any). Use DSU to jump to next available house.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = [(int(next(it)), int(next(it)), int(next(it))) for _ in range(m)]  # l,r,g\n    offers.sort(key=lambda x: x[2], reverse=True)  # by gold desc\n\n    parent = list(range(n + 1))  # parent[n] is sentinel (no house)\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for l, r, g in offers:\n        x = find(l)\n        if x <= r:\n            total += g\n            parent[x] = find(x + 1)  # mark house x used\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "each offer ranges from 1 to 1000 gold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers: l r gold (0 <= l <= r < n), gold in [1,1000]\n    #\n    # Each offer buys exactly ONE house within [l,r] for 'gold'.\n    # Each house can be sold at most once; each offer can be used at most once.\n    # Maximize total gold.\n    #\n    # Use DSU to find next free house. Since gold is small, bucket offers by gold\n    # to avoid O(m log m) sorting (though sorting would also be fine for 1e5).\n    n = int(next(it))\n    m = int(next(it))\n\n    buckets = [[] for _ in range(1001)]  # buckets[g] = list of (l,r)\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        buckets[g].append((l, r))\n\n    parent = list(range(n + 1))  # n sentinel\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g in range(1000, 0, -1):\n        for l, r in buckets[g]:\n            x = find(l)\n            if x <= r:\n                total += g\n                parent[x] = find(x + 1)\n\n    sys.stdout.write(str(total))\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Expect: n m k\n    # then m house offers: (g x) meaning pay g gold, costs x capacity\n    # then k queries: each query is capacity C -> output max gold achievable (0..C)\n    #\n    # If input doesn't match this format, we try a simpler fallback:\n    # n offers, then n pairs (g x), then one capacity C.\n    try:\n        n = int(next(it))\n        m = int(next(it))\n        k = int(next(it))\n        offers = []\n        for _ in range(m):\n            g = int(next(it)); x = int(next(it))\n            offers.append((x, g))\n        queries = [int(next(it)) for _ in range(k)]\n    except Exception:\n        # Fallback: n, then n pairs, then capacity\n        it = iter(data)\n        n = int(next(it))\n        offers = []\n        for _ in range(n):\n            g = int(next(it)); x = int(next(it))\n            offers.append((x, g))\n        queries = [int(next(it))] if True else []\n\n    # 0/1 knapsack over capacity = max query\n    maxC = max(queries) if queries else 0\n    dp = [0] * (maxC + 1)\n    for w, val in offers:\n        if w <= maxC:\n            for c in range(maxC, w - 1, -1):\n                nv = dp[c - w] + val\n                if nv > dp[c]:\n                    dp[c] = nv\n\n    out = []\n    for C in queries:\n        out.append(str(dp[C] if 0 <= C <= maxC else 0))\n    sys.stdout.write(\"\\n\".join(out))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\nimport heapq\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Assumed format:\n    # n k\n    # then n offers: price_i deadline_i\n    # Goal: maximize gold by accepting at most one offer per day,\n    # and offer i must be scheduled on some day <= deadline_i.\n    #\n    # Output: maximum total gold.\n    #\n    # (Classic job sequencing with deadlines: sort by deadline, keep best prices in a min-heap.)\n    n = int(next(it))\n    _maybe = None\n    try:\n        k = int(next(it))\n        _maybe = k\n    except StopIteration:\n        k = None\n\n    # If \"k\" exists but input actually only had n (rare), we\u2019ll treat it as n offers start;\n    # but typical tasks are \"n\" then n pairs. If there are exactly 2*n remaining tokens,\n    # then the second number was actually the first price, not k.\n    remaining = list(it)\n    if _maybe is not None and len(remaining) == 2 * n:\n        # second value was not k; it was first offer's price\n        # reconstruct iterator including it\n        remaining = [str(_maybe).encode()] + remaining\n        k = None\n    it = iter(remaining)\n\n    offers = []\n    for _ in range(n):\n        try:\n            price = int(next(it))\n            deadline = int(next(it))\n        except StopIteration:\n            break\n        offers.append((deadline, price))\n\n    offers.sort()  # by deadline\n\n    import heapq\n    heap = []\n    total = 0\n    for d, p in offers:\n        heapq.heappush(heap, p)\n        total += p\n        if len(heap) > d:\n            total -= heapq.heappop(heap)\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, heapq\n\ndef solve():\n    import sys, heapq\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input format assumed:\n    # n m\n    # then m offers: l r gold\n    # Houses are indexed 1..n. Each house can be sold at most once.\n    # An offer (l,r,g) buys exactly one house within [l,r] for g gold.\n    # Maximize total gold.\n    #\n    # Greedy: sweep houses from left to right, add offers starting at i to a max-heap by gold,\n    # discard offers whose r < i, pick best gold offer to sell house i (or skip).\n    n = int(next(it))\n    m = int(next(it))\n\n    offers_by_l = [[] for _ in range(n + 2)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > n or r < 1:\n            continue\n        if l < 1: l = 1\n        if r > n: r = n\n        if l <= r:\n            offers_by_l[l].append((r, g))\n\n    # max-heap via (-gold, r)\n    heap = []\n    total = 0\n\n    for i in range(1, n + 1):\n        for r, g in offers_by_l[i]:\n            heapq.heappush(heap, (-g, r))\n\n        # remove expired offers\n        while heap and heap[0][1] < i:\n            heapq.heappop(heap)\n\n        if heap:\n            gneg, r = heapq.heappop(heap)\n            total += -gneg  # sell house i to this buyer\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, heapq\n\ndef solve():\n    import sys, heapq\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # n m\n    # m lines: l r g\n    # Each offer buys exactly ONE house in [l,r] for g gold.\n    # Each house can be sold at most once. Maximize total gold.\n    #\n    # Greedy sweep over houses: for each house i, consider all offers with l <= i,\n    # among those not expired (r >= i) pick the one with highest g to assign to house i.\n    # This ensures each chosen offer is used once, and each house is used once.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers_by_l = [[] for _ in range(n + 2)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 1 or l > n:\n            continue\n        if l < 1: l = 1\n        if r > n: r = n\n        if l <= r:\n            offers_by_l[l].append((r, g))\n\n    heap = []  # (-gold, r)\n    total = 0\n\n    for i in range(1, n + 1):\n        for r, g in offers_by_l[i]:\n            heapq.heappush(heap, (-g, r))\n\n        while heap and heap[0][1] < i:\n            heapq.heappop(heap)\n\n        if heap:\n            gneg, r = heapq.heappop(heap)\n            total += -gneg\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, heapq\n\ndef solve():\n    import sys, heapq\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers: l r g  (0-based, inclusive range [l, r])\n    #\n    # Each offer buys exactly ONE house in [l,r] for g gold.\n    # Each house can be sold at most once; each offer can be used at most once.\n    # Maximize total gold.\n    #\n    # Greedy sweep i=0..n-1:\n    # add offers whose l==i to a max-heap by gold; discard offers with r<i;\n    # if heap non-empty, assign the best offer to house i.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers_by_l = [[] for _ in range(n + 1)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0: l = 0\n        if r >= n: r = n - 1\n        if l <= r:\n            offers_by_l[l].append((r, g))\n\n    heap = []  # (-gold, r)\n    total = 0\n\n    for i in range(n):\n        for r, g in offers_by_l[i]:\n            heapq.heappush(heap, (-g, r))\n\n        while heap and heap[0][1] < i:\n            heapq.heappop(heap)\n\n        if heap:\n            gneg, r = heapq.heappop(heap)\n            total += -gneg\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\nimport heapq\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input format:\n    # n m\n    # then m offers: l r g  (0-based inclusive)\n    #\n    # Each offer buys exactly ONE house in [l,r] for g gold.\n    # Each house can be sold at most once and each offer can be used at most once.\n    #\n    # This is a maximum weight matching between offers (intervals) and house positions.\n    # Solve via min-cost max-flow on a line graph:\n    # 0..n positions with edges i->i+1 capacity=INF cost=0\n    # for each offer (l,r,g): edge l->r+1 cap=1 cost=-g\n    # send up to n units from 0 to n, maximizing profit => minimizing negative cost.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0: l = 0\n        if r >= n: r = n - 1\n        if l <= r:\n            offers.append((l, r, g))\n\n    N = n + 1\n    INF = 10**18\n\n    # adjacency list with edges: to, rev, cap, cost\n    gph = [[] for _ in range(N)]\n\n    def add_edge(u, v, cap, cost):\n        gph[u].append([v, len(gph[v]), cap, cost])\n        gph[v].append([u, len(gph[u]) - 1, 0, -cost])\n\n    # move along houses without selling: unlimited flow, cost 0\n    for i in range(n):\n        add_edge(i, i + 1, n, 0)\n\n    # selling via an offer consumes one \"house-slot\" in [l,r] because it skips from l to r+1\n    for l, r, gold in offers:\n        add_edge(l, r + 1, 1, -gold)\n\n    # min-cost flow: send up to n units from 0 to n\n    s, t = 0, n\n    flow = 0\n    cost = 0\n\n    # potentials for reduced costs (costs can be negative)\n    pi = [0] * N\n\n    import heapq\n    while flow < n:\n        dist = [INF] * N\n        prev_v = [-1] * N\n        prev_e = [-1] * N\n        dist[s] = 0\n        pq = [(0, s)]\n        while pq:\n            d, v = heapq.heappop(pq)\n            if d != dist[v]:\n                continue\n            for ei, e in enumerate(gph[v]):\n                to, rev, cap, c = e\n                if cap <= 0:\n                    continue\n                nd = d + c + pi[v] - pi[to]\n                if nd < dist[to]:\n                    dist[to] = nd\n                    prev_v[to] = v\n                    prev_e[to] = ei\n                    heapq.heappush(pq, (nd, to))\n\n        if dist[t] == INF:\n            break\n\n        for v in range(N):\n            if dist[v] < INF:\n                pi[v] += dist[v]\n\n        # augment 1 unit each time (all special edges are cap 1; this is fine for constraints up to ~2e5 offers with n up to ~2e5)\n        addf = n - flow\n        v = t\n        while v != s:\n            u = prev_v[v]\n            ei = prev_e[v]\n            if u < 0:\n                addf = 0\n                break\n            addf = min(addf, gph[u][ei][2])\n            v = u\n        if addf == 0:\n            break\n\n        v = t\n        while v != s:\n            u = prev_v[v]\n            ei = prev_e[v]\n            e = gph[u][ei]\n            e[2] -= addf\n            gph[v][e[1]][2] += addf\n            cost += addf * e[3]\n            v = u\n\n        flow += addf\n\n    # maximize profit == -min_cost\n    sys.stdout.write(str(-cost))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # n m\n    # m offers: l r g (0-based inclusive)\n    # Each offer can be used once to sell ONE house within [l,r].\n    # Each house can be sold at most once.\n    # Max profit.\n    #\n    # Efficient solution (O((n+m) log (n+m))):\n    # Sweep r from 0..n-1, keep offers whose right endpoint == r in a list.\n    # Maintain a segment tree over positions 0..n-1 with value = max gold among offers\n    # starting at that position (currently available by right endpoint), and we pick the\n    # global best offer each time we decide to sell a house to some buyer.\n    #\n    # But we must also ensure an offer selects an unused house within its range.\n    # Standard approach: sort offers by gold descending, and for each offer pick the\n    # leftmost available house in its interval using DSU \"next\" pointers.\n    # This is optimal: always take highest gold remaining offer, assign it any available\n    # house it can take; choosing the leftmost keeps future flexibility.\n    #\n    # Complexity: sort offers O(m log m), DSU operations ~ O((n+m) alpha(n)).\n\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0: l = 0\n        if r >= n: r = n - 1\n        if l <= r:\n            offers.append((g, l, r))\n\n    offers.sort(reverse=True)  # by gold desc\n\n    # DSU to find next available house index >= x.\n    parent = list(range(n + 1))  # n is sentinel meaning \"no house available\"\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    def use(x):\n        # mark house x as used: union with x+1\n        parent[x] = find(x + 1)\n\n    total = 0\n    for g, l, r in offers:\n        x = find(l)\n        if x <= r:\n            total += g\n            use(x)\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers: l r gold   (0-based, inclusive)\n    #\n    # Each offer buys exactly ONE house within [l, r] for 'gold'.\n    # Each house can be sold at most once; each offer can be accepted at most once.\n    # Maximize total gold.\n    #\n    # Greedy: take offers in descending gold and assign each to the leftmost still-available\n    # house in its range (DSU \"next available\" structure). This is optimal.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0: l = 0\n        if r >= n: r = n - 1\n        if l <= r:\n            offers.append((g, l, r))\n\n    offers.sort(reverse=True)  # highest gold first\n\n    parent = list(range(n + 1))  # parent[n] is sentinel (no house available)\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g, l, r in offers:\n        x = find(l)\n        if x <= r:\n            total += g\n            parent[x] = find(x + 1)  # mark house x used\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m lines: l r gold   (houses are 0..n-1, [l,r] inclusive)\n    #\n    # Each offer can be accepted at most once, and buys exactly ONE house within its range.\n    # Each house can be sold at most once. Maximize total gold.\n    #\n    # Optimal greedy:\n    # process offers in descending gold; for each offer, assign it the leftmost available\n    # house in [l,r] (if any). Use DSU \"next available index\" to find/occupy houses fast.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if r < 0 or l >= n:\n            continue\n        if l < 0:\n            l = 0\n        if r >= n:\n            r = n - 1\n        if l <= r:\n            offers.append((g, l, r))\n\n    offers.sort(reverse=True)  # by gold desc\n\n    parent = list(range(n + 1))  # n is sentinel: no available house\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g, l, r in offers:\n        x = find(l)\n        if x <= r:\n            total += g\n            parent[x] = find(x + 1)  # occupy x\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 9
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # then m offers: l r gold, where 0 <= l <= r < n\n    #\n    # Each offer can be taken at most once and buys exactly ONE house within [l, r].\n    # Each house can be sold at most once.\n    # Maximize total gold.\n    #\n    # Greedy optimal:\n    # Sort offers by gold descending; for each offer, assign it the leftmost available\n    # house in its range (if any). Use DSU to jump to next available house.\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = [(int(next(it)), int(next(it)), int(next(it))) for _ in range(m)]  # l,r,g\n    offers.sort(key=lambda x: x[2], reverse=True)  # by gold desc\n\n    parent = list(range(n + 1))  # parent[n] is sentinel (no house)\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for l, r, g in offers:\n        x = find(l)\n        if x <= r:\n            total += g\n            parent[x] = find(x + 1)  # mark house x used\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 10
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers: l r gold (0 <= l <= r < n), gold in [1,1000]\n    #\n    # Each offer buys exactly ONE house within [l,r] for 'gold'.\n    # Each house can be sold at most once; each offer can be used at most once.\n    # Maximize total gold.\n    #\n    # Use DSU to find next free house. Since gold is small, bucket offers by gold\n    # to avoid O(m log m) sorting (though sorting would also be fine for 1e5).\n    n = int(next(it))\n    m = int(next(it))\n\n    buckets = [[] for _ in range(1001)]  # buckets[g] = list of (l,r)\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        buckets[g].append((l, r))\n\n    parent = list(range(n + 1))  # n sentinel\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g in range(1000, 0, -1):\n        for l, r in buckets[g]:\n            x = find(l)\n            if x <= r:\n                total += g\n                parent[x] = find(x + 1)\n\n    sys.stdout.write(str(total))",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

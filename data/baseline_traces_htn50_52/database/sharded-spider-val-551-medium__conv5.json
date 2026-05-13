@@ -1,0 +1,142 @@
+{
+  "sample_id": "sharded-spider-val-551-medium",
+  "task_name": "database",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 02:37:37",
+  "lic_conv_id": "69980f41175c5382b0945493",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are helping a user write SQL queries to a database. If something is not clear, you can ask the user to clarify what they need. The schema for the database being accessed is the following:\n        \nCREATE TABLE Addresses (\n    address_id INTEGER   PRIMARY KEY,\n    line_1 VARCHAR(255),\n    line_2 VARCHAR(255),\n    line_3 VARCHAR(255),\n    city VARCHAR(255),\n    zip_postcode VARCHAR(20),\n    state_province_county VARCHAR(255),\n    country VARCHAR(255),\n    other_address_details VARCHAR(255)\n);\n\nCREATE TABLE Courses (\n    course_id INTEGER   PRIMARY KEY,\n    course_name VARCHAR(255),\n    course_description VARCHAR(255),\n    other_details VARCHAR(255)\n);\n\nCREATE TABLE Departments (\n    department_id INTEGER   PRIMARY KEY,\n    department_name VARCHAR(255),\n    department_description VARCHAR(255),\n    other_details VARCHAR(255)\n);\n\nCREATE TABLE Degree_Programs (\n    degree_program_id INTEGER   PRIMARY KEY,\n    department_id INTEGER NOT NULL,\n    degree_summary_name VARCHAR(255),\n    degree_summary_description VARCHAR(255),\n    other_details VARCHAR(255),\n    FOREIGN KEY (department_id) REFERENCES Departments(department_id)\n);\n\nCREATE TABLE Sections (\n    section_id INTEGER   PRIMARY KEY,\n    course_id INTEGER NOT NULL,\n    section_name VARCHAR(255),\n    section_description VARCHAR(255),\n    other_details VARCHAR(255),\n    FOREIGN KEY (course_id) REFERENCES Courses(course_id)\n);\n\nCREATE TABLE Semesters (\n    semester_id INTEGER   PRIMARY KEY,\n    semester_name VARCHAR(255),\n    semester_description VARCHAR(255),\n    other_details VARCHAR(255)\n);\n\nCREATE TABLE Students (\n    student_id INTEGER   PRIMARY KEY,\n    current_address_id INTEGER NOT NULL,\n    permanent_address_id INTEGER NOT NULL,\n    first_name VARCHAR(80),\n    middle_name VARCHAR(40),\n    last_name VARCHAR(40),\n    cell_mobile_number VARCHAR(40),\n    email_address VARCHAR(40),\n    ssn VARCHAR(40),\n    date_first_registered DATETIME,\n    date_left DATETIME,\n    other_student_details VARCHAR(255),\n    FOREIGN KEY (permanent_address_id) REFERENCES Addresses(address_id),\n    FOREIGN KEY (current_address_id) REFERENCES Addresses(address_id)\n);\n\nCREATE TABLE Student_Enrolment (\n    student_enrolment_id INTEGER   PRIMARY KEY,\n    degree_program_id INTEGER NOT NULL,\n    semester_id INTEGER NOT NULL,\n    student_id INTEGER NOT NULL,\n    other_details VARCHAR(255),\n    FOREIGN KEY (student_id) REFERENCES Students(student_id),\n    FOREIGN KEY (semester_id) REFERENCES Semesters(semester_id),\n    FOREIGN KEY (degree_program_id) REFERENCES Degree_Programs(degree_program_id)\n);\n\nCREATE TABLE Student_Enrolment_Courses (\n    student_course_id INTEGER   PRIMARY KEY,\n    course_id INTEGER NOT NULL,\n    student_enrolment_id INTEGER NOT NULL,\n    FOREIGN KEY (student_enrolment_id) REFERENCES Student_Enrolment(student_enrolment_id),\n    FOREIGN KEY (course_id) REFERENCES Courses(course_id)\n);\n\nCREATE TABLE Transcripts (\n    transcript_id INTEGER   PRIMARY KEY,\n    transcript_date DATETIME,\n    other_details VARCHAR(255)\n);\n\nCREATE TABLE Transcript_Contents (\n    student_course_id INTEGER NOT NULL,\n    transcript_id INTEGER NOT NULL,\n    FOREIGN KEY (transcript_id) REFERENCES Transcripts(transcript_id),\n    FOREIGN KEY (student_course_id) REFERENCES Student_Enrolment_Courses(student_course_id)\n);",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "transcripts info gathering",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "What transcript info do you want to gather (and at what level): **per transcript**, **per student**, or **per course/semester**?\n\nMeanwhile, here are common \u201ctranscripts info gathering\u201d SQL patterns for this schema.\n\n## 1) Full transcript detail (courses on each transcript)\n```sql\nSELECT\n  t.transcript_id,\n  t.transcript_date,\n  s.student_id,\n  s.first_name,\n  s.last_name,\n  c.course_id,\n  c.course_name\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nJOIN Student_Enrolment_Courses sec\n  ON sec.student_course_id = tc.student_course_id\nJOIN Courses c\n  ON c.course_id = sec.course_id\nJOIN Student_Enrolment se\n  ON se.student_enrolment_id = sec.student_enrolment_id\nJOIN Students s\n  ON s.student_id = se.student_id\nORDER BY t.transcript_id, c.course_name;\n```\n\n## 2) Transcript summary (how many courses are on each transcript)\n```sql\nSELECT\n  t.transcript_id,\n  t.transcript_date,\n  COUNT(*) AS course_count\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nGROUP BY t.transcript_id, t.transcript_date\nORDER BY t.transcript_date DESC, t.transcript_id;\n```\n\n## 3) Transcripts for a specific student\n```sql\nSELECT DISTINCT\n  s.student_id,\n  s.first_name,\n  s.last_name,\n  t.transcript_id,\n  t.transcript_date\nFROM Students s\nJOIN Student_Enrolment se\n  ON se.student_id = s.student_id\nJOIN Student_Enrolment_Courses sec\n  ON sec.student_enrolment_id = se.student_enrolment_id\nJOIN Transcript_Contents tc\n  ON tc.student_course_id = sec.student_course_id\nJOIN Transcripts t\n  ON t.transcript_id = tc.transcript_id\nWHERE s.student_id = :student_id\nORDER BY t.transcript_date DESC, t.transcript_id;\n```\n\n## 4) Transcript detail including semester + degree program + department\n```sql\nSELECT\n  t.transcript_id,\n  t.transcript_date,\n  s.student_id,\n  s.first_name,\n  s.last_name,\n  sem.semester_name,\n  dp.degree_summary_name,\n  d.department_name,\n  c.course_name\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nJOIN Student_Enrolment_Courses sec\n  ON sec.student_course_id = tc.student_course_id\nJOIN Courses c\n  ON c.course_id = sec.course_id\nJOIN Student_Enrolment se\n  ON se.student_enrolment_id = sec.student_enrolment_id\nJOIN Semesters sem\n  ON sem.semester_id = se.semester_id\nJOIN Degree_Programs dp\n  ON dp.degree_program_id = se.degree_program_id\nJOIN Departments d\n  ON d.department_id = dp.department_id\nJOIN Students s\n  ON s.student_id = se.student_id\nORDER BY t.transcript_id, sem.semester_name, c.course_name;\n```\n\n## 5) Find \u201corphan\u201d transcripts (no contents)\n```sql\nSELECT t.*\nFROM Transcripts t\nLEFT JOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nWHERE tc.transcript_id IS NULL;\n```\n\nIf you tell me:\n1) what output columns you need (student name, semester, degree, etc.),  \n2) any filters (student_id, date range, semester),  \nI\u2019ll tailor one query exactly to your \u201cinfo gathering\u201d goal.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I need transcripts with at least 2 course results.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT\n  t.transcript_id,\n  t.transcript_date,\n  COUNT(tc.student_course_id) AS course_count\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nGROUP BY t.transcript_id, t.transcript_date\nHAVING COUNT(tc.student_course_id) >= 2\nORDER BY t.transcript_date DESC, t.transcript_id;\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I need the date for each transcript too.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT\n  t.transcript_id,\n  t.transcript_date,\n  COUNT(tc.student_course_id) AS course_count\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nGROUP BY t.transcript_id, t.transcript_date\nHAVING COUNT(tc.student_course_id) >= 2\nORDER BY t.transcript_date DESC, t.transcript_id;\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "also need the id for each transcript",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "The query already includes both the **transcript id** and **date**:\n\n```sql\nSELECT\n  t.transcript_id,\n  t.transcript_date,\n  COUNT(tc.student_course_id) AS course_count\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nGROUP BY t.transcript_id, t.transcript_date\nHAVING COUNT(tc.student_course_id) >= 2\nORDER BY t.transcript_date DESC, t.transcript_id;\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "discussion",
+          "is_answer_attempt": false
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  t.transcript_id,\n  t.transcript_date,\n  COUNT(tc.student_course_id) AS course_count\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nGROUP BY t.transcript_id, t.transcript_date\nHAVING COUNT(tc.student_course_id) >= 2\nORDER BY t.transcript_date DESC, t.transcript_id;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  t.transcript_id,\n  t.transcript_date,\n  COUNT(tc.student_course_id) AS course_count\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nGROUP BY t.transcript_id, t.transcript_date\nHAVING COUNT(tc.student_course_id) >= 2\nORDER BY t.transcript_date DESC, t.transcript_id;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  t.transcript_id,\n  t.transcript_date,\n  COUNT(tc.student_course_id) AS course_count\nFROM Transcripts t\nJOIN Transcript_Contents tc\n  ON tc.transcript_id = t.transcript_id\nGROUP BY t.transcript_id, t.transcript_date\nHAVING COUNT(tc.student_course_id) >= 2\nORDER BY t.transcript_date DESC, t.transcript_id;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

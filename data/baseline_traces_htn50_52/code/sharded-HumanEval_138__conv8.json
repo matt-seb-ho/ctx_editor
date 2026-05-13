@@ -1,0 +1,212 @@
+{
+  "sample_id": "sharded-HumanEval/138",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 07:11:58",
+  "lic_conv_id": "69984f8e175c537babc69a5e",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Check if a number can be expressed by adding up numbers",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_be_expressed_by_sum(target, numbers, allow_reuse=True, must_use_at_least_one=True):\n    \"\"\"\n    Return True if `target` can be formed by adding numbers from `numbers`.\n\n    - If allow_reuse=True: each number can be used any number of times (unbounded subset sum / coin change).\n    - If allow_reuse=False: each number can be used at most once (subset sum).\n    - If must_use_at_least_one=True: disallow expressing target=0 with empty sum.\n\n    Assumes integers; supports negative targets only for bounded (allow_reuse=False).\n    \"\"\"\n    if not isinstance(numbers, (list, tuple, set)):\n        raise TypeError(\"numbers must be a list/tuple/set of integers\")\n    nums = [int(x) for x in numbers]\n    target = int(target)\n\n    if not nums:\n        return (not must_use_at_least_one) and target == 0\n\n    if allow_reuse:\n        # Unbounded reuse with negatives/zero can cause non-termination / undefined behavior.\n        if any(n <= 0 for n in nums):\n            raise ValueError(\"allow_reuse=True requires all numbers to be positive (no 0 or negatives).\")\n        if target < 0:\n            return False\n        # Classic coin-change feasibility DP\n        dp = [False] * (target + 1)\n        dp[0] = True\n        for s in range(1, target + 1):\n            for n in nums:\n                if n <= s and dp[s - n]:\n                    dp[s] = True\n                    break\n        if must_use_at_least_one and target == 0:\n            return False\n        return dp[target]\n    else:\n        # Bounded subset-sum supports negatives via set-of-sums DP.\n        sums = {0}\n        for n in nums:\n            sums |= {s + n for s in sums}\n        if must_use_at_least_one and target == 0:\n            # Ensure 0 can be made using at least one element\n            return any(n == 0 for n in nums) or any((s == 0) for s in sums if s != 0)\n        return target in sums\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Just to clarify, there needs to be exactly four numbers to add up.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Return True if `target` can be expressed as the sum of exactly four numbers\n    chosen from `numbers`.\n\n    - allow_reuse=True: the same value may be used multiple times.\n    - allow_reuse=False: each element can be used at most once.\n    \"\"\"\n    nums = [int(x) for x in numbers]\n    target = int(target)\n\n    if allow_reuse:\n        # Check all sums of two numbers (with reuse), then see if target - sum exists.\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        for s in pair_sums:\n            if (target - s) in pair_sums:\n                return True\n        return False\n    else:\n        # Exactly four distinct indices: use pair sums with index tracking.\n        # Build all i<j sums, then look for two disjoint pairs summing to target.\n        pairs = {}\n        n = len(nums)\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                if s not in pairs:\n                    pairs[s] = []\n                pairs[s].append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            if t not in pairs:\n                continue\n            for (i, j) in plist:\n                for (k, l) in pairs[t]:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Also, the numbers need to be positive and even.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Return True if `target` can be expressed as the sum of exactly four numbers\n    chosen from `numbers`, where all usable numbers must be positive and even.\n\n    - allow_reuse=True: same value may be used multiple times.\n    - allow_reuse=False: each element can be used at most once (distinct indices).\n    \"\"\"\n    target = int(target)\n    nums = [int(x) for x in numbers if int(x) > 0 and int(x) % 2 == 0]\n    if len(nums) == 0:\n        return False\n\n    if allow_reuse:\n        # If target is odd, impossible since sum of evens is even\n        if target % 2 != 0:\n            return False\n        # Two-sum-of-two-sums approach: O(m^2) time, O(m^2) memory\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        for s in pair_sums:\n            if (target - s) in pair_sums:\n                return True\n        return False\n    else:\n        n = len(nums)\n        if n < 4:\n            return False\n        if target % 2 != 0:\n            return False\n\n        # Store all i<j pair sums with their indices; then find two disjoint pairs.\n        pairs = {}\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                pairs.setdefault(s, []).append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            if t not in pairs:\n                continue\n            for (i, j) in plist:\n                for (k, l) in pairs[t]:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "We're checking to see if a specific number can be expressed this way.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Check whether `target` can be written as the sum of exactly four numbers\n    from `numbers`, where chosen numbers must be positive and even.\n\n    Parameters\n    ----------\n    target : int\n        The specific number to test.\n    numbers : iterable of int\n        Candidate addends.\n    allow_reuse : bool\n        If True, values may be reused (same element/value can be picked multiple times).\n        If False, each element can be used at most once (four distinct indices).\n\n    Returns\n    -------\n    bool\n    \"\"\"\n    target = int(target)\n    nums = [int(x) for x in numbers if int(x) > 0 and int(x) % 2 == 0]\n\n    if target % 2 != 0:\n        return False  # sum of four evens is even\n    if allow_reuse:\n        if not nums:\n            return False\n        # Precompute all sums of two (with reuse), then see if target is sum of two such sums.\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        for s in pair_sums:\n            if (target - s) in pair_sums:\n                return True\n        return False\n    else:\n        n = len(nums)\n        if n < 4:\n            return False\n        # All i<j sums; need two disjoint pairs\n        pairs = {}\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                pairs.setdefault(s, []).append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            if t not in pairs:\n                continue\n            for (i, j) in plist:\n                for (k, l) in pairs[t]:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "If the target is 6, the output should be False.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Return True iff `target` can be written as the sum of exactly four numbers\n    chosen from `numbers`, with the restriction that chosen numbers must be\n    positive and even.\n\n    If allow_reuse=True, you may reuse values.\n    If allow_reuse=False, you must use four distinct indices from `numbers`.\n    \"\"\"\n    target = int(target)\n    nums = [int(x) for x in numbers if int(x) > 0 and int(x) % 2 == 0]\n\n    # Minimum possible sum of four positive even integers is 2+2+2+2 = 8\n    if target < 8:\n        return False\n    # Sum of four even numbers must be even\n    if target % 2 != 0:\n        return False\n\n    if allow_reuse:\n        if not nums:\n            return False\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        return any((target - s) in pair_sums for s in pair_sums)\n    else:\n        n = len(nums)\n        if n < 4:\n            return False\n\n        pairs = {}\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                pairs.setdefault(s, []).append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            other = pairs.get(t)\n            if not other:\n                continue\n            for i, j in plist:\n                for k, l in other:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "If you check the input of 8, it should give True.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Return True iff `target` can be written as the sum of exactly four numbers\n    chosen from `numbers`, where each chosen number must be positive and even.\n\n    allow_reuse=True  -> values may be used multiple times.\n    allow_reuse=False -> each list element can be used at most once (distinct indices).\n    \"\"\"\n    target = int(target)\n    nums = [int(x) for x in numbers if int(x) > 0 and int(x) % 2 == 0]\n\n    # Sum of four even numbers is even; minimum is 2+2+2+2 = 8.\n    if target % 2 != 0 or target < 8:\n        return False\n\n    if allow_reuse:\n        # With reuse, target is possible only if we can make it from two pair-sums.\n        if not nums:\n            return False\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        return any((target - s) in pair_sums for s in pair_sums)\n    else:\n        # Without reuse, need two disjoint pairs.\n        n = len(nums)\n        if n < 4:\n            return False\n\n        pairs = {}\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                pairs.setdefault(s, []).append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            other = pairs.get(t)\n            if not other:\n                continue\n            for i, j in plist:\n                for k, l in other:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_be_expressed_by_sum(target, numbers, allow_reuse=True, must_use_at_least_one=True):\n    \"\"\"\n    Return True if `target` can be formed by adding numbers from `numbers`.\n\n    - If allow_reuse=True: each number can be used any number of times (unbounded subset sum / coin change).\n    - If allow_reuse=False: each number can be used at most once (subset sum).\n    - If must_use_at_least_one=True: disallow expressing target=0 with empty sum.\n\n    Assumes integers; supports negative targets only for bounded (allow_reuse=False).\n    \"\"\"\n    if not isinstance(numbers, (list, tuple, set)):\n        raise TypeError(\"numbers must be a list/tuple/set of integers\")\n    nums = [int(x) for x in numbers]\n    target = int(target)\n\n    if not nums:\n        return (not must_use_at_least_one) and target == 0\n\n    if allow_reuse:\n        # Unbounded reuse with negatives/zero can cause non-termination / undefined behavior.\n        if any(n <= 0 for n in nums):\n            raise ValueError(\"allow_reuse=True requires all numbers to be positive (no 0 or negatives).\")\n        if target < 0:\n            return False\n        # Classic coin-change feasibility DP\n        dp = [False] * (target + 1)\n        dp[0] = True\n        for s in range(1, target + 1):\n            for n in nums:\n                if n <= s and dp[s - n]:\n                    dp[s] = True\n                    break\n        if must_use_at_least_one and target == 0:\n            return False\n        return dp[target]\n    else:\n        # Bounded subset-sum supports negatives via set-of-sums DP.\n        sums = {0}\n        for n in nums:\n            sums |= {s + n for s in sums}\n        if must_use_at_least_one and target == 0:\n            # Ensure 0 can be made using at least one element\n            return any(n == 0 for n in nums) or any((s == 0) for s in sums if s != 0)\n        return target in sums",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Return True if `target` can be expressed as the sum of exactly four numbers\n    chosen from `numbers`.\n\n    - allow_reuse=True: the same value may be used multiple times.\n    - allow_reuse=False: each element can be used at most once.\n    \"\"\"\n    nums = [int(x) for x in numbers]\n    target = int(target)\n\n    if allow_reuse:\n        # Check all sums of two numbers (with reuse), then see if target - sum exists.\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        for s in pair_sums:\n            if (target - s) in pair_sums:\n                return True\n        return False\n    else:\n        # Exactly four distinct indices: use pair sums with index tracking.\n        # Build all i<j sums, then look for two disjoint pairs summing to target.\n        pairs = {}\n        n = len(nums)\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                if s not in pairs:\n                    pairs[s] = []\n                pairs[s].append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            if t not in pairs:\n                continue\n            for (i, j) in plist:\n                for (k, l) in pairs[t]:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Return True if `target` can be expressed as the sum of exactly four numbers\n    chosen from `numbers`, where all usable numbers must be positive and even.\n\n    - allow_reuse=True: same value may be used multiple times.\n    - allow_reuse=False: each element can be used at most once (distinct indices).\n    \"\"\"\n    target = int(target)\n    nums = [int(x) for x in numbers if int(x) > 0 and int(x) % 2 == 0]\n    if len(nums) == 0:\n        return False\n\n    if allow_reuse:\n        # If target is odd, impossible since sum of evens is even\n        if target % 2 != 0:\n            return False\n        # Two-sum-of-two-sums approach: O(m^2) time, O(m^2) memory\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        for s in pair_sums:\n            if (target - s) in pair_sums:\n                return True\n        return False\n    else:\n        n = len(nums)\n        if n < 4:\n            return False\n        if target % 2 != 0:\n            return False\n\n        # Store all i<j pair sums with their indices; then find two disjoint pairs.\n        pairs = {}\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                pairs.setdefault(s, []).append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            if t not in pairs:\n                continue\n            for (i, j) in plist:\n                for (k, l) in pairs[t]:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Check whether `target` can be written as the sum of exactly four numbers\n    from `numbers`, where chosen numbers must be positive and even.\n\n    Parameters\n    ----------\n    target : int\n        The specific number to test.\n    numbers : iterable of int\n        Candidate addends.\n    allow_reuse : bool\n        If True, values may be reused (same element/value can be picked multiple times).\n        If False, each element can be used at most once (four distinct indices).\n\n    Returns\n    -------\n    bool\n    \"\"\"\n    target = int(target)\n    nums = [int(x) for x in numbers if int(x) > 0 and int(x) % 2 == 0]\n\n    if target % 2 != 0:\n        return False  # sum of four evens is even\n    if allow_reuse:\n        if not nums:\n            return False\n        # Precompute all sums of two (with reuse), then see if target is sum of two such sums.\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        for s in pair_sums:\n            if (target - s) in pair_sums:\n                return True\n        return False\n    else:\n        n = len(nums)\n        if n < 4:\n            return False\n        # All i<j sums; need two disjoint pairs\n        pairs = {}\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                pairs.setdefault(s, []).append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            if t not in pairs:\n                continue\n            for (i, j) in plist:\n                for (k, l) in pairs[t]:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Return True iff `target` can be written as the sum of exactly four numbers\n    chosen from `numbers`, with the restriction that chosen numbers must be\n    positive and even.\n\n    If allow_reuse=True, you may reuse values.\n    If allow_reuse=False, you must use four distinct indices from `numbers`.\n    \"\"\"\n    target = int(target)\n    nums = [int(x) for x in numbers if int(x) > 0 and int(x) % 2 == 0]\n\n    # Minimum possible sum of four positive even integers is 2+2+2+2 = 8\n    if target < 8:\n        return False\n    # Sum of four even numbers must be even\n    if target % 2 != 0:\n        return False\n\n    if allow_reuse:\n        if not nums:\n            return False\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        return any((target - s) in pair_sums for s in pair_sums)\n    else:\n        n = len(nums)\n        if n < 4:\n            return False\n\n        pairs = {}\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                pairs.setdefault(s, []).append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            other = pairs.get(t)\n            if not other:\n                continue\n            for i, j in plist:\n                for k, l in other:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_be_expressed_by_sum(target, numbers, allow_reuse=True):\n    \"\"\"\n    Return True iff `target` can be written as the sum of exactly four numbers\n    chosen from `numbers`, where each chosen number must be positive and even.\n\n    allow_reuse=True  -> values may be used multiple times.\n    allow_reuse=False -> each list element can be used at most once (distinct indices).\n    \"\"\"\n    target = int(target)\n    nums = [int(x) for x in numbers if int(x) > 0 and int(x) % 2 == 0]\n\n    # Sum of four even numbers is even; minimum is 2+2+2+2 = 8.\n    if target % 2 != 0 or target < 8:\n        return False\n\n    if allow_reuse:\n        # With reuse, target is possible only if we can make it from two pair-sums.\n        if not nums:\n            return False\n        pair_sums = set()\n        for a in nums:\n            for b in nums:\n                pair_sums.add(a + b)\n        return any((target - s) in pair_sums for s in pair_sums)\n    else:\n        # Without reuse, need two disjoint pairs.\n        n = len(nums)\n        if n < 4:\n            return False\n\n        pairs = {}\n        for i in range(n):\n            for j in range(i + 1, n):\n                s = nums[i] + nums[j]\n                pairs.setdefault(s, []).append((i, j))\n\n        for s, plist in pairs.items():\n            t = target - s\n            other = pairs.get(t)\n            if not other:\n                continue\n            for i, j in plist:\n                for k, l in other:\n                    if i != k and i != l and j != k and j != l:\n                        return True\n        return False",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

@@ -1,0 +1,305 @@
+{
+  "sample_id": "sharded-livecodebench/2891",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 23:52:23",
+  "lic_conv_id": "6997e887175c537babc68cdb",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "How can I get the maximum beauty of the array by doing some operations?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(nums):\n    \"\"\"\n    Return the maximum possible \"beauty\" of an array after allowed operations.\n\n    Since your prompt doesn't include the exact problem statement (what \"beauty\"\n    means and what operations are allowed), this function implements the common\n    version of the problem:\n\n      - You may add or subtract any integer in [-k, k] to each element (or\n        equivalently, each element can be moved within an interval).\n      - Beauty is the maximum size of a subsequence that can be made equal.\n\n    If you intended a different definition/operation set, paste the full statement\n    and I\u2019ll adjust.\n\n    Expected input for this common variant:\n      nums: list[int] OR (list[int], int) packed \u2014 see below.\n\n    To support both calling styles:\n      - max_beauty_of_array([1,2,3], k=2)  [NOT supported because only one top-level function allowed]\n      - max_beauty_of_array(([1,2,3], 2))  -> 3\n      - max_beauty_of_array([1,2,3])       -> assumes k=0\n\n    Returns:\n      int: maximum beauty.\n\n    \"\"\"\n    # Backward-compatible parsing: allow nums to be either list[int] (k=0)\n    # or a tuple/list of (list[int], k).\n    k = 0\n    if isinstance(nums, (tuple, list)) and len(nums) == 2 and isinstance(nums[1], int) and isinstance(nums[0], list):\n        nums, k = nums[0], nums[1]\n\n    if not nums:\n        return 0\n\n    # Each value x can be shifted to any value in [x-k, x+k].\n    # We want maximum overlap among these intervals.\n    intervals = sorted((x - k, x + k) for x in nums)\n    ans = 0\n    j = 0\n    # Two-pointer on sorted intervals: maintain window where all intervals overlap,\n    # i.e., max(L) <= min(R). With sorted by L, max(L)=L[j] in window end, min(R)=min R in window.\n    # Easier: sort by left endpoints, and use min-heap of right endpoints, counting intervals\n    # whose right >= current left; then the maximum number of active intervals equals max overlap.\n    import heapq\n    heap = []\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        ans = max(ans, len(heap))\n    return ans\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "beauty is about making the longest sequence of the same number.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(nums):\n    \"\"\"\n    Maximum beauty = length of the longest sequence (subsequence) that can be made\n    the same number after operations where each element x can be changed to any\n    value in [x-k, x+k].\n\n    Input formats supported:\n      - nums is a list[int]            -> assumes k = 0\n      - nums is (list[int], k)         -> k is int\n      - nums is [list[int], k]         -> k is int\n\n    Returns: int\n    \"\"\"\n    k = 0\n    if isinstance(nums, (tuple, list)) and len(nums) == 2 and isinstance(nums[0], list) and isinstance(nums[1], int):\n        nums, k = nums[0], nums[1]\n\n    if not nums:\n        return 0\n\n    intervals = sorted((x - k, x + k) for x in nums)\n\n    import heapq\n    heap = []  # min-heap of right endpoints of currently overlapping intervals\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I can replace any number with anything from plus/minus k in one operation.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(nums):\n    \"\"\"\n    You may perform at most one operation per element: replace nums[i] with any\n    integer in [nums[i]-k, nums[i]+k]. Beauty = maximum number of elements that\n    can be made equal (longest sequence/subsequence of the same number).\n\n    Supported inputs:\n      - nums is a list[int]            -> assumes k = 0\n      - nums is (list[int], k) or [list[int], k]\n\n    Returns: int\n    \"\"\"\n    k = 0\n    if isinstance(nums, (tuple, list)) and len(nums) == 2 and isinstance(nums[0], list) and isinstance(nums[1], int):\n        nums, k = nums[0], nums[1]\n\n    if not nums:\n        return 0\n\n    # Each element can become any value in [x-k, x+k]. We need the maximum number\n    # of these intervals that overlap at some point => max overlap.\n    intervals = sorted((x - k, x + k) for x in nums)\n\n    import heapq\n    heap = []  # active interval right endpoints\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I can only change each number in the array once.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(nums):\n    \"\"\"\n    Each element can be changed at most once, to any integer in [x-k, x+k].\n    Beauty = maximum count of elements that can be made equal.\n\n    Input:\n      - nums as list[int] -> assumes k=0\n      - nums as (list[int], k) or [list[int], k]\n\n    Output: int\n    \"\"\"\n    k = 0\n    if isinstance(nums, (tuple, list)) and len(nums) == 2 and isinstance(nums[0], list) and isinstance(nums[1], int):\n        nums, k = nums[0], nums[1]\n\n    if not nums:\n        return 0\n\n    # One change per element is exactly the model \"choose any value in [x-k, x+k]\".\n    # Then the best equal-value count is the maximum overlap among these intervals.\n    intervals = sorted((x - k, x + k) for x in nums)\n\n    import heapq\n    heap = []\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the starting array is indexed from 0 and there's a non-negative integer k",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(data):\n    \"\"\"\n    Maximum beauty (max number of equal elements possible) when each element a[i]\n    (0-indexed) can be changed at most once to any integer in [a[i]-k, a[i]+k],\n    where k is a non-negative integer.\n\n    Accepts either:\n      - data = (nums, k) or [nums, k]\n      - data = nums  (then k is assumed 0)\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    if not nums:\n        return 0\n\n    # Each element defines an interval [x-k, x+k] of attainable values.\n    # Beauty = maximum number of intervals overlapping at a point.\n    intervals = sorted((x - k, x + k) for x in nums)\n\n    import heapq\n    heap = []  # min-heap of right endpoints of active intervals\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the array length is between 1 and 100,000",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(data):\n    \"\"\"\n    Compute the maximum beauty of an array (0-indexed) of length 1..100000.\n\n    Operation: for each i, at most once, replace nums[i] with any integer in\n    [nums[i]-k, nums[i]+k], where k is a non-negative integer.\n    Beauty: maximum number of elements that can be made equal.\n\n    Accepted inputs:\n      - data = (nums, k) or [nums, k]\n      - data = nums  (then k=0)\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    n = len(nums)\n    if n == 0:\n        return 0\n\n    # Each x gives an attainable interval [x-k, x+k]; beauty is max overlap.\n    intervals = [(x - k, x + k) for x in nums]\n    intervals.sort()\n\n    import heapq\n    heap = []\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the numbers in the array and k can be as high as 100,000",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(data):\n    \"\"\"\n    Operation: each element nums[i] can be changed at most once to any integer in\n    [nums[i]-k, nums[i]+k], with k >= 0.\n    Beauty: maximum number of elements that can be made equal.\n\n    Input forms supported:\n      - data = (nums, k) or [nums, k]\n      - data = nums  (assumes k = 0)\n\n    Constraints handled:\n      - 1 <= len(nums) <= 100000\n      - 0 <= nums[i], k <= 100000\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    if not nums:\n        return 0\n\n    # Max overlap among intervals [x-k, x+k].\n    nums.sort()\n    # With sorted nums, intervals' left endpoints are sorted; we can do a two-pointer\n    # directly: find largest window where nums[r] - nums[l] <= 2k.\n    # (Because [nums[l]-k, nums[l]+k] overlaps [nums[r]-k, nums[r]+k] iff nums[r]-nums[l] <= 2k)\n    best = 1\n    l = 0\n    limit = 2 * k\n    for r, val in enumerate(nums):\n        while val - nums[l] > limit:\n            l += 1\n        window = r - l + 1\n        if window > best:\n            best = window\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "like a subsequence, you can pick some numbers but not rearranging them to form the longest sequence.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(data):\n    \"\"\"\n    Beauty = maximum length of a subsequence (keep original order, can skip items)\n    that can be made all equal after at most one change per element, where each\n    nums[i] can be replaced by any integer in [nums[i]-k, nums[i]+k], k >= 0.\n\n    Because it's a subsequence (not necessarily contiguous) and order doesn't\n    matter for \"all equal\", the answer is simply the maximum number of elements\n    that can be changed to the same target value. That equals the maximum overlap\n    among intervals [nums[i]-k, nums[i]+k], which can be computed by sorting nums\n    and using a sliding window where nums[r] - nums[l] <= 2k.\n\n    Accepted inputs:\n      - data = (nums, k) or [nums, k]\n      - data = nums  (then k=0)\n\n    Constraints handled:\n      - 1 <= len(nums) <= 100000\n      - 0 <= nums[i], k <= 100000\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    if not nums:\n        return 0\n\n    nums.sort()\n    l = 0\n    best = 1\n    limit = 2 * k\n    for r in range(len(nums)):\n        while nums[r] - nums[l] > limit:\n            l += 1\n        w = r - l + 1\n        if w > best:\n            best = w\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example, with nums [4, 6, 1, 2] and k 2, the best I can get is a beauty of 3",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_beauty_of_array(data):\n    \"\"\"\n    Given nums (0-indexed) and non-negative k:\n      - Each element nums[i] can be changed at most once to any integer in\n        [nums[i]-k, nums[i]+k].\n      - Beauty is the maximum length of a subsequence that can be made all equal\n        (you may skip elements; you do NOT rearrange).\n\n    For a fixed target value t, an index i can be included iff t is in\n    [nums[i]-k, nums[i]+k]. So beauty is the maximum number of these intervals\n    overlapping at some t.\n\n    This equals the largest window in sorted nums with nums[r] - nums[l] <= 2k.\n\n    Accepts:\n      - data = (nums, k) or [nums, k]\n      - data = nums (then k=0)\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    nums.sort()\n    l = 0\n    best = 1\n    limit = 2 * k\n    for r in range(len(nums)):\n        while nums[r] - nums[l] > limit:\n            l += 1\n        w = r - l + 1\n        if w > best:\n            best = w\n    return best\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef max_beauty_of_array(nums):\n    \"\"\"\n    Return the maximum possible \"beauty\" of an array after allowed operations.\n\n    Since your prompt doesn't include the exact problem statement (what \"beauty\"\n    means and what operations are allowed), this function implements the common\n    version of the problem:\n\n      - You may add or subtract any integer in [-k, k] to each element (or\n        equivalently, each element can be moved within an interval).\n      - Beauty is the maximum size of a subsequence that can be made equal.\n\n    If you intended a different definition/operation set, paste the full statement\n    and I\u2019ll adjust.\n\n    Expected input for this common variant:\n      nums: list[int] OR (list[int], int) packed \u2014 see below.\n\n    To support both calling styles:\n      - max_beauty_of_array([1,2,3], k=2)  [NOT supported because only one top-level function allowed]\n      - max_beauty_of_array(([1,2,3], 2))  -> 3\n      - max_beauty_of_array([1,2,3])       -> assumes k=0\n\n    Returns:\n      int: maximum beauty.\n\n    \"\"\"\n    # Backward-compatible parsing: allow nums to be either list[int] (k=0)\n    # or a tuple/list of (list[int], k).\n    k = 0\n    if isinstance(nums, (tuple, list)) and len(nums) == 2 and isinstance(nums[1], int) and isinstance(nums[0], list):\n        nums, k = nums[0], nums[1]\n\n    if not nums:\n        return 0\n\n    # Each value x can be shifted to any value in [x-k, x+k].\n    # We want maximum overlap among these intervals.\n    intervals = sorted((x - k, x + k) for x in nums)\n    ans = 0\n    j = 0\n    # Two-pointer on sorted intervals: maintain window where all intervals overlap,\n    # i.e., max(L) <= min(R). With sorted by L, max(L)=L[j] in window end, min(R)=min R in window.\n    # Easier: sort by left endpoints, and use min-heap of right endpoints, counting intervals\n    # whose right >= current left; then the maximum number of active intervals equals max overlap.\n    import heapq\n    heap = []\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        ans = max(ans, len(heap))\n    return ans",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef max_beauty_of_array(nums):\n    \"\"\"\n    Maximum beauty = length of the longest sequence (subsequence) that can be made\n    the same number after operations where each element x can be changed to any\n    value in [x-k, x+k].\n\n    Input formats supported:\n      - nums is a list[int]            -> assumes k = 0\n      - nums is (list[int], k)         -> k is int\n      - nums is [list[int], k]         -> k is int\n\n    Returns: int\n    \"\"\"\n    k = 0\n    if isinstance(nums, (tuple, list)) and len(nums) == 2 and isinstance(nums[0], list) and isinstance(nums[1], int):\n        nums, k = nums[0], nums[1]\n\n    if not nums:\n        return 0\n\n    intervals = sorted((x - k, x + k) for x in nums)\n\n    import heapq\n    heap = []  # min-heap of right endpoints of currently overlapping intervals\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef max_beauty_of_array(nums):\n    \"\"\"\n    You may perform at most one operation per element: replace nums[i] with any\n    integer in [nums[i]-k, nums[i]+k]. Beauty = maximum number of elements that\n    can be made equal (longest sequence/subsequence of the same number).\n\n    Supported inputs:\n      - nums is a list[int]            -> assumes k = 0\n      - nums is (list[int], k) or [list[int], k]\n\n    Returns: int\n    \"\"\"\n    k = 0\n    if isinstance(nums, (tuple, list)) and len(nums) == 2 and isinstance(nums[0], list) and isinstance(nums[1], int):\n        nums, k = nums[0], nums[1]\n\n    if not nums:\n        return 0\n\n    # Each element can become any value in [x-k, x+k]. We need the maximum number\n    # of these intervals that overlap at some point => max overlap.\n    intervals = sorted((x - k, x + k) for x in nums)\n\n    import heapq\n    heap = []  # active interval right endpoints\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef max_beauty_of_array(nums):\n    \"\"\"\n    Each element can be changed at most once, to any integer in [x-k, x+k].\n    Beauty = maximum count of elements that can be made equal.\n\n    Input:\n      - nums as list[int] -> assumes k=0\n      - nums as (list[int], k) or [list[int], k]\n\n    Output: int\n    \"\"\"\n    k = 0\n    if isinstance(nums, (tuple, list)) and len(nums) == 2 and isinstance(nums[0], list) and isinstance(nums[1], int):\n        nums, k = nums[0], nums[1]\n\n    if not nums:\n        return 0\n\n    # One change per element is exactly the model \"choose any value in [x-k, x+k]\".\n    # Then the best equal-value count is the maximum overlap among these intervals.\n    intervals = sorted((x - k, x + k) for x in nums)\n\n    import heapq\n    heap = []\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef max_beauty_of_array(data):\n    \"\"\"\n    Maximum beauty (max number of equal elements possible) when each element a[i]\n    (0-indexed) can be changed at most once to any integer in [a[i]-k, a[i]+k],\n    where k is a non-negative integer.\n\n    Accepts either:\n      - data = (nums, k) or [nums, k]\n      - data = nums  (then k is assumed 0)\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    if not nums:\n        return 0\n\n    # Each element defines an interval [x-k, x+k] of attainable values.\n    # Beauty = maximum number of intervals overlapping at a point.\n    intervals = sorted((x - k, x + k) for x in nums)\n\n    import heapq\n    heap = []  # min-heap of right endpoints of active intervals\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef max_beauty_of_array(data):\n    \"\"\"\n    Compute the maximum beauty of an array (0-indexed) of length 1..100000.\n\n    Operation: for each i, at most once, replace nums[i] with any integer in\n    [nums[i]-k, nums[i]+k], where k is a non-negative integer.\n    Beauty: maximum number of elements that can be made equal.\n\n    Accepted inputs:\n      - data = (nums, k) or [nums, k]\n      - data = nums  (then k=0)\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    n = len(nums)\n    if n == 0:\n        return 0\n\n    # Each x gives an attainable interval [x-k, x+k]; beauty is max overlap.\n    intervals = [(x - k, x + k) for x in nums]\n    intervals.sort()\n\n    import heapq\n    heap = []\n    best = 0\n    for L, R in intervals:\n        heapq.heappush(heap, R)\n        while heap and heap[0] < L:\n            heapq.heappop(heap)\n        if len(heap) > best:\n            best = len(heap)\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def max_beauty_of_array(data):\n    \"\"\"\n    Operation: each element nums[i] can be changed at most once to any integer in\n    [nums[i]-k, nums[i]+k], with k >= 0.\n    Beauty: maximum number of elements that can be made equal.\n\n    Input forms supported:\n      - data = (nums, k) or [nums, k]\n      - data = nums  (assumes k = 0)\n\n    Constraints handled:\n      - 1 <= len(nums) <= 100000\n      - 0 <= nums[i], k <= 100000\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    if not nums:\n        return 0\n\n    # Max overlap among intervals [x-k, x+k].\n    nums.sort()\n    # With sorted nums, intervals' left endpoints are sorted; we can do a two-pointer\n    # directly: find largest window where nums[r] - nums[l] <= 2k.\n    # (Because [nums[l]-k, nums[l]+k] overlaps [nums[r]-k, nums[r]+k] iff nums[r]-nums[l] <= 2k)\n    best = 1\n    l = 0\n    limit = 2 * k\n    for r, val in enumerate(nums):\n        while val - nums[l] > limit:\n            l += 1\n        window = r - l + 1\n        if window > best:\n            best = window\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def max_beauty_of_array(data):\n    \"\"\"\n    Beauty = maximum length of a subsequence (keep original order, can skip items)\n    that can be made all equal after at most one change per element, where each\n    nums[i] can be replaced by any integer in [nums[i]-k, nums[i]+k], k >= 0.\n\n    Because it's a subsequence (not necessarily contiguous) and order doesn't\n    matter for \"all equal\", the answer is simply the maximum number of elements\n    that can be changed to the same target value. That equals the maximum overlap\n    among intervals [nums[i]-k, nums[i]+k], which can be computed by sorting nums\n    and using a sliding window where nums[r] - nums[l] <= 2k.\n\n    Accepted inputs:\n      - data = (nums, k) or [nums, k]\n      - data = nums  (then k=0)\n\n    Constraints handled:\n      - 1 <= len(nums) <= 100000\n      - 0 <= nums[i], k <= 100000\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    if not nums:\n        return 0\n\n    nums.sort()\n    l = 0\n    best = 1\n    limit = 2 * k\n    for r in range(len(nums)):\n        while nums[r] - nums[l] > limit:\n            l += 1\n        w = r - l + 1\n        if w > best:\n            best = w\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 9
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def max_beauty_of_array(data):\n    \"\"\"\n    Given nums (0-indexed) and non-negative k:\n      - Each element nums[i] can be changed at most once to any integer in\n        [nums[i]-k, nums[i]+k].\n      - Beauty is the maximum length of a subsequence that can be made all equal\n        (you may skip elements; you do NOT rearrange).\n\n    For a fixed target value t, an index i can be included iff t is in\n    [nums[i]-k, nums[i]+k]. So beauty is the maximum number of these intervals\n    overlapping at some t.\n\n    This equals the largest window in sorted nums with nums[r] - nums[l] <= 2k.\n\n    Accepts:\n      - data = (nums, k) or [nums, k]\n      - data = nums (then k=0)\n\n    Returns: int\n    \"\"\"\n    k = 0\n    nums = data\n    if isinstance(data, (tuple, list)) and len(data) == 2 and isinstance(data[0], list) and isinstance(data[1], int):\n        nums, k = data[0], data[1]\n\n    nums.sort()\n    l = 0\n    best = 1\n    limit = 2 * k\n    for r in range(len(nums)):\n        while nums[r] - nums[l] > limit:\n            l += 1\n        w = r - l + 1\n        if w > best:\n            best = w\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

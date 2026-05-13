@@ -1,0 +1,142 @@
+{
+  "sample_id": "sharded-spider-val-279-hard",
+  "task_name": "database",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 23:58:28",
+  "lic_conv_id": "6997e9f4175c537babc68d18",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are helping a user write SQL queries to a database. If something is not clear, you can ask the user to clarify what they need. The schema for the database being accessed is the following:\n        \nCREATE TABLE employee (\n    Employee_ID INT   PRIMARY KEY,\n    Name TEXT,\n    Age INT,\n    City TEXT,\n    UNIQUE (Employee_ID)\n);\n\nCREATE TABLE shop (\n    Shop_ID INT   PRIMARY KEY,\n    Name TEXT,\n    Location TEXT,\n    District TEXT,\n    Number_products INT,\n    Manager_name TEXT,\n    UNIQUE (Shop_ID)\n);\n\nCREATE TABLE hiring (\n    Shop_ID INT,\n    Employee_ID INT   PRIMARY KEY,\n    Start_from TEXT,\n    Is_full_time bool,\n    UNIQUE (Employee_ID),\n    FOREIGN KEY (Employee_ID) REFERENCES employee(Employee_ID),\n    FOREIGN KEY (Shop_ID) REFERENCES shop(Shop_ID)\n);\n\nCREATE TABLE evaluation (\n    Employee_ID TEXT   PRIMARY KEY,\n    Year_awarded TEXT   PRIMARY KEY,\n    Bonus REAL,\n    PRIMARY KEY (Employee_ID, Year_awarded),\n    UNIQUE (Employee_ID, Year_awarded),\n    FOREIGN KEY (Employee_ID) REFERENCES employee(Employee_ID)\n);",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "hard-working employee information",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "What do you mean by \u201chard-working\u201d? There isn\u2019t a \u201chard_working\u201d column in the schema, so we need a rule to identify them.\n\nCommon options (pick one):\n1) Employees who received a bonus (evaluation.Bonus > 0) in any year  \n2) Employees with total bonus over a threshold (e.g., SUM(Bonus) >= X)  \n3) Employees with bonuses in multiple years (e.g., COUNT(DISTINCT Year_awarded) >= 2)  \n4) Full-time employees (hiring.Is_full_time = true)\n\nMeanwhile, here are ready-to-use queries for each definition:\n\n**1) Bonus > 0 in any year**\n```sql\nSELECT e.Employee_ID, e.Name, e.Age, e.City\nFROM employee e\nWHERE EXISTS (\n  SELECT 1\n  FROM evaluation ev\n  WHERE ev.Employee_ID = e.Employee_ID\n    AND ev.Bonus > 0\n);\n```\n\n**2) Total bonus >= 1000 (change threshold)**\n```sql\nSELECT e.Employee_ID, e.Name, e.Age, e.City, SUM(ev.Bonus) AS total_bonus\nFROM employee e\nJOIN evaluation ev ON ev.Employee_ID = e.Employee_ID\nGROUP BY e.Employee_ID, e.Name, e.Age, e.City\nHAVING SUM(ev.Bonus) >= 1000;\n```\n\n**3) Bonuses in 2+ different years**\n```sql\nSELECT e.Employee_ID, e.Name, e.Age, e.City, COUNT(DISTINCT ev.Year_awarded) AS bonus_years\nFROM employee e\nJOIN evaluation ev ON ev.Employee_ID = e.Employee_ID\nWHERE ev.Bonus > 0\nGROUP BY e.Employee_ID, e.Name, e.Age, e.City\nHAVING COUNT(DISTINCT ev.Year_awarded) >= 2;\n```\n\n**4) Full-time employees**\n```sql\nSELECT e.Employee_ID, e.Name, e.Age, e.City, h.Shop_ID, h.Start_from\nFROM employee e\nJOIN hiring h ON h.Employee_ID = e.Employee_ID\nWHERE h.Is_full_time = true;\n```\n\nTell me which definition you want (and any thresholds), and whether you also want shop details included.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "bonus info is important, focus on the highest one-time bonus received by an employee.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\n-- Employee(s) with the highest one-time bonus (single evaluation record)\nSELECT\n  e.Employee_ID,\n  e.Name,\n  e.Age,\n  e.City,\n  ev.Year_awarded,\n  ev.Bonus\nFROM evaluation ev\nJOIN employee e\n  ON e.Employee_ID = ev.Employee_ID\nWHERE ev.Bonus = (SELECT MAX(Bonus) FROM evaluation);\n```\n\nIf you want only one row even when there are ties, tell me which SQL dialect you\u2019re using (SQLite/Postgres/MySQL) and what tie-breaker you prefer (e.g., earliest year, smallest Employee_ID).",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "The focus should be on the employee who got the highest one-time bonus.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT\n  e.Employee_ID,\n  e.Name,\n  e.Age,\n  e.City,\n  ev.Year_awarded,\n  ev.Bonus\nFROM evaluation ev\nJOIN employee e\n  ON e.Employee_ID = ev.Employee_ID\nORDER BY ev.Bonus DESC\nLIMIT 1;\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Make sure to get the name of the employee who got that highest one-time bonus.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```sql\nSELECT\n  e.Name,\n  ev.Bonus,\n  ev.Year_awarded\nFROM evaluation ev\nJOIN employee e\n  ON e.Employee_ID = ev.Employee_ID\nORDER BY ev.Bonus DESC\nLIMIT 1;\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "discussion",
+          "is_answer_attempt": false
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  e.Employee_ID,\n  e.Name,\n  e.Age,\n  e.City,\n  ev.Year_awarded,\n  ev.Bonus\nFROM evaluation ev\nJOIN employee e\n  ON e.Employee_ID = ev.Employee_ID\nWHERE ev.Bonus = (SELECT MAX(Bonus) FROM evaluation);",
+          "is_correct": null,
+          "score": 0.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  e.Employee_ID,\n  e.Name,\n  e.Age,\n  e.City,\n  ev.Year_awarded,\n  ev.Bonus\nFROM evaluation ev\nJOIN employee e\n  ON e.Employee_ID = ev.Employee_ID\nORDER BY ev.Bonus DESC\nLIMIT 1;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "SELECT\n  e.Name,\n  ev.Bonus,\n  ev.Year_awarded\nFROM evaluation ev\nJOIN employee e\n  ON e.Employee_ID = ev.Employee_ID\nORDER BY ev.Bonus DESC\nLIMIT 1;",
+          "is_correct": null,
+          "score": 0.0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

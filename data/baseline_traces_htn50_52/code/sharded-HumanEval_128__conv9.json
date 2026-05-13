@@ -1,0 +1,212 @@
+{
+  "sample_id": "sharded-HumanEval/128",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 12:17:46",
+  "lic_conv_id": "6998973a175c531041e0b104",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Calculate product of signs and aggregate them",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n\n    # If the first token is a count, use it; otherwise treat all tokens as numbers.\n    nums = []\n    try:\n        n = int(data[0])\n        if n == len(data) - 1:\n            nums = list(map(int, data[1:]))\n        else:\n            nums = list(map(int, data))\n    except Exception:\n        nums = list(map(int, data))\n\n    # Aggregate sign products over all unordered pairs: sum_{i<j} sign(ai)*sign(aj)\n    # with sign(x) in {-1,0,1}\n    pos = neg = zero = 0\n    for x in nums:\n        if x > 0:\n            pos += 1\n        elif x < 0:\n            neg += 1\n        else:\n            zero += 1\n\n    # Pairs involving zero contribute 0.\n    # (+,+): +1, (-,-): +1, (+,-): -1\n    ans = (pos * (pos - 1) // 2) + (neg * (neg - 1) // 2) - (pos * neg)\n\n    sys.stdout.write(str(ans))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "You'll start with a list of numbers.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(nums=None):\n    # If called with a Python list, return the aggregate.\n    # If used in a judge (no argument), read from stdin and print.\n    def sign(x):\n        return 1 if x > 0 else (-1 if x < 0 else 0)\n\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        # Accept either: \"n a1 a2 ... an\" or just \"a1 a2 ...\".\n        try:\n            n = int(data[0])\n            if n == len(data) - 1:\n                nums = list(map(int, data[1:]))\n            else:\n                nums = list(map(int, data))\n        except Exception:\n            nums = list(map(int, data))\n\n        pos = neg = 0\n        for x in nums:\n            if x > 0:\n                pos += 1\n            elif x < 0:\n                neg += 1\n        ans = pos * (pos - 1) // 2 + neg * (neg - 1) // 2 - pos * neg\n        sys.stdout.write(str(ans))\n        return\n\n    # Return value mode (given a list).\n    pos = neg = 0\n    for x in nums:\n        s = sign(x)\n        if s == 1:\n            pos += 1\n        elif s == -1:\n            neg += 1\n    return pos * (pos - 1) // 2 + neg * (neg - 1) // 2 - pos * neg\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "You need to add up the absolute values of the numbers as part of the calculations.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(nums=None):\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        # Accept either: \"n a1 a2 ... an\" or just \"a1 a2 ...\"\n        try:\n            n = int(data[0])\n            if n == len(data) - 1:\n                nums = list(map(int, data[1:]))\n            else:\n                nums = list(map(int, data))\n        except Exception:\n            nums = list(map(int, data))\n\n        total_abs = 0\n        sign_prod = 1  # product of signs over non-zero elements; becomes 0 if any zero\n        for x in nums:\n            if x < 0:\n                sign_prod *= -1\n                total_abs += -x\n            elif x > 0:\n                total_abs += x\n            else:\n                sign_prod = 0\n\n        sys.stdout.write(f\"{total_abs} {sign_prod}\")\n        return\n\n    total_abs = 0\n    sign_prod = 1\n    for x in nums:\n        if x < 0:\n            sign_prod *= -1\n            total_abs += -x\n        elif x > 0:\n            total_abs += x\n        else:\n            sign_prod = 0\n    return total_abs, sign_prod\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Signs can be 1, -1, or 0.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(nums=None):\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        # Accept either: \"n a1 a2 ... an\" or just \"a1 a2 ...\"\n        try:\n            n = int(data[0])\n            if n == len(data) - 1:\n                nums = list(map(int, data[1:]))\n            else:\n                nums = list(map(int, data))\n        except Exception:\n            nums = list(map(int, data))\n\n        sum_abs = 0\n        prod_sign = 1  # product of signs: 0 if any element is 0\n        for x in nums:\n            if x > 0:\n                sum_abs += x\n            elif x < 0:\n                sum_abs += -x\n                prod_sign = -prod_sign\n            else:\n                prod_sign = 0\n\n        sys.stdout.write(f\"{sum_abs} {prod_sign}\")\n        return\n\n    sum_abs = 0\n    prod_sign = 1\n    for x in nums:\n        if x > 0:\n            sum_abs += x\n        elif x < 0:\n            sum_abs += -x\n            prod_sign = -prod_sign\n        else:\n            prod_sign = 0\n    return sum_abs, prod_sign\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "If there are no numbers, you should return None.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(nums=None):\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        nums = list(map(int, data))\n        if not nums:\n            return\n\n        sum_abs = 0\n        prod_sign = 1  # product of signs; becomes 0 if any number is 0\n        for x in nums:\n            if x > 0:\n                sum_abs += x\n            elif x < 0:\n                sum_abs += -x\n                prod_sign = -prod_sign\n            else:\n                prod_sign = 0\n\n        sys.stdout.write(f\"{sum_abs} {prod_sign}\")\n        return\n\n    if not nums:\n        return None\n\n    sum_abs = 0\n    prod_sign = 1\n    for x in nums:\n        if x > 0:\n            sum_abs += x\n        elif x < 0:\n            sum_abs += -x\n            prod_sign = -prod_sign\n        else:\n            prod_sign = 0\n\n    return sum_abs, prod_sign\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Just to clarify, if the input is [0, 1], the output should be 0.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(nums=None):\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        nums = list(map(int, data))\n\n    if not nums:\n        return None\n\n    # Product of signs, where sign(x) in {-1, 0, 1}\n    prod_sign = 1\n    for x in nums:\n        if x == 0:\n            prod_sign = 0\n            break\n        elif x < 0:\n            prod_sign = -prod_sign\n\n    if nums is None:\n        sys.stdout.write(str(prod_sign))\n        return\n    return prod_sign\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n\n    # If the first token is a count, use it; otherwise treat all tokens as numbers.\n    nums = []\n    try:\n        n = int(data[0])\n        if n == len(data) - 1:\n            nums = list(map(int, data[1:]))\n        else:\n            nums = list(map(int, data))\n    except Exception:\n        nums = list(map(int, data))\n\n    # Aggregate sign products over all unordered pairs: sum_{i<j} sign(ai)*sign(aj)\n    # with sign(x) in {-1,0,1}\n    pos = neg = zero = 0\n    for x in nums:\n        if x > 0:\n            pos += 1\n        elif x < 0:\n            neg += 1\n        else:\n            zero += 1\n\n    # Pairs involving zero contribute 0.\n    # (+,+): +1, (-,-): +1, (+,-): -1\n    ans = (pos * (pos - 1) // 2) + (neg * (neg - 1) // 2) - (pos * neg)\n\n    sys.stdout.write(str(ans))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve(nums=None):\n    # If called with a Python list, return the aggregate.\n    # If used in a judge (no argument), read from stdin and print.\n    def sign(x):\n        return 1 if x > 0 else (-1 if x < 0 else 0)\n\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        # Accept either: \"n a1 a2 ... an\" or just \"a1 a2 ...\".\n        try:\n            n = int(data[0])\n            if n == len(data) - 1:\n                nums = list(map(int, data[1:]))\n            else:\n                nums = list(map(int, data))\n        except Exception:\n            nums = list(map(int, data))\n\n        pos = neg = 0\n        for x in nums:\n            if x > 0:\n                pos += 1\n            elif x < 0:\n                neg += 1\n        ans = pos * (pos - 1) // 2 + neg * (neg - 1) // 2 - pos * neg\n        sys.stdout.write(str(ans))\n        return\n\n    # Return value mode (given a list).\n    pos = neg = 0\n    for x in nums:\n        s = sign(x)\n        if s == 1:\n            pos += 1\n        elif s == -1:\n            neg += 1\n    return pos * (pos - 1) // 2 + neg * (neg - 1) // 2 - pos * neg",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve(nums=None):\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        # Accept either: \"n a1 a2 ... an\" or just \"a1 a2 ...\"\n        try:\n            n = int(data[0])\n            if n == len(data) - 1:\n                nums = list(map(int, data[1:]))\n            else:\n                nums = list(map(int, data))\n        except Exception:\n            nums = list(map(int, data))\n\n        total_abs = 0\n        sign_prod = 1  # product of signs over non-zero elements; becomes 0 if any zero\n        for x in nums:\n            if x < 0:\n                sign_prod *= -1\n                total_abs += -x\n            elif x > 0:\n                total_abs += x\n            else:\n                sign_prod = 0\n\n        sys.stdout.write(f\"{total_abs} {sign_prod}\")\n        return\n\n    total_abs = 0\n    sign_prod = 1\n    for x in nums:\n        if x < 0:\n            sign_prod *= -1\n            total_abs += -x\n        elif x > 0:\n            total_abs += x\n        else:\n            sign_prod = 0\n    return total_abs, sign_prod",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve(nums=None):\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        # Accept either: \"n a1 a2 ... an\" or just \"a1 a2 ...\"\n        try:\n            n = int(data[0])\n            if n == len(data) - 1:\n                nums = list(map(int, data[1:]))\n            else:\n                nums = list(map(int, data))\n        except Exception:\n            nums = list(map(int, data))\n\n        sum_abs = 0\n        prod_sign = 1  # product of signs: 0 if any element is 0\n        for x in nums:\n            if x > 0:\n                sum_abs += x\n            elif x < 0:\n                sum_abs += -x\n                prod_sign = -prod_sign\n            else:\n                prod_sign = 0\n\n        sys.stdout.write(f\"{sum_abs} {prod_sign}\")\n        return\n\n    sum_abs = 0\n    prod_sign = 1\n    for x in nums:\n        if x > 0:\n            sum_abs += x\n        elif x < 0:\n            sum_abs += -x\n            prod_sign = -prod_sign\n        else:\n            prod_sign = 0\n    return sum_abs, prod_sign",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve(nums=None):\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        nums = list(map(int, data))\n        if not nums:\n            return\n\n        sum_abs = 0\n        prod_sign = 1  # product of signs; becomes 0 if any number is 0\n        for x in nums:\n            if x > 0:\n                sum_abs += x\n            elif x < 0:\n                sum_abs += -x\n                prod_sign = -prod_sign\n            else:\n                prod_sign = 0\n\n        sys.stdout.write(f\"{sum_abs} {prod_sign}\")\n        return\n\n    if not nums:\n        return None\n\n    sum_abs = 0\n    prod_sign = 1\n    for x in nums:\n        if x > 0:\n            sum_abs += x\n        elif x < 0:\n            sum_abs += -x\n            prod_sign = -prod_sign\n        else:\n            prod_sign = 0\n\n    return sum_abs, prod_sign",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve(nums=None):\n    import sys\n\n    if nums is None:\n        data = sys.stdin.buffer.read().split()\n        if not data:\n            return\n        nums = list(map(int, data))\n\n    if not nums:\n        return None\n\n    # Product of signs, where sign(x) in {-1, 0, 1}\n    prod_sign = 1\n    for x in nums:\n        if x == 0:\n            prod_sign = 0\n            break\n        elif x < 0:\n            prod_sign = -prod_sign\n\n    if nums is None:\n        sys.stdout.write(str(prod_sign))\n        return\n    return prod_sign",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

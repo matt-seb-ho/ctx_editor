@@ -1,0 +1,150 @@
+{
+  "sample_id": "sharded-livecodebench/2866",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": true,
+  "score": 1.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 18:54:56",
+  "lic_conv_id": "6997b456175c5393aef16d09",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "longest subarray meeting conditions?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr=None, k=None, condition=None):\n    \"\"\"\n    Flexible helper for \"longest subarray meeting conditions\" style problems.\n\n    Modes:\n    1) If condition is provided (callable taking (window_data) -> bool), this function\n       cannot generally be solved efficiently without problem-specific structure, so\n       we fall back to O(n^2) checking.\n\n    2) Common fast built-ins (set by passing specific 'condition' strings):\n       - condition == \"sum_le_k\": longest subarray with sum <= k (non-negative arr)\n         Uses sliding window O(n).\n       - condition == \"sum_eq_k\": longest subarray with sum == k (any ints)\n         Uses prefix sums + earliest index O(n).\n       - condition == \"at_most_k_distinct\": longest subarray with <= k distinct\n         Uses sliding window + counts O(n).\n       - condition == \"max_minus_min_le_k\": longest subarray where max-min <= k\n         Uses two deques O(n).\n\n    Parameters:\n      arr: list[int]\n      k: int (meaning depends on condition)\n      condition: None/callable/str\n\n    Returns:\n      int: length of longest qualifying subarray.\n    \"\"\"\n    if arr is None:\n        return 0\n    n = len(arr)\n    if n == 0:\n        return 0\n\n    # Generic slow fallback for arbitrary predicate\n    if callable(condition):\n        best = 0\n        for i in range(n):\n            # build incrementally to reduce overhead a bit\n            window = []\n            for j in range(i, n):\n                window.append(arr[j])\n                if condition(window):\n                    best = max(best, j - i + 1)\n        return best\n\n    if condition == \"sum_le_k\":\n        # Requires non-negative elements for correctness.\n        if k is None:\n            raise ValueError(\"k required for sum_le_k\")\n        left = 0\n        s = 0\n        best = 0\n        for right, x in enumerate(arr):\n            s += x\n            while left <= right and s > k:\n                s -= arr[left]\n                left += 1\n            best = max(best, right - left + 1)\n        return best\n\n    if condition == \"sum_eq_k\":\n        if k is None:\n            raise ValueError(\"k required for sum_eq_k\")\n        pref = 0\n        first = {0: -1}  # prefix sum -> earliest index\n        best = 0\n        for i, x in enumerate(arr):\n            pref += x\n            need = pref - k\n            if need in first:\n                best = max(best, i - first[need])\n            if pref not in first:\n                first[pref] = i\n        return best\n\n    if condition == \"at_most_k_distinct\":\n        if k is None:\n            raise ValueError(\"k required for at_most_k_distinct\")\n        if k < 0:\n            return 0\n        left = 0\n        best = 0\n        counts = {}\n        distinct = 0\n        for right, x in enumerate(arr):\n            c = counts.get(x, 0)\n            if c == 0:\n                distinct += 1\n            counts[x] = c + 1\n            while distinct > k:\n                y = arr[left]\n                counts[y] -= 1\n                if counts[y] == 0:\n                    distinct -= 1\n                    del counts[y]\n                left += 1\n            best = max(best, right - left + 1)\n        return best\n\n    if condition == \"max_minus_min_le_k\":\n        if k is None:\n            raise ValueError(\"k required for max_minus_min_le_k\")\n        from collections import deque\n        minq = deque()  # increasing\n        maxq = deque()  # decreasing\n        left = 0\n        best = 0\n        for right, x in enumerate(arr):\n            while minq and arr[minq[-1]] > x:\n                minq.pop()\n            minq.append(right)\n            while maxq and arr[maxq[-1]] < x:\n                maxq.pop()\n            maxq.append(right)\n\n            while arr[maxq[0]] - arr[minq[0]] > k:\n                left += 1\n                if minq and minq[0] < left:\n                    minq.popleft()\n                if maxq and maxq[0] < left:\n                    maxq.popleft()\n\n            best = max(best, right - left + 1)\n        return best\n\n    # If no recognized condition provided, default to 0.\n    return 0\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the subarray has to start with an even number",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr):\n    n = len(arr)\n    best = 0\n    cur = 0  # length of current run since last odd (inclusive boundary)\n    for x in arr:\n        if x % 2 == 0:\n            cur += 1\n        else:\n            # any subarray starting with an even cannot cross this odd,\n            # so reset to 0 after an odd.\n            cur = 0\n        if cur > best:\n            best = cur\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the numbers in the subarray should alternate between even and odd",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr):\n    n = len(arr)\n    best = 0\n    cur = 0\n    prev_par = None  # 0 even, 1 odd\n\n    for x in arr:\n        par = x & 1\n        if cur == 0:\n            # must start with even\n            if par == 0:\n                cur = 1\n                prev_par = 0\n                best = max(best, cur)\n            else:\n                prev_par = None\n        else:\n            if par != prev_par:\n                cur += 1\n                prev_par = par\n                best = max(best, cur)\n            else:\n                # break; can restart at this element only if it's even\n                if par == 0:\n                    cur = 1\n                    prev_par = 0\n                    best = max(best, cur)\n                else:\n                    cur = 0\n                    prev_par = None\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "each number in the subarray has to be less than or equal to the threshold",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef longest_subarray_meeting_conditions(arr, threshold):\n    best = 0\n    cur = 0\n    prev_par = None  # 0 even, 1 odd\n\n    for x in arr:\n        # Hard break if value exceeds threshold: cannot be included.\n        if x > threshold:\n            cur = 0\n            prev_par = None\n            continue\n\n        par = x & 1\n\n        if cur == 0:\n            # subarray must start with even\n            if par == 0:\n                cur = 1\n                prev_par = 0\n                if cur > best:\n                    best = cur\n            else:\n                prev_par = None\n        else:\n            # must alternate parity\n            if par != prev_par:\n                cur += 1\n                prev_par = par\n                if cur > best:\n                    best = cur\n            else:\n                # restart if possible at this element\n                if par == 0:\n                    cur = 1\n                    prev_par = 0\n                    if cur > best:\n                        best = cur\n                else:\n                    cur = 0\n                    prev_par = None\n\n    return best\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from collections import deque\n\ndef longest_subarray_meeting_conditions(arr=None, k=None, condition=None):\n    \"\"\"\n    Flexible helper for \"longest subarray meeting conditions\" style problems.\n\n    Modes:\n    1) If condition is provided (callable taking (window_data) -> bool), this function\n       cannot generally be solved efficiently without problem-specific structure, so\n       we fall back to O(n^2) checking.\n\n    2) Common fast built-ins (set by passing specific 'condition' strings):\n       - condition == \"sum_le_k\": longest subarray with sum <= k (non-negative arr)\n         Uses sliding window O(n).\n       - condition == \"sum_eq_k\": longest subarray with sum == k (any ints)\n         Uses prefix sums + earliest index O(n).\n       - condition == \"at_most_k_distinct\": longest subarray with <= k distinct\n         Uses sliding window + counts O(n).\n       - condition == \"max_minus_min_le_k\": longest subarray where max-min <= k\n         Uses two deques O(n).\n\n    Parameters:\n      arr: list[int]\n      k: int (meaning depends on condition)\n      condition: None/callable/str\n\n    Returns:\n      int: length of longest qualifying subarray.\n    \"\"\"\n    if arr is None:\n        return 0\n    n = len(arr)\n    if n == 0:\n        return 0\n\n    # Generic slow fallback for arbitrary predicate\n    if callable(condition):\n        best = 0\n        for i in range(n):\n            # build incrementally to reduce overhead a bit\n            window = []\n            for j in range(i, n):\n                window.append(arr[j])\n                if condition(window):\n                    best = max(best, j - i + 1)\n        return best\n\n    if condition == \"sum_le_k\":\n        # Requires non-negative elements for correctness.\n        if k is None:\n            raise ValueError(\"k required for sum_le_k\")\n        left = 0\n        s = 0\n        best = 0\n        for right, x in enumerate(arr):\n            s += x\n            while left <= right and s > k:\n                s -= arr[left]\n                left += 1\n            best = max(best, right - left + 1)\n        return best\n\n    if condition == \"sum_eq_k\":\n        if k is None:\n            raise ValueError(\"k required for sum_eq_k\")\n        pref = 0\n        first = {0: -1}  # prefix sum -> earliest index\n        best = 0\n        for i, x in enumerate(arr):\n            pref += x\n            need = pref - k\n            if need in first:\n                best = max(best, i - first[need])\n            if pref not in first:\n                first[pref] = i\n        return best\n\n    if condition == \"at_most_k_distinct\":\n        if k is None:\n            raise ValueError(\"k required for at_most_k_distinct\")\n        if k < 0:\n            return 0\n        left = 0\n        best = 0\n        counts = {}\n        distinct = 0\n        for right, x in enumerate(arr):\n            c = counts.get(x, 0)\n            if c == 0:\n                distinct += 1\n            counts[x] = c + 1\n            while distinct > k:\n                y = arr[left]\n                counts[y] -= 1\n                if counts[y] == 0:\n                    distinct -= 1\n                    del counts[y]\n                left += 1\n            best = max(best, right - left + 1)\n        return best\n\n    if condition == \"max_minus_min_le_k\":\n        if k is None:\n            raise ValueError(\"k required for max_minus_min_le_k\")\n        from collections import deque\n        minq = deque()  # increasing\n        maxq = deque()  # decreasing\n        left = 0\n        best = 0\n        for right, x in enumerate(arr):\n            while minq and arr[minq[-1]] > x:\n                minq.pop()\n            minq.append(right)\n            while maxq and arr[maxq[-1]] < x:\n                maxq.pop()\n            maxq.append(right)\n\n            while arr[maxq[0]] - arr[minq[0]] > k:\n                left += 1\n                if minq and minq[0] < left:\n                    minq.popleft()\n                if maxq and maxq[0] < left:\n                    maxq.popleft()\n\n            best = max(best, right - left + 1)\n        return best\n\n    # If no recognized condition provided, default to 0.\n    return 0",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr):\n    n = len(arr)\n    best = 0\n    cur = 0  # length of current run since last odd (inclusive boundary)\n    for x in arr:\n        if x % 2 == 0:\n            cur += 1\n        else:\n            # any subarray starting with an even cannot cross this odd,\n            # so reset to 0 after an odd.\n            cur = 0\n        if cur > best:\n            best = cur\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr):\n    n = len(arr)\n    best = 0\n    cur = 0\n    prev_par = None  # 0 even, 1 odd\n\n    for x in arr:\n        par = x & 1\n        if cur == 0:\n            # must start with even\n            if par == 0:\n                cur = 1\n                prev_par = 0\n                best = max(best, cur)\n            else:\n                prev_par = None\n        else:\n            if par != prev_par:\n                cur += 1\n                prev_par = par\n                best = max(best, cur)\n            else:\n                # break; can restart at this element only if it's even\n                if par == 0:\n                    cur = 1\n                    prev_par = 0\n                    best = max(best, cur)\n                else:\n                    cur = 0\n                    prev_par = None\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def longest_subarray_meeting_conditions(arr, threshold):\n    best = 0\n    cur = 0\n    prev_par = None  # 0 even, 1 odd\n\n    for x in arr:\n        # Hard break if value exceeds threshold: cannot be included.\n        if x > threshold:\n            cur = 0\n            prev_par = None\n            continue\n\n        par = x & 1\n\n        if cur == 0:\n            # subarray must start with even\n            if par == 0:\n                cur = 1\n                prev_par = 0\n                if cur > best:\n                    best = cur\n            else:\n                prev_par = None\n        else:\n            # must alternate parity\n            if par != prev_par:\n                cur += 1\n                prev_par = par\n                if cur > best:\n                    best = cur\n            else:\n                # restart if possible at this element\n                if par == 0:\n                    cur = 1\n                    prev_par = 0\n                    if cur > best:\n                        best = cur\n                else:\n                    cur = 0\n                    prev_par = None\n\n    return best",
+          "is_correct": true,
+          "score": 1
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

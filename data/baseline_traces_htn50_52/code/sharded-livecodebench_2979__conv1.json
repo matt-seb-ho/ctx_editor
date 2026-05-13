@@ -1,0 +1,336 @@
+{
+  "sample_id": "sharded-livecodebench/2979",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 20:49:15",
+  "lic_conv_id": "6997bd9b175c5382b09443a9",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "how much gold can I make from house offers?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef house_offer_gold(offers, keep_house=None):\n    \"\"\"\n    Compute how much gold you can make from a set of house offers.\n\n    Parameters\n    ----------\n    offers : iterable\n        Each offer should be either:\n          - a dict with keys: {\"buy\": <number>, \"sell\": <number>} (or \"offer\"/\"price\" synonyms), or\n          - a 2-tuple/list: (buy_price, sell_price)\n        Gold made for one offer is max(0, sell - buy).\n\n    keep_house : int or None\n        If you must keep exactly one house (i.e., not sell it), pass its index (0-based).\n        That offer's profit is treated as 0 (you buy it and keep it).\n        If None, you take profit from all offers where sell > buy.\n\n    Returns\n    -------\n    number\n        Total gold you can make.\n\n    Notes\n    -----\n    This is a pure arithmetic helper. If your actual problem has constraints (e.g., you can only buy one\n    house, limited gold, choose the best subset, etc.), tell me those rules and I\u2019ll adapt it.\n    \"\"\"\n    total = 0\n    for i, off in enumerate(offers):\n        if isinstance(off, dict):\n            # accept common field names\n            buy = off.get(\"buy\", off.get(\"offer\", off.get(\"cost\", off.get(\"price\"))))\n            sell = off.get(\"sell\", off.get(\"payout\", off.get(\"value\", off.get(\"resale\"))))\n            if buy is None or sell is None:\n                raise ValueError(f\"Offer dict at index {i} must include buy/sell (or synonyms). Got: {off}\")\n        else:\n            if not (isinstance(off, (list, tuple)) and len(off) == 2):\n                raise ValueError(f\"Offer at index {i} must be a dict or a (buy, sell) pair. Got: {off}\")\n            buy, sell = off\n\n        if keep_house is not None and i == keep_house:\n            continue\n\n        profit = sell - buy\n        if profit > 0:\n            total += profit\n    return total\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I can get the max gold by considering the ranges that buyers want the houses in.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_gold_from_house_offers(ranges):\n    \"\"\"\n    Given buyers' acceptable price ranges for a house, compute the maximum gold you can make.\n\n    Model:\n      - You can \"source\" (buy) one house at some price x.\n      - You can sell that same house to every buyer whose acceptable range [L, R] contains x.\n      - Each such buyer pays you x, so profit from that buyer is x - L (equivalently: you had to at least\n        meet their minimum L; maximizing over x turns into a sweep problem).\n      - Total profit for a chosen x is:  sum_{i: L_i <= x <= R_i} (x - L_i)\n      - We want max over all real x. With integer endpoints, an optimal x occurs at some endpoint.\n\n    Input:\n      ranges: iterable of (L, R) with L <= R, numeric (typically ints).\n\n    Returns:\n      maximum profit (int if inputs are ints).\n    \"\"\"\n    events = {}\n    # For a given x, among \"active\" ranges (L<=x<=R):\n    # profit(x) = x*count_active - sum_L_active\n    # Maintain active count and sum_L via event sweep on x.\n    for L, R in ranges:\n        if L > R:\n            L, R = R, L\n        events[L] = events.get(L, [0, 0, 0])[0:3]\n        events[L] = [events[L][0] + 1, events[L][1] + L, events[L][2]]  # add at L\n        end = R\n        key = end + 1  # for integer endpoints; removing just after R\n        events[key] = events.get(key, [0, 0, 0])[0:3]\n        events[key] = [events[key][0], events[key][1], events[key][2] + 1]  # remove at R+1\n\n    # Sort sweep points\n    xs = sorted(events.keys())\n    active_cnt = 0\n    active_sumL = 0\n    best = 0\n\n    # Because we used R+1 removal (integer assumption), evaluate profit at each integer x that appears\n    # as an event point (which includes all L's). Also x just before a removal is already covered by R itself\n    # since R is either an L of something or within a flat interval where profit is linear; endpoints suffice.\n    for x in xs:\n        add_cnt, add_sumL, rem_cnt = events[x]\n        # Apply additions at x\n        active_cnt += add_cnt\n        active_sumL += add_sumL\n        # Evaluate at x (active ranges are those with L<=x and R>=x)\n        if active_cnt > 0:\n            profit = x * active_cnt - active_sumL\n            if profit > best:\n                best = profit\n        # Apply removals that start at x (these correspond to ranges ending at x-1)\n        active_cnt -= rem_cnt\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "buyers can\u2019t share houses, so each house can only be sold to one buyer.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_gold_from_house_offers(ranges):\n    \"\"\"\n    Maximum gold when each buyer can buy at most one house and each house can be sold to at most one buyer.\n\n    Interpreting the \"ranges buyers want the houses in\" as:\n      - You can obtain houses at a fixed cost equal to a buyer's minimum L (profit = sell_price - L).\n      - You can sell a house to buyer i at any price x within [L_i, R_i].\n      - Since you choose x, you'd sell at R_i for that buyer.\n      - With exclusivity (one house per buyer, one buyer per house), the best is simply sum of profits\n        for chosen buyers, but if you have only ONE house total then it\u2019s max(R-L).\n      - This function assumes you have as many houses available as buyers (so exclusivity doesn't bind\n        across different buyers), which would be trivial.\n\n    Because your statement implies a non-trivial matching problem, we instead solve the standard problem:\n      Given N houses with asking prices P_j and M buyers with acceptable ranges [L_i, R_i],\n      match each house to at most one buyer (and vice versa) if P_j in [L_i, R_i].\n      Profit for a match (buyer i, house j) is P_j - L_i (i.e., buy at L_i, sell at P_j).\n\n    To use this function, pass `ranges` in one of two forms:\n      1) {\"houses\": [P...], \"buyers\": [(L,R)...]}\n      2) (houses_list, buyers_list)\n\n    Returns maximum total profit (int).\n\n    Complexity: O((N+M) log M)\n    \"\"\"\n    if isinstance(ranges, dict):\n        houses = list(ranges.get(\"houses\", []))\n        buyers = list(ranges.get(\"buyers\", []))\n    else:\n        houses, buyers = ranges\n\n    houses.sort()\n    buyers = [(min(L, R), max(L, R)) for L, R in buyers]\n    # Sort buyers by L to add them as houses get large enough\n    buyers.sort(key=lambda t: t[0])\n\n    # We'll greedily match each house price p to an available buyer with R>=p,\n    # choosing the buyer with the L that maximizes profit (i.e., smallest L) among those who can take p.\n    # But they must also have L<=p. We add buyers with L<=p into a structure keyed by R,\n    # and among those with R>=p we want smallest L. We'll implement with two heaps:\n    #  - by_R: min-heap of (R, L) for buyers whose L<=current p and not yet expired\n    #  - eligible_L: min-heap of L for buyers with R>=p; to avoid deletions complexity, we pop from by_R\n    #    until R>=p, but that would drop buyers that might match later larger p; not correct.\n    #\n    # Correct greedy for interval-to-point matching with maximizing sum(p-L):\n    # Process houses in increasing p. Maintain a max-heap of candidate buyers' L among those with R>=p,\n    # but ensuring L<=p. A simpler correct approach:\n    #   - Sort buyers by R ascending.\n    #   - Sweep houses ascending; for each buyer (by increasing R), consider houses with p<=R and pick\n    #     one house to assign. That solves feasibility but profit depends on p-L.\n    #\n    # Instead, convert profit = p - L. For fixed p, best buyer is the one with minimal L among those\n    # whose interval covers p. This is classic: sort houses ascending, add buyers with L<=p, remove those with R<p.\n    # Among remaining, pick buyer with minimal L to maximize p-L for this p. This greedy is optimal.\n    #\n    import heapq\n\n    i = 0\n    # active buyers heap by L (min L first), but we must discard expired (R<p)\n    active = []  # entries: (L, R)\n    total = 0\n\n    for p in houses:\n        # add all buyers with L <= p\n        while i < len(buyers) and buyers[i][0] <= p:\n            L, R = buyers[i]\n            heapq.heappush(active, (L, R))\n            i += 1\n\n        # remove expired buyers (R < p)\n        while active and active[0][1] < p:\n            heapq.heappop(active)\n\n        if active:\n            L, R = heapq.heappop(active)\n            # match this house to this buyer at price p\n            total += p - L\n\n    return total\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I need to find the best way to sell the houses for maximum gold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_gold(houses, buyers):\n    \"\"\"\n    Maximize total gold by selling houses to buyers (1 house per buyer, 1 buyer per house).\n\n    You have houses with fixed sale prices `houses` (you sell a house for its price p).\n    Buyer i is willing to buy any house with price p in [L_i, R_i].\n    If buyer i buys a house priced p, your gold gain is (p - L_i).\n\n    Return the maximum total gold.\n\n    Parameters\n    ----------\n    houses : list[int] | list[float]\n        House prices.\n    buyers : list[tuple[int,int]] | list[tuple[float,float]]\n        Each (L, R) acceptable range.\n\n    Notes\n    -----\n    Greedy optimal:\n      - Sort houses by price ascending.\n      - As we consider a house price p, add all buyers with L <= p into a heap keyed by L.\n      - Remove from heap any buyers with R < p (can\u2019t buy this or any later (more expensive) house).\n      - If heap non-empty, match this house to the buyer with smallest L (maximizes p-L now; optimal overall).\n\n    Complexity: O((N+M) log M)\n    \"\"\"\n    import heapq\n\n    hs = sorted(houses)\n    bs = [(L, R) if L <= R else (R, L) for (L, R) in buyers]\n    bs.sort(key=lambda t: t[0])  # by L\n\n    active = []  # min-heap of (L, R) for buyers with L <= current p and not yet matched\n    i = 0\n    total = 0\n\n    for p in hs:\n        while i < len(bs) and bs[i][0] <= p:\n            heapq.heappush(active, bs[i])\n            i += 1\n\n        while active and active[0][1] < p:  # expired (R < p)\n            heapq.heappop(active)\n\n        if active:\n            L, R = heapq.heappop(active)  # smallest L -> largest profit for this p\n            total += p - L\n\n    return total\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "There are n houses lined up, numbered from 0 to n-1.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(data):\n    \"\"\"\n    Max gold from selling houses in a line.\n\n    Input (whitespace separated):\n      n m\n      (n integers)            # house prices p[0..n-1]\n      (m lines/tuples)        # each buyer: l r L R\n                              # buyer is interested in houses with index in [l,r] (inclusive)\n                              # and will buy a house whose price p is in [L,R] (inclusive)\n                              # profit from selling to that buyer is p - L\n      Constraints unspecified; solution is O((n+m) log m).\n\n    Output:\n      maximum total gold (each house sold to at most one buyer; each buyer buys at most one house)\n\n    Greedy:\n      Sweep houses from left to right by index.\n      Keep a heap of buyers that can buy the current index (l <= i) and are not expired by index (r >= i).\n      Also require price constraints: for current price p, buyer must satisfy L <= p <= R.\n      Among feasible buyers, choose smallest L to maximize profit for this house, which is optimal in this\n      one-dimensional sweep with single assignment per house.\n\n    If your problem statement differs (e.g., buyers specify only index range OR only price range), adjust\n    the parsing/filters accordingly.\n    \"\"\"\n    import heapq\n\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    prices = [int(next(it)) for _ in range(n)]\n\n    buyers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); L = int(next(it)); R = int(next(it))\n        if l > r:\n            l, r = r, l\n        if L > R:\n            L, R = R, L\n        buyers.append((l, r, L, R))\n\n    buyers.sort(key=lambda x: x[0])  # by l\n\n    # We need to select, for each house i with price p:\n    # any buyer with l<=i<=r and L<=p<=R. Profit = p-L. Use two heaps:\n    #  - candidates by L (min L first) for buyers active by index (l<=i) and not yet expired by index.\n    # We will lazily discard those not matching current price or expired index. But price feasibility depends on p,\n    # so discarding permanently for one p could be wrong for later p; thus we cannot just pop those with R<p etc.\n    # Therefore this exact greedy only works if price is monotone with i or if buyers only constrain indices.\n    #\n    # With arbitrary prices per index AND both index+price constraints, the problem becomes a general matching\n    # and needs a different algorithm (e.g., min-cost max-flow / Hungarian on bipartite graph), which is too\n    # unspecified.\n    #\n    # To keep it correct, we solve the case buyers constrain only indices (l,r) and have a fixed minimum L\n    # (no upper R), OR only prices. Since statement is incomplete, we implement the fully correct approach\n    # for the stated 4-tuple by using min-cost max-flow on the bipartite graph edges where constraints hold.\n\n    # Build min-cost max-flow (successive SPFA potentials) for correctness.\n    # Nodes: source -> buyers -> houses -> sink\n    # Edge buyer->house exists if l<=i<=r and L<=price[i]<=R with cost = -(price[i]-L) to maximize profit.\n    # Complexity O(V^2 * E) worst-case; OK for small/medium.\n    #\n    # If your constraints are large, provide them and we can switch to a faster specialized method.\n\n    N = 1 + m + n + 1\n    S = 0\n    buyer_off = 1\n    house_off = 1 + m\n    T = N - 1\n\n    g = [[] for _ in range(N)]\n    def add_edge(u, v, cap, cost):\n        g[u].append([v, cap, cost, None])\n        g[v].append([u, 0, -cost, None])\n        g[u][-1][3] = g[v][-1]\n        g[v][-1][3] = g[u][-1]\n\n    for bi in range(m):\n        add_edge(S, buyer_off + bi, 1, 0)\n    for hi in range(n):\n        add_edge(house_off + hi, T, 1, 0)\n\n    for bi, (l, r, L, R) in enumerate(buyers):\n        u = buyer_off + bi\n        for hi, p in enumerate(prices):\n            if l <= hi <= r and L <= p <= R:\n                profit = p - L\n                add_edge(u, house_off + hi, 1, -profit)\n\n    # Min-cost max-flow\n    import collections\n    flow = 0\n    cost = 0\n    potential = [0] * N\n\n    while True:\n        dist = [10**30] * N\n        inq = [False] * N\n        prev = [None] * N  # (node, edge_index)\n        dist[S] = 0\n        dq = collections.deque([S])\n        inq[S] = True\n        while dq:\n            u = dq.popleft()\n            inq[u] = False\n            for ei, e in enumerate(g[u]):\n                v, cap, c, rev = e\n                if cap <= 0:\n                    continue\n                nd = dist[u] + c + potential[u] - potential[v]\n                if nd < dist[v]:\n                    dist[v] = nd\n                    prev[v] = (u, ei)\n                    if not inq[v]:\n                        dq.append(v)\n                        inq[v] = True\n\n        if prev[T] is None:\n            break\n\n        for v in range(N):\n            if dist[v] < 10**30:\n                potential[v] += dist[v]\n\n        # augment 1 (all caps are 1 on path)\n        v = T\n        while v != S:\n            u, ei = prev[v]\n            e = g[u][ei]\n            e[1] -= 1\n            e[3][1] += 1\n            cost += e[2]\n            v = u\n        flow += 1\n\n    max_profit = -cost\n    return str(max_profit)\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example with 5 houses and offers like [[0,0,1],[0,2,2],[1,3,2]], I can make 3 gold as max profit",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(data):\n    \"\"\"\n    Max profit from house offers on a line.\n\n    Interpreting each offer as [l, r, g]:\n      - You may accept an offer to sell ONE house whose index i is in [l, r] (inclusive).\n      - If accepted, you earn exactly g gold.\n      - Each house can be sold at most once (so accepted offers must use distinct house indices).\n      - Each offer can be used at most once.\n\n    Goal: maximize total gold.\n\n    Example:\n      n=5, offers=[[0,0,1],[0,2,2],[1,3,2]]\n      Pick offer [0,0,1] uses house 0, and offer [1,3,2] uses house 1 (or 2/3) => total 3.\n\n    Input format (whitespace separated):\n      n m\n      then m lines: l r g\n\n    Output: maximum gold (int)\n\n    Complexity: O((n+m) log m)\n    \"\"\"\n    import heapq\n\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > r:\n            l, r = r, l\n        l = max(l, 0)\n        r = min(r, n - 1)\n        if l <= r:\n            offers.append((l, r, g))\n\n    offers.sort(key=lambda x: x[0])  # by l\n\n    # Sweep houses from left to right.\n    # At house i, add all offers with l<=i to a heap keyed by -g (max g first).\n    # Remove expired offers with r<i.\n    # If any offer remains, take the one with max g and assign it to this house i.\n    #\n    # This is optimal: at each house position, among offers that can use this house,\n    # taking the highest profit cannot reduce the achievable total (exchange argument).\n    h = []\n    j = 0\n    total = 0\n\n    for i in range(n):\n        while j < len(offers) and offers[j][0] <= i:\n            l, r, g = offers[j]\n            heapq.heappush(h, (-g, r))\n            j += 1\n\n        while h and h[0][1] < i:\n            heapq.heappop(h)\n\n        if h:\n            gneg, r = heapq.heappop(h)\n            total += -gneg  # sell this house to that offer\n\n    return str(total)\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "there could be up to 100,000 houses and offers",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(data):\n    \"\"\"\n    Max profit with up to 1e5 houses and offers.\n\n    Problem model:\n      - Houses are positions 0..n-1 (each house can be used at most once).\n      - Each offer is (l, r, g): you may take it at most once, assign it to ONE unused house i in [l, r],\n        and gain g gold.\n      - Maximize total gold.\n\n    Input (whitespace separated):\n      n m\n      m lines: l r g\n\n    Output:\n      maximum total gold\n\n    Algorithm: greedy sweep with a max-heap, O((n+m) log m)\n      - Sort offers by l.\n      - Sweep i=0..n-1:\n          * add offers with l<=i into heap keyed by g (max g first)\n          * drop expired offers with r<i\n          * if heap non-empty: take offer with largest g and assign it to house i\n    \"\"\"\n    import heapq\n\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > r:\n            l, r = r, l\n        if r < 0 or l >= n:\n            continue\n        if l < 0:\n            l = 0\n        if r >= n:\n            r = n - 1\n        offers.append((l, r, g))\n\n    offers.sort(key=lambda x: x[0])\n\n    h = []  # (-g, r)\n    j = 0\n    total = 0\n\n    for i in range(n):\n        while j < len(offers) and offers[j][0] <= i:\n            _, r, g = offers[j]\n            heapq.heappush(h, (-g, r))\n            j += 1\n\n        while h and h[0][1] < i:\n            heapq.heappop(h)\n\n        if h:\n            gneg, _ = heapq.heappop(h)\n            total += -gneg\n\n    return str(total)\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Each offer consists of three numbers: a low index, a high index, and the amount of gold offered.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(data):\n    import heapq\n\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > r:\n            l, r = r, l\n        if r < 0 or l >= n:\n            continue\n        if l < 0:\n            l = 0\n        if r >= n:\n            r = n - 1\n        offers.append((l, r, g))\n\n    offers.sort(key=lambda x: x[0])  # by l\n\n    # Sweep houses i=0..n-1:\n    # heap contains offers that can start at/before i, not yet used, and not expired (r>=i)\n    # pick the offer with max gold for the current house.\n    h = []  # entries (-gold, r)\n    j = 0\n    total = 0\n\n    for i in range(n):\n        while j < len(offers) and offers[j][0] <= i:\n            _, r, g = offers[j]\n            heapq.heappush(h, (-g, r))\n            j += 1\n\n        while h and h[0][1] < i:\n            heapq.heappop(h)\n\n        if h:\n            gneg, _ = heapq.heappop(h)\n            total += -gneg\n\n    return str(total)\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "The offer ranges will match the house numbers, so every offer you make has to fit within the house indices.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(data):\n    \"\"\"\n    Maximize gold by accepting non-overlapping-in-house offers.\n\n    Houses: indices 0..n-1, each house can be sold at most once.\n    Offer: (l, r, g) with 0 <= l <= r < n. If accepted, it uses exactly ONE house i in [l,r]\n           (chosen by you) and yields g gold. Each offer used at most once.\n\n    Input (whitespace separated):\n      n m\n      m lines: l r g\n\n    Output: maximum gold.\n\n    Note: The greedy-heap sweep (pick max g available at each i) is NOT always optimal.\n    Correct solution: min-cost max-flow is too slow for 1e5.\n    Here the problem is equivalent to:\n      - Choose a set of offers and assign each to a distinct house within its range.\n    This is exactly maximum weight bipartite matching in an interval graph, solvable in\n    O((n+m) log(n+m)) using a segment tree / DSU + sorting by gold descending.\n\n    We process offers in descending gold, and for each offer try to reserve any still-free house in [l,r].\n    If we can, take it and mark that house used. This is optimal because all weights are nonnegative and\n    feasibility depends only on available slots; picking higher weights first with any feasible slot works\n    (matroid greedy / transversal matroid).\n    \"\"\"\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        # per statement, already within bounds; still normalize\n        if l > r:\n            l, r = r, l\n        offers.append((g, l, r))\n\n    offers.sort(reverse=True)  # by gold desc\n\n    # DSU \"next free position\": parent[i] = smallest free index >= i; parent[n]=n sentinel\n    parent = list(range(n + 1))\n\n    # iterative find with path compression\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g, l, r in offers:\n        i = find(l)\n        if i <= r:\n            total += g\n            parent[i] = find(i + 1)  # mark i used\n\n    return str(total)\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Each offer will give between 1 and 1000 gold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve(data):\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > r:\n            l, r = r, l\n        offers.append((g, l, r))\n\n    # Gold is in [1,1000], so we can bucket-sort by gold instead of full sort.\n    buckets = [[] for _ in range(1001)]\n    for g, l, r in offers:\n        buckets[g].append((l, r))\n\n    parent = list(range(n + 1))\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g in range(1000, 0, -1):\n        for l, r in buckets[g]:\n            i = find(l)\n            if i <= r:\n                total += g\n                parent[i] = find(i + 1)\n\n    return str(total)\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def house_offer_gold(offers, keep_house=None):\n    \"\"\"\n    Compute how much gold you can make from a set of house offers.\n\n    Parameters\n    ----------\n    offers : iterable\n        Each offer should be either:\n          - a dict with keys: {\"buy\": <number>, \"sell\": <number>} (or \"offer\"/\"price\" synonyms), or\n          - a 2-tuple/list: (buy_price, sell_price)\n        Gold made for one offer is max(0, sell - buy).\n\n    keep_house : int or None\n        If you must keep exactly one house (i.e., not sell it), pass its index (0-based).\n        That offer's profit is treated as 0 (you buy it and keep it).\n        If None, you take profit from all offers where sell > buy.\n\n    Returns\n    -------\n    number\n        Total gold you can make.\n\n    Notes\n    -----\n    This is a pure arithmetic helper. If your actual problem has constraints (e.g., you can only buy one\n    house, limited gold, choose the best subset, etc.), tell me those rules and I\u2019ll adapt it.\n    \"\"\"\n    total = 0\n    for i, off in enumerate(offers):\n        if isinstance(off, dict):\n            # accept common field names\n            buy = off.get(\"buy\", off.get(\"offer\", off.get(\"cost\", off.get(\"price\"))))\n            sell = off.get(\"sell\", off.get(\"payout\", off.get(\"value\", off.get(\"resale\"))))\n            if buy is None or sell is None:\n                raise ValueError(f\"Offer dict at index {i} must include buy/sell (or synonyms). Got: {off}\")\n        else:\n            if not (isinstance(off, (list, tuple)) and len(off) == 2):\n                raise ValueError(f\"Offer at index {i} must be a dict or a (buy, sell) pair. Got: {off}\")\n            buy, sell = off\n\n        if keep_house is not None and i == keep_house:\n            continue\n\n        profit = sell - buy\n        if profit > 0:\n            total += profit\n    return total",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def max_gold_from_house_offers(ranges):\n    \"\"\"\n    Given buyers' acceptable price ranges for a house, compute the maximum gold you can make.\n\n    Model:\n      - You can \"source\" (buy) one house at some price x.\n      - You can sell that same house to every buyer whose acceptable range [L, R] contains x.\n      - Each such buyer pays you x, so profit from that buyer is x - L (equivalently: you had to at least\n        meet their minimum L; maximizing over x turns into a sweep problem).\n      - Total profit for a chosen x is:  sum_{i: L_i <= x <= R_i} (x - L_i)\n      - We want max over all real x. With integer endpoints, an optimal x occurs at some endpoint.\n\n    Input:\n      ranges: iterable of (L, R) with L <= R, numeric (typically ints).\n\n    Returns:\n      maximum profit (int if inputs are ints).\n    \"\"\"\n    events = {}\n    # For a given x, among \"active\" ranges (L<=x<=R):\n    # profit(x) = x*count_active - sum_L_active\n    # Maintain active count and sum_L via event sweep on x.\n    for L, R in ranges:\n        if L > R:\n            L, R = R, L\n        events[L] = events.get(L, [0, 0, 0])[0:3]\n        events[L] = [events[L][0] + 1, events[L][1] + L, events[L][2]]  # add at L\n        end = R\n        key = end + 1  # for integer endpoints; removing just after R\n        events[key] = events.get(key, [0, 0, 0])[0:3]\n        events[key] = [events[key][0], events[key][1], events[key][2] + 1]  # remove at R+1\n\n    # Sort sweep points\n    xs = sorted(events.keys())\n    active_cnt = 0\n    active_sumL = 0\n    best = 0\n\n    # Because we used R+1 removal (integer assumption), evaluate profit at each integer x that appears\n    # as an event point (which includes all L's). Also x just before a removal is already covered by R itself\n    # since R is either an L of something or within a flat interval where profit is linear; endpoints suffice.\n    for x in xs:\n        add_cnt, add_sumL, rem_cnt = events[x]\n        # Apply additions at x\n        active_cnt += add_cnt\n        active_sumL += add_sumL\n        # Evaluate at x (active ranges are those with L<=x and R>=x)\n        if active_cnt > 0:\n            profit = x * active_cnt - active_sumL\n            if profit > best:\n                best = profit\n        # Apply removals that start at x (these correspond to ranges ending at x-1)\n        active_cnt -= rem_cnt\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef max_gold_from_house_offers(ranges):\n    \"\"\"\n    Maximum gold when each buyer can buy at most one house and each house can be sold to at most one buyer.\n\n    Interpreting the \"ranges buyers want the houses in\" as:\n      - You can obtain houses at a fixed cost equal to a buyer's minimum L (profit = sell_price - L).\n      - You can sell a house to buyer i at any price x within [L_i, R_i].\n      - Since you choose x, you'd sell at R_i for that buyer.\n      - With exclusivity (one house per buyer, one buyer per house), the best is simply sum of profits\n        for chosen buyers, but if you have only ONE house total then it\u2019s max(R-L).\n      - This function assumes you have as many houses available as buyers (so exclusivity doesn't bind\n        across different buyers), which would be trivial.\n\n    Because your statement implies a non-trivial matching problem, we instead solve the standard problem:\n      Given N houses with asking prices P_j and M buyers with acceptable ranges [L_i, R_i],\n      match each house to at most one buyer (and vice versa) if P_j in [L_i, R_i].\n      Profit for a match (buyer i, house j) is P_j - L_i (i.e., buy at L_i, sell at P_j).\n\n    To use this function, pass `ranges` in one of two forms:\n      1) {\"houses\": [P...], \"buyers\": [(L,R)...]}\n      2) (houses_list, buyers_list)\n\n    Returns maximum total profit (int).\n\n    Complexity: O((N+M) log M)\n    \"\"\"\n    if isinstance(ranges, dict):\n        houses = list(ranges.get(\"houses\", []))\n        buyers = list(ranges.get(\"buyers\", []))\n    else:\n        houses, buyers = ranges\n\n    houses.sort()\n    buyers = [(min(L, R), max(L, R)) for L, R in buyers]\n    # Sort buyers by L to add them as houses get large enough\n    buyers.sort(key=lambda t: t[0])\n\n    # We'll greedily match each house price p to an available buyer with R>=p,\n    # choosing the buyer with the L that maximizes profit (i.e., smallest L) among those who can take p.\n    # But they must also have L<=p. We add buyers with L<=p into a structure keyed by R,\n    # and among those with R>=p we want smallest L. We'll implement with two heaps:\n    #  - by_R: min-heap of (R, L) for buyers whose L<=current p and not yet expired\n    #  - eligible_L: min-heap of L for buyers with R>=p; to avoid deletions complexity, we pop from by_R\n    #    until R>=p, but that would drop buyers that might match later larger p; not correct.\n    #\n    # Correct greedy for interval-to-point matching with maximizing sum(p-L):\n    # Process houses in increasing p. Maintain a max-heap of candidate buyers' L among those with R>=p,\n    # but ensuring L<=p. A simpler correct approach:\n    #   - Sort buyers by R ascending.\n    #   - Sweep houses ascending; for each buyer (by increasing R), consider houses with p<=R and pick\n    #     one house to assign. That solves feasibility but profit depends on p-L.\n    #\n    # Instead, convert profit = p - L. For fixed p, best buyer is the one with minimal L among those\n    # whose interval covers p. This is classic: sort houses ascending, add buyers with L<=p, remove those with R<p.\n    # Among remaining, pick buyer with minimal L to maximize p-L for this p. This greedy is optimal.\n    #\n    import heapq\n\n    i = 0\n    # active buyers heap by L (min L first), but we must discard expired (R<p)\n    active = []  # entries: (L, R)\n    total = 0\n\n    for p in houses:\n        # add all buyers with L <= p\n        while i < len(buyers) and buyers[i][0] <= p:\n            L, R = buyers[i]\n            heapq.heappush(active, (L, R))\n            i += 1\n\n        # remove expired buyers (R < p)\n        while active and active[0][1] < p:\n            heapq.heappop(active)\n\n        if active:\n            L, R = heapq.heappop(active)\n            # match this house to this buyer at price p\n            total += p - L\n\n    return total",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef max_gold(houses, buyers):\n    \"\"\"\n    Maximize total gold by selling houses to buyers (1 house per buyer, 1 buyer per house).\n\n    You have houses with fixed sale prices `houses` (you sell a house for its price p).\n    Buyer i is willing to buy any house with price p in [L_i, R_i].\n    If buyer i buys a house priced p, your gold gain is (p - L_i).\n\n    Return the maximum total gold.\n\n    Parameters\n    ----------\n    houses : list[int] | list[float]\n        House prices.\n    buyers : list[tuple[int,int]] | list[tuple[float,float]]\n        Each (L, R) acceptable range.\n\n    Notes\n    -----\n    Greedy optimal:\n      - Sort houses by price ascending.\n      - As we consider a house price p, add all buyers with L <= p into a heap keyed by L.\n      - Remove from heap any buyers with R < p (can\u2019t buy this or any later (more expensive) house).\n      - If heap non-empty, match this house to the buyer with smallest L (maximizes p-L now; optimal overall).\n\n    Complexity: O((N+M) log M)\n    \"\"\"\n    import heapq\n\n    hs = sorted(houses)\n    bs = [(L, R) if L <= R else (R, L) for (L, R) in buyers]\n    bs.sort(key=lambda t: t[0])  # by L\n\n    active = []  # min-heap of (L, R) for buyers with L <= current p and not yet matched\n    i = 0\n    total = 0\n\n    for p in hs:\n        while i < len(bs) and bs[i][0] <= p:\n            heapq.heappush(active, bs[i])\n            i += 1\n\n        while active and active[0][1] < p:  # expired (R < p)\n            heapq.heappop(active)\n\n        if active:\n            L, R = heapq.heappop(active)  # smallest L -> largest profit for this p\n            total += p - L\n\n    return total",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\nimport collections\n\ndef solve(data):\n    \"\"\"\n    Max gold from selling houses in a line.\n\n    Input (whitespace separated):\n      n m\n      (n integers)            # house prices p[0..n-1]\n      (m lines/tuples)        # each buyer: l r L R\n                              # buyer is interested in houses with index in [l,r] (inclusive)\n                              # and will buy a house whose price p is in [L,R] (inclusive)\n                              # profit from selling to that buyer is p - L\n      Constraints unspecified; solution is O((n+m) log m).\n\n    Output:\n      maximum total gold (each house sold to at most one buyer; each buyer buys at most one house)\n\n    Greedy:\n      Sweep houses from left to right by index.\n      Keep a heap of buyers that can buy the current index (l <= i) and are not expired by index (r >= i).\n      Also require price constraints: for current price p, buyer must satisfy L <= p <= R.\n      Among feasible buyers, choose smallest L to maximize profit for this house, which is optimal in this\n      one-dimensional sweep with single assignment per house.\n\n    If your problem statement differs (e.g., buyers specify only index range OR only price range), adjust\n    the parsing/filters accordingly.\n    \"\"\"\n    import heapq\n\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    prices = [int(next(it)) for _ in range(n)]\n\n    buyers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); L = int(next(it)); R = int(next(it))\n        if l > r:\n            l, r = r, l\n        if L > R:\n            L, R = R, L\n        buyers.append((l, r, L, R))\n\n    buyers.sort(key=lambda x: x[0])  # by l\n\n    # We need to select, for each house i with price p:\n    # any buyer with l<=i<=r and L<=p<=R. Profit = p-L. Use two heaps:\n    #  - candidates by L (min L first) for buyers active by index (l<=i) and not yet expired by index.\n    # We will lazily discard those not matching current price or expired index. But price feasibility depends on p,\n    # so discarding permanently for one p could be wrong for later p; thus we cannot just pop those with R<p etc.\n    # Therefore this exact greedy only works if price is monotone with i or if buyers only constrain indices.\n    #\n    # With arbitrary prices per index AND both index+price constraints, the problem becomes a general matching\n    # and needs a different algorithm (e.g., min-cost max-flow / Hungarian on bipartite graph), which is too\n    # unspecified.\n    #\n    # To keep it correct, we solve the case buyers constrain only indices (l,r) and have a fixed minimum L\n    # (no upper R), OR only prices. Since statement is incomplete, we implement the fully correct approach\n    # for the stated 4-tuple by using min-cost max-flow on the bipartite graph edges where constraints hold.\n\n    # Build min-cost max-flow (successive SPFA potentials) for correctness.\n    # Nodes: source -> buyers -> houses -> sink\n    # Edge buyer->house exists if l<=i<=r and L<=price[i]<=R with cost = -(price[i]-L) to maximize profit.\n    # Complexity O(V^2 * E) worst-case; OK for small/medium.\n    #\n    # If your constraints are large, provide them and we can switch to a faster specialized method.\n\n    N = 1 + m + n + 1\n    S = 0\n    buyer_off = 1\n    house_off = 1 + m\n    T = N - 1\n\n    g = [[] for _ in range(N)]\n    def add_edge(u, v, cap, cost):\n        g[u].append([v, cap, cost, None])\n        g[v].append([u, 0, -cost, None])\n        g[u][-1][3] = g[v][-1]\n        g[v][-1][3] = g[u][-1]\n\n    for bi in range(m):\n        add_edge(S, buyer_off + bi, 1, 0)\n    for hi in range(n):\n        add_edge(house_off + hi, T, 1, 0)\n\n    for bi, (l, r, L, R) in enumerate(buyers):\n        u = buyer_off + bi\n        for hi, p in enumerate(prices):\n            if l <= hi <= r and L <= p <= R:\n                profit = p - L\n                add_edge(u, house_off + hi, 1, -profit)\n\n    # Min-cost max-flow\n    import collections\n    flow = 0\n    cost = 0\n    potential = [0] * N\n\n    while True:\n        dist = [10**30] * N\n        inq = [False] * N\n        prev = [None] * N  # (node, edge_index)\n        dist[S] = 0\n        dq = collections.deque([S])\n        inq[S] = True\n        while dq:\n            u = dq.popleft()\n            inq[u] = False\n            for ei, e in enumerate(g[u]):\n                v, cap, c, rev = e\n                if cap <= 0:\n                    continue\n                nd = dist[u] + c + potential[u] - potential[v]\n                if nd < dist[v]:\n                    dist[v] = nd\n                    prev[v] = (u, ei)\n                    if not inq[v]:\n                        dq.append(v)\n                        inq[v] = True\n\n        if prev[T] is None:\n            break\n\n        for v in range(N):\n            if dist[v] < 10**30:\n                potential[v] += dist[v]\n\n        # augment 1 (all caps are 1 on path)\n        v = T\n        while v != S:\n            u, ei = prev[v]\n            e = g[u][ei]\n            e[1] -= 1\n            e[3][1] += 1\n            cost += e[2]\n            v = u\n        flow += 1\n\n    max_profit = -cost\n    return str(max_profit)",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef solve(data):\n    \"\"\"\n    Max profit from house offers on a line.\n\n    Interpreting each offer as [l, r, g]:\n      - You may accept an offer to sell ONE house whose index i is in [l, r] (inclusive).\n      - If accepted, you earn exactly g gold.\n      - Each house can be sold at most once (so accepted offers must use distinct house indices).\n      - Each offer can be used at most once.\n\n    Goal: maximize total gold.\n\n    Example:\n      n=5, offers=[[0,0,1],[0,2,2],[1,3,2]]\n      Pick offer [0,0,1] uses house 0, and offer [1,3,2] uses house 1 (or 2/3) => total 3.\n\n    Input format (whitespace separated):\n      n m\n      then m lines: l r g\n\n    Output: maximum gold (int)\n\n    Complexity: O((n+m) log m)\n    \"\"\"\n    import heapq\n\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > r:\n            l, r = r, l\n        l = max(l, 0)\n        r = min(r, n - 1)\n        if l <= r:\n            offers.append((l, r, g))\n\n    offers.sort(key=lambda x: x[0])  # by l\n\n    # Sweep houses from left to right.\n    # At house i, add all offers with l<=i to a heap keyed by -g (max g first).\n    # Remove expired offers with r<i.\n    # If any offer remains, take the one with max g and assign it to this house i.\n    #\n    # This is optimal: at each house position, among offers that can use this house,\n    # taking the highest profit cannot reduce the achievable total (exchange argument).\n    h = []\n    j = 0\n    total = 0\n\n    for i in range(n):\n        while j < len(offers) and offers[j][0] <= i:\n            l, r, g = offers[j]\n            heapq.heappush(h, (-g, r))\n            j += 1\n\n        while h and h[0][1] < i:\n            heapq.heappop(h)\n\n        if h:\n            gneg, r = heapq.heappop(h)\n            total += -gneg  # sell this house to that offer\n\n    return str(total)",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef solve(data):\n    \"\"\"\n    Max profit with up to 1e5 houses and offers.\n\n    Problem model:\n      - Houses are positions 0..n-1 (each house can be used at most once).\n      - Each offer is (l, r, g): you may take it at most once, assign it to ONE unused house i in [l, r],\n        and gain g gold.\n      - Maximize total gold.\n\n    Input (whitespace separated):\n      n m\n      m lines: l r g\n\n    Output:\n      maximum total gold\n\n    Algorithm: greedy sweep with a max-heap, O((n+m) log m)\n      - Sort offers by l.\n      - Sweep i=0..n-1:\n          * add offers with l<=i into heap keyed by g (max g first)\n          * drop expired offers with r<i\n          * if heap non-empty: take offer with largest g and assign it to house i\n    \"\"\"\n    import heapq\n\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > r:\n            l, r = r, l\n        if r < 0 or l >= n:\n            continue\n        if l < 0:\n            l = 0\n        if r >= n:\n            r = n - 1\n        offers.append((l, r, g))\n\n    offers.sort(key=lambda x: x[0])\n\n    h = []  # (-g, r)\n    j = 0\n    total = 0\n\n    for i in range(n):\n        while j < len(offers) and offers[j][0] <= i:\n            _, r, g = offers[j]\n            heapq.heappush(h, (-g, r))\n            j += 1\n\n        while h and h[0][1] < i:\n            heapq.heappop(h)\n\n        if h:\n            gneg, _ = heapq.heappop(h)\n            total += -gneg\n\n    return str(total)",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import heapq\n\ndef solve(data):\n    import heapq\n\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > r:\n            l, r = r, l\n        if r < 0 or l >= n:\n            continue\n        if l < 0:\n            l = 0\n        if r >= n:\n            r = n - 1\n        offers.append((l, r, g))\n\n    offers.sort(key=lambda x: x[0])  # by l\n\n    # Sweep houses i=0..n-1:\n    # heap contains offers that can start at/before i, not yet used, and not expired (r>=i)\n    # pick the offer with max gold for the current house.\n    h = []  # entries (-gold, r)\n    j = 0\n    total = 0\n\n    for i in range(n):\n        while j < len(offers) and offers[j][0] <= i:\n            _, r, g = offers[j]\n            heapq.heappush(h, (-g, r))\n            j += 1\n\n        while h and h[0][1] < i:\n            heapq.heappop(h)\n\n        if h:\n            gneg, _ = heapq.heappop(h)\n            total += -gneg\n\n    return str(total)",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 9
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def solve(data):\n    \"\"\"\n    Maximize gold by accepting non-overlapping-in-house offers.\n\n    Houses: indices 0..n-1, each house can be sold at most once.\n    Offer: (l, r, g) with 0 <= l <= r < n. If accepted, it uses exactly ONE house i in [l,r]\n           (chosen by you) and yields g gold. Each offer used at most once.\n\n    Input (whitespace separated):\n      n m\n      m lines: l r g\n\n    Output: maximum gold.\n\n    Note: The greedy-heap sweep (pick max g available at each i) is NOT always optimal.\n    Correct solution: min-cost max-flow is too slow for 1e5.\n    Here the problem is equivalent to:\n      - Choose a set of offers and assign each to a distinct house within its range.\n    This is exactly maximum weight bipartite matching in an interval graph, solvable in\n    O((n+m) log(n+m)) using a segment tree / DSU + sorting by gold descending.\n\n    We process offers in descending gold, and for each offer try to reserve any still-free house in [l,r].\n    If we can, take it and mark that house used. This is optimal because all weights are nonnegative and\n    feasibility depends only on available slots; picking higher weights first with any feasible slot works\n    (matroid greedy / transversal matroid).\n    \"\"\"\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        # per statement, already within bounds; still normalize\n        if l > r:\n            l, r = r, l\n        offers.append((g, l, r))\n\n    offers.sort(reverse=True)  # by gold desc\n\n    # DSU \"next free position\": parent[i] = smallest free index >= i; parent[n]=n sentinel\n    parent = list(range(n + 1))\n\n    # iterative find with path compression\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g, l, r in offers:\n        i = find(l)\n        if i <= r:\n            total += g\n            parent[i] = find(i + 1)  # mark i used\n\n    return str(total)",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 10
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def solve(data):\n    it = iter(data.split())\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return \"\"\n    m = int(next(it))\n\n    offers = []\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        if l > r:\n            l, r = r, l\n        offers.append((g, l, r))\n\n    # Gold is in [1,1000], so we can bucket-sort by gold instead of full sort.\n    buckets = [[] for _ in range(1001)]\n    for g, l, r in offers:\n        buckets[g].append((l, r))\n\n    parent = list(range(n + 1))\n\n    def find(x):\n        while parent[x] != x:\n            parent[x] = parent[parent[x]]\n            x = parent[x]\n        return x\n\n    total = 0\n    for g in range(1000, 0, -1):\n        for l, r in buckets[g]:\n            i = find(l)\n            if i <= r:\n                total += g\n                parent[i] = find(i + 1)\n\n    return str(total)",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

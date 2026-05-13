@@ -1,0 +1,274 @@
+{
+  "sample_id": "sharded-livecodebench/2866",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 00:08:31",
+  "lic_conv_id": "6997ec4f175c5382b0944d1a",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "longest subarray meeting conditions?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # This solver handles the common \"longest subarray meeting conditions\":\n    # longest subarray where max(nums[l:r]) - min(nums[l:r]) <= k\n    # Input formats supported:\n    # 1) n k \\n a1 a2 ... an\n    # 2) n \\n a1 a2 ... an \\n k\n    # If extra tokens exist, it uses the first n numbers as the array and the next token as k.\n\n    n = int(next(it))\n    # Peek next token to decide whether it's k or a1; we can't easily \"peek\" iter, so read rest.\n    rest = [x.decode() for x in it]\n    # Rebuild in a flexible way\n    # Try parse as: n k followed by n ints\n    def try_parse_nk_then_arr():\n        if len(rest) < 1:\n            return None\n        try:\n            k = int(rest[0])\n        except:\n            return None\n        if len(rest) < 1 + n:\n            return None\n        try:\n            arr = list(map(int, rest[1:1 + n]))\n        except:\n            return None\n        return arr, k\n\n    parsed = try_parse_nk_then_arr()\n    if parsed is None:\n        # Try parse as: n then n ints then k\n        if len(rest) < n + 1:\n            return\n        arr = list(map(int, rest[:n]))\n        k = int(rest[n])\n    else:\n        arr, k = parsed\n\n    from collections import deque\n\n    minq = deque()  # increasing values (store indices)\n    maxq = deque()  # decreasing values (store indices)\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        while arr[maxq[0]] - arr[minq[0]] > k:\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        cur = r - l + 1\n        if cur > best:\n            best = cur\n\n    sys.stdout.write(str(best))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the subarray should start with an even number",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    vals = list(map(int, data[1:]))\n\n    # Expect: n k then n numbers, OR n then n numbers then k\n    if len(vals) >= n + 1:\n        k = vals[0]\n        arr = vals[1:1 + n]\n        if len(arr) < n:  # fallback\n            arr = vals[:n]\n            k = vals[n]\n    else:\n        # minimal fallback (won't happen in valid tests)\n        sys.stdout.write(\"0\")\n        return\n\n    minq = deque()\n    maxq = deque()\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # Ensure window starts with even number: advance l until arr[l] is even\n        while l <= r and (arr[l] % 2 != 0):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # Enforce max-min <= k\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] % 2 != 0):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the subarray should also alternate between even and odd numbers",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    vals = list(map(int, data[1:]))\n\n    # Accept: n k then n numbers  OR  n then n numbers then k\n    if len(vals) >= n + 1:\n        k = vals[0]\n        arr = vals[1:1 + n]\n        if len(arr) < n:\n            arr = vals[:n]\n            k = vals[n]\n    else:\n        sys.stdout.write(\"0\")\n        return\n\n    minq = deque()\n    maxq = deque()\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        # Add r into monotonic queues\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # If alternation breaks between r-1 and r, any valid subarray ending at r\n        # must start at least at r (i.e., l >= r). So reset l to r.\n        if r > 0 and ((arr[r] & 1) == (arr[r - 1] & 1)):\n            l = r\n            # rebuild deques to contain only indices >= l\n            while minq and minq[0] < l:\n                minq.popleft()\n            while maxq and maxq[0] < l:\n                maxq.popleft()\n\n        # Ensure start parity is even\n        while l <= r and (arr[l] & 1):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # Enforce max-min <= k\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] & 1):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the numbers in the subarray gotta alternate between even and odd.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    vals = list(map(int, data[1:]))\n\n    # Supported input:\n    # 1) n k \\n a1..an\n    # 2) n \\n a1..an \\n k\n    if len(vals) >= n + 1:\n        k = vals[0]\n        arr = vals[1:1 + n]\n        if len(arr) < n:\n            arr = vals[:n]\n            k = vals[n]\n    else:\n        sys.stdout.write(\"0\")\n        return\n\n    # We'll keep a sliding window [l..r] where:\n    # - parity alternates between neighbors (no equal parities adjacent)\n    # - start element arr[l] is even\n    # - max(arr[l..r]) - min(arr[l..r]) <= k\n    #\n    # Alternation constraint implies: if arr[i] and arr[i-1] have same parity,\n    # any valid window cannot cross that boundary, so we reset l to i.\n\n    minq = deque()  # indices with increasing values\n    maxq = deque()  # indices with decreasing values\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        # Maintain deques with new r\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # Enforce alternation boundary\n        if r > 0 and ((arr[r] & 1) == (arr[r - 1] & 1)):\n            l = r\n            while minq and minq[0] < l:\n                minq.popleft()\n            while maxq and maxq[0] < l:\n                maxq.popleft()\n\n        # Enforce start even\n        while l <= r and (arr[l] & 1):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # Enforce max-min <= k\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] & 1):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "you need to figure out the length of the longest subarray that meets these conditions.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    vals = list(map(int, data[1:]))\n\n    # Supported input layouts:\n    # (A) n k  a1..an\n    # (B) n    a1..an  k\n    if len(vals) < n + 1:\n        sys.stdout.write(\"0\")\n        return\n    k = vals[0]\n    arr = vals[1:1 + n]\n    if len(arr) < n:\n        arr = vals[:n]\n        k = vals[n]\n\n    # Deques for window min/max\n    minq = deque()  # increasing values by arr[idx]\n    maxq = deque()  # decreasing values by arr[idx]\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        # Add r\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # Alternation constraint: window cannot cross a same-parity adjacency\n        if r > 0 and ((arr[r] & 1) == (arr[r - 1] & 1)):\n            l = r\n            while minq and minq[0] < l:\n                minq.popleft()\n            while maxq and maxq[0] < l:\n                maxq.popleft()\n\n        # Start must be even\n        while l <= r and (arr[l] & 1):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # Range constraint: max - min <= k\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] & 1):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the setup gives you an array and a threshold number",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n\n    # Expected input (common):\n    # n k\n    # a1 a2 ... an\n    # Also accepts: n then n numbers then k\n    n = int(data[0])\n    rest = list(map(int, data[1:]))\n\n    if len(rest) < n + 1:\n        sys.stdout.write(\"0\")\n        return\n\n    # Try parse as n k then n numbers; else n numbers then k\n    k = rest[0]\n    arr = rest[1:1 + n]\n    if len(arr) < n:\n        arr = rest[:n]\n        k = rest[n]\n\n    # Find longest subarray such that:\n    # 1) it starts with an even number\n    # 2) adjacent elements alternate parity (even/odd/even/odd...)\n    # 3) max(subarray) - min(subarray) <= k\n    minq = deque()  # indices with increasing arr values\n    maxq = deque()  # indices with decreasing arr values\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        # add r to deques\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # alternation boundary: cannot include both r-1 and r if same parity\n        if r > 0 and ((arr[r] & 1) == (arr[r - 1] & 1)):\n            l = r\n            while minq and minq[0] < l:\n                minq.popleft()\n            while maxq and maxq[0] < l:\n                maxq.popleft()\n\n        # start even\n        while l <= r and (arr[l] & 1):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # range constraint\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] & 1):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "The array can be as long as 100 elements.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n\n    # Expected:\n    # n k\n    # a1 ... an\n    # (also accepts: n then a1..an then k)\n    n = int(data[0])\n    rest = list(map(int, data[1:]))\n\n    if len(rest) < n + 1:\n        sys.stdout.write(\"0\")\n        return\n\n    # Parse flexibly\n    k = rest[0]\n    arr = rest[1:1 + n]\n    if len(arr) < n:\n        arr = rest[:n]\n        k = rest[n]\n\n    # n <= 100: brute force is fine\n    best = 0\n    for l in range(n):\n        if arr[l] % 2 != 0:\n            continue  # must start even\n        mn = mx = arr[l]\n        for r in range(l, n):\n            if r > l and (arr[r] % 2) == (arr[r - 1] % 2):\n                break  # alternation violated\n            v = arr[r]\n            if v < mn:\n                mn = v\n            if v > mx:\n                mx = v\n            if mx - mn <= k:\n                best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "an example is if you have the array [3,2,5,4] and a threshold of 5, the longest valid subarray length you can get is 3.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n\n    # Input:\n    # n k\n    # a1 a2 ... an\n    # (also accepts: n then a1..an then k)\n    n = int(data[0])\n    rest = list(map(int, data[1:]))\n\n    if len(rest) < n + 1:\n        sys.stdout.write(\"0\")\n        return\n\n    # Parse flexibly\n    k = rest[0]\n    arr = rest[1:1 + n]\n    if len(arr) < n:\n        arr = rest[:n]\n        k = rest[n]\n\n    best = 0\n    for l in range(n):\n        mn = mx = arr[l]\n        for r in range(l, n):\n            # enforce alternation\n            if r > l and ((arr[r] & 1) == (arr[r - 1] & 1)):\n                break\n            v = arr[r]\n            if v < mn:\n                mn = v\n            if v > mx:\n                mx = v\n            if mx - mn <= k:\n                best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\nfrom collections import deque\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # This solver handles the common \"longest subarray meeting conditions\":\n    # longest subarray where max(nums[l:r]) - min(nums[l:r]) <= k\n    # Input formats supported:\n    # 1) n k \\n a1 a2 ... an\n    # 2) n \\n a1 a2 ... an \\n k\n    # If extra tokens exist, it uses the first n numbers as the array and the next token as k.\n\n    n = int(next(it))\n    # Peek next token to decide whether it's k or a1; we can't easily \"peek\" iter, so read rest.\n    rest = [x.decode() for x in it]\n    # Rebuild in a flexible way\n    # Try parse as: n k followed by n ints\n    def try_parse_nk_then_arr():\n        if len(rest) < 1:\n            return None\n        try:\n            k = int(rest[0])\n        except:\n            return None\n        if len(rest) < 1 + n:\n            return None\n        try:\n            arr = list(map(int, rest[1:1 + n]))\n        except:\n            return None\n        return arr, k\n\n    parsed = try_parse_nk_then_arr()\n    if parsed is None:\n        # Try parse as: n then n ints then k\n        if len(rest) < n + 1:\n            return\n        arr = list(map(int, rest[:n]))\n        k = int(rest[n])\n    else:\n        arr, k = parsed\n\n    from collections import deque\n\n    minq = deque()  # increasing values (store indices)\n    maxq = deque()  # decreasing values (store indices)\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        while arr[maxq[0]] - arr[minq[0]] > k:\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        cur = r - l + 1\n        if cur > best:\n            best = cur\n\n    sys.stdout.write(str(best))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\nfrom collections import deque\n\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    vals = list(map(int, data[1:]))\n\n    # Expect: n k then n numbers, OR n then n numbers then k\n    if len(vals) >= n + 1:\n        k = vals[0]\n        arr = vals[1:1 + n]\n        if len(arr) < n:  # fallback\n            arr = vals[:n]\n            k = vals[n]\n    else:\n        # minimal fallback (won't happen in valid tests)\n        sys.stdout.write(\"0\")\n        return\n\n    minq = deque()\n    maxq = deque()\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # Ensure window starts with even number: advance l until arr[l] is even\n        while l <= r and (arr[l] % 2 != 0):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # Enforce max-min <= k\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] % 2 != 0):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\nfrom collections import deque\n\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    vals = list(map(int, data[1:]))\n\n    # Accept: n k then n numbers  OR  n then n numbers then k\n    if len(vals) >= n + 1:\n        k = vals[0]\n        arr = vals[1:1 + n]\n        if len(arr) < n:\n            arr = vals[:n]\n            k = vals[n]\n    else:\n        sys.stdout.write(\"0\")\n        return\n\n    minq = deque()\n    maxq = deque()\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        # Add r into monotonic queues\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # If alternation breaks between r-1 and r, any valid subarray ending at r\n        # must start at least at r (i.e., l >= r). So reset l to r.\n        if r > 0 and ((arr[r] & 1) == (arr[r - 1] & 1)):\n            l = r\n            # rebuild deques to contain only indices >= l\n            while minq and minq[0] < l:\n                minq.popleft()\n            while maxq and maxq[0] < l:\n                maxq.popleft()\n\n        # Ensure start parity is even\n        while l <= r and (arr[l] & 1):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # Enforce max-min <= k\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] & 1):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\nfrom collections import deque\n\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    vals = list(map(int, data[1:]))\n\n    # Supported input:\n    # 1) n k \\n a1..an\n    # 2) n \\n a1..an \\n k\n    if len(vals) >= n + 1:\n        k = vals[0]\n        arr = vals[1:1 + n]\n        if len(arr) < n:\n            arr = vals[:n]\n            k = vals[n]\n    else:\n        sys.stdout.write(\"0\")\n        return\n\n    # We'll keep a sliding window [l..r] where:\n    # - parity alternates between neighbors (no equal parities adjacent)\n    # - start element arr[l] is even\n    # - max(arr[l..r]) - min(arr[l..r]) <= k\n    #\n    # Alternation constraint implies: if arr[i] and arr[i-1] have same parity,\n    # any valid window cannot cross that boundary, so we reset l to i.\n\n    minq = deque()  # indices with increasing values\n    maxq = deque()  # indices with decreasing values\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        # Maintain deques with new r\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # Enforce alternation boundary\n        if r > 0 and ((arr[r] & 1) == (arr[r - 1] & 1)):\n            l = r\n            while minq and minq[0] < l:\n                minq.popleft()\n            while maxq and maxq[0] < l:\n                maxq.popleft()\n\n        # Enforce start even\n        while l <= r and (arr[l] & 1):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # Enforce max-min <= k\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] & 1):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\nfrom collections import deque\n\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    n = int(data[0])\n    vals = list(map(int, data[1:]))\n\n    # Supported input layouts:\n    # (A) n k  a1..an\n    # (B) n    a1..an  k\n    if len(vals) < n + 1:\n        sys.stdout.write(\"0\")\n        return\n    k = vals[0]\n    arr = vals[1:1 + n]\n    if len(arr) < n:\n        arr = vals[:n]\n        k = vals[n]\n\n    # Deques for window min/max\n    minq = deque()  # increasing values by arr[idx]\n    maxq = deque()  # decreasing values by arr[idx]\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        # Add r\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # Alternation constraint: window cannot cross a same-parity adjacency\n        if r > 0 and ((arr[r] & 1) == (arr[r - 1] & 1)):\n            l = r\n            while minq and minq[0] < l:\n                minq.popleft()\n            while maxq and maxq[0] < l:\n                maxq.popleft()\n\n        # Start must be even\n        while l <= r and (arr[l] & 1):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # Range constraint: max - min <= k\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] & 1):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\nfrom collections import deque\n\ndef solve():\n    import sys\n    from collections import deque\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n\n    # Expected input (common):\n    # n k\n    # a1 a2 ... an\n    # Also accepts: n then n numbers then k\n    n = int(data[0])\n    rest = list(map(int, data[1:]))\n\n    if len(rest) < n + 1:\n        sys.stdout.write(\"0\")\n        return\n\n    # Try parse as n k then n numbers; else n numbers then k\n    k = rest[0]\n    arr = rest[1:1 + n]\n    if len(arr) < n:\n        arr = rest[:n]\n        k = rest[n]\n\n    # Find longest subarray such that:\n    # 1) it starts with an even number\n    # 2) adjacent elements alternate parity (even/odd/even/odd...)\n    # 3) max(subarray) - min(subarray) <= k\n    minq = deque()  # indices with increasing arr values\n    maxq = deque()  # indices with decreasing arr values\n\n    l = 0\n    best = 0\n\n    for r, x in enumerate(arr):\n        # add r to deques\n        while minq and arr[minq[-1]] > x:\n            minq.pop()\n        minq.append(r)\n        while maxq and arr[maxq[-1]] < x:\n            maxq.pop()\n        maxq.append(r)\n\n        # alternation boundary: cannot include both r-1 and r if same parity\n        if r > 0 and ((arr[r] & 1) == (arr[r - 1] & 1)):\n            l = r\n            while minq and minq[0] < l:\n                minq.popleft()\n            while maxq and maxq[0] < l:\n                maxq.popleft()\n\n        # start even\n        while l <= r and (arr[l] & 1):\n            if minq and minq[0] == l:\n                minq.popleft()\n            if maxq and maxq[0] == l:\n                maxq.popleft()\n            l += 1\n\n        # range constraint\n        while l <= r and minq and maxq and (arr[maxq[0]] - arr[minq[0]] > k):\n            if minq[0] == l:\n                minq.popleft()\n            if maxq[0] == l:\n                maxq.popleft()\n            l += 1\n            while l <= r and (arr[l] & 1):\n                if minq and minq[0] == l:\n                    minq.popleft()\n                if maxq and maxq[0] == l:\n                    maxq.popleft()\n                l += 1\n\n        if l <= r:\n            best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n\n    # Expected:\n    # n k\n    # a1 ... an\n    # (also accepts: n then a1..an then k)\n    n = int(data[0])\n    rest = list(map(int, data[1:]))\n\n    if len(rest) < n + 1:\n        sys.stdout.write(\"0\")\n        return\n\n    # Parse flexibly\n    k = rest[0]\n    arr = rest[1:1 + n]\n    if len(arr) < n:\n        arr = rest[:n]\n        k = rest[n]\n\n    # n <= 100: brute force is fine\n    best = 0\n    for l in range(n):\n        if arr[l] % 2 != 0:\n            continue  # must start even\n        mn = mx = arr[l]\n        for r in range(l, n):\n            if r > l and (arr[r] % 2) == (arr[r - 1] % 2):\n                break  # alternation violated\n            v = arr[r]\n            if v < mn:\n                mn = v\n            if v > mx:\n                mx = v\n            if mx - mn <= k:\n                best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n\n    # Input:\n    # n k\n    # a1 a2 ... an\n    # (also accepts: n then a1..an then k)\n    n = int(data[0])\n    rest = list(map(int, data[1:]))\n\n    if len(rest) < n + 1:\n        sys.stdout.write(\"0\")\n        return\n\n    # Parse flexibly\n    k = rest[0]\n    arr = rest[1:1 + n]\n    if len(arr) < n:\n        arr = rest[:n]\n        k = rest[n]\n\n    best = 0\n    for l in range(n):\n        mn = mx = arr[l]\n        for r in range(l, n):\n            # enforce alternation\n            if r > l and ((arr[r] & 1) == (arr[r - 1] & 1)):\n                break\n            v = arr[r]\n            if v < mn:\n                mn = v\n            if v > mx:\n                mx = v\n            if mx - mn <= k:\n                best = max(best, r - l + 1)\n\n    sys.stdout.write(str(best))",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

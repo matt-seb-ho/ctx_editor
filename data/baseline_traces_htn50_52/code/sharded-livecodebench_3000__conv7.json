@@ -1,0 +1,243 @@
+{
+  "sample_id": "sharded-livecodebench/3000",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 03:00:28",
+  "lic_conv_id": "6998149c175c5382b09455c9",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Get the smallest diff between numbers in an array",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef smallest_diff(arr):\n    \"\"\"\n    Return the smallest absolute difference between any two numbers in arr.\n    If arr has fewer than 2 elements, returns None.\n    \"\"\"\n    if arr is None or len(arr) < 2:\n        return None\n\n    arr = sorted(arr)\n    best = abs(arr[1] - arr[0])\n    for i in range(2, len(arr)):\n        d = arr[i] - arr[i - 1]  # non-negative due to sorting\n        if d < best:\n            best = d\n            if best == 0:\n                return 0\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the pairs we're looking for should be at least a small amount apart",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef smallest_diff(arr, min_apart=0):\n    \"\"\"\n    Return the smallest absolute difference between any two numbers in arr\n    whose absolute difference is >= min_apart.\n\n    If no such pair exists (or arr has < 2 items), returns None.\n    \"\"\"\n    if arr is None or len(arr) < 2:\n        return None\n    if min_apart < 0:\n        min_apart = -min_apart\n\n    arr = sorted(arr)\n    n = len(arr)\n\n    # Two-pointer sweep for smallest diff >= min_apart\n    i, j = 0, 1\n    best = None\n    while i < n and j < n:\n        if i == j:\n            j += 1\n            continue\n        d = arr[j] - arr[i]  # >= 0 because sorted\n        if d < min_apart:\n            j += 1\n        else:\n            if best is None or d < best:\n                best = d\n                if best == min_apart:\n                    return best\n            i += 1\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I just want the pairs to be at least x apart.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef smallest_diff(arr, x):\n    \"\"\"\n    Smallest absolute difference between any two numbers in arr, considering\n    only pairs whose index positions are at least x apart (|i-j| >= x).\n\n    Returns None if no valid pair exists.\n    \"\"\"\n    n = 0 if arr is None else len(arr)\n    if n < 2:\n        return None\n    if x <= 0:\n        arr_sorted = sorted(arr)\n        best = abs(arr_sorted[1] - arr_sorted[0])\n        for i in range(2, n):\n            d = arr_sorted[i] - arr_sorted[i - 1]\n            if d < best:\n                best = d\n                if best == 0:\n                    return 0\n        return best\n    if x >= n:\n        return None\n\n    best = None\n    for i in range(n):\n        j_start = i + x\n        if j_start >= n:\n            break\n        ai = arr[i]\n        for j in range(j_start, n):\n            d = ai - arr[j]\n            if d < 0:\n                d = -d\n            if best is None or d < best:\n                best = d\n                if best == 0:\n                    return 0\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example, if nums = [4, 3, 2, 4] and x = 2, the result should be 0",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef smallest_diff(nums, x):\n    \"\"\"\n    Smallest absolute difference |nums[i]-nums[j]| over all pairs with |i-j| >= x.\n    Returns None if no such pair exists.\n    \"\"\"\n    n = 0 if nums is None else len(nums)\n    if n < 2:\n        return None\n    if x <= 0:\n        x = 1\n    if x >= n:\n        return None\n\n    # Maintain a sorted list of values from indices <= j-x, so each candidate\n    # automatically satisfies |i-j| >= x with i < j.\n    import bisect\n    seen = []\n    best = None\n\n    for j in range(x, n):\n        bisect.insort(seen, nums[j - x])\n\n        v = nums[j]\n        k = bisect.bisect_left(seen, v)\n\n        if k < len(seen):\n            d = abs(v - seen[k])\n            if best is None or d < best:\n                best = d\n                if best == 0:\n                    return 0\n        if k > 0:\n            d = abs(v - seen[k - 1])\n            if best is None or d < best:\n                best = d\n                if best == 0:\n                    return 0\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the size of the array can be up to 100,000 elements",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef smallest_diff(nums, x):\n    \"\"\"\n    Return min |nums[i] - nums[j]| over all pairs with |i-j| >= x.\n    If no valid pair exists, return None.\n\n    Expected to handle up to 100,000 elements efficiently.\n    \"\"\"\n    n = 0 if nums is None else len(nums)\n    if n < 2:\n        return None\n    if x <= 0:\n        x = 1\n    if x >= n:\n        return None\n\n    # Coordinate compression for Fenwick trees (BIT) over values\n    vals = sorted(set(nums))\n    m = len(vals)\n\n    def _idx(v):\n        import bisect\n        return bisect.bisect_left(vals, v) + 1  # 1-based\n\n    # Fenwick supporting prefix count queries\n    bit = [0] * (m + 1)\n\n    def add(i, delta):\n        while i <= m:\n            bit[i] += delta\n            i += i & -i\n\n    def sum_(i):\n        s = 0\n        while i > 0:\n            s += bit[i]\n            i -= i & -i\n        return s\n\n    def kth(k):\n        # smallest idx such that prefix sum >= k (assumes 1 <= k <= total)\n        idx = 0\n        bitmask = 1 << (m.bit_length() - 1)\n        while bitmask:\n            nxt = idx + bitmask\n            if nxt <= m and bit[nxt] < k:\n                k -= bit[nxt]\n                idx = nxt\n            bitmask >>= 1\n        return idx + 1\n\n    best = None\n    total = 0\n\n    import bisect\n\n    for j in range(x, n):\n        # add nums[j-x] into structure\n        add(_idx(nums[j - x]), 1)\n        total += 1\n\n        v = nums[j]\n        pos = bisect.bisect_left(vals, v)  # 0-based insertion position\n\n        # successor (>= v)\n        if pos < m:\n            cnt_before = sum_(pos)  # counts with index <= pos (0-based) -> prefix pos\n            if total - cnt_before > 0:\n                succ_idx = kth(cnt_before + 1)\n                d = abs(v - vals[succ_idx - 1])\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n        # predecessor (< v) i.e., <= v-? : take last element < v\n        if pos > 0:\n            cnt_upto_prev = sum_(pos)  # prefix for indices <= pos (0-based) equals pos in 1-based\n            if cnt_upto_prev > 0:\n                pred_idx = kth(cnt_upto_prev)\n                d = abs(v - vals[pred_idx - 1])\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Each number in the array can be up to a billion.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef smallest_diff(nums, x):\n    \"\"\"\n    Return min |nums[i] - nums[j]| over all pairs with |i-j| >= x.\n    If no valid pair exists, return None.\n\n    Works for up to 100,000 elements and values up to 1e9 (or larger).\n    Time: O(n log n), Space: O(n)\n    \"\"\"\n    n = 0 if nums is None else len(nums)\n    if n < 2:\n        return None\n    if x <= 0:\n        x = 1\n    if x >= n:\n        return None\n\n    # Coordinate-compress values (supports large integers like up to 1e9+)\n    vals = sorted(set(nums))\n    m = len(vals)\n\n    import bisect\n\n    def idx(v):  # 1-based\n        return bisect.bisect_left(vals, v) + 1\n\n    # Fenwick tree (BIT) of counts over compressed coordinates\n    bit = [0] * (m + 1)\n\n    def add(i, delta):\n        while i <= m:\n            bit[i] += delta\n            i += i & -i\n\n    def pref(i):\n        s = 0\n        while i > 0:\n            s += bit[i]\n            i -= i & -i\n        return s\n\n    def kth(k):\n        \"\"\"Smallest i such that pref(i) >= k, assuming 1 <= k <= pref(m).\"\"\"\n        i = 0\n        step = 1 << (m.bit_length() - 1)\n        while step:\n            ni = i + step\n            if ni <= m and bit[ni] < k:\n                k -= bit[ni]\n                i = ni\n            step >>= 1\n        return i + 1\n\n    best = None\n    total = 0\n\n    for j in range(x, n):\n        add(idx(nums[j - x]), 1)\n        total += 1\n\n        v = nums[j]\n        pos0 = bisect.bisect_left(vals, v)  # 0..m\n\n        # successor: first inserted value >= v\n        if pos0 < m:\n            before = pref(pos0)  # count of inserted values with compressed index <= pos0\n            if total - before > 0:\n                succ_i = kth(before + 1)\n                d = v - vals[succ_i - 1]\n                if d < 0:\n                    d = -d\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n        # predecessor: last inserted value < v\n        if pos0 > 0:\n            upto_prev = pref(pos0)  # count of inserted values with index <= pos0\n            if upto_prev > 0:\n                pred_i = kth(upto_prev)\n                d = v - vals[pred_i - 1]\n                if d < 0:\n                    d = -d\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n    return best\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Also, x is non-negative and should be less than the length of nums.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef smallest_diff(nums, x):\n    \"\"\"\n    Minimize |nums[i] - nums[j]| subject to |i - j| >= x.\n    Assumptions: x is non-negative and x < len(nums).\n    \"\"\"\n    n = len(nums)\n    if n < 2:\n        return None\n    if x == 0:\n        x = 1  # avoid pairing an element with itself\n\n    # Coordinate compression (values may be up to 1e9 or more)\n    vals = sorted(set(nums))\n    m = len(vals)\n\n    import bisect\n\n    def idx(v):  # 1-based\n        return bisect.bisect_left(vals, v) + 1\n\n    # Fenwick tree (BIT) of counts over compressed coordinates\n    bit = [0] * (m + 1)\n\n    def add(i, delta):\n        while i <= m:\n            bit[i] += delta\n            i += i & -i\n\n    def pref(i):\n        s = 0\n        while i > 0:\n            s += bit[i]\n            i -= i & -i\n        return s\n\n    def kth(k):\n        \"\"\"Smallest i such that pref(i) >= k (1 <= k <= pref(m)).\"\"\"\n        i = 0\n        step = 1 << (m.bit_length() - 1)\n        while step:\n            ni = i + step\n            if ni <= m and bit[ni] < k:\n                k -= bit[ni]\n                i = ni\n            step >>= 1\n        return i + 1\n\n    best = None\n    total = 0\n\n    for j in range(x, n):\n        add(idx(nums[j - x]), 1)\n        total += 1\n\n        v = nums[j]\n        pos0 = bisect.bisect_left(vals, v)  # insertion pos among all values\n\n        # successor: first inserted value >= v\n        if pos0 < m:\n            before = pref(pos0)  # count with compressed index <= pos0\n            if total - before > 0:\n                succ_i = kth(before + 1)\n                d = abs(v - vals[succ_i - 1])\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n        # predecessor: last inserted value < v\n        if pos0 > 0:\n            upto_prev = pref(pos0)  # count with compressed index <= pos0\n            if upto_prev > 0:\n                pred_i = kth(upto_prev)\n                d = abs(v - vals[pred_i - 1])\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n    return best\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def smallest_diff(arr):\n    \"\"\"\n    Return the smallest absolute difference between any two numbers in arr.\n    If arr has fewer than 2 elements, returns None.\n    \"\"\"\n    if arr is None or len(arr) < 2:\n        return None\n\n    arr = sorted(arr)\n    best = abs(arr[1] - arr[0])\n    for i in range(2, len(arr)):\n        d = arr[i] - arr[i - 1]  # non-negative due to sorting\n        if d < best:\n            best = d\n            if best == 0:\n                return 0\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def smallest_diff(arr, min_apart=0):\n    \"\"\"\n    Return the smallest absolute difference between any two numbers in arr\n    whose absolute difference is >= min_apart.\n\n    If no such pair exists (or arr has < 2 items), returns None.\n    \"\"\"\n    if arr is None or len(arr) < 2:\n        return None\n    if min_apart < 0:\n        min_apart = -min_apart\n\n    arr = sorted(arr)\n    n = len(arr)\n\n    # Two-pointer sweep for smallest diff >= min_apart\n    i, j = 0, 1\n    best = None\n    while i < n and j < n:\n        if i == j:\n            j += 1\n            continue\n        d = arr[j] - arr[i]  # >= 0 because sorted\n        if d < min_apart:\n            j += 1\n        else:\n            if best is None or d < best:\n                best = d\n                if best == min_apart:\n                    return best\n            i += 1\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def smallest_diff(arr, x):\n    \"\"\"\n    Smallest absolute difference between any two numbers in arr, considering\n    only pairs whose index positions are at least x apart (|i-j| >= x).\n\n    Returns None if no valid pair exists.\n    \"\"\"\n    n = 0 if arr is None else len(arr)\n    if n < 2:\n        return None\n    if x <= 0:\n        arr_sorted = sorted(arr)\n        best = abs(arr_sorted[1] - arr_sorted[0])\n        for i in range(2, n):\n            d = arr_sorted[i] - arr_sorted[i - 1]\n            if d < best:\n                best = d\n                if best == 0:\n                    return 0\n        return best\n    if x >= n:\n        return None\n\n    best = None\n    for i in range(n):\n        j_start = i + x\n        if j_start >= n:\n            break\n        ai = arr[i]\n        for j in range(j_start, n):\n            d = ai - arr[j]\n            if d < 0:\n                d = -d\n            if best is None or d < best:\n                best = d\n                if best == 0:\n                    return 0\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import bisect\n\ndef smallest_diff(nums, x):\n    \"\"\"\n    Smallest absolute difference |nums[i]-nums[j]| over all pairs with |i-j| >= x.\n    Returns None if no such pair exists.\n    \"\"\"\n    n = 0 if nums is None else len(nums)\n    if n < 2:\n        return None\n    if x <= 0:\n        x = 1\n    if x >= n:\n        return None\n\n    # Maintain a sorted list of values from indices <= j-x, so each candidate\n    # automatically satisfies |i-j| >= x with i < j.\n    import bisect\n    seen = []\n    best = None\n\n    for j in range(x, n):\n        bisect.insort(seen, nums[j - x])\n\n        v = nums[j]\n        k = bisect.bisect_left(seen, v)\n\n        if k < len(seen):\n            d = abs(v - seen[k])\n            if best is None or d < best:\n                best = d\n                if best == 0:\n                    return 0\n        if k > 0:\n            d = abs(v - seen[k - 1])\n            if best is None or d < best:\n                best = d\n                if best == 0:\n                    return 0\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import bisect\nimport bisect\n\ndef smallest_diff(nums, x):\n    \"\"\"\n    Return min |nums[i] - nums[j]| over all pairs with |i-j| >= x.\n    If no valid pair exists, return None.\n\n    Expected to handle up to 100,000 elements efficiently.\n    \"\"\"\n    n = 0 if nums is None else len(nums)\n    if n < 2:\n        return None\n    if x <= 0:\n        x = 1\n    if x >= n:\n        return None\n\n    # Coordinate compression for Fenwick trees (BIT) over values\n    vals = sorted(set(nums))\n    m = len(vals)\n\n    def _idx(v):\n        import bisect\n        return bisect.bisect_left(vals, v) + 1  # 1-based\n\n    # Fenwick supporting prefix count queries\n    bit = [0] * (m + 1)\n\n    def add(i, delta):\n        while i <= m:\n            bit[i] += delta\n            i += i & -i\n\n    def sum_(i):\n        s = 0\n        while i > 0:\n            s += bit[i]\n            i -= i & -i\n        return s\n\n    def kth(k):\n        # smallest idx such that prefix sum >= k (assumes 1 <= k <= total)\n        idx = 0\n        bitmask = 1 << (m.bit_length() - 1)\n        while bitmask:\n            nxt = idx + bitmask\n            if nxt <= m and bit[nxt] < k:\n                k -= bit[nxt]\n                idx = nxt\n            bitmask >>= 1\n        return idx + 1\n\n    best = None\n    total = 0\n\n    import bisect\n\n    for j in range(x, n):\n        # add nums[j-x] into structure\n        add(_idx(nums[j - x]), 1)\n        total += 1\n\n        v = nums[j]\n        pos = bisect.bisect_left(vals, v)  # 0-based insertion position\n\n        # successor (>= v)\n        if pos < m:\n            cnt_before = sum_(pos)  # counts with index <= pos (0-based) -> prefix pos\n            if total - cnt_before > 0:\n                succ_idx = kth(cnt_before + 1)\n                d = abs(v - vals[succ_idx - 1])\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n        # predecessor (< v) i.e., <= v-? : take last element < v\n        if pos > 0:\n            cnt_upto_prev = sum_(pos)  # prefix for indices <= pos (0-based) equals pos in 1-based\n            if cnt_upto_prev > 0:\n                pred_idx = kth(cnt_upto_prev)\n                d = abs(v - vals[pred_idx - 1])\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import bisect\n\ndef smallest_diff(nums, x):\n    \"\"\"\n    Return min |nums[i] - nums[j]| over all pairs with |i-j| >= x.\n    If no valid pair exists, return None.\n\n    Works for up to 100,000 elements and values up to 1e9 (or larger).\n    Time: O(n log n), Space: O(n)\n    \"\"\"\n    n = 0 if nums is None else len(nums)\n    if n < 2:\n        return None\n    if x <= 0:\n        x = 1\n    if x >= n:\n        return None\n\n    # Coordinate-compress values (supports large integers like up to 1e9+)\n    vals = sorted(set(nums))\n    m = len(vals)\n\n    import bisect\n\n    def idx(v):  # 1-based\n        return bisect.bisect_left(vals, v) + 1\n\n    # Fenwick tree (BIT) of counts over compressed coordinates\n    bit = [0] * (m + 1)\n\n    def add(i, delta):\n        while i <= m:\n            bit[i] += delta\n            i += i & -i\n\n    def pref(i):\n        s = 0\n        while i > 0:\n            s += bit[i]\n            i -= i & -i\n        return s\n\n    def kth(k):\n        \"\"\"Smallest i such that pref(i) >= k, assuming 1 <= k <= pref(m).\"\"\"\n        i = 0\n        step = 1 << (m.bit_length() - 1)\n        while step:\n            ni = i + step\n            if ni <= m and bit[ni] < k:\n                k -= bit[ni]\n                i = ni\n            step >>= 1\n        return i + 1\n\n    best = None\n    total = 0\n\n    for j in range(x, n):\n        add(idx(nums[j - x]), 1)\n        total += 1\n\n        v = nums[j]\n        pos0 = bisect.bisect_left(vals, v)  # 0..m\n\n        # successor: first inserted value >= v\n        if pos0 < m:\n            before = pref(pos0)  # count of inserted values with compressed index <= pos0\n            if total - before > 0:\n                succ_i = kth(before + 1)\n                d = v - vals[succ_i - 1]\n                if d < 0:\n                    d = -d\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n        # predecessor: last inserted value < v\n        if pos0 > 0:\n            upto_prev = pref(pos0)  # count of inserted values with index <= pos0\n            if upto_prev > 0:\n                pred_i = kth(upto_prev)\n                d = v - vals[pred_i - 1]\n                if d < 0:\n                    d = -d\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import bisect\n\ndef smallest_diff(nums, x):\n    \"\"\"\n    Minimize |nums[i] - nums[j]| subject to |i - j| >= x.\n    Assumptions: x is non-negative and x < len(nums).\n    \"\"\"\n    n = len(nums)\n    if n < 2:\n        return None\n    if x == 0:\n        x = 1  # avoid pairing an element with itself\n\n    # Coordinate compression (values may be up to 1e9 or more)\n    vals = sorted(set(nums))\n    m = len(vals)\n\n    import bisect\n\n    def idx(v):  # 1-based\n        return bisect.bisect_left(vals, v) + 1\n\n    # Fenwick tree (BIT) of counts over compressed coordinates\n    bit = [0] * (m + 1)\n\n    def add(i, delta):\n        while i <= m:\n            bit[i] += delta\n            i += i & -i\n\n    def pref(i):\n        s = 0\n        while i > 0:\n            s += bit[i]\n            i -= i & -i\n        return s\n\n    def kth(k):\n        \"\"\"Smallest i such that pref(i) >= k (1 <= k <= pref(m)).\"\"\"\n        i = 0\n        step = 1 << (m.bit_length() - 1)\n        while step:\n            ni = i + step\n            if ni <= m and bit[ni] < k:\n                k -= bit[ni]\n                i = ni\n            step >>= 1\n        return i + 1\n\n    best = None\n    total = 0\n\n    for j in range(x, n):\n        add(idx(nums[j - x]), 1)\n        total += 1\n\n        v = nums[j]\n        pos0 = bisect.bisect_left(vals, v)  # insertion pos among all values\n\n        # successor: first inserted value >= v\n        if pos0 < m:\n            before = pref(pos0)  # count with compressed index <= pos0\n            if total - before > 0:\n                succ_i = kth(before + 1)\n                d = abs(v - vals[succ_i - 1])\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n        # predecessor: last inserted value < v\n        if pos0 > 0:\n            upto_prev = pref(pos0)  # count with compressed index <= pos0\n            if upto_prev > 0:\n                pred_i = kth(upto_prev)\n                d = abs(v - vals[pred_i - 1])\n                if best is None or d < best:\n                    best = d\n                    if best == 0:\n                        return 0\n\n    return best",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

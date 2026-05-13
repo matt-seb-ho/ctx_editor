@@ -1,0 +1,212 @@
+{
+  "sample_id": "sharded-livecodebench/2979",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": true,
+  "score": 1.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 21:05:29",
+  "lic_conv_id": "6997c169175c5382b0944491",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "how much gold can I make from house offers?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef house_offer_gold(offers=None, include_market_fees=False):\n    \"\"\"\n    Estimate how much gold you can make from house offers.\n\n    This function is written to be test-friendly, but you must pass your data.\n    There isn't enough info in your question to compute a number otherwise.\n\n    Parameters\n    ----------\n    offers : list[dict] | None\n        Each offer should be a dict with at least:\n          - \"buy_price\" (gold you pay per unit) OR \"cost\" (total gold you pay)\n          - \"sell_price\" (gold you receive per unit) OR \"revenue\" (total gold you receive)\n        And either:\n          - \"qty\" (units), if using per-unit prices\n          - or omit \"qty\" if using totals.\n\n        Examples:\n          {\"item\":\"Iron Ore\", \"qty\": 200, \"buy_price\": 3.0, \"sell_price\": 4.2}\n          {\"item\":\"Bundle A\", \"cost\": 1500, \"revenue\": 1900}\n\n    include_market_fees : bool\n        If True, you can optionally include:\n          - \"fee_rate\" per offer (e.g., 0.05 for 5%),\n        otherwise fee_rate is assumed 0.\n\n    Returns\n    -------\n    dict with keys:\n      - \"total_profit\"\n      - \"total_cost\"\n      - \"total_revenue\"\n      - \"per_offer\" (list of per-offer breakdown dicts)\n\n    Notes\n    -----\n    Profit = revenue_after_fees - cost\n    \"\"\"\n    offers = offers or []\n    total_cost = 0.0\n    total_revenue = 0.0\n    per_offer = []\n\n    for o in offers:\n        qty = o.get(\"qty\", None)\n\n        # Cost\n        if \"cost\" in o:\n            cost = float(o[\"cost\"])\n        else:\n            if qty is None:\n                raise ValueError(\"Offer missing 'qty' when using per-unit 'buy_price'.\")\n            cost = float(o.get(\"buy_price\", 0.0)) * float(qty)\n\n        # Revenue\n        if \"revenue\" in o:\n            revenue = float(o[\"revenue\"])\n        else:\n            if qty is None:\n                raise ValueError(\"Offer missing 'qty' when using per-unit 'sell_price'.\")\n            revenue = float(o.get(\"sell_price\", 0.0)) * float(qty)\n\n        fee_rate = float(o.get(\"fee_rate\", 0.0)) if include_market_fees else 0.0\n        revenue_after_fees = revenue * (1.0 - fee_rate)\n\n        profit = revenue_after_fees - cost\n\n        total_cost += cost\n        total_revenue += revenue_after_fees\n\n        per_offer.append({\n            \"item\": o.get(\"item\"),\n            \"qty\": qty,\n            \"cost\": cost,\n            \"revenue_before_fees\": revenue,\n            \"fee_rate\": fee_rate,\n            \"revenue_after_fees\": revenue_after_fees,\n            \"profit\": profit,\n        })\n\n    return {\n        \"total_profit\": total_revenue - total_cost,\n        \"total_cost\": total_cost,\n        \"total_revenue\": total_revenue,\n        \"per_offer\": per_offer,\n    }\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I gotta find the best way to sell houses for profit.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef best_house_flip(houses=None, capital=None, fee_rate=0.0):\n    \"\"\"\n    Find the best way to sell houses for profit (pick the best flip).\n\n    You pass a list of house opportunities; the function returns the single best\n    profit option you can afford (if capital is provided).\n\n    Parameters\n    ----------\n    houses : list[dict] | None\n        Each dict should contain:\n          - \"buy\"  : purchase price (number)\n          - \"sell\" : expected sale price (number)\n        Optional:\n          - \"id\" or \"name\" : identifier\n          - \"fee_rate\" : overrides global fee_rate for that house (e.g., 0.06)\n\n        Example:\n          {\"id\":\"A12\", \"buy\": 220000, \"sell\": 260000, \"fee_rate\": 0.06}\n\n    capital : number | None\n        If provided, only houses with buy <= capital are considered.\n\n    fee_rate : float\n        Default transaction fee as a fraction applied to sale price (e.g., 0.06).\n\n    Returns\n    -------\n    dict with keys:\n      - \"best\" : best house dict with computed fields, or None if no candidates\n      - \"ranked\" : all candidates sorted by profit descending (each with computed fields)\n\n    Computation\n    -----------\n    net_sell = sell * (1 - fee)\n    profit   = net_sell - buy\n    roi      = profit / buy (if buy > 0)\n    \"\"\"\n    houses = houses or []\n    ranked = []\n\n    for h in houses:\n        if \"buy\" not in h or \"sell\" not in h:\n            raise ValueError(\"Each house must have 'buy' and 'sell' fields.\")\n\n        buy = float(h[\"buy\"])\n        sell = float(h[\"sell\"])\n\n        if capital is not None and buy > float(capital):\n            continue\n\n        fr = float(h.get(\"fee_rate\", fee_rate))\n        net_sell = sell * (1.0 - fr)\n        profit = net_sell - buy\n        roi = profit / buy if buy > 0 else float(\"inf\") if profit > 0 else float(\"-inf\")\n\n        ranked.append({\n            **h,\n            \"fee_rate_used\": fr,\n            \"net_sell\": net_sell,\n            \"profit\": profit,\n            \"roi\": roi,\n        })\n\n    ranked.sort(key=lambda x: (x[\"profit\"], x[\"roi\"]), reverse=True)\n    best = ranked[0] if ranked else None\n    return {\"best\": best, \"ranked\": ranked}\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "offers show the range for houses that buyers want and how much gold they offer.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef best_house_offer(offers, house_price, listing_fee_rate=0.0, prefer=\"max_net\"):\n    \"\"\"\n    Choose the best buyer offer for your house.\n\n    Offers represent what buyers want to pay (often as a range). This function\n    evaluates each offer against your specific house_price and returns the best\n    one (by max net gold after fees, or by max gross).\n\n    Parameters\n    ----------\n    offers : list[dict]\n        Each offer dict can be one of:\n          1) Fixed price:\n             {\"id\": \"O1\", \"gold\": 1200}\n          2) Range (buyers will pay based on your house price):\n             {\"id\": \"O2\", \"min_price\": 80_000, \"max_price\": 120_000, \"gold\": 1500}\n          3) Tiered range (optional): same as (2), you decide validity by overlap.\n\n        Optional fields:\n          - \"fee_rate\": overrides listing_fee_rate for that offer\n          - \"name\": label\n\n    house_price : number\n        Your house's price/value. A range offer applies if:\n            min_price <= house_price <= max_price\n        If min/max not present, the offer is treated as always applicable.\n\n    listing_fee_rate : float\n        Fraction taken from the gold you receive (e.g., 0.05 for 5%).\n\n    prefer : str\n        \"max_net\" (default) or \"max_gross\"\n\n    Returns\n    -------\n    dict with keys:\n      - \"best\": best applicable offer (with computed fields) or None\n      - \"applicable\": list of applicable offers (with computed fields), sorted best-first\n      - \"inapplicable\": list of offers that don't match your house_price\n\n    Computed fields added to each returned offer:\n      - \"applicable\": bool\n      - \"gross_gold\": offered gold\n      - \"fee_rate_used\": fee rate used\n      - \"net_gold\": gross after fee\n    \"\"\"\n    hp = float(house_price)\n    applicable = []\n    inapplicable = []\n\n    for o in offers:\n        if \"gold\" not in o:\n            raise ValueError(\"Each offer must contain 'gold'.\")\n\n        mn = o.get(\"min_price\", None)\n        mx = o.get(\"max_price\", None)\n\n        is_app = True\n        if mn is not None and hp < float(mn):\n            is_app = False\n        if mx is not None and hp > float(mx):\n            is_app = False\n\n        gross = float(o[\"gold\"])\n        fr = float(o.get(\"fee_rate\", listing_fee_rate))\n        net = gross * (1.0 - fr)\n\n        enriched = {\n            **o,\n            \"applicable\": is_app,\n            \"gross_gold\": gross,\n            \"fee_rate_used\": fr,\n            \"net_gold\": net,\n        }\n\n        (applicable if is_app else inapplicable).append(enriched)\n\n    if prefer not in (\"max_net\", \"max_gross\"):\n        raise ValueError(\"prefer must be 'max_net' or 'max_gross'.\")\n\n    key = (lambda x: (x[\"net_gold\"], x[\"gross_gold\"])) if prefer == \"max_net\" else (lambda x: (x[\"gross_gold\"], x[\"net_gold\"]))\n    applicable.sort(key=key, reverse=True)\n\n    best = applicable[0] if applicable else None\n    return {\"best\": best, \"applicable\": applicable, \"inapplicable\": inapplicable}\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "There are no overlapping sales to the same house, so buyers can't share them.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_gold_non_overlapping_offers(offers, listing_fee_rate=0.0):\n    \"\"\"\n    Pick a maximum-gold subset of offers such that no two offers overlap in house range.\n\n    Context\n    -------\n    Each offer targets houses within a price interval [min_price, max_price] and pays\n    some amount of gold if you sell a house in that interval. You want to accept a set\n    of offers, but buyers can't \"share\" houses: intervals must be non-overlapping.\n\n    This is the classic weighted interval scheduling problem.\n\n    Parameters\n    ----------\n    offers : list[dict]\n        Each dict must have:\n          - \"min_price\": number\n          - \"max_price\": number  (must be >= min_price)\n          - \"gold\": number\n        Optional:\n          - \"id\"/\"name\": identifier\n          - \"fee_rate\": overrides listing_fee_rate for this offer\n\n        Intervals are treated as closed; i.e., two offers overlap if:\n            not (a.max_price < b.min_price or b.max_price < a.min_price)\n        So touching at an endpoint counts as overlap.\n\n    listing_fee_rate : float\n        Fraction deducted from gold received (e.g., 0.05 for 5%).\n        Applied unless an offer has its own \"fee_rate\".\n\n    Returns\n    -------\n    dict with keys:\n      - \"max_net_gold\": maximum achievable net gold\n      - \"chosen\": chosen offers (original fields + computed \"net_gold\"), in increasing max_price\n      - \"all\": all offers enriched with computed fields and sorted by max_price\n\n    Notes\n    -----\n    net_gold = gold * (1 - fee_rate_used)\n    \"\"\"\n    if not offers:\n        return {\"max_net_gold\": 0.0, \"chosen\": [], \"all\": []}\n\n    enriched = []\n    for o in offers:\n        if \"min_price\" not in o or \"max_price\" not in o or \"gold\" not in o:\n            raise ValueError(\"Each offer must have 'min_price', 'max_price', and 'gold'.\")\n        start = float(o[\"min_price\"])\n        end = float(o[\"max_price\"])\n        if end < start:\n            raise ValueError(\"Offer has max_price < min_price.\")\n        gross = float(o[\"gold\"])\n        fr = float(o.get(\"fee_rate\", listing_fee_rate))\n        net = gross * (1.0 - fr)\n        enriched.append({**o, \"min_price\": start, \"max_price\": end, \"gross_gold\": gross, \"fee_rate_used\": fr, \"net_gold\": net})\n\n    # Sort by end time (max_price)\n    enriched.sort(key=lambda x: (x[\"max_price\"], x[\"min_price\"]))\n\n    ends = [o[\"max_price\"] for o in enriched]\n\n    # p[i] = index of rightmost offer that ends strictly before offer i starts (no overlap)\n    # Because intervals are closed and touching counts as overlap, we require end < start.\n    import bisect\n    p = []\n    for i, o in enumerate(enriched):\n        j = bisect.bisect_left(ends, o[\"min_price\"]) - 1  # last end < start\n        p.append(j)\n\n    n = len(enriched)\n    dp = [0.0] * (n + 1)      # dp[i] = best for first i offers (1..i)\n    take = [False] * (n + 1)  # whether we take offer i\n    prev = [-1] * (n + 1)     # link to previous dp index if taken\n\n    for i in range(1, n + 1):\n        w = enriched[i - 1][\"net_gold\"]\n        j = p[i - 1] + 1  # dp index (since dp is 1-based)\n        opt_take = w + dp[j]\n        opt_skip = dp[i - 1]\n        if opt_take > opt_skip:\n            dp[i] = opt_take\n            take[i] = True\n            prev[i] = j\n        else:\n            dp[i] = opt_skip\n            take[i] = False\n\n    # Reconstruct chosen offers\n    chosen = []\n    i = n\n    while i > 0:\n        if take[i]:\n            chosen.append(enriched[i - 1])\n            i = prev[i]\n        else:\n            i -= 1\n    chosen.reverse()\n\n    return {\"max_net_gold\": dp[n], \"chosen\": chosen, \"all\": enriched}\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "there's a certain number of houses lined up, numbered from 0 to n-1.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef max_gold_offers_on_houses(offers, n, fee_rate=0.0):\n    \"\"\"\n    Maximize net gold from buyer offers over a line of discrete houses 0..n-1,\n    with the rule that chosen offers may not overlap (buyers can't share houses).\n\n    Each offer covers an interval of house indices [l, r] (inclusive) and pays 'gold'\n    if accepted. Choose a subset of non-overlapping offers with maximum total net gold.\n\n    This is weighted interval scheduling on discrete indices (touching endpoints overlap).\n\n    Parameters\n    ----------\n    offers : list[dict]\n        Each offer dict must contain:\n          - \"l\": int   (0 <= l <= r < n)\n          - \"r\": int\n          - \"gold\": number\n        Optional:\n          - \"id\"/\"name\": identifier\n          - \"fee_rate\": overrides global fee_rate for this offer (fraction)\n\n    n : int\n        Number of houses (indices 0..n-1). Only used for validation.\n\n    fee_rate : float\n        Default fee fraction applied to gold unless an offer provides \"fee_rate\".\n\n    Returns\n    -------\n    dict with keys:\n      - \"max_net_gold\": float\n      - \"chosen\": list of chosen offers (enriched with \"net_gold\"), sorted by r then l\n      - \"all\": all offers (enriched, sorted)\n\n    Notes\n    -----\n    Intervals are inclusive. So offers [l1,r1] and [l2,r2] are compatible iff:\n        r1 < l2 or r2 < l1\n    \"\"\"\n    if n < 0:\n        raise ValueError(\"n must be non-negative.\")\n    if not offers:\n        return {\"max_net_gold\": 0.0, \"chosen\": [], \"all\": []}\n\n    enriched = []\n    for o in offers:\n        if \"l\" not in o or \"r\" not in o or \"gold\" not in o:\n            raise ValueError(\"Each offer must have 'l', 'r', and 'gold'.\")\n        l = int(o[\"l\"])\n        r = int(o[\"r\"])\n        if l < 0 or r < 0 or l > r or r >= n:\n            raise ValueError(\"Offer interval must satisfy 0 <= l <= r < n.\")\n        gross = float(o[\"gold\"])\n        fr = float(o.get(\"fee_rate\", fee_rate))\n        net = gross * (1.0 - fr)\n        enriched.append({**o, \"l\": l, \"r\": r, \"gross_gold\": gross, \"fee_rate_used\": fr, \"net_gold\": net})\n\n    # Sort by end index r, then l\n    enriched.sort(key=lambda x: (x[\"r\"], x[\"l\"]))\n\n    # Compute p[i]: index of rightmost offer ending strictly before offer i starts.\n    # Because inclusive intervals, require prev.r < curr.l.\n    import bisect\n    ends = [o[\"r\"] for o in enriched]\n    p = []\n    for i, o in enumerate(enriched):\n        j = bisect.bisect_left(ends, o[\"l\"]) - 1  # last end < l\n        p.append(j)\n\n    m = len(enriched)\n    dp = [0.0] * (m + 1)      # dp[i] best net for first i offers (i offers considered)\n    take = [False] * (m + 1)\n    prev = [-1] * (m + 1)\n\n    for i in range(1, m + 1):\n        w = enriched[i - 1][\"net_gold\"]\n        j = p[i - 1] + 1       # dp index\n        take_val = w + dp[j]\n        skip_val = dp[i - 1]\n        if take_val > skip_val:\n            dp[i] = take_val\n            take[i] = True\n            prev[i] = j\n        else:\n            dp[i] = skip_val\n\n    chosen = []\n    i = m\n    while i > 0:\n        if take[i]:\n            chosen.append(enriched[i - 1])\n            i = prev[i]\n        else:\n            i -= 1\n    chosen.reverse()\n\n    return {\"max_net_gold\": dp[m], \"chosen\": chosen, \"all\": enriched}\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example given 5 houses and the offers are [[0,0,1],[0,2,2],[1,3,2]], I can get 3 as the max profit",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef maximize_the_profit(n, offers):\n    \"\"\"\n    LeetCode-style: given n houses (0..n-1) and offers [start, end, gold],\n    choose non-overlapping offers (inclusive ranges) to maximize total gold.\n\n    Example:\n        n=5, offers=[[0,0,1],[0,2,2],[1,3,2]] -> 3\n    \"\"\"\n    # dp[i] = max profit using houses from i..n-1\n    dp = [0] * (n + 1)\n\n    # bucket offers by their start index\n    by_start = [[] for _ in range(n)]\n    for s, e, g in offers:\n        by_start[s].append((e, g))\n\n    for i in range(n - 1, -1, -1):\n        best = dp[i + 1]  # skip starting any offer at i\n        for e, g in by_start[i]:\n            nxt = e + 1\n            val = g + (dp[nxt] if nxt <= n else 0)\n            if val > best:\n                best = val\n        dp[i] = best\n\n    return dp[0]\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def house_offer_gold(offers=None, include_market_fees=False):\n    \"\"\"\n    Estimate how much gold you can make from house offers.\n\n    This function is written to be test-friendly, but you must pass your data.\n    There isn't enough info in your question to compute a number otherwise.\n\n    Parameters\n    ----------\n    offers : list[dict] | None\n        Each offer should be a dict with at least:\n          - \"buy_price\" (gold you pay per unit) OR \"cost\" (total gold you pay)\n          - \"sell_price\" (gold you receive per unit) OR \"revenue\" (total gold you receive)\n        And either:\n          - \"qty\" (units), if using per-unit prices\n          - or omit \"qty\" if using totals.\n\n        Examples:\n          {\"item\":\"Iron Ore\", \"qty\": 200, \"buy_price\": 3.0, \"sell_price\": 4.2}\n          {\"item\":\"Bundle A\", \"cost\": 1500, \"revenue\": 1900}\n\n    include_market_fees : bool\n        If True, you can optionally include:\n          - \"fee_rate\" per offer (e.g., 0.05 for 5%),\n        otherwise fee_rate is assumed 0.\n\n    Returns\n    -------\n    dict with keys:\n      - \"total_profit\"\n      - \"total_cost\"\n      - \"total_revenue\"\n      - \"per_offer\" (list of per-offer breakdown dicts)\n\n    Notes\n    -----\n    Profit = revenue_after_fees - cost\n    \"\"\"\n    offers = offers or []\n    total_cost = 0.0\n    total_revenue = 0.0\n    per_offer = []\n\n    for o in offers:\n        qty = o.get(\"qty\", None)\n\n        # Cost\n        if \"cost\" in o:\n            cost = float(o[\"cost\"])\n        else:\n            if qty is None:\n                raise ValueError(\"Offer missing 'qty' when using per-unit 'buy_price'.\")\n            cost = float(o.get(\"buy_price\", 0.0)) * float(qty)\n\n        # Revenue\n        if \"revenue\" in o:\n            revenue = float(o[\"revenue\"])\n        else:\n            if qty is None:\n                raise ValueError(\"Offer missing 'qty' when using per-unit 'sell_price'.\")\n            revenue = float(o.get(\"sell_price\", 0.0)) * float(qty)\n\n        fee_rate = float(o.get(\"fee_rate\", 0.0)) if include_market_fees else 0.0\n        revenue_after_fees = revenue * (1.0 - fee_rate)\n\n        profit = revenue_after_fees - cost\n\n        total_cost += cost\n        total_revenue += revenue_after_fees\n\n        per_offer.append({\n            \"item\": o.get(\"item\"),\n            \"qty\": qty,\n            \"cost\": cost,\n            \"revenue_before_fees\": revenue,\n            \"fee_rate\": fee_rate,\n            \"revenue_after_fees\": revenue_after_fees,\n            \"profit\": profit,\n        })\n\n    return {\n        \"total_profit\": total_revenue - total_cost,\n        \"total_cost\": total_cost,\n        \"total_revenue\": total_revenue,\n        \"per_offer\": per_offer,\n    }",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def best_house_flip(houses=None, capital=None, fee_rate=0.0):\n    \"\"\"\n    Find the best way to sell houses for profit (pick the best flip).\n\n    You pass a list of house opportunities; the function returns the single best\n    profit option you can afford (if capital is provided).\n\n    Parameters\n    ----------\n    houses : list[dict] | None\n        Each dict should contain:\n          - \"buy\"  : purchase price (number)\n          - \"sell\" : expected sale price (number)\n        Optional:\n          - \"id\" or \"name\" : identifier\n          - \"fee_rate\" : overrides global fee_rate for that house (e.g., 0.06)\n\n        Example:\n          {\"id\":\"A12\", \"buy\": 220000, \"sell\": 260000, \"fee_rate\": 0.06}\n\n    capital : number | None\n        If provided, only houses with buy <= capital are considered.\n\n    fee_rate : float\n        Default transaction fee as a fraction applied to sale price (e.g., 0.06).\n\n    Returns\n    -------\n    dict with keys:\n      - \"best\" : best house dict with computed fields, or None if no candidates\n      - \"ranked\" : all candidates sorted by profit descending (each with computed fields)\n\n    Computation\n    -----------\n    net_sell = sell * (1 - fee)\n    profit   = net_sell - buy\n    roi      = profit / buy (if buy > 0)\n    \"\"\"\n    houses = houses or []\n    ranked = []\n\n    for h in houses:\n        if \"buy\" not in h or \"sell\" not in h:\n            raise ValueError(\"Each house must have 'buy' and 'sell' fields.\")\n\n        buy = float(h[\"buy\"])\n        sell = float(h[\"sell\"])\n\n        if capital is not None and buy > float(capital):\n            continue\n\n        fr = float(h.get(\"fee_rate\", fee_rate))\n        net_sell = sell * (1.0 - fr)\n        profit = net_sell - buy\n        roi = profit / buy if buy > 0 else float(\"inf\") if profit > 0 else float(\"-inf\")\n\n        ranked.append({\n            **h,\n            \"fee_rate_used\": fr,\n            \"net_sell\": net_sell,\n            \"profit\": profit,\n            \"roi\": roi,\n        })\n\n    ranked.sort(key=lambda x: (x[\"profit\"], x[\"roi\"]), reverse=True)\n    best = ranked[0] if ranked else None\n    return {\"best\": best, \"ranked\": ranked}",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def best_house_offer(offers, house_price, listing_fee_rate=0.0, prefer=\"max_net\"):\n    \"\"\"\n    Choose the best buyer offer for your house.\n\n    Offers represent what buyers want to pay (often as a range). This function\n    evaluates each offer against your specific house_price and returns the best\n    one (by max net gold after fees, or by max gross).\n\n    Parameters\n    ----------\n    offers : list[dict]\n        Each offer dict can be one of:\n          1) Fixed price:\n             {\"id\": \"O1\", \"gold\": 1200}\n          2) Range (buyers will pay based on your house price):\n             {\"id\": \"O2\", \"min_price\": 80_000, \"max_price\": 120_000, \"gold\": 1500}\n          3) Tiered range (optional): same as (2), you decide validity by overlap.\n\n        Optional fields:\n          - \"fee_rate\": overrides listing_fee_rate for that offer\n          - \"name\": label\n\n    house_price : number\n        Your house's price/value. A range offer applies if:\n            min_price <= house_price <= max_price\n        If min/max not present, the offer is treated as always applicable.\n\n    listing_fee_rate : float\n        Fraction taken from the gold you receive (e.g., 0.05 for 5%).\n\n    prefer : str\n        \"max_net\" (default) or \"max_gross\"\n\n    Returns\n    -------\n    dict with keys:\n      - \"best\": best applicable offer (with computed fields) or None\n      - \"applicable\": list of applicable offers (with computed fields), sorted best-first\n      - \"inapplicable\": list of offers that don't match your house_price\n\n    Computed fields added to each returned offer:\n      - \"applicable\": bool\n      - \"gross_gold\": offered gold\n      - \"fee_rate_used\": fee rate used\n      - \"net_gold\": gross after fee\n    \"\"\"\n    hp = float(house_price)\n    applicable = []\n    inapplicable = []\n\n    for o in offers:\n        if \"gold\" not in o:\n            raise ValueError(\"Each offer must contain 'gold'.\")\n\n        mn = o.get(\"min_price\", None)\n        mx = o.get(\"max_price\", None)\n\n        is_app = True\n        if mn is not None and hp < float(mn):\n            is_app = False\n        if mx is not None and hp > float(mx):\n            is_app = False\n\n        gross = float(o[\"gold\"])\n        fr = float(o.get(\"fee_rate\", listing_fee_rate))\n        net = gross * (1.0 - fr)\n\n        enriched = {\n            **o,\n            \"applicable\": is_app,\n            \"gross_gold\": gross,\n            \"fee_rate_used\": fr,\n            \"net_gold\": net,\n        }\n\n        (applicable if is_app else inapplicable).append(enriched)\n\n    if prefer not in (\"max_net\", \"max_gross\"):\n        raise ValueError(\"prefer must be 'max_net' or 'max_gross'.\")\n\n    key = (lambda x: (x[\"net_gold\"], x[\"gross_gold\"])) if prefer == \"max_net\" else (lambda x: (x[\"gross_gold\"], x[\"net_gold\"]))\n    applicable.sort(key=key, reverse=True)\n\n    best = applicable[0] if applicable else None\n    return {\"best\": best, \"applicable\": applicable, \"inapplicable\": inapplicable}",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import bisect\n\ndef max_gold_non_overlapping_offers(offers, listing_fee_rate=0.0):\n    \"\"\"\n    Pick a maximum-gold subset of offers such that no two offers overlap in house range.\n\n    Context\n    -------\n    Each offer targets houses within a price interval [min_price, max_price] and pays\n    some amount of gold if you sell a house in that interval. You want to accept a set\n    of offers, but buyers can't \"share\" houses: intervals must be non-overlapping.\n\n    This is the classic weighted interval scheduling problem.\n\n    Parameters\n    ----------\n    offers : list[dict]\n        Each dict must have:\n          - \"min_price\": number\n          - \"max_price\": number  (must be >= min_price)\n          - \"gold\": number\n        Optional:\n          - \"id\"/\"name\": identifier\n          - \"fee_rate\": overrides listing_fee_rate for this offer\n\n        Intervals are treated as closed; i.e., two offers overlap if:\n            not (a.max_price < b.min_price or b.max_price < a.min_price)\n        So touching at an endpoint counts as overlap.\n\n    listing_fee_rate : float\n        Fraction deducted from gold received (e.g., 0.05 for 5%).\n        Applied unless an offer has its own \"fee_rate\".\n\n    Returns\n    -------\n    dict with keys:\n      - \"max_net_gold\": maximum achievable net gold\n      - \"chosen\": chosen offers (original fields + computed \"net_gold\"), in increasing max_price\n      - \"all\": all offers enriched with computed fields and sorted by max_price\n\n    Notes\n    -----\n    net_gold = gold * (1 - fee_rate_used)\n    \"\"\"\n    if not offers:\n        return {\"max_net_gold\": 0.0, \"chosen\": [], \"all\": []}\n\n    enriched = []\n    for o in offers:\n        if \"min_price\" not in o or \"max_price\" not in o or \"gold\" not in o:\n            raise ValueError(\"Each offer must have 'min_price', 'max_price', and 'gold'.\")\n        start = float(o[\"min_price\"])\n        end = float(o[\"max_price\"])\n        if end < start:\n            raise ValueError(\"Offer has max_price < min_price.\")\n        gross = float(o[\"gold\"])\n        fr = float(o.get(\"fee_rate\", listing_fee_rate))\n        net = gross * (1.0 - fr)\n        enriched.append({**o, \"min_price\": start, \"max_price\": end, \"gross_gold\": gross, \"fee_rate_used\": fr, \"net_gold\": net})\n\n    # Sort by end time (max_price)\n    enriched.sort(key=lambda x: (x[\"max_price\"], x[\"min_price\"]))\n\n    ends = [o[\"max_price\"] for o in enriched]\n\n    # p[i] = index of rightmost offer that ends strictly before offer i starts (no overlap)\n    # Because intervals are closed and touching counts as overlap, we require end < start.\n    import bisect\n    p = []\n    for i, o in enumerate(enriched):\n        j = bisect.bisect_left(ends, o[\"min_price\"]) - 1  # last end < start\n        p.append(j)\n\n    n = len(enriched)\n    dp = [0.0] * (n + 1)      # dp[i] = best for first i offers (1..i)\n    take = [False] * (n + 1)  # whether we take offer i\n    prev = [-1] * (n + 1)     # link to previous dp index if taken\n\n    for i in range(1, n + 1):\n        w = enriched[i - 1][\"net_gold\"]\n        j = p[i - 1] + 1  # dp index (since dp is 1-based)\n        opt_take = w + dp[j]\n        opt_skip = dp[i - 1]\n        if opt_take > opt_skip:\n            dp[i] = opt_take\n            take[i] = True\n            prev[i] = j\n        else:\n            dp[i] = opt_skip\n            take[i] = False\n\n    # Reconstruct chosen offers\n    chosen = []\n    i = n\n    while i > 0:\n        if take[i]:\n            chosen.append(enriched[i - 1])\n            i = prev[i]\n        else:\n            i -= 1\n    chosen.reverse()\n\n    return {\"max_net_gold\": dp[n], \"chosen\": chosen, \"all\": enriched}",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import bisect\n\ndef max_gold_offers_on_houses(offers, n, fee_rate=0.0):\n    \"\"\"\n    Maximize net gold from buyer offers over a line of discrete houses 0..n-1,\n    with the rule that chosen offers may not overlap (buyers can't share houses).\n\n    Each offer covers an interval of house indices [l, r] (inclusive) and pays 'gold'\n    if accepted. Choose a subset of non-overlapping offers with maximum total net gold.\n\n    This is weighted interval scheduling on discrete indices (touching endpoints overlap).\n\n    Parameters\n    ----------\n    offers : list[dict]\n        Each offer dict must contain:\n          - \"l\": int   (0 <= l <= r < n)\n          - \"r\": int\n          - \"gold\": number\n        Optional:\n          - \"id\"/\"name\": identifier\n          - \"fee_rate\": overrides global fee_rate for this offer (fraction)\n\n    n : int\n        Number of houses (indices 0..n-1). Only used for validation.\n\n    fee_rate : float\n        Default fee fraction applied to gold unless an offer provides \"fee_rate\".\n\n    Returns\n    -------\n    dict with keys:\n      - \"max_net_gold\": float\n      - \"chosen\": list of chosen offers (enriched with \"net_gold\"), sorted by r then l\n      - \"all\": all offers (enriched, sorted)\n\n    Notes\n    -----\n    Intervals are inclusive. So offers [l1,r1] and [l2,r2] are compatible iff:\n        r1 < l2 or r2 < l1\n    \"\"\"\n    if n < 0:\n        raise ValueError(\"n must be non-negative.\")\n    if not offers:\n        return {\"max_net_gold\": 0.0, \"chosen\": [], \"all\": []}\n\n    enriched = []\n    for o in offers:\n        if \"l\" not in o or \"r\" not in o or \"gold\" not in o:\n            raise ValueError(\"Each offer must have 'l', 'r', and 'gold'.\")\n        l = int(o[\"l\"])\n        r = int(o[\"r\"])\n        if l < 0 or r < 0 or l > r or r >= n:\n            raise ValueError(\"Offer interval must satisfy 0 <= l <= r < n.\")\n        gross = float(o[\"gold\"])\n        fr = float(o.get(\"fee_rate\", fee_rate))\n        net = gross * (1.0 - fr)\n        enriched.append({**o, \"l\": l, \"r\": r, \"gross_gold\": gross, \"fee_rate_used\": fr, \"net_gold\": net})\n\n    # Sort by end index r, then l\n    enriched.sort(key=lambda x: (x[\"r\"], x[\"l\"]))\n\n    # Compute p[i]: index of rightmost offer ending strictly before offer i starts.\n    # Because inclusive intervals, require prev.r < curr.l.\n    import bisect\n    ends = [o[\"r\"] for o in enriched]\n    p = []\n    for i, o in enumerate(enriched):\n        j = bisect.bisect_left(ends, o[\"l\"]) - 1  # last end < l\n        p.append(j)\n\n    m = len(enriched)\n    dp = [0.0] * (m + 1)      # dp[i] best net for first i offers (i offers considered)\n    take = [False] * (m + 1)\n    prev = [-1] * (m + 1)\n\n    for i in range(1, m + 1):\n        w = enriched[i - 1][\"net_gold\"]\n        j = p[i - 1] + 1       # dp index\n        take_val = w + dp[j]\n        skip_val = dp[i - 1]\n        if take_val > skip_val:\n            dp[i] = take_val\n            take[i] = True\n            prev[i] = j\n        else:\n            dp[i] = skip_val\n\n    chosen = []\n    i = m\n    while i > 0:\n        if take[i]:\n            chosen.append(enriched[i - 1])\n            i = prev[i]\n        else:\n            i -= 1\n    chosen.reverse()\n\n    return {\"max_net_gold\": dp[m], \"chosen\": chosen, \"all\": enriched}",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def maximize_the_profit(n, offers):\n    \"\"\"\n    LeetCode-style: given n houses (0..n-1) and offers [start, end, gold],\n    choose non-overlapping offers (inclusive ranges) to maximize total gold.\n\n    Example:\n        n=5, offers=[[0,0,1],[0,2,2],[1,3,2]] -> 3\n    \"\"\"\n    # dp[i] = max profit using houses from i..n-1\n    dp = [0] * (n + 1)\n\n    # bucket offers by their start index\n    by_start = [[] for _ in range(n)]\n    for s, e, g in offers:\n        by_start[s].append((e, g))\n\n    for i in range(n - 1, -1, -1):\n        best = dp[i + 1]  # skip starting any offer at i\n        for e, g in by_start[i]:\n            nxt = e + 1\n            val = g + (dp[nxt] if nxt <= n else 0)\n            if val > best:\n                best = val\n        dp[i] = best\n\n    return dp[0]",
+          "is_correct": true,
+          "score": 1
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

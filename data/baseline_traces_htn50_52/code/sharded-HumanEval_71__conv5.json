@@ -1,0 +1,212 @@
+{
+  "sample_id": "sharded-HumanEval/71",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": true,
+  "score": 1.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 03:09:28",
+  "lic_conv_id": "699816b8175c5382b0945655",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Calculate triangle area ",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(*args, **kwargs):\n    \"\"\"\n    Calculate the area of a triangle.\n\n    Supported inputs:\n    - triangle_area(base, height)\n    - triangle_area((x1, y1), (x2, y2), (x3, y3))\n    - triangle_area(x1, y1, x2, y2, x3, y3)\n    - triangle_area(base=..., height=...)\n    - triangle_area(points=[(x1,y1),(x2,y2),(x3,y3)]) or points=((...),(...),(...))\n\n    Returns:\n        float: area (always non-negative)\n\n    Raises:\n        ValueError: on invalid inputs\n    \"\"\"\n    def _area_from_base_height(b, h):\n        b = float(b); h = float(h)\n        if b < 0 or h < 0:\n            raise ValueError(\"base and height must be non-negative\")\n        return 0.5 * b * h\n\n    def _area_from_points(p1, p2, p3):\n        x1, y1 = map(float, p1)\n        x2, y2 = map(float, p2)\n        x3, y3 = map(float, p3)\n        return abs(0.5 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)))\n\n    # kwargs forms\n    if kwargs:\n        if \"base\" in kwargs or \"height\" in kwargs:\n            if \"base\" not in kwargs or \"height\" not in kwargs:\n                raise ValueError(\"Both 'base' and 'height' must be provided\")\n            return _area_from_base_height(kwargs[\"base\"], kwargs[\"height\"])\n        if \"points\" in kwargs:\n            pts = kwargs[\"points\"]\n            if not (isinstance(pts, (list, tuple)) and len(pts) == 3):\n                raise ValueError(\"'points' must be a sequence of 3 (x,y) pairs\")\n            return _area_from_points(pts[0], pts[1], pts[2])\n        raise ValueError(\"Unsupported keyword arguments\")\n\n    # positional forms\n    if len(args) == 2:\n        return _area_from_base_height(args[0], args[1])\n\n    if len(args) == 3 and all(isinstance(a, (list, tuple)) for a in args):\n        return _area_from_points(args[0], args[1], args[2])\n\n    if len(args) == 6:\n        return _area_from_points((args[0], args[1]), (args[2], args[3]), (args[4], args[5]))\n\n    raise ValueError(\"Unsupported input. Use (base, height) or 3 points.\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "You gotta make sure the sides can actually form a triangle first.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(*args, **kwargs):\n    \"\"\"\n    Calculate the area of a triangle, validating that a non-degenerate triangle can be formed.\n\n    Supported inputs:\n    - triangle_area(a, b, c)                              # side lengths\n    - triangle_area(base, height)                         # base & height (must be > 0)\n    - triangle_area((x1,y1), (x2,y2), (x3,y3))            # 3 points\n    - triangle_area(x1,y1,x2,y2,x3,y3)                    # 3 points flat\n    - triangle_area(a=..., b=..., c=...)                  # side lengths\n    - triangle_area(base=..., height=...)                 # base & height\n    - triangle_area(points=[(x1,y1),(x2,y2),(x3,y3)])      # 3 points\n\n    Returns:\n        float: area (always non-negative)\n\n    Raises:\n        ValueError: if inputs are invalid or do not form a non-degenerate triangle.\n    \"\"\"\n    def valid_sides(a, b, c):\n        a = float(a); b = float(b); c = float(c)\n        if a <= 0 or b <= 0 or c <= 0:\n            raise ValueError(\"Side lengths must be positive\")\n        # strict inequality => non-degenerate triangle\n        if not (a + b > c and a + c > b and b + c > a):\n            raise ValueError(\"Side lengths do not form a triangle\")\n        return a, b, c\n\n    def area_from_sides(a, b, c):\n        a, b, c = valid_sides(a, b, c)\n        s = (a + b + c) / 2.0\n        val = s * (s - a) * (s - b) * (s - c)\n        if val <= 0:\n            raise ValueError(\"Side lengths do not form a non-degenerate triangle\")\n        return val ** 0.5\n\n    def area_from_points(p1, p2, p3):\n        x1, y1 = map(float, p1)\n        x2, y2 = map(float, p2)\n        x3, y3 = map(float, p3)\n        area = abs(0.5 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)))\n        if area == 0.0:\n            raise ValueError(\"Points are collinear; triangle is degenerate\")\n        return area\n\n    def area_from_base_height(base, height):\n        base = float(base); height = float(height)\n        if base <= 0 or height <= 0:\n            raise ValueError(\"base and height must be positive for a non-degenerate triangle\")\n        return 0.5 * base * height\n\n    # kwargs forms\n    if kwargs:\n        if any(k in kwargs for k in (\"a\", \"b\", \"c\")):\n            if not all(k in kwargs for k in (\"a\", \"b\", \"c\")):\n                raise ValueError(\"Must provide a, b, and c\")\n            return area_from_sides(kwargs[\"a\"], kwargs[\"b\"], kwargs[\"c\"])\n        if any(k in kwargs for k in (\"base\", \"height\")):\n            if \"base\" not in kwargs or \"height\" not in kwargs:\n                raise ValueError(\"Both 'base' and 'height' must be provided\")\n            return area_from_base_height(kwargs[\"base\"], kwargs[\"height\"])\n        if \"points\" in kwargs:\n            pts = kwargs[\"points\"]\n            if not (isinstance(pts, (list, tuple)) and len(pts) == 3):\n                raise ValueError(\"'points' must be a sequence of 3 (x,y) pairs\")\n            return area_from_points(pts[0], pts[1], pts[2])\n        raise ValueError(\"Unsupported keyword arguments\")\n\n    # positional forms\n    if len(args) == 3 and not all(isinstance(a, (list, tuple)) for a in args):\n        return area_from_sides(args[0], args[1], args[2])\n\n    if len(args) == 2:\n        return area_from_base_height(args[0], args[1])\n\n    if len(args) == 3 and all(isinstance(a, (list, tuple)) for a in args):\n        return area_from_points(args[0], args[1], args[2])\n\n    if len(args) == 6:\n        return area_from_points((args[0], args[1]), (args[2], args[3]), (args[4], args[5]))\n\n    raise ValueError(\"Unsupported input. Use (a,b,c), (base,height), or 3 points.\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "you need to check that any two sides are greater than the third to see if they make a real triangle",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(*args, **kwargs):\n    \"\"\"\n    Triangle area with validation.\n\n    Accepted forms:\n      - triangle_area(a, b, c)                 # side lengths (validated: any two > third)\n      - triangle_area(base, height)            # base & height (must be > 0)\n      - triangle_area((x1,y1),(x2,y2),(x3,y3)) # 3 points (must be non-collinear)\n      - triangle_area(x1,y1,x2,y2,x3,y3)       # 3 points flat\n      - keyword variants: a=,b=,c=  or base=,height=  or points=[...]\n    \"\"\"\n    def _valid_sides(a, b, c):\n        a = float(a); b = float(b); c = float(c)\n        if a <= 0 or b <= 0 or c <= 0:\n            raise ValueError(\"Side lengths must be positive\")\n        # Triangle inequality: any two sides must be greater than the third\n        if not (a + b > c and a + c > b and b + c > a):\n            raise ValueError(\"Sides do not form a real triangle\")\n        return a, b, c\n\n    def _area_sides(a, b, c):\n        a, b, c = _valid_sides(a, b, c)\n        s = (a + b + c) / 2.0\n        return (s * (s - a) * (s - b) * (s - c)) ** 0.5\n\n    def _area_points(p1, p2, p3):\n        x1, y1 = map(float, p1)\n        x2, y2 = map(float, p2)\n        x3, y3 = map(float, p3)\n        area = abs(0.5 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)))\n        if area == 0.0:\n            raise ValueError(\"Points are collinear; not a real triangle\")\n        return area\n\n    def _area_base_height(base, height):\n        base = float(base); height = float(height)\n        if base <= 0 or height <= 0:\n            raise ValueError(\"base and height must be positive\")\n        return 0.5 * base * height\n\n    # Keyword inputs\n    if kwargs:\n        if any(k in kwargs for k in (\"a\", \"b\", \"c\")):\n            if not all(k in kwargs for k in (\"a\", \"b\", \"c\")):\n                raise ValueError(\"Provide a, b, and c\")\n            return _area_sides(kwargs[\"a\"], kwargs[\"b\"], kwargs[\"c\"])\n        if any(k in kwargs for k in (\"base\", \"height\")):\n            if \"base\" not in kwargs or \"height\" not in kwargs:\n                raise ValueError(\"Provide both base and height\")\n            return _area_base_height(kwargs[\"base\"], kwargs[\"height\"])\n        if \"points\" in kwargs:\n            pts = kwargs[\"points\"]\n            if not (isinstance(pts, (list, tuple)) and len(pts) == 3):\n                raise ValueError(\"points must be 3 (x,y) pairs\")\n            return _area_points(pts[0], pts[1], pts[2])\n        raise ValueError(\"Unsupported keyword arguments\")\n\n    # Positional inputs\n    if len(args) == 3 and not all(isinstance(a, (list, tuple)) for a in args):\n        return _area_sides(args[0], args[1], args[2])\n    if len(args) == 2:\n        return _area_base_height(args[0], args[1])\n    if len(args) == 3 and all(isinstance(a, (list, tuple)) for a in args):\n        return _area_points(args[0], args[1], args[2])\n    if len(args) == 6:\n        return _area_points((args[0], args[1]), (args[2], args[3]), (args[4], args[5]))\n\n    raise ValueError(\"Unsupported input. Use (a,b,c), (base,height), or 3 points.\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "You have the lengths of all three sides.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(a, b, c):\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0:\n        raise ValueError(\"Side lengths must be positive\")\n    if not (a + b > c and a + c > b and b + c > a):\n        raise ValueError(\"Sides do not form a real triangle\")\n\n    s = (a + b + c) / 2.0  # semiperimeter\n    return (s * (s - a) * (s - b) * (s - c)) ** 0.5\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "If the sides aren't valid, just return -1.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(a, b, c):\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0:\n        return -1\n    if not (a + b > c and a + c > b and b + c > a):\n        return -1\n\n    s = (a + b + c) / 2.0\n    return (s * (s - a) * (s - b) * (s - c)) ** 0.5\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example, if the sides are 3, 4, and 5, the area is 6.00",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(a, b, c):\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0:\n        return -1\n    if not (a + b > c and a + c > b and b + c > a):\n        return -1\n\n    s = (a + b + c) / 2.0\n    area = (s * (s - a) * (s - b) * (s - c)) ** 0.5\n    return float(f\"{area:.2f}\")\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(*args, **kwargs):\n    \"\"\"\n    Calculate the area of a triangle.\n\n    Supported inputs:\n    - triangle_area(base, height)\n    - triangle_area((x1, y1), (x2, y2), (x3, y3))\n    - triangle_area(x1, y1, x2, y2, x3, y3)\n    - triangle_area(base=..., height=...)\n    - triangle_area(points=[(x1,y1),(x2,y2),(x3,y3)]) or points=((...),(...),(...))\n\n    Returns:\n        float: area (always non-negative)\n\n    Raises:\n        ValueError: on invalid inputs\n    \"\"\"\n    def _area_from_base_height(b, h):\n        b = float(b); h = float(h)\n        if b < 0 or h < 0:\n            raise ValueError(\"base and height must be non-negative\")\n        return 0.5 * b * h\n\n    def _area_from_points(p1, p2, p3):\n        x1, y1 = map(float, p1)\n        x2, y2 = map(float, p2)\n        x3, y3 = map(float, p3)\n        return abs(0.5 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)))\n\n    # kwargs forms\n    if kwargs:\n        if \"base\" in kwargs or \"height\" in kwargs:\n            if \"base\" not in kwargs or \"height\" not in kwargs:\n                raise ValueError(\"Both 'base' and 'height' must be provided\")\n            return _area_from_base_height(kwargs[\"base\"], kwargs[\"height\"])\n        if \"points\" in kwargs:\n            pts = kwargs[\"points\"]\n            if not (isinstance(pts, (list, tuple)) and len(pts) == 3):\n                raise ValueError(\"'points' must be a sequence of 3 (x,y) pairs\")\n            return _area_from_points(pts[0], pts[1], pts[2])\n        raise ValueError(\"Unsupported keyword arguments\")\n\n    # positional forms\n    if len(args) == 2:\n        return _area_from_base_height(args[0], args[1])\n\n    if len(args) == 3 and all(isinstance(a, (list, tuple)) for a in args):\n        return _area_from_points(args[0], args[1], args[2])\n\n    if len(args) == 6:\n        return _area_from_points((args[0], args[1]), (args[2], args[3]), (args[4], args[5]))\n\n    raise ValueError(\"Unsupported input. Use (base, height) or 3 points.\")",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(*args, **kwargs):\n    \"\"\"\n    Calculate the area of a triangle, validating that a non-degenerate triangle can be formed.\n\n    Supported inputs:\n    - triangle_area(a, b, c)                              # side lengths\n    - triangle_area(base, height)                         # base & height (must be > 0)\n    - triangle_area((x1,y1), (x2,y2), (x3,y3))            # 3 points\n    - triangle_area(x1,y1,x2,y2,x3,y3)                    # 3 points flat\n    - triangle_area(a=..., b=..., c=...)                  # side lengths\n    - triangle_area(base=..., height=...)                 # base & height\n    - triangle_area(points=[(x1,y1),(x2,y2),(x3,y3)])      # 3 points\n\n    Returns:\n        float: area (always non-negative)\n\n    Raises:\n        ValueError: if inputs are invalid or do not form a non-degenerate triangle.\n    \"\"\"\n    def valid_sides(a, b, c):\n        a = float(a); b = float(b); c = float(c)\n        if a <= 0 or b <= 0 or c <= 0:\n            raise ValueError(\"Side lengths must be positive\")\n        # strict inequality => non-degenerate triangle\n        if not (a + b > c and a + c > b and b + c > a):\n            raise ValueError(\"Side lengths do not form a triangle\")\n        return a, b, c\n\n    def area_from_sides(a, b, c):\n        a, b, c = valid_sides(a, b, c)\n        s = (a + b + c) / 2.0\n        val = s * (s - a) * (s - b) * (s - c)\n        if val <= 0:\n            raise ValueError(\"Side lengths do not form a non-degenerate triangle\")\n        return val ** 0.5\n\n    def area_from_points(p1, p2, p3):\n        x1, y1 = map(float, p1)\n        x2, y2 = map(float, p2)\n        x3, y3 = map(float, p3)\n        area = abs(0.5 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)))\n        if area == 0.0:\n            raise ValueError(\"Points are collinear; triangle is degenerate\")\n        return area\n\n    def area_from_base_height(base, height):\n        base = float(base); height = float(height)\n        if base <= 0 or height <= 0:\n            raise ValueError(\"base and height must be positive for a non-degenerate triangle\")\n        return 0.5 * base * height\n\n    # kwargs forms\n    if kwargs:\n        if any(k in kwargs for k in (\"a\", \"b\", \"c\")):\n            if not all(k in kwargs for k in (\"a\", \"b\", \"c\")):\n                raise ValueError(\"Must provide a, b, and c\")\n            return area_from_sides(kwargs[\"a\"], kwargs[\"b\"], kwargs[\"c\"])\n        if any(k in kwargs for k in (\"base\", \"height\")):\n            if \"base\" not in kwargs or \"height\" not in kwargs:\n                raise ValueError(\"Both 'base' and 'height' must be provided\")\n            return area_from_base_height(kwargs[\"base\"], kwargs[\"height\"])\n        if \"points\" in kwargs:\n            pts = kwargs[\"points\"]\n            if not (isinstance(pts, (list, tuple)) and len(pts) == 3):\n                raise ValueError(\"'points' must be a sequence of 3 (x,y) pairs\")\n            return area_from_points(pts[0], pts[1], pts[2])\n        raise ValueError(\"Unsupported keyword arguments\")\n\n    # positional forms\n    if len(args) == 3 and not all(isinstance(a, (list, tuple)) for a in args):\n        return area_from_sides(args[0], args[1], args[2])\n\n    if len(args) == 2:\n        return area_from_base_height(args[0], args[1])\n\n    if len(args) == 3 and all(isinstance(a, (list, tuple)) for a in args):\n        return area_from_points(args[0], args[1], args[2])\n\n    if len(args) == 6:\n        return area_from_points((args[0], args[1]), (args[2], args[3]), (args[4], args[5]))\n\n    raise ValueError(\"Unsupported input. Use (a,b,c), (base,height), or 3 points.\")",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(*args, **kwargs):\n    \"\"\"\n    Triangle area with validation.\n\n    Accepted forms:\n      - triangle_area(a, b, c)                 # side lengths (validated: any two > third)\n      - triangle_area(base, height)            # base & height (must be > 0)\n      - triangle_area((x1,y1),(x2,y2),(x3,y3)) # 3 points (must be non-collinear)\n      - triangle_area(x1,y1,x2,y2,x3,y3)       # 3 points flat\n      - keyword variants: a=,b=,c=  or base=,height=  or points=[...]\n    \"\"\"\n    def _valid_sides(a, b, c):\n        a = float(a); b = float(b); c = float(c)\n        if a <= 0 or b <= 0 or c <= 0:\n            raise ValueError(\"Side lengths must be positive\")\n        # Triangle inequality: any two sides must be greater than the third\n        if not (a + b > c and a + c > b and b + c > a):\n            raise ValueError(\"Sides do not form a real triangle\")\n        return a, b, c\n\n    def _area_sides(a, b, c):\n        a, b, c = _valid_sides(a, b, c)\n        s = (a + b + c) / 2.0\n        return (s * (s - a) * (s - b) * (s - c)) ** 0.5\n\n    def _area_points(p1, p2, p3):\n        x1, y1 = map(float, p1)\n        x2, y2 = map(float, p2)\n        x3, y3 = map(float, p3)\n        area = abs(0.5 * (x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)))\n        if area == 0.0:\n            raise ValueError(\"Points are collinear; not a real triangle\")\n        return area\n\n    def _area_base_height(base, height):\n        base = float(base); height = float(height)\n        if base <= 0 or height <= 0:\n            raise ValueError(\"base and height must be positive\")\n        return 0.5 * base * height\n\n    # Keyword inputs\n    if kwargs:\n        if any(k in kwargs for k in (\"a\", \"b\", \"c\")):\n            if not all(k in kwargs for k in (\"a\", \"b\", \"c\")):\n                raise ValueError(\"Provide a, b, and c\")\n            return _area_sides(kwargs[\"a\"], kwargs[\"b\"], kwargs[\"c\"])\n        if any(k in kwargs for k in (\"base\", \"height\")):\n            if \"base\" not in kwargs or \"height\" not in kwargs:\n                raise ValueError(\"Provide both base and height\")\n            return _area_base_height(kwargs[\"base\"], kwargs[\"height\"])\n        if \"points\" in kwargs:\n            pts = kwargs[\"points\"]\n            if not (isinstance(pts, (list, tuple)) and len(pts) == 3):\n                raise ValueError(\"points must be 3 (x,y) pairs\")\n            return _area_points(pts[0], pts[1], pts[2])\n        raise ValueError(\"Unsupported keyword arguments\")\n\n    # Positional inputs\n    if len(args) == 3 and not all(isinstance(a, (list, tuple)) for a in args):\n        return _area_sides(args[0], args[1], args[2])\n    if len(args) == 2:\n        return _area_base_height(args[0], args[1])\n    if len(args) == 3 and all(isinstance(a, (list, tuple)) for a in args):\n        return _area_points(args[0], args[1], args[2])\n    if len(args) == 6:\n        return _area_points((args[0], args[1]), (args[2], args[3]), (args[4], args[5]))\n\n    raise ValueError(\"Unsupported input. Use (a,b,c), (base,height), or 3 points.\")",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(a, b, c):\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0:\n        raise ValueError(\"Side lengths must be positive\")\n    if not (a + b > c and a + c > b and b + c > a):\n        raise ValueError(\"Sides do not form a real triangle\")\n\n    s = (a + b + c) / 2.0  # semiperimeter\n    return (s * (s - a) * (s - b) * (s - c)) ** 0.5",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(a, b, c):\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0:\n        return -1\n    if not (a + b > c and a + c > b and b + c > a):\n        return -1\n\n    s = (a + b + c) / 2.0\n    return (s * (s - a) * (s - b) * (s - c)) ** 0.5",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(a, b, c):\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0:\n        return -1\n    if not (a + b > c and a + c > b and b + c > a):\n        return -1\n\n    s = (a + b + c) / 2.0\n    area = (s * (s - a) * (s - b) * (s - c)) ** 0.5\n    return float(f\"{area:.2f}\")",
+          "is_correct": true,
+          "score": 1
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

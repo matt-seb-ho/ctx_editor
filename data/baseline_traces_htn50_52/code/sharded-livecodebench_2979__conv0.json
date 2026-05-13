@@ -1,0 +1,204 @@
+{
+  "sample_id": "sharded-livecodebench/2979",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": true,
+  "score": 1.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 18:51:57",
+  "lic_conv_id": "6997b456175c5393aef16d04",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "how much gold can I make from house offers?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef house_offer_gold(*args, **kwargs):\n    \"\"\"\n    This function can't answer yet because the problem specification is missing.\n\n    Please provide:\n    - What a \"house offer\" is in your game/app (inputs and rules),\n    - The list of offers (or how offers are generated),\n    - Any constraints (limits per day, fees, taxes, bonuses),\n    - What \"gold\" means (integer? rounding? caps?).\n\n    Then I can implement the exact calculation.\n\n    For convenience, you can call this function like:\n      house_offer_gold(offers=[...], fee_rate=..., daily_limit=...)\n    once you tell me the expected fields.\n    \"\"\"\n    raise NotImplementedError(\"Need full specification of 'house offers' gold calculation.\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I can figure out the best way to sell the houses for more gold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef maximize_house_sale_gold(offers, houses, *, allow_partial=False):\n    \"\"\"\n    Compute the maximum gold you can make by matching houses to offers.\n\n    Parameters\n    ----------\n    offers : list of dict/tuple\n        Each offer must provide (min_value, max_value, gold) where the offer\n        can be used for any house whose value is in [min_value, max_value].\n        Accepted forms:\n          - dict with keys: 'min', 'max', 'gold'\n          - tuple/list: (min_value, max_value, gold)\n\n    houses : list[int|float]\n        The value of each house you can sell.\n\n    allow_partial : bool\n        If False (default): each house can be sold at most once and each offer\n        can be used at most once (1-to-1 matching).\n        If True: an offer can be used unlimited times (best offer per house),\n        while each house still sells at most once.\n\n    Returns\n    -------\n    int|float\n        Maximum total gold obtainable.\n\n    Notes\n    -----\n    - If multiple offers apply to a house, you choose at most one.\n    - If a house matches no offer, it yields 0 gold.\n    \"\"\"\n    # Normalize offers\n    norm = []\n    for o in offers:\n        if isinstance(o, dict):\n            a, b, g = o[\"min\"], o[\"max\"], o[\"gold\"]\n        else:\n            a, b, g = o\n        if a > b:\n            a, b = b, a\n        norm.append((a, b, g))\n\n    # If offers are reusable, just pick best offer per house.\n    if allow_partial:\n        total = 0\n        for v in houses:\n            best = 0\n            for a, b, g in norm:\n                if a <= v <= b and g > best:\n                    best = g\n            total += best\n        return total\n\n    # 1-to-1 matching (each offer used once): maximize total gold.\n    # Model as maximum weight bipartite matching where edges exist if offer fits house.\n    # Use DP over subsets when the smaller side is offers (works up to ~20 offers).\n    n_off = len(norm)\n    n_house = len(houses)\n\n    # If too large for subset DP, fall back to a greedy heuristic.\n    # (Without a full spec/constraints, we can't guarantee polynomial optimality here.)\n    if n_off > 20:\n        # Greedy: sort potential assignments by gold descending.\n        edges = []\n        for i, (a, b, g) in enumerate(norm):\n            for j, v in enumerate(houses):\n                if a <= v <= b:\n                    edges.append((g, i, j))\n        edges.sort(reverse=True)\n        used_off = [False] * n_off\n        used_house = [False] * n_house\n        total = 0\n        for g, i, j in edges:\n            if not used_off[i] and not used_house[j]:\n                used_off[i] = True\n                used_house[j] = True\n                total += g\n        return total\n\n    # DP: dp[mask] = max gold using offers in mask assigned to first k houses as we iterate.\n    # We'll iterate houses and transition by choosing an unused offer that fits.\n    dp = {0: 0}\n    for v in houses:\n        ndp = dict(dp)  # option: don't sell this house\n        for mask, val in dp.items():\n            for i, (a, b, g) in enumerate(norm):\n                if (mask >> i) & 1:\n                    continue\n                if a <= v <= b:\n                    nmask = mask | (1 << i)\n                    nv = val + g\n                    if nv > ndp.get(nmask, float(\"-inf\")):\n                        ndp[nmask] = nv\n        dp = ndp\n\n    return max(dp.values(), default=0)\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the offers are like triplets, giving a range of house values and the amount of gold for each offer",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef house_offer_gold(house_values, offers, *, offer_reuse=False):\n    \"\"\"\n    Max gold from selling houses given offers as triplets (lo, hi, gold).\n\n    Parameters\n    ----------\n    house_values : list[int|float]\n        Value of each house you can sell (each house at most once).\n\n    offers : list[tuple(lo, hi, gold)]\n        Each offer applies to any house with value in [lo, hi] (inclusive),\n        and pays `gold`. Each offer can be used at most once unless offer_reuse=True.\n\n    offer_reuse : bool\n        False (default): each offer can be used at most once (1-to-1 matching).\n        True: offers can be used unlimited times (each house picks best applicable offer).\n\n    Returns\n    -------\n    int|float\n        Maximum total gold obtainable.\n    \"\"\"\n    # normalize offers\n    norm = []\n    for lo, hi, g in offers:\n        if lo > hi:\n            lo, hi = hi, lo\n        norm.append((lo, hi, g))\n\n    if offer_reuse:\n        total = 0\n        for v in house_values:\n            best = 0\n            for lo, hi, g in norm:\n                if lo <= v <= hi and g > best:\n                    best = g\n            total += best\n        return total\n\n    # exact maximum for \"each offer at most once\" via subset DP when offers are small\n    m = len(norm)\n    if m <= 20:\n        dp = {0: 0}\n        for v in house_values:\n            ndp = dict(dp)  # option: don't sell this house\n            for mask, val in dp.items():\n                for i, (lo, hi, g) in enumerate(norm):\n                    if (mask >> i) & 1:\n                        continue\n                    if lo <= v <= hi:\n                        nmask = mask | (1 << i)\n                        nv = val + g\n                        if nv > ndp.get(nmask, float(\"-inf\")):\n                            ndp[nmask] = nv\n            dp = ndp\n        return max(dp.values(), default=0)\n\n    # fallback (large offers): greedy heuristic\n    edges = []\n    for i, (lo, hi, g) in enumerate(norm):\n        for j, v in enumerate(house_values):\n            if lo <= v <= hi:\n                edges.append((g, i, j))\n    edges.sort(reverse=True)\n    used_offer = [False] * m\n    used_house = [False] * len(house_values)\n    total = 0\n    for g, i, j in edges:\n        if not used_offer[i] and not used_house[j]:\n            used_offer[i] = True\n            used_house[j] = True\n            total += g\n    return total\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "also, buyers can't share houses. no overlapping sales to the same house",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef house_offer_gold(house_values, offers, *, offer_reuse=False):\n    \"\"\"\n    Max gold from selling houses given offers as triplets (lo, hi, gold).\n\n    Rules enforced:\n    - Each house can be sold at most once (no overlapping sales to the same house).\n    - If offer_reuse=False: each offer can be used at most once as well.\n      If offer_reuse=True: offers can be used multiple times, but still one per house.\n\n    Parameters\n    ----------\n    house_values : list[int|float]\n    offers : list[tuple(lo, hi, gold)]\n        Offer applies if lo <= house_value <= hi (inclusive).\n    offer_reuse : bool\n\n    Returns\n    -------\n    int|float : maximum total gold\n    \"\"\"\n    norm = []\n    for lo, hi, g in offers:\n        if lo > hi:\n            lo, hi = hi, lo\n        norm.append((lo, hi, g))\n\n    # Offers reusable: each house independently picks best applicable offer.\n    if offer_reuse:\n        total = 0\n        for v in house_values:\n            best = 0\n            for lo, hi, g in norm:\n                if lo <= v <= hi and g > best:\n                    best = g\n            total += best\n        return total\n\n    # Offers not reusable: exact max matching via subset DP when offers small.\n    m = len(norm)\n    if m <= 20:\n        dp = {0: 0}\n        for v in house_values:\n            ndp = dict(dp)  # option: skip this house\n            for mask, val in dp.items():\n                for i, (lo, hi, g) in enumerate(norm):\n                    if (mask >> i) & 1:\n                        continue\n                    if lo <= v <= hi:\n                        nmask = mask | (1 << i)\n                        nv = val + g\n                        if nv > ndp.get(nmask, float(\"-inf\")):\n                            ndp[nmask] = nv\n            dp = ndp\n        return max(dp.values(), default=0)\n\n    # Large m fallback: greedy heuristic (still respects \"no overlapping sales to same house\")\n    edges = []\n    for i, (lo, hi, g) in enumerate(norm):\n        for j, v in enumerate(house_values):\n            if lo <= v <= hi:\n                edges.append((g, i, j))\n    edges.sort(reverse=True)\n\n    used_offer = [False] * m\n    used_house = [False] * len(house_values)\n    total = 0\n    for g, i, j in edges:\n        if not used_offer[i] and not used_house[j]:\n            used_offer[i] = True\n            used_house[j] = True\n            total += g\n    return total\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "there are n houses lined up, numbered from 0 to n-1.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef house_offer_gold(house_values, offers, *, offer_reuse=False):\n    \"\"\"\n    Max gold from selling houses with values house_values[0..n-1].\n\n    Houses are distinct (indexed 0..n-1) and cannot be sold to more than one buyer:\n    no overlapping sales to the same house.\n\n    Offers are triplets (lo, hi, gold) and apply to any house whose *value* v satisfies\n    lo <= v <= hi (inclusive).\n\n    If offer_reuse=False (default): each offer can be used at most once total.\n    If offer_reuse=True: offers can be used multiple times (still at most one per house).\n\n    Returns the maximum total gold.\n    \"\"\"\n    norm = []\n    for lo, hi, g in offers:\n        if lo > hi:\n            lo, hi = hi, lo\n        norm.append((lo, hi, g))\n\n    if offer_reuse:\n        total = 0\n        for v in house_values:\n            best = 0\n            for lo, hi, g in norm:\n                if lo <= v <= hi and g > best:\n                    best = g\n            total += best\n        return total\n\n    m = len(norm)\n    # Exact when number of offers is modest (subset DP).\n    if m <= 20:\n        dp = {0: 0}\n        for v in house_values:\n            ndp = dict(dp)  # skip this house\n            for mask, val in dp.items():\n                for i, (lo, hi, g) in enumerate(norm):\n                    if (mask >> i) & 1:\n                        continue\n                    if lo <= v <= hi:\n                        nmask = mask | (1 << i)\n                        nv = val + g\n                        if nv > ndp.get(nmask, float(\"-inf\")):\n                            ndp[nmask] = nv\n            dp = ndp\n        return max(dp.values(), default=0)\n\n    # Fallback heuristic for large number of offers (still respects distinct houses/offers).\n    edges = []\n    for i, (lo, hi, g) in enumerate(norm):\n        for j, v in enumerate(house_values):\n            if lo <= v <= hi:\n                edges.append((g, i, j))\n    edges.sort(reverse=True)\n\n    used_offer = [False] * m\n    used_house = [False] * len(house_values)\n    total = 0\n    for g, i, j in edges:\n        if not used_offer[i] and not used_house[j]:\n            used_offer[i] = True\n            used_house[j] = True\n            total += g\n    return total\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "there's also an example where if I have 5 houses and offers like [[0,0,1],[0,2,2],[1,3,2]], I can make a max profit of 3",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef house_offer_gold(n, offers):\n    \"\"\"\n    n houses in a line, indexed 0..n-1. Each house can be sold at most once.\n\n    offers: list of [l, r, gold]\n      - buyer offers to buy exactly one house whose index i is in [l, r] (inclusive)\n      - pays `gold` for that one house\n      - each offer can be accepted at most once\n\n    Return maximum total gold.\n\n    Example:\n      n=5, offers=[[0,0,1],[0,2,2],[1,3,2]] -> 3\n    \"\"\"\n    # Collect offers by their right endpoint for interval scheduling DP\n    by_r = [[] for _ in range(n)]\n    for l, r, g in offers:\n        if l > r:\n            l, r = r, l\n        if r < 0 or l >= n:\n            continue\n        l = max(l, 0)\n        r = min(r, n - 1)\n        by_r[r].append((l, g))\n\n    # dp[i] = max gold using houses in prefix [0..i)\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        # don't sell house i-1\n        best = dp[i - 1]\n        # accept an offer that ends at house i-1, selling exactly one house in its range\n        # Transition: dp[l] + gold (sell one house at some position in [l..i-1])\n        for l, g in by_r[i - 1]:\n            cand = dp[l] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n    return dp[n]\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "refuse",
+          "is_answer_attempt": false
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def maximize_house_sale_gold(offers, houses, *, allow_partial=False):\n    \"\"\"\n    Compute the maximum gold you can make by matching houses to offers.\n\n    Parameters\n    ----------\n    offers : list of dict/tuple\n        Each offer must provide (min_value, max_value, gold) where the offer\n        can be used for any house whose value is in [min_value, max_value].\n        Accepted forms:\n          - dict with keys: 'min', 'max', 'gold'\n          - tuple/list: (min_value, max_value, gold)\n\n    houses : list[int|float]\n        The value of each house you can sell.\n\n    allow_partial : bool\n        If False (default): each house can be sold at most once and each offer\n        can be used at most once (1-to-1 matching).\n        If True: an offer can be used unlimited times (best offer per house),\n        while each house still sells at most once.\n\n    Returns\n    -------\n    int|float\n        Maximum total gold obtainable.\n\n    Notes\n    -----\n    - If multiple offers apply to a house, you choose at most one.\n    - If a house matches no offer, it yields 0 gold.\n    \"\"\"\n    # Normalize offers\n    norm = []\n    for o in offers:\n        if isinstance(o, dict):\n            a, b, g = o[\"min\"], o[\"max\"], o[\"gold\"]\n        else:\n            a, b, g = o\n        if a > b:\n            a, b = b, a\n        norm.append((a, b, g))\n\n    # If offers are reusable, just pick best offer per house.\n    if allow_partial:\n        total = 0\n        for v in houses:\n            best = 0\n            for a, b, g in norm:\n                if a <= v <= b and g > best:\n                    best = g\n            total += best\n        return total\n\n    # 1-to-1 matching (each offer used once): maximize total gold.\n    # Model as maximum weight bipartite matching where edges exist if offer fits house.\n    # Use DP over subsets when the smaller side is offers (works up to ~20 offers).\n    n_off = len(norm)\n    n_house = len(houses)\n\n    # If too large for subset DP, fall back to a greedy heuristic.\n    # (Without a full spec/constraints, we can't guarantee polynomial optimality here.)\n    if n_off > 20:\n        # Greedy: sort potential assignments by gold descending.\n        edges = []\n        for i, (a, b, g) in enumerate(norm):\n            for j, v in enumerate(houses):\n                if a <= v <= b:\n                    edges.append((g, i, j))\n        edges.sort(reverse=True)\n        used_off = [False] * n_off\n        used_house = [False] * n_house\n        total = 0\n        for g, i, j in edges:\n            if not used_off[i] and not used_house[j]:\n                used_off[i] = True\n                used_house[j] = True\n                total += g\n        return total\n\n    # DP: dp[mask] = max gold using offers in mask assigned to first k houses as we iterate.\n    # We'll iterate houses and transition by choosing an unused offer that fits.\n    dp = {0: 0}\n    for v in houses:\n        ndp = dict(dp)  # option: don't sell this house\n        for mask, val in dp.items():\n            for i, (a, b, g) in enumerate(norm):\n                if (mask >> i) & 1:\n                    continue\n                if a <= v <= b:\n                    nmask = mask | (1 << i)\n                    nv = val + g\n                    if nv > ndp.get(nmask, float(\"-inf\")):\n                        ndp[nmask] = nv\n        dp = ndp\n\n    return max(dp.values(), default=0)",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def house_offer_gold(house_values, offers, *, offer_reuse=False):\n    \"\"\"\n    Max gold from selling houses given offers as triplets (lo, hi, gold).\n\n    Parameters\n    ----------\n    house_values : list[int|float]\n        Value of each house you can sell (each house at most once).\n\n    offers : list[tuple(lo, hi, gold)]\n        Each offer applies to any house with value in [lo, hi] (inclusive),\n        and pays `gold`. Each offer can be used at most once unless offer_reuse=True.\n\n    offer_reuse : bool\n        False (default): each offer can be used at most once (1-to-1 matching).\n        True: offers can be used unlimited times (each house picks best applicable offer).\n\n    Returns\n    -------\n    int|float\n        Maximum total gold obtainable.\n    \"\"\"\n    # normalize offers\n    norm = []\n    for lo, hi, g in offers:\n        if lo > hi:\n            lo, hi = hi, lo\n        norm.append((lo, hi, g))\n\n    if offer_reuse:\n        total = 0\n        for v in house_values:\n            best = 0\n            for lo, hi, g in norm:\n                if lo <= v <= hi and g > best:\n                    best = g\n            total += best\n        return total\n\n    # exact maximum for \"each offer at most once\" via subset DP when offers are small\n    m = len(norm)\n    if m <= 20:\n        dp = {0: 0}\n        for v in house_values:\n            ndp = dict(dp)  # option: don't sell this house\n            for mask, val in dp.items():\n                for i, (lo, hi, g) in enumerate(norm):\n                    if (mask >> i) & 1:\n                        continue\n                    if lo <= v <= hi:\n                        nmask = mask | (1 << i)\n                        nv = val + g\n                        if nv > ndp.get(nmask, float(\"-inf\")):\n                            ndp[nmask] = nv\n            dp = ndp\n        return max(dp.values(), default=0)\n\n    # fallback (large offers): greedy heuristic\n    edges = []\n    for i, (lo, hi, g) in enumerate(norm):\n        for j, v in enumerate(house_values):\n            if lo <= v <= hi:\n                edges.append((g, i, j))\n    edges.sort(reverse=True)\n    used_offer = [False] * m\n    used_house = [False] * len(house_values)\n    total = 0\n    for g, i, j in edges:\n        if not used_offer[i] and not used_house[j]:\n            used_offer[i] = True\n            used_house[j] = True\n            total += g\n    return total",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def house_offer_gold(house_values, offers, *, offer_reuse=False):\n    \"\"\"\n    Max gold from selling houses given offers as triplets (lo, hi, gold).\n\n    Rules enforced:\n    - Each house can be sold at most once (no overlapping sales to the same house).\n    - If offer_reuse=False: each offer can be used at most once as well.\n      If offer_reuse=True: offers can be used multiple times, but still one per house.\n\n    Parameters\n    ----------\n    house_values : list[int|float]\n    offers : list[tuple(lo, hi, gold)]\n        Offer applies if lo <= house_value <= hi (inclusive).\n    offer_reuse : bool\n\n    Returns\n    -------\n    int|float : maximum total gold\n    \"\"\"\n    norm = []\n    for lo, hi, g in offers:\n        if lo > hi:\n            lo, hi = hi, lo\n        norm.append((lo, hi, g))\n\n    # Offers reusable: each house independently picks best applicable offer.\n    if offer_reuse:\n        total = 0\n        for v in house_values:\n            best = 0\n            for lo, hi, g in norm:\n                if lo <= v <= hi and g > best:\n                    best = g\n            total += best\n        return total\n\n    # Offers not reusable: exact max matching via subset DP when offers small.\n    m = len(norm)\n    if m <= 20:\n        dp = {0: 0}\n        for v in house_values:\n            ndp = dict(dp)  # option: skip this house\n            for mask, val in dp.items():\n                for i, (lo, hi, g) in enumerate(norm):\n                    if (mask >> i) & 1:\n                        continue\n                    if lo <= v <= hi:\n                        nmask = mask | (1 << i)\n                        nv = val + g\n                        if nv > ndp.get(nmask, float(\"-inf\")):\n                            ndp[nmask] = nv\n            dp = ndp\n        return max(dp.values(), default=0)\n\n    # Large m fallback: greedy heuristic (still respects \"no overlapping sales to same house\")\n    edges = []\n    for i, (lo, hi, g) in enumerate(norm):\n        for j, v in enumerate(house_values):\n            if lo <= v <= hi:\n                edges.append((g, i, j))\n    edges.sort(reverse=True)\n\n    used_offer = [False] * m\n    used_house = [False] * len(house_values)\n    total = 0\n    for g, i, j in edges:\n        if not used_offer[i] and not used_house[j]:\n            used_offer[i] = True\n            used_house[j] = True\n            total += g\n    return total",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def house_offer_gold(house_values, offers, *, offer_reuse=False):\n    \"\"\"\n    Max gold from selling houses with values house_values[0..n-1].\n\n    Houses are distinct (indexed 0..n-1) and cannot be sold to more than one buyer:\n    no overlapping sales to the same house.\n\n    Offers are triplets (lo, hi, gold) and apply to any house whose *value* v satisfies\n    lo <= v <= hi (inclusive).\n\n    If offer_reuse=False (default): each offer can be used at most once total.\n    If offer_reuse=True: offers can be used multiple times (still at most one per house).\n\n    Returns the maximum total gold.\n    \"\"\"\n    norm = []\n    for lo, hi, g in offers:\n        if lo > hi:\n            lo, hi = hi, lo\n        norm.append((lo, hi, g))\n\n    if offer_reuse:\n        total = 0\n        for v in house_values:\n            best = 0\n            for lo, hi, g in norm:\n                if lo <= v <= hi and g > best:\n                    best = g\n            total += best\n        return total\n\n    m = len(norm)\n    # Exact when number of offers is modest (subset DP).\n    if m <= 20:\n        dp = {0: 0}\n        for v in house_values:\n            ndp = dict(dp)  # skip this house\n            for mask, val in dp.items():\n                for i, (lo, hi, g) in enumerate(norm):\n                    if (mask >> i) & 1:\n                        continue\n                    if lo <= v <= hi:\n                        nmask = mask | (1 << i)\n                        nv = val + g\n                        if nv > ndp.get(nmask, float(\"-inf\")):\n                            ndp[nmask] = nv\n            dp = ndp\n        return max(dp.values(), default=0)\n\n    # Fallback heuristic for large number of offers (still respects distinct houses/offers).\n    edges = []\n    for i, (lo, hi, g) in enumerate(norm):\n        for j, v in enumerate(house_values):\n            if lo <= v <= hi:\n                edges.append((g, i, j))\n    edges.sort(reverse=True)\n\n    used_offer = [False] * m\n    used_house = [False] * len(house_values)\n    total = 0\n    for g, i, j in edges:\n        if not used_offer[i] and not used_house[j]:\n            used_offer[i] = True\n            used_house[j] = True\n            total += g\n    return total",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def house_offer_gold(n, offers):\n    \"\"\"\n    n houses in a line, indexed 0..n-1. Each house can be sold at most once.\n\n    offers: list of [l, r, gold]\n      - buyer offers to buy exactly one house whose index i is in [l, r] (inclusive)\n      - pays `gold` for that one house\n      - each offer can be accepted at most once\n\n    Return maximum total gold.\n\n    Example:\n      n=5, offers=[[0,0,1],[0,2,2],[1,3,2]] -> 3\n    \"\"\"\n    # Collect offers by their right endpoint for interval scheduling DP\n    by_r = [[] for _ in range(n)]\n    for l, r, g in offers:\n        if l > r:\n            l, r = r, l\n        if r < 0 or l >= n:\n            continue\n        l = max(l, 0)\n        r = min(r, n - 1)\n        by_r[r].append((l, g))\n\n    # dp[i] = max gold using houses in prefix [0..i)\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        # don't sell house i-1\n        best = dp[i - 1]\n        # accept an offer that ends at house i-1, selling exactly one house in its range\n        # Transition: dp[l] + gold (sell one house at some position in [l..i-1])\n        for l, g in by_r[i - 1]:\n            cand = dp[l] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n    return dp[n]",
+          "is_correct": true,
+          "score": 1
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

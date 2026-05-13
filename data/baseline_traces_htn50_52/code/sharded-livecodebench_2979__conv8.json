@@ -1,0 +1,336 @@
+{
+  "sample_id": "sharded-livecodebench/2979",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 07:07:19",
+  "lic_conv_id": "69984e77175c537babc69a37",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "how much gold can I make from house offers?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, math\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n\n    # Since the prompt doesn't include the exact \"house offers\" problem specification,\n    # we try to handle the most common competitive-programming interpretation:\n    # \"House Offers / Sell Houses\" where you have offers for houses and want the maximum gold.\n    #\n    # Expected common input format:\n    # n\n    # a1 a2 ... an\n    #\n    # Output:\n    # maximum sum of non-adjacent values (classic House Robber).\n    #\n    # If the judge uses a different format, this will likely fail; the user needs to provide\n    # the exact statement / input-output format.\n\n    it = iter(data)\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return\n\n    arr = []\n    for _ in range(n):\n        try:\n            arr.append(int(next(it)))\n        except StopIteration:\n            break\n\n    # House robber DP: max sum with no adjacent picks\n    prev2 = 0\n    prev1 = 0\n    for x in arr:\n        cur = max(prev1, prev2 + x)\n        prev2, prev1 = prev1, cur\n\n    sys.stdout.write(str(prev1))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I need to find the best way to sell houses for maximum gold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    n = int(data[0])\n    a = list(map(int, data[1:1 + n]))\n\n    # Max gold by accepting non-adjacent house offers (classic \"house robber\" DP).\n    prev2 = 0  # best up to i-2\n    prev1 = 0  # best up to i-1\n    for x in a:\n        cur = prev1 if prev1 >= prev2 + x else prev2 + x\n        prev2, prev1 = prev1, cur\n\n    sys.stdout.write(str(prev1))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "there's this array of offers showing which buyers want which houses and how much gold they're offering",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Assumed standard \"maximize profit from offers\" format:\n    # n m\n    # then m lines: start end gold  (0- or 1-based houses; we normalize)\n    # Choose a set of non-overlapping offers (intervals) to maximize total gold.\n    #\n    # This matches the common problem \"maximize profit from offers\" / \"sell houses\"\n    # where an offer buys houses in [start, end] for gold, and offers cannot overlap.\n\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    min_s = 10**18\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        offers.append([s, e, g])\n        if s < min_s:\n            min_s = s\n\n    # normalize to 0-based if input seems 1-based\n    if min_s >= 1:\n        for off in offers:\n            off[0] -= 1\n            off[1] -= 1\n\n    # group offers by end index\n    by_end = [[] for _ in range(n)]\n    for s, e, g in offers:\n        if 0 <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1] (i houses)\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # skip house i-1\n        for s, g in by_end[i - 1]:\n            # take offer [s..i-1]\n            cand = dp[s] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "buyers can't share houses, so no overlapping sales to the same house",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input (assumed):\n    # n m\n    # m lines: start end gold\n    # Choose a set of non-overlapping intervals to maximize total gold.\n\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    min_s = 10**18\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        offers.append([s, e, g])\n        if s < min_s:\n            min_s = s\n\n    # Normalize to 0-based if it looks 1-based.\n    if min_s >= 1:\n        for off in offers:\n            off[0] -= 1\n            off[1] -= 1\n\n    by_end = [[] for _ in range(n)]\n    for s, e, g in offers:\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # don't sell house i-1\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g  # sell houses [s..i-1] to this buyer\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "we have houses numbered from 0 to n-1",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m lines: start end gold   (houses are 0..n-1, inclusive interval)\n    # Choose non-overlapping offers (intervals) to maximize total gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # skip house i-1\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g  # take offer [s..i-1]\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example, if there are 5 houses and offers like [[0,0,1],[0,2,2],[1,3,2]], you can get a max profit of 3.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Houses: 0..n-1\n    # Input:\n    # n m\n    # then m lines: start end gold\n    # Choose a subset of offers with no overlapping houses (disjoint intervals)\n    # to maximize total gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # don't sell house i-1\n        for s, g in by_end[i - 1]:\n            # take offer covering [s..i-1] (i-1 == end)\n            cand = dp[s] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "There can be up to 100,000 houses and offers in total.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # n houses labeled 0..n-1\n    # m offers\n    # each offer: s e g (inclusive interval [s,e]), offers must be disjoint\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold achievable using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "each offer is made up of three numbers: the start house, the end house, and the amount of gold offered",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers, each: start end gold\n    # Houses are 0..n-1; offer covers inclusive interval [start, end].\n    # Choose a set of offers with no overlapping houses to maximize total gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the offers fit within the house numbers.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # then m offers: start end gold\n    # Houses are 0..n-1, and all offers satisfy 0 <= start <= end < n.\n    # Choose non-overlapping offers to maximize total gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        by_end[e].append((s, g))\n\n    dp = [0] * (n + 1)  # dp[i] best using houses [0..i-1]\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # skip house i-1\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g  # take offer [s..i-1]\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "The offers can have gold between 1 and 1000.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers: start end gold (1 <= gold <= 1000)\n    # Houses 0..n-1, offers are within bounds.\n    # Pick non-overlapping offers to maximize gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        by_end[e].append((s, g))\n\n    dp = [0] * (n + 1)  # dp[i] = best using houses [0..i-1]\n    for i in range(1, n + 1):\n        best = dp[i - 1]\n        for s, g in by_end[i - 1]:\n            val = dp[s] + g\n            if val > best:\n                best = val\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, math\n\ndef solve():\n    import sys, math\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n\n    # Since the prompt doesn't include the exact \"house offers\" problem specification,\n    # we try to handle the most common competitive-programming interpretation:\n    # \"House Offers / Sell Houses\" where you have offers for houses and want the maximum gold.\n    #\n    # Expected common input format:\n    # n\n    # a1 a2 ... an\n    #\n    # Output:\n    # maximum sum of non-adjacent values (classic House Robber).\n    #\n    # If the judge uses a different format, this will likely fail; the user needs to provide\n    # the exact statement / input-output format.\n\n    it = iter(data)\n    try:\n        n = int(next(it))\n    except StopIteration:\n        return\n\n    arr = []\n    for _ in range(n):\n        try:\n            arr.append(int(next(it)))\n        except StopIteration:\n            break\n\n    # House robber DP: max sum with no adjacent picks\n    prev2 = 0\n    prev1 = 0\n    for x in arr:\n        cur = max(prev1, prev2 + x)\n        prev2, prev1 = prev1, cur\n\n    sys.stdout.write(str(prev1))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    n = int(data[0])\n    a = list(map(int, data[1:1 + n]))\n\n    # Max gold by accepting non-adjacent house offers (classic \"house robber\" DP).\n    prev2 = 0  # best up to i-2\n    prev1 = 0  # best up to i-1\n    for x in a:\n        cur = prev1 if prev1 >= prev2 + x else prev2 + x\n        prev2, prev1 = prev1, cur\n\n    sys.stdout.write(str(prev1))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Assumed standard \"maximize profit from offers\" format:\n    # n m\n    # then m lines: start end gold  (0- or 1-based houses; we normalize)\n    # Choose a set of non-overlapping offers (intervals) to maximize total gold.\n    #\n    # This matches the common problem \"maximize profit from offers\" / \"sell houses\"\n    # where an offer buys houses in [start, end] for gold, and offers cannot overlap.\n\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    min_s = 10**18\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        offers.append([s, e, g])\n        if s < min_s:\n            min_s = s\n\n    # normalize to 0-based if input seems 1-based\n    if min_s >= 1:\n        for off in offers:\n            off[0] -= 1\n            off[1] -= 1\n\n    # group offers by end index\n    by_end = [[] for _ in range(n)]\n    for s, e, g in offers:\n        if 0 <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1] (i houses)\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # skip house i-1\n        for s, g in by_end[i - 1]:\n            # take offer [s..i-1]\n            cand = dp[s] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input (assumed):\n    # n m\n    # m lines: start end gold\n    # Choose a set of non-overlapping intervals to maximize total gold.\n\n    n = int(next(it))\n    m = int(next(it))\n\n    offers = []\n    min_s = 10**18\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        offers.append([s, e, g])\n        if s < min_s:\n            min_s = s\n\n    # Normalize to 0-based if it looks 1-based.\n    if min_s >= 1:\n        for off in offers:\n            off[0] -= 1\n            off[1] -= 1\n\n    by_end = [[] for _ in range(n)]\n    for s, e, g in offers:\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # don't sell house i-1\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g  # sell houses [s..i-1] to this buyer\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m lines: start end gold   (houses are 0..n-1, inclusive interval)\n    # Choose non-overlapping offers (intervals) to maximize total gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # skip house i-1\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g  # take offer [s..i-1]\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.read().strip().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Houses: 0..n-1\n    # Input:\n    # n m\n    # then m lines: start end gold\n    # Choose a subset of offers with no overlapping houses (disjoint intervals)\n    # to maximize total gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # don't sell house i-1\n        for s, g in by_end[i - 1]:\n            # take offer covering [s..i-1] (i-1 == end)\n            cand = dp[s] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # n houses labeled 0..n-1\n    # m offers\n    # each offer: s e g (inclusive interval [s,e]), offers must be disjoint\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold achievable using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers, each: start end gold\n    # Houses are 0..n-1; offer covers inclusive interval [start, end].\n    # Choose a set of offers with no overlapping houses to maximize total gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if 0 <= s <= e < n:\n            by_end[e].append((s, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(1, n + 1):\n        best = dp[i - 1]\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 9
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # then m offers: start end gold\n    # Houses are 0..n-1, and all offers satisfy 0 <= start <= end < n.\n    # Choose non-overlapping offers to maximize total gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        by_end[e].append((s, g))\n\n    dp = [0] * (n + 1)  # dp[i] best using houses [0..i-1]\n    for i in range(1, n + 1):\n        best = dp[i - 1]  # skip house i-1\n        for s, g in by_end[i - 1]:\n            cand = dp[s] + g  # take offer [s..i-1]\n            if cand > best:\n                best = cand\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 10
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    # Input:\n    # n m\n    # m offers: start end gold (1 <= gold <= 1000)\n    # Houses 0..n-1, offers are within bounds.\n    # Pick non-overlapping offers to maximize gold.\n    n = int(next(it))\n    m = int(next(it))\n\n    by_end = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        by_end[e].append((s, g))\n\n    dp = [0] * (n + 1)  # dp[i] = best using houses [0..i-1]\n    for i in range(1, n + 1):\n        best = dp[i - 1]\n        for s, g in by_end[i - 1]:\n            val = dp[s] + g\n            if val > best:\n                best = val\n        dp[i] = best\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

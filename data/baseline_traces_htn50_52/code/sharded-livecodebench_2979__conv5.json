@@ -1,0 +1,336 @@
+{
+  "sample_id": "sharded-livecodebench/2979",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 23:45:53",
+  "lic_conv_id": "6997e701175c5382b0944beb",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "how much gold can I make from house offers?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, re\n\n    s = sys.stdin.read()\n    nums = list(map(int, re.findall(r\"-?\\d+\", s)))\n\n    if not nums:\n        return\n\n    # Assumption (common \"house offers\" / \"gold\" style problems):\n    # Given N offers, each with profit value (gold). Choose non-adjacent offers to maximize gold.\n    # Input may be:\n    #   N followed by N integers\n    # or just a list of integers (treat all as offers).\n    n = nums[0]\n    if 1 + n <= len(nums):\n        offers = nums[1:1 + n]\n    else:\n        offers = nums[:]  # fallback\n\n    # Max sum of non-adjacent elements (House Robber DP)\n    prev2 = 0\n    prev1 = 0\n    for x in offers:\n        cur = prev1 if prev1 > prev2 + x else prev2 + x\n        prev2, prev1 = prev1, cur\n\n    sys.stdout.write(str(prev1))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I need to find the best way to sell the houses for maximum gold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, re\n\n    data = sys.stdin.read()\n    a = list(map(int, re.findall(r\"-?\\d+\", data)))\n    if not a:\n        return\n\n    # Interpret input as: N followed by N prices; if N doesn't fit, treat all numbers as prices.\n    n = a[0]\n    if 1 + n <= len(a):\n        prices = a[1:1 + n]\n    else:\n        prices = a\n\n    # Best total gold when selling houses with the constraint that you can't sell adjacent houses.\n    prev2 = 0  # best up to i-2\n    prev1 = 0  # best up to i-1\n    for p in prices:\n        take = prev2 + p\n        skip = prev1\n        cur = take if take > skip else skip\n        prev2, prev1 = prev1, cur\n\n    sys.stdout.write(str(prev1))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the offers are in a format that includes a low and high range for houses along with the gold they offer",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, re\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.read())))\n    if not nums:\n        return\n\n    # Expect input as:\n    # n\n    # l1 r1 g1\n    # l2 r2 g2\n    # ...\n    # Choose a subset of offers with non-overlapping house ranges [li, ri] to maximize total gold.\n    i = 0\n    n = nums[i]\n    i += 1\n\n    offers = []\n    for _ in range(n):\n        if i + 2 >= len(nums):\n            break\n        l, r, g = nums[i], nums[i + 1], nums[i + 2]\n        i += 3\n        if l > r:\n            l, r = r, l\n        offers.append((r, l, g))  # sort by end\n\n    offers.sort()  # by r then l then g\n    m = len(offers)\n    if m == 0:\n        sys.stdout.write(\"0\")\n        return\n\n    ends = [offers[j][0] for j in range(m)]\n\n    # dp[j] = best using offers up to j (1-based for convenience)\n    dp = [0] * (m + 1)\n\n    import bisect\n    for j in range(1, m + 1):\n        r, l, g = offers[j - 1]\n        # find rightmost offer with end < l (non-overlapping with [l, r])\n        k = bisect.bisect_left(ends, l)  # first end >= l\n        # best: skip j or take j + best up to k\n        take = dp[k] + g\n        skip = dp[j - 1]\n        dp[j] = take if take > skip else skip\n\n    sys.stdout.write(str(dp[m]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "buyers can't share houses, so no overlapping sales to the same house",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, re, bisect\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.read())))\n    if not nums:\n        return\n\n    # Input:\n    # n\n    # l1 r1 g1\n    # ...\n    # Select a subset of offers with no shared house (ranges must be disjoint).\n    # Treat ranges as inclusive, so two offers [a,b] and [c,d] are compatible iff b < c or d < a.\n    n = nums[0]\n    offers = []\n    idx = 1\n    for _ in range(n):\n        if idx + 2 >= len(nums):\n            break\n        l, r, g = nums[idx], nums[idx + 1], nums[idx + 2]\n        idx += 3\n        if l > r:\n            l, r = r, l\n        offers.append((r, l, g))  # sort by end\n\n    offers.sort()\n    m = len(offers)\n    if m == 0:\n        sys.stdout.write(\"0\")\n        return\n\n    ends = [offers[i][0] for i in range(m)]\n\n    # Weighted interval scheduling DP\n    dp = [0] * (m + 1)\n    for j in range(1, m + 1):\n        r, l, g = offers[j - 1]\n        # last offer with end < l (since ranges are inclusive and cannot touch/overlap on a house)\n        k = bisect.bisect_left(ends, l)\n        take = dp[k] + g\n        skip = dp[j - 1]\n        dp[j] = take if take > skip else skip\n\n    sys.stdout.write(str(dp[m]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "There are n houses, numbered from 0 to n-1.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, re, bisect\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.read())))\n    if not nums:\n        return\n\n    # Expected input (typical):\n    # n m\n    # s1 e1 g1\n    # ...\n    # sm em gm\n    #\n    # There are n houses numbered 0..n-1.\n    # Each offer covers an inclusive range [s,e] and pays g gold.\n    # Choose a set of offers such that no house is sold more than once (ranges must be disjoint).\n    # Maximize total gold.\n\n    if len(nums) >= 2:\n        n = nums[0]\n        m = nums[1]\n        idx = 2\n    else:\n        # Fallback: if only one number given, treat it as m and ignore n\n        n = 0\n        m = nums[0]\n        idx = 1\n\n    offers = []\n    for _ in range(m):\n        if idx + 2 >= len(nums):\n            break\n        s, e, g = nums[idx], nums[idx + 1], nums[idx + 2]\n        idx += 3\n        if s > e:\n            s, e = e, s\n        # clamp to valid house indices if n is provided sensibly\n        if n > 0:\n            s = max(0, min(s, n - 1))\n            e = max(0, min(e, n - 1))\n            if s > e:\n                continue\n        offers.append((e, s, g))  # sort by end\n\n    if not offers:\n        sys.stdout.write(\"0\")\n        return\n\n    offers.sort()\n    ends = [o[0] for o in offers]\n    M = len(offers)\n\n    # Weighted interval scheduling where compatibility is end < next_start (inclusive ranges)\n    dp = [0] * (M + 1)\n    for j in range(1, M + 1):\n        e, s, g = offers[j - 1]\n        k = bisect.bisect_left(ends, s)  # first end >= s, so compatible are [0..k-1]\n        take = dp[k] + g\n        skip = dp[j - 1]\n        dp[j] = take if take > skip else skip\n\n    sys.stdout.write(str(dp[M]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example, if you have 5 houses and the offers are [[0,0,1],[0,2,2],[1,3,2]], you can get a max profit of 3.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, re\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.read())))\n    if not nums:\n        return\n\n    # Input assumed as:\n    # n m\n    # followed by m triples: start end gold\n    n = nums[0]\n    m = nums[1] if len(nums) >= 2 else 0\n\n    offers = []\n    idx = 2\n    for _ in range(m):\n        if idx + 2 >= len(nums):\n            break\n        s, e, g = nums[idx], nums[idx + 1], nums[idx + 2]\n        idx += 3\n        if s > e:\n            s, e = e, s\n        s = max(0, min(s, n - 1))\n        e = max(0, min(e, n - 1))\n        if s <= e:\n            offers.append((s, e, g))\n\n    # DP over house index: dp[i] = max profit from houses [0..i-1]\n    # Transition: dp[i+1] = max(dp[i+1], dp[i]) (skip house i)\n    # and for any offer starting at i: dp[end+1] = max(dp[end+1], dp[i] + gold)\n    starts = [[] for _ in range(n)]\n    for s, e, g in offers:\n        starts[s].append((e, g))\n\n    dp = [0] * (n + 1)\n    for i in range(n):\n        if dp[i + 1] < dp[i]:\n            dp[i + 1] = dp[i]\n        base = dp[i]\n        for e, g in starts[i]:\n            j = e + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "just remember there can be up to 100,000 houses and offers",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys, re\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.buffer.read().decode())))\n    if not nums:\n        return\n\n    # Input: n m, then m triples [start, end, gold]\n    n = nums[0]\n    m = nums[1] if len(nums) > 1 else 0\n\n    starts = [[] for _ in range(n)]\n    idx = 2\n    for _ in range(m):\n        if idx + 2 >= len(nums):\n            break\n        s, e, g = nums[idx], nums[idx + 1], nums[idx + 2]\n        idx += 3\n        if s > e:\n            s, e = e, s\n        if s < 0:\n            s = 0\n        if e >= n:\n            e = n - 1\n        if 0 <= s <= e < n:\n            starts[s].append((e, g))\n\n    # DP: dp[i] = max profit using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(n):\n        # skip house i\n        v = dp[i]\n        if dp[i + 1] < v:\n            dp[i + 1] = v\n        base = dp[i]\n        for e, g in starts[i]:\n            j = e + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "each offer is basically a triplet with a low end, high end, and how much gold they offer",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    n = int(next(it))          # houses: 0..n-1\n    m = int(next(it))          # number of offers\n\n    starts = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if s > e:\n            s, e = e, s\n        if 0 <= s < n and 0 <= e < n and s <= e:\n            starts[s].append((e, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(n):\n        if dp[i + 1] < dp[i]:\n            dp[i + 1] = dp[i]  # skip house i\n        base = dp[i]\n        for e, g in starts[i]:\n            j = e + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "also the offer ranges fit within the house numbers",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    n = int(next(it))  # houses: 0..n-1\n    m = int(next(it))  # number of offers\n\n    # offers are triples (l, r, gold), with 0 <= l <= r < n guaranteed\n    starts = [[] for _ in range(n)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        starts[l].append((r, g))\n\n    # dp[i] = best profit using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(n):\n        # option: do nothing with house i\n        if dp[i + 1] < dp[i]:\n            dp[i + 1] = dp[i]\n        base = dp[i]\n        for r, g in starts[i]:\n            j = r + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "each buyer's offer is between 1 and 1000 gold.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    n = int(next(it))  # houses: 0..n-1\n    m = int(next(it))  # number of offers\n\n    # Each offer: l r gold, with 0 <= l <= r < n and 1 <= gold <= 1000\n    starts = [[] for _ in range(n)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        starts[l].append((r, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(n):\n        v = dp[i]\n        if dp[i + 1] < v:\n            dp[i + 1] = v  # skip house i\n        base = v\n        for r, g in starts[i]:\n            j = r + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, re\n\ndef solve():\n    import sys, re\n\n    s = sys.stdin.read()\n    nums = list(map(int, re.findall(r\"-?\\d+\", s)))\n\n    if not nums:\n        return\n\n    # Assumption (common \"house offers\" / \"gold\" style problems):\n    # Given N offers, each with profit value (gold). Choose non-adjacent offers to maximize gold.\n    # Input may be:\n    #   N followed by N integers\n    # or just a list of integers (treat all as offers).\n    n = nums[0]\n    if 1 + n <= len(nums):\n        offers = nums[1:1 + n]\n    else:\n        offers = nums[:]  # fallback\n\n    # Max sum of non-adjacent elements (House Robber DP)\n    prev2 = 0\n    prev1 = 0\n    for x in offers:\n        cur = prev1 if prev1 > prev2 + x else prev2 + x\n        prev2, prev1 = prev1, cur\n\n    sys.stdout.write(str(prev1))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, re\n\ndef solve():\n    import sys, re\n\n    data = sys.stdin.read()\n    a = list(map(int, re.findall(r\"-?\\d+\", data)))\n    if not a:\n        return\n\n    # Interpret input as: N followed by N prices; if N doesn't fit, treat all numbers as prices.\n    n = a[0]\n    if 1 + n <= len(a):\n        prices = a[1:1 + n]\n    else:\n        prices = a\n\n    # Best total gold when selling houses with the constraint that you can't sell adjacent houses.\n    prev2 = 0  # best up to i-2\n    prev1 = 0  # best up to i-1\n    for p in prices:\n        take = prev2 + p\n        skip = prev1\n        cur = take if take > skip else skip\n        prev2, prev1 = prev1, cur\n\n    sys.stdout.write(str(prev1))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, re\nimport bisect\n\ndef solve():\n    import sys, re\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.read())))\n    if not nums:\n        return\n\n    # Expect input as:\n    # n\n    # l1 r1 g1\n    # l2 r2 g2\n    # ...\n    # Choose a subset of offers with non-overlapping house ranges [li, ri] to maximize total gold.\n    i = 0\n    n = nums[i]\n    i += 1\n\n    offers = []\n    for _ in range(n):\n        if i + 2 >= len(nums):\n            break\n        l, r, g = nums[i], nums[i + 1], nums[i + 2]\n        i += 3\n        if l > r:\n            l, r = r, l\n        offers.append((r, l, g))  # sort by end\n\n    offers.sort()  # by r then l then g\n    m = len(offers)\n    if m == 0:\n        sys.stdout.write(\"0\")\n        return\n\n    ends = [offers[j][0] for j in range(m)]\n\n    # dp[j] = best using offers up to j (1-based for convenience)\n    dp = [0] * (m + 1)\n\n    import bisect\n    for j in range(1, m + 1):\n        r, l, g = offers[j - 1]\n        # find rightmost offer with end < l (non-overlapping with [l, r])\n        k = bisect.bisect_left(ends, l)  # first end >= l\n        # best: skip j or take j + best up to k\n        take = dp[k] + g\n        skip = dp[j - 1]\n        dp[j] = take if take > skip else skip\n\n    sys.stdout.write(str(dp[m]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, re, bisect\n\ndef solve():\n    import sys, re, bisect\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.read())))\n    if not nums:\n        return\n\n    # Input:\n    # n\n    # l1 r1 g1\n    # ...\n    # Select a subset of offers with no shared house (ranges must be disjoint).\n    # Treat ranges as inclusive, so two offers [a,b] and [c,d] are compatible iff b < c or d < a.\n    n = nums[0]\n    offers = []\n    idx = 1\n    for _ in range(n):\n        if idx + 2 >= len(nums):\n            break\n        l, r, g = nums[idx], nums[idx + 1], nums[idx + 2]\n        idx += 3\n        if l > r:\n            l, r = r, l\n        offers.append((r, l, g))  # sort by end\n\n    offers.sort()\n    m = len(offers)\n    if m == 0:\n        sys.stdout.write(\"0\")\n        return\n\n    ends = [offers[i][0] for i in range(m)]\n\n    # Weighted interval scheduling DP\n    dp = [0] * (m + 1)\n    for j in range(1, m + 1):\n        r, l, g = offers[j - 1]\n        # last offer with end < l (since ranges are inclusive and cannot touch/overlap on a house)\n        k = bisect.bisect_left(ends, l)\n        take = dp[k] + g\n        skip = dp[j - 1]\n        dp[j] = take if take > skip else skip\n\n    sys.stdout.write(str(dp[m]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, re, bisect\n\ndef solve():\n    import sys, re, bisect\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.read())))\n    if not nums:\n        return\n\n    # Expected input (typical):\n    # n m\n    # s1 e1 g1\n    # ...\n    # sm em gm\n    #\n    # There are n houses numbered 0..n-1.\n    # Each offer covers an inclusive range [s,e] and pays g gold.\n    # Choose a set of offers such that no house is sold more than once (ranges must be disjoint).\n    # Maximize total gold.\n\n    if len(nums) >= 2:\n        n = nums[0]\n        m = nums[1]\n        idx = 2\n    else:\n        # Fallback: if only one number given, treat it as m and ignore n\n        n = 0\n        m = nums[0]\n        idx = 1\n\n    offers = []\n    for _ in range(m):\n        if idx + 2 >= len(nums):\n            break\n        s, e, g = nums[idx], nums[idx + 1], nums[idx + 2]\n        idx += 3\n        if s > e:\n            s, e = e, s\n        # clamp to valid house indices if n is provided sensibly\n        if n > 0:\n            s = max(0, min(s, n - 1))\n            e = max(0, min(e, n - 1))\n            if s > e:\n                continue\n        offers.append((e, s, g))  # sort by end\n\n    if not offers:\n        sys.stdout.write(\"0\")\n        return\n\n    offers.sort()\n    ends = [o[0] for o in offers]\n    M = len(offers)\n\n    # Weighted interval scheduling where compatibility is end < next_start (inclusive ranges)\n    dp = [0] * (M + 1)\n    for j in range(1, M + 1):\n        e, s, g = offers[j - 1]\n        k = bisect.bisect_left(ends, s)  # first end >= s, so compatible are [0..k-1]\n        take = dp[k] + g\n        skip = dp[j - 1]\n        dp[j] = take if take > skip else skip\n\n    sys.stdout.write(str(dp[M]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, re\n\ndef solve():\n    import sys, re\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.read())))\n    if not nums:\n        return\n\n    # Input assumed as:\n    # n m\n    # followed by m triples: start end gold\n    n = nums[0]\n    m = nums[1] if len(nums) >= 2 else 0\n\n    offers = []\n    idx = 2\n    for _ in range(m):\n        if idx + 2 >= len(nums):\n            break\n        s, e, g = nums[idx], nums[idx + 1], nums[idx + 2]\n        idx += 3\n        if s > e:\n            s, e = e, s\n        s = max(0, min(s, n - 1))\n        e = max(0, min(e, n - 1))\n        if s <= e:\n            offers.append((s, e, g))\n\n    # DP over house index: dp[i] = max profit from houses [0..i-1]\n    # Transition: dp[i+1] = max(dp[i+1], dp[i]) (skip house i)\n    # and for any offer starting at i: dp[end+1] = max(dp[end+1], dp[i] + gold)\n    starts = [[] for _ in range(n)]\n    for s, e, g in offers:\n        starts[s].append((e, g))\n\n    dp = [0] * (n + 1)\n    for i in range(n):\n        if dp[i + 1] < dp[i]:\n            dp[i + 1] = dp[i]\n        base = dp[i]\n        for e, g in starts[i]:\n            j = e + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys, re\n\ndef solve():\n    import sys, re\n\n    nums = list(map(int, re.findall(r\"-?\\d+\", sys.stdin.buffer.read().decode())))\n    if not nums:\n        return\n\n    # Input: n m, then m triples [start, end, gold]\n    n = nums[0]\n    m = nums[1] if len(nums) > 1 else 0\n\n    starts = [[] for _ in range(n)]\n    idx = 2\n    for _ in range(m):\n        if idx + 2 >= len(nums):\n            break\n        s, e, g = nums[idx], nums[idx + 1], nums[idx + 2]\n        idx += 3\n        if s > e:\n            s, e = e, s\n        if s < 0:\n            s = 0\n        if e >= n:\n            e = n - 1\n        if 0 <= s <= e < n:\n            starts[s].append((e, g))\n\n    # DP: dp[i] = max profit using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(n):\n        # skip house i\n        v = dp[i]\n        if dp[i + 1] < v:\n            dp[i + 1] = v\n        base = dp[i]\n        for e, g in starts[i]:\n            j = e + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    n = int(next(it))          # houses: 0..n-1\n    m = int(next(it))          # number of offers\n\n    starts = [[] for _ in range(n)]\n    for _ in range(m):\n        s = int(next(it)); e = int(next(it)); g = int(next(it))\n        if s > e:\n            s, e = e, s\n        if 0 <= s < n and 0 <= e < n and s <= e:\n            starts[s].append((e, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(n):\n        if dp[i + 1] < dp[i]:\n            dp[i + 1] = dp[i]  # skip house i\n        base = dp[i]\n        for e, g in starts[i]:\n            j = e + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 9
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    n = int(next(it))  # houses: 0..n-1\n    m = int(next(it))  # number of offers\n\n    # offers are triples (l, r, gold), with 0 <= l <= r < n guaranteed\n    starts = [[] for _ in range(n)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        starts[l].append((r, g))\n\n    # dp[i] = best profit using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(n):\n        # option: do nothing with house i\n        if dp[i + 1] < dp[i]:\n            dp[i + 1] = dp[i]\n        base = dp[i]\n        for r, g in starts[i]:\n            j = r + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 10
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import sys\n\ndef solve():\n    import sys\n\n    data = sys.stdin.buffer.read().split()\n    if not data:\n        return\n    it = iter(data)\n\n    n = int(next(it))  # houses: 0..n-1\n    m = int(next(it))  # number of offers\n\n    # Each offer: l r gold, with 0 <= l <= r < n and 1 <= gold <= 1000\n    starts = [[] for _ in range(n)]\n    for _ in range(m):\n        l = int(next(it)); r = int(next(it)); g = int(next(it))\n        starts[l].append((r, g))\n\n    # dp[i] = max gold using houses [0..i-1]\n    dp = [0] * (n + 1)\n    for i in range(n):\n        v = dp[i]\n        if dp[i + 1] < v:\n            dp[i + 1] = v  # skip house i\n        base = v\n        for r, g in starts[i]:\n            j = r + 1\n            val = base + g\n            if dp[j] < val:\n                dp[j] = val\n\n    sys.stdout.write(str(dp[n]))",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

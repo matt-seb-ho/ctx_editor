@@ -1,0 +1,305 @@
+{
+  "sample_id": "sharded-livecodebench/2916",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 05:38:32",
+  "lic_conv_id": "699839a8175c537babc69748",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "can I split the array into n arrays?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef split_array_into_n_arrays(arr, n):\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    L = len(arr)\n    q, r = divmod(L, n)  # first r chunks get one extra element\n    out, i = [], 0\n    for k in range(n):\n        size = q + (1 if k < r else 0)\n        out.append(arr[i:i+size])\n        i += size\n    return out\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I can split it as long as it has at least two elements.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef split_array_into_n_arrays(arr, n):\n    if len(arr) < 2:\n        raise ValueError(\"array must have at least two elements to be split\")\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    if n > len(arr):\n        raise ValueError(\"n cannot be greater than the number of elements in the array\")\n\n    q, r = divmod(len(arr), n)  # first r chunks get one extra element\n    out, i = [], 0\n    for k in range(n):\n        size = q + (1 if k < r else 0)\n        out.append(arr[i:i + size])\n        i += size\n    return out\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "each part from a split has to be either one element long or have a sum that's at least m.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef split_array_into_n_arrays(arr, n, m):\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    if len(arr) < 2:\n        raise ValueError(\"array must have at least two elements to be split\")\n    if n > len(arr):\n        raise ValueError(\"n cannot be greater than the number of elements in the array\")\n\n    parts = [[] for _ in range(n)]\n    sums = [0] * n\n    sizes = [0] * n\n\n    for x in arr:\n        best = None\n        best_key = None  # prefer filling parts that are already >= m or are empty, and keep sizes balanced\n        for i in range(n):\n            if sizes[i] == 0:\n                key = (0, sizes[i], sums[i])  # empty: good\n            elif sizes[i] == 1:\n                key = (2, sizes[i], sums[i])  # already length 1: adding would force sum>=m\n            elif sums[i] >= m:\n                key = (1, sizes[i], sums[i])  # already valid: safe\n            else:\n                key = (3, sizes[i], sums[i])  # invalid multi-elem: avoid\n            if best is None or key < best_key:\n                best = i\n                best_key = key\n\n        parts[best].append(x)\n        sizes[best] += 1\n        sums[best] += x\n\n    # Validate constraint: each part is length 1, or sum >= m\n    for p in parts:\n        if len(p) != 1 and sum(p) < m:\n            raise ValueError(\"cannot split to satisfy: each part must be length 1 or have sum >= m\")\n\n    return parts\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I've got an array called nums and a number m to work with.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_split(nums, m):\n    # Return True iff nums can be split into 2+ contiguous parts\n    # such that every part is either length 1, or has sum >= m.\n    n = len(nums)\n    if n < 2:\n        return False\n\n    pref = [0] * (n + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(l, r):\n        return pref[r] - pref[l]\n\n    # dp[i] = reachable start indices i (0..n), dp[0]=True\n    dp = [False] * (n + 1)\n    dp[0] = True\n\n    # need at least 2 parts: track whether we've made at least one cut\n    # cuts[i] = True means position i is reachable with >=1 part already formed\n    parts_count = [-10**9] * (n + 1)  # max parts to reach i\n    parts_count[0] = 0\n\n    for i in range(n):\n        if parts_count[i] < 0:\n            continue\n        # length-1 segment [i,i+1)\n        parts_count[i + 1] = max(parts_count[i + 1], parts_count[i] + 1)\n\n        # longer segments: smallest j>=i+2 with sum>=m (if exists); then any larger j also works\n        s = 0\n        # binary search on prefix sums for first j with pref[j]-pref[i] >= m\n        lo, hi = i + 2, n\n        target = pref[i] + m\n        ans = None\n        while lo <= hi:\n            mid = (lo + hi) // 2\n            if pref[mid] >= target:\n                ans = mid\n                hi = mid - 1\n            else:\n                lo = mid + 1\n        if ans is not None:\n            # Any end j in [ans..n] is valid; we can update all, but that's O(n^2).\n            # Instead, use a suffix \"best\" propagation via a difference array.\n            # We'll mark that from ans onward, parts_count can be at least parts_count[i]+1.\n            pass\n\n    # O(n^2) fallback (still fine for modest sizes)\n    parts_count = [-10**9] * (n + 1)\n    parts_count[0] = 0\n    for i in range(n):\n        if parts_count[i] < 0:\n            continue\n        for j in range(i + 1, n + 1):\n            length = j - i\n            ok = (length == 1) or (segsum(i, j) >= m)\n            if ok:\n                parts_count[j] = max(parts_count[j], parts_count[i] + 1)\n\n    return parts_count[n] >= 2\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "I also need to continue splitting the array while following the rules to see if I can end up with n arrays.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_split_into_n(nums, m, n):\n    \"\"\"\n    Return True iff nums can be split into exactly n contiguous parts such that\n    each part is either length 1 OR has sum >= m.\n    \"\"\"\n    L = len(nums)\n    if not isinstance(n, int) or n <= 0:\n        return False\n    if n > L:\n        return False  # can't make more parts than elements\n\n    # prefix sums for O(1) segment sum\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    # dp[k][i] = can we split first i elements into exactly k valid parts\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            # last part is nums[j:i]\n            for j in range(0, i):\n                if not dp[k - 1][j]:\n                    continue\n                length = i - j\n                if length == 1 or segsum(j, i) >= m:\n                    dp[k][i] = True\n                    break\n\n    return dp[n][L]\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "the length of the array is between 1 and 100",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_split_into_n(nums, m, n):\n    L = len(nums)\n    if not isinstance(n, int) or n <= 0:\n        return False\n    if n > L:\n        return False  # can't have more parts than elements\n\n    # prefix sums\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    # dp[k][i] = possible to split nums[:i] into exactly k valid parts\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            for j in range(i):\n                if not dp[k - 1][j]:\n                    continue\n                length = i - j\n                if length == 1 or segsum(j, i) >= m:\n                    dp[k][i] = True\n                    break\n\n    return dp[n][L]\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "every number in nums is between 1 and 100",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_split_into_n(nums, m, n):\n    \"\"\"\n    Decide if nums can be split into exactly n non-empty contiguous parts where\n    each part is either length 1 or has sum >= m.\n\n    Constraints assumed: 1 <= len(nums) <= 100, 1 <= nums[i] <= 100.\n    \"\"\"\n    L = len(nums)\n    if not isinstance(n, int) or n <= 0 or n > L:\n        return False\n\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            for j in range(i):\n                if dp[k - 1][j]:\n                    length = i - j\n                    if length == 1 or segsum(j, i) >= m:\n                        dp[k][i] = True\n                        break\n\n    return dp[n][L]\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "by the way, the number m is between 1 and 200",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_split_into_n(nums, m, n):\n    \"\"\"\n    Return True iff nums can be split into exactly n non-empty contiguous parts\n    such that each part is either:\n      - length 1, OR\n      - has sum >= m\n\n    Constraints: 1 <= len(nums) <= 100, 1 <= nums[i] <= 100, 1 <= m <= 200.\n    \"\"\"\n    L = len(nums)\n    if not isinstance(n, int) or n <= 0 or n > L:\n        return False\n\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            for j in range(i):\n                if not dp[k - 1][j]:\n                    continue\n                length = i - j\n                if length == 1 or segsum(j, i) >= m:\n                    dp[k][i] = True\n                    break\n\n    return dp[n][L]\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "for example, splitting the array [2, 2, 1] with m set to 4 is possible",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef can_split_into_n(nums, m, n=None):\n    \"\"\"\n    If n is None:\n      Return True iff nums can be split into 2+ non-empty contiguous parts where\n      each part is either length 1 or has sum >= m.\n\n    If n is an int:\n      Return True iff nums can be split into exactly n such parts.\n\n    Constraints: 1 <= len(nums) <= 100, 1 <= nums[i] <= 100, 1 <= m <= 200.\n    \"\"\"\n    L = len(nums)\n    if L < 2:\n        return False\n\n    # prefix sums\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    if n is None:\n        # dp[i] = max number of valid parts for nums[:i], or -inf if impossible\n        parts = [-10**9] * (L + 1)\n        parts[0] = 0\n        for i in range(L):\n            if parts[i] < 0:\n                continue\n            for j in range(i + 1, L + 1):\n                length = j - i\n                if length == 1 or segsum(i, j) >= m:\n                    if parts[i] + 1 > parts[j]:\n                        parts[j] = parts[i] + 1\n        return parts[L] >= 2\n\n    # exact n parts\n    if not isinstance(n, int) or n <= 0 or n > L:\n        return False\n\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            for j in range(i):\n                if dp[k - 1][j]:\n                    length = i - j\n                    if length == 1 or segsum(j, i) >= m:\n                        dp[k][i] = True\n                        break\n    return dp[n][L]\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def split_array_into_n_arrays(arr, n):\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    L = len(arr)\n    q, r = divmod(L, n)  # first r chunks get one extra element\n    out, i = [], 0\n    for k in range(n):\n        size = q + (1 if k < r else 0)\n        out.append(arr[i:i+size])\n        i += size\n    return out",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def split_array_into_n_arrays(arr, n):\n    if len(arr) < 2:\n        raise ValueError(\"array must have at least two elements to be split\")\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    if n > len(arr):\n        raise ValueError(\"n cannot be greater than the number of elements in the array\")\n\n    q, r = divmod(len(arr), n)  # first r chunks get one extra element\n    out, i = [], 0\n    for k in range(n):\n        size = q + (1 if k < r else 0)\n        out.append(arr[i:i + size])\n        i += size\n    return out",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def split_array_into_n_arrays(arr, n, m):\n    if not isinstance(n, int) or n <= 0:\n        raise ValueError(\"n must be a positive integer\")\n    if len(arr) < 2:\n        raise ValueError(\"array must have at least two elements to be split\")\n    if n > len(arr):\n        raise ValueError(\"n cannot be greater than the number of elements in the array\")\n\n    parts = [[] for _ in range(n)]\n    sums = [0] * n\n    sizes = [0] * n\n\n    for x in arr:\n        best = None\n        best_key = None  # prefer filling parts that are already >= m or are empty, and keep sizes balanced\n        for i in range(n):\n            if sizes[i] == 0:\n                key = (0, sizes[i], sums[i])  # empty: good\n            elif sizes[i] == 1:\n                key = (2, sizes[i], sums[i])  # already length 1: adding would force sum>=m\n            elif sums[i] >= m:\n                key = (1, sizes[i], sums[i])  # already valid: safe\n            else:\n                key = (3, sizes[i], sums[i])  # invalid multi-elem: avoid\n            if best is None or key < best_key:\n                best = i\n                best_key = key\n\n        parts[best].append(x)\n        sizes[best] += 1\n        sums[best] += x\n\n    # Validate constraint: each part is length 1, or sum >= m\n    for p in parts:\n        if len(p) != 1 and sum(p) < m:\n            raise ValueError(\"cannot split to satisfy: each part must be length 1 or have sum >= m\")\n\n    return parts",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_split(nums, m):\n    # Return True iff nums can be split into 2+ contiguous parts\n    # such that every part is either length 1, or has sum >= m.\n    n = len(nums)\n    if n < 2:\n        return False\n\n    pref = [0] * (n + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(l, r):\n        return pref[r] - pref[l]\n\n    # dp[i] = reachable start indices i (0..n), dp[0]=True\n    dp = [False] * (n + 1)\n    dp[0] = True\n\n    # need at least 2 parts: track whether we've made at least one cut\n    # cuts[i] = True means position i is reachable with >=1 part already formed\n    parts_count = [-10**9] * (n + 1)  # max parts to reach i\n    parts_count[0] = 0\n\n    for i in range(n):\n        if parts_count[i] < 0:\n            continue\n        # length-1 segment [i,i+1)\n        parts_count[i + 1] = max(parts_count[i + 1], parts_count[i] + 1)\n\n        # longer segments: smallest j>=i+2 with sum>=m (if exists); then any larger j also works\n        s = 0\n        # binary search on prefix sums for first j with pref[j]-pref[i] >= m\n        lo, hi = i + 2, n\n        target = pref[i] + m\n        ans = None\n        while lo <= hi:\n            mid = (lo + hi) // 2\n            if pref[mid] >= target:\n                ans = mid\n                hi = mid - 1\n            else:\n                lo = mid + 1\n        if ans is not None:\n            # Any end j in [ans..n] is valid; we can update all, but that's O(n^2).\n            # Instead, use a suffix \"best\" propagation via a difference array.\n            # We'll mark that from ans onward, parts_count can be at least parts_count[i]+1.\n            pass\n\n    # O(n^2) fallback (still fine for modest sizes)\n    parts_count = [-10**9] * (n + 1)\n    parts_count[0] = 0\n    for i in range(n):\n        if parts_count[i] < 0:\n            continue\n        for j in range(i + 1, n + 1):\n            length = j - i\n            ok = (length == 1) or (segsum(i, j) >= m)\n            if ok:\n                parts_count[j] = max(parts_count[j], parts_count[i] + 1)\n\n    return parts_count[n] >= 2",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_split_into_n(nums, m, n):\n    \"\"\"\n    Return True iff nums can be split into exactly n contiguous parts such that\n    each part is either length 1 OR has sum >= m.\n    \"\"\"\n    L = len(nums)\n    if not isinstance(n, int) or n <= 0:\n        return False\n    if n > L:\n        return False  # can't make more parts than elements\n\n    # prefix sums for O(1) segment sum\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    # dp[k][i] = can we split first i elements into exactly k valid parts\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            # last part is nums[j:i]\n            for j in range(0, i):\n                if not dp[k - 1][j]:\n                    continue\n                length = i - j\n                if length == 1 or segsum(j, i) >= m:\n                    dp[k][i] = True\n                    break\n\n    return dp[n][L]",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_split_into_n(nums, m, n):\n    L = len(nums)\n    if not isinstance(n, int) or n <= 0:\n        return False\n    if n > L:\n        return False  # can't have more parts than elements\n\n    # prefix sums\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    # dp[k][i] = possible to split nums[:i] into exactly k valid parts\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            for j in range(i):\n                if not dp[k - 1][j]:\n                    continue\n                length = i - j\n                if length == 1 or segsum(j, i) >= m:\n                    dp[k][i] = True\n                    break\n\n    return dp[n][L]",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_split_into_n(nums, m, n):\n    \"\"\"\n    Decide if nums can be split into exactly n non-empty contiguous parts where\n    each part is either length 1 or has sum >= m.\n\n    Constraints assumed: 1 <= len(nums) <= 100, 1 <= nums[i] <= 100.\n    \"\"\"\n    L = len(nums)\n    if not isinstance(n, int) or n <= 0 or n > L:\n        return False\n\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            for j in range(i):\n                if dp[k - 1][j]:\n                    length = i - j\n                    if length == 1 or segsum(j, i) >= m:\n                        dp[k][i] = True\n                        break\n\n    return dp[n][L]",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_split_into_n(nums, m, n):\n    \"\"\"\n    Return True iff nums can be split into exactly n non-empty contiguous parts\n    such that each part is either:\n      - length 1, OR\n      - has sum >= m\n\n    Constraints: 1 <= len(nums) <= 100, 1 <= nums[i] <= 100, 1 <= m <= 200.\n    \"\"\"\n    L = len(nums)\n    if not isinstance(n, int) or n <= 0 or n > L:\n        return False\n\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            for j in range(i):\n                if not dp[k - 1][j]:\n                    continue\n                length = i - j\n                if length == 1 or segsum(j, i) >= m:\n                    dp[k][i] = True\n                    break\n\n    return dp[n][L]",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 9
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def can_split_into_n(nums, m, n=None):\n    \"\"\"\n    If n is None:\n      Return True iff nums can be split into 2+ non-empty contiguous parts where\n      each part is either length 1 or has sum >= m.\n\n    If n is an int:\n      Return True iff nums can be split into exactly n such parts.\n\n    Constraints: 1 <= len(nums) <= 100, 1 <= nums[i] <= 100, 1 <= m <= 200.\n    \"\"\"\n    L = len(nums)\n    if L < 2:\n        return False\n\n    # prefix sums\n    pref = [0] * (L + 1)\n    for i, x in enumerate(nums):\n        pref[i + 1] = pref[i] + x\n\n    def segsum(i, j):\n        return pref[j] - pref[i]\n\n    if n is None:\n        # dp[i] = max number of valid parts for nums[:i], or -inf if impossible\n        parts = [-10**9] * (L + 1)\n        parts[0] = 0\n        for i in range(L):\n            if parts[i] < 0:\n                continue\n            for j in range(i + 1, L + 1):\n                length = j - i\n                if length == 1 or segsum(i, j) >= m:\n                    if parts[i] + 1 > parts[j]:\n                        parts[j] = parts[i] + 1\n        return parts[L] >= 2\n\n    # exact n parts\n    if not isinstance(n, int) or n <= 0 or n > L:\n        return False\n\n    dp = [[False] * (L + 1) for _ in range(n + 1)]\n    dp[0][0] = True\n    for k in range(1, n + 1):\n        for i in range(1, L + 1):\n            for j in range(i):\n                if dp[k - 1][j]:\n                    length = i - j\n                    if length == 1 or segsum(j, i) >= m:\n                        dp[k][i] = True\n                        break\n    return dp[n][L]",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

@@ -1,0 +1,212 @@
+{
+  "sample_id": "sharded-HumanEval/71",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": true,
+  "score": 1.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-19 21:46:49",
+  "lic_conv_id": "6997cb19175c537babc688a4",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Calculate triangle area ",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(*args):\n    \"\"\"\n    Calculate the area of a triangle.\n\n    Supported inputs:\n    - triangle_area(base, height)\n    - triangle_area((base, height))\n    - triangle_area({\"base\": b, \"height\": h})\n    - triangle_area([(x1,y1), (x2,y2), (x3,y3)]) or triangle_area((x1,y1), (x2,y2), (x3,y3))\n\n    Returns:\n        float area (non-negative).\n\n    Raises:\n        ValueError / TypeError for invalid input.\n    \"\"\"\n    def _num(x, name=\"value\"):\n        if isinstance(x, bool):\n            raise TypeError(f\"{name} must be a number\")\n        try:\n            return float(x)\n        except Exception as e:\n            raise TypeError(f\"{name} must be a number\") from e\n\n    # Unwrap single container arg\n    if len(args) == 1:\n        a = args[0]\n        # dict with base/height\n        if isinstance(a, dict):\n            if \"base\" in a and \"height\" in a:\n                b = _num(a[\"base\"], \"base\")\n                h = _num(a[\"height\"], \"height\")\n                return abs(b * h) / 2.0\n            raise ValueError(\"dict input must contain 'base' and 'height'\")\n        # (base, height)\n        if isinstance(a, (list, tuple)) and len(a) == 2 and not (isinstance(a[0], (list, tuple)) and isinstance(a[1], (list, tuple))):\n            b = _num(a[0], \"base\")\n            h = _num(a[1], \"height\")\n            return abs(b * h) / 2.0\n        # [(x1,y1), (x2,y2), (x3,y3)]\n        if isinstance(a, (list, tuple)) and len(a) == 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n            (x1, y1), (x2, y2), (x3, y3) = a\n            x1, y1 = _num(x1, \"x1\"), _num(y1, \"y1\")\n            x2, y2 = _num(x2, \"x2\"), _num(y2, \"y2\")\n            x3, y3 = _num(x3, \"x3\"), _num(y3, \"y3\")\n            return abs(x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)) / 2.0\n        raise ValueError(\"unsupported input format\")\n\n    # base, height\n    if len(args) == 2:\n        b = _num(args[0], \"base\")\n        h = _num(args[1], \"height\")\n        return abs(b * h) / 2.0\n\n    # three points\n    if len(args) == 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in args):\n        (x1, y1), (x2, y2), (x3, y3) = args\n        x1, y1 = _num(x1, \"x1\"), _num(y1, \"y1\")\n        x2, y2 = _num(x2, \"x2\"), _num(y2, \"y2\")\n        x3, y3 = _num(x3, \"x3\"), _num(y3, \"y3\")\n        return abs(x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)) / 2.0\n\n    raise ValueError(\"unsupported input format\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "you need to check if the sides can form a real triangle first",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(*args):\n    \"\"\"\n    Calculate the area of a triangle, validating that it is a real (non-degenerate) triangle first.\n\n    Accepted forms:\n      1) triangle_area(a, b, c)                         # three side lengths\n      2) triangle_area((a, b, c))                       # sides in a tuple/list\n      3) triangle_area([(x1,y1),(x2,y2),(x3,y3)])       # three points\n      4) triangle_area((x1,y1),(x2,y2),(x3,y3))         # three points\n      5) triangle_area(base, height)                    # requires base>0 and height>0\n      6) triangle_area((base, height))\n      7) triangle_area({\"base\": b, \"height\": h})\n\n    Returns:\n        float area\n\n    Raises:\n        ValueError if inputs cannot form a real triangle (or base/height invalid), or format unsupported.\n        TypeError for non-numeric values.\n    \"\"\"\n    def _num(x, name=\"value\"):\n        if isinstance(x, bool):\n            raise TypeError(f\"{name} must be a number\")\n        try:\n            return float(x)\n        except Exception as e:\n            raise TypeError(f\"{name} must be a number\") from e\n\n    def _valid_triangle_sides(a, b, c):\n        eps = 1e-12\n        if a <= 0 or b <= 0 or c <= 0:\n            return False\n        # strict inequality: non-degenerate triangle\n        return (a + b > c + eps) and (a + c > b + eps) and (b + c > a + eps)\n\n    def _heron(a, b, c):\n        if not _valid_triangle_sides(a, b, c):\n            raise ValueError(\"sides cannot form a real triangle\")\n        s = (a + b + c) / 2.0\n        val = s * (s - a) * (s - b) * (s - c)\n        # numerical guard\n        if val <= 0:\n            raise ValueError(\"sides cannot form a real triangle\")\n        return val ** 0.5\n\n    def _dist(p, q):\n        x1, y1 = p\n        x2, y2 = q\n        x1, y1 = _num(x1, \"x\"), _num(y1, \"y\")\n        x2, y2 = _num(x2, \"x\"), _num(y2, \"y\")\n        dx, dy = x2 - x1, y2 - y1\n        return (dx * dx + dy * dy) ** 0.5\n\n    def _area_from_points(p1, p2, p3):\n        a = _dist(p1, p2)\n        b = _dist(p2, p3)\n        c = _dist(p3, p1)\n        return _heron(a, b, c)\n\n    def _area_from_base_height(b, h):\n        b = _num(b, \"base\")\n        h = _num(h, \"height\")\n        if b <= 0 or h <= 0:\n            raise ValueError(\"base and height must be positive for a real triangle\")\n        return (b * h) / 2.0\n\n    # Unwrap single container arg\n    if len(args) == 1:\n        a = args[0]\n        if isinstance(a, dict):\n            if \"base\" in a and \"height\" in a:\n                return _area_from_base_height(a[\"base\"], a[\"height\"])\n            raise ValueError(\"dict input must contain 'base' and 'height'\")\n\n        if isinstance(a, (list, tuple)):\n            # sides (a,b,c)\n            if len(a) == 3 and not all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n                sa, sb, sc = _num(a[0], \"a\"), _num(a[1], \"b\"), _num(a[2], \"c\")\n                return _heron(sa, sb, sc)\n            # base/height (b,h)\n            if len(a) == 2 and not all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n                return _area_from_base_height(a[0], a[1])\n            # points [(x,y),...]\n            if len(a) == 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n                return _area_from_points(a[0], a[1], a[2])\n\n        raise ValueError(\"unsupported input format\")\n\n    # base, height\n    if len(args) == 2:\n        return _area_from_base_height(args[0], args[1])\n\n    # sides a, b, c\n    if len(args) == 3:\n        # three points\n        if all(isinstance(p, (list, tuple)) and len(p) == 2 for p in args):\n            return _area_from_points(args[0], args[1], args[2])\n        # three sides\n        sa, sb, sc = _num(args[0], \"a\"), _num(args[1], \"b\"), _num(args[2], \"c\")\n        return _heron(sa, sb, sc)\n\n    raise ValueError(\"unsupported input format\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "A real triangle exists when the sum of the lengths of any two sides is greater than the length of the third side.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(*args):\n    \"\"\"\n    Compute triangle area after validating it's a real (non-degenerate) triangle.\n\n    Accepted inputs:\n      - triangle_area(a, b, c) or triangle_area((a,b,c))         # side lengths (Heron's formula)\n      - triangle_area((x1,y1),(x2,y2),(x3,y3)) or triangle_area([(x1,y1),(x2,y2),(x3,y3)])  # points\n      - triangle_area(base, height) or triangle_area((base,height)) or triangle_area({\"base\":b,\"height\":h})\n\n    Real triangle condition (strict): for sides a,b,c:\n        a + b > c, a + c > b, b + c > a\n    \"\"\"\n    def _num(x, name=\"value\"):\n        if isinstance(x, bool):\n            raise TypeError(f\"{name} must be a number\")\n        try:\n            return float(x)\n        except Exception as e:\n            raise TypeError(f\"{name} must be a number\") from e\n\n    def _check_real(a, b, c):\n        if a <= 0 or b <= 0 or c <= 0:\n            raise ValueError(\"sides must be positive\")\n        if not (a + b > c and a + c > b and b + c > a):\n            raise ValueError(\"a real triangle cannot be formed from these sides\")\n\n    def _heron(a, b, c):\n        _check_real(a, b, c)\n        s = (a + b + c) / 2.0\n        return (s * (s - a) * (s - b) * (s - c)) ** 0.5\n\n    def _dist(p, q):\n        x1, y1 = _num(p[0], \"x\"), _num(p[1], \"y\")\n        x2, y2 = _num(q[0], \"x\"), _num(q[1], \"y\")\n        dx, dy = x2 - x1, y2 - y1\n        return (dx * dx + dy * dy) ** 0.5\n\n    def _area_points(p1, p2, p3):\n        a = _dist(p1, p2)\n        b = _dist(p2, p3)\n        c = _dist(p3, p1)\n        return _heron(a, b, c)\n\n    def _area_base_height(b, h):\n        b = _num(b, \"base\")\n        h = _num(h, \"height\")\n        if b <= 0 or h <= 0:\n            raise ValueError(\"base and height must be positive\")\n        return (b * h) / 2.0\n\n    # unwrap single argument container\n    if len(args) == 1:\n        a = args[0]\n        if isinstance(a, dict):\n            if \"base\" in a and \"height\" in a:\n                return _area_base_height(a[\"base\"], a[\"height\"])\n            raise ValueError(\"dict input must contain 'base' and 'height'\")\n        if isinstance(a, (list, tuple)):\n            # points\n            if len(a) == 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n                return _area_points(a[0], a[1], a[2])\n            # sides\n            if len(a) == 3:\n                sa, sb, sc = _num(a[0], \"a\"), _num(a[1], \"b\"), _num(a[2], \"c\")\n                return _heron(sa, sb, sc)\n            # base/height\n            if len(a) == 2:\n                return _area_base_height(a[0], a[1])\n        raise ValueError(\"unsupported input format\")\n\n    # base/height\n    if len(args) == 2:\n        return _area_base_height(args[0], args[1])\n\n    # sides or points\n    if len(args) == 3:\n        if all(isinstance(p, (list, tuple)) and len(p) == 2 for p in args):\n            return _area_points(args[0], args[1], args[2])\n        sa, sb, sc = _num(args[0], \"a\"), _num(args[1], \"b\"), _num(args[2], \"c\")\n        return _heron(sa, sb, sc)\n\n    raise ValueError(\"unsupported input format\")\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "You can use the lengths of the three sides to check if they form a triangle.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(a, b, c):\n    \"\"\"\n    Return the area of a triangle from side lengths a, b, c.\n\n    Raises ValueError if the sides cannot form a real (non-degenerate) triangle:\n        a + b > c, a + c > b, b + c > a\n    \"\"\"\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0 or not (a + b > c and a + c > b and b + c > a):\n        raise ValueError(\"Sides do not form a real triangle\")\n\n    s = (a + b + c) / 2.0  # semiperimeter\n    return (s * (s - a) * (s - b) * (s - c)) ** 0.5\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "If the sides aren't valid, just return -1.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(a, b, c):\n    \"\"\"\n    Return the area of a triangle given side lengths a, b, c.\n    If the sides cannot form a real (non-degenerate) triangle, return -1.\n\n    Real triangle condition:\n        a + b > c, a + c > b, b + c > a\n    \"\"\"\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0 or not (a + b > c and a + c > b and b + c > a):\n        return -1\n\n    s = (a + b + c) / 2.0\n    return (s * (s - a) * (s - b) * (s - c)) ** 0.5\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "3, 4, 5 makes a valid triangle. It gives an area of 6.00.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef triangle_area(a, b, c):\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0 or not (a + b > c and a + c > b and b + c > a):\n        return -1\n\n    s = (a + b + c) / 2.0\n    return round((s * (s - a) * (s - b) * (s - c)) ** 0.5, 2)\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(*args):\n    \"\"\"\n    Calculate the area of a triangle.\n\n    Supported inputs:\n    - triangle_area(base, height)\n    - triangle_area((base, height))\n    - triangle_area({\"base\": b, \"height\": h})\n    - triangle_area([(x1,y1), (x2,y2), (x3,y3)]) or triangle_area((x1,y1), (x2,y2), (x3,y3))\n\n    Returns:\n        float area (non-negative).\n\n    Raises:\n        ValueError / TypeError for invalid input.\n    \"\"\"\n    def _num(x, name=\"value\"):\n        if isinstance(x, bool):\n            raise TypeError(f\"{name} must be a number\")\n        try:\n            return float(x)\n        except Exception as e:\n            raise TypeError(f\"{name} must be a number\") from e\n\n    # Unwrap single container arg\n    if len(args) == 1:\n        a = args[0]\n        # dict with base/height\n        if isinstance(a, dict):\n            if \"base\" in a and \"height\" in a:\n                b = _num(a[\"base\"], \"base\")\n                h = _num(a[\"height\"], \"height\")\n                return abs(b * h) / 2.0\n            raise ValueError(\"dict input must contain 'base' and 'height'\")\n        # (base, height)\n        if isinstance(a, (list, tuple)) and len(a) == 2 and not (isinstance(a[0], (list, tuple)) and isinstance(a[1], (list, tuple))):\n            b = _num(a[0], \"base\")\n            h = _num(a[1], \"height\")\n            return abs(b * h) / 2.0\n        # [(x1,y1), (x2,y2), (x3,y3)]\n        if isinstance(a, (list, tuple)) and len(a) == 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n            (x1, y1), (x2, y2), (x3, y3) = a\n            x1, y1 = _num(x1, \"x1\"), _num(y1, \"y1\")\n            x2, y2 = _num(x2, \"x2\"), _num(y2, \"y2\")\n            x3, y3 = _num(x3, \"x3\"), _num(y3, \"y3\")\n            return abs(x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)) / 2.0\n        raise ValueError(\"unsupported input format\")\n\n    # base, height\n    if len(args) == 2:\n        b = _num(args[0], \"base\")\n        h = _num(args[1], \"height\")\n        return abs(b * h) / 2.0\n\n    # three points\n    if len(args) == 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in args):\n        (x1, y1), (x2, y2), (x3, y3) = args\n        x1, y1 = _num(x1, \"x1\"), _num(y1, \"y1\")\n        x2, y2 = _num(x2, \"x2\"), _num(y2, \"y2\")\n        x3, y3 = _num(x3, \"x3\"), _num(y3, \"y3\")\n        return abs(x1*(y2 - y3) + x2*(y3 - y1) + x3*(y1 - y2)) / 2.0\n\n    raise ValueError(\"unsupported input format\")",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(*args):\n    \"\"\"\n    Calculate the area of a triangle, validating that it is a real (non-degenerate) triangle first.\n\n    Accepted forms:\n      1) triangle_area(a, b, c)                         # three side lengths\n      2) triangle_area((a, b, c))                       # sides in a tuple/list\n      3) triangle_area([(x1,y1),(x2,y2),(x3,y3)])       # three points\n      4) triangle_area((x1,y1),(x2,y2),(x3,y3))         # three points\n      5) triangle_area(base, height)                    # requires base>0 and height>0\n      6) triangle_area((base, height))\n      7) triangle_area({\"base\": b, \"height\": h})\n\n    Returns:\n        float area\n\n    Raises:\n        ValueError if inputs cannot form a real triangle (or base/height invalid), or format unsupported.\n        TypeError for non-numeric values.\n    \"\"\"\n    def _num(x, name=\"value\"):\n        if isinstance(x, bool):\n            raise TypeError(f\"{name} must be a number\")\n        try:\n            return float(x)\n        except Exception as e:\n            raise TypeError(f\"{name} must be a number\") from e\n\n    def _valid_triangle_sides(a, b, c):\n        eps = 1e-12\n        if a <= 0 or b <= 0 or c <= 0:\n            return False\n        # strict inequality: non-degenerate triangle\n        return (a + b > c + eps) and (a + c > b + eps) and (b + c > a + eps)\n\n    def _heron(a, b, c):\n        if not _valid_triangle_sides(a, b, c):\n            raise ValueError(\"sides cannot form a real triangle\")\n        s = (a + b + c) / 2.0\n        val = s * (s - a) * (s - b) * (s - c)\n        # numerical guard\n        if val <= 0:\n            raise ValueError(\"sides cannot form a real triangle\")\n        return val ** 0.5\n\n    def _dist(p, q):\n        x1, y1 = p\n        x2, y2 = q\n        x1, y1 = _num(x1, \"x\"), _num(y1, \"y\")\n        x2, y2 = _num(x2, \"x\"), _num(y2, \"y\")\n        dx, dy = x2 - x1, y2 - y1\n        return (dx * dx + dy * dy) ** 0.5\n\n    def _area_from_points(p1, p2, p3):\n        a = _dist(p1, p2)\n        b = _dist(p2, p3)\n        c = _dist(p3, p1)\n        return _heron(a, b, c)\n\n    def _area_from_base_height(b, h):\n        b = _num(b, \"base\")\n        h = _num(h, \"height\")\n        if b <= 0 or h <= 0:\n            raise ValueError(\"base and height must be positive for a real triangle\")\n        return (b * h) / 2.0\n\n    # Unwrap single container arg\n    if len(args) == 1:\n        a = args[0]\n        if isinstance(a, dict):\n            if \"base\" in a and \"height\" in a:\n                return _area_from_base_height(a[\"base\"], a[\"height\"])\n            raise ValueError(\"dict input must contain 'base' and 'height'\")\n\n        if isinstance(a, (list, tuple)):\n            # sides (a,b,c)\n            if len(a) == 3 and not all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n                sa, sb, sc = _num(a[0], \"a\"), _num(a[1], \"b\"), _num(a[2], \"c\")\n                return _heron(sa, sb, sc)\n            # base/height (b,h)\n            if len(a) == 2 and not all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n                return _area_from_base_height(a[0], a[1])\n            # points [(x,y),...]\n            if len(a) == 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n                return _area_from_points(a[0], a[1], a[2])\n\n        raise ValueError(\"unsupported input format\")\n\n    # base, height\n    if len(args) == 2:\n        return _area_from_base_height(args[0], args[1])\n\n    # sides a, b, c\n    if len(args) == 3:\n        # three points\n        if all(isinstance(p, (list, tuple)) and len(p) == 2 for p in args):\n            return _area_from_points(args[0], args[1], args[2])\n        # three sides\n        sa, sb, sc = _num(args[0], \"a\"), _num(args[1], \"b\"), _num(args[2], \"c\")\n        return _heron(sa, sb, sc)\n\n    raise ValueError(\"unsupported input format\")",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(*args):\n    \"\"\"\n    Compute triangle area after validating it's a real (non-degenerate) triangle.\n\n    Accepted inputs:\n      - triangle_area(a, b, c) or triangle_area((a,b,c))         # side lengths (Heron's formula)\n      - triangle_area((x1,y1),(x2,y2),(x3,y3)) or triangle_area([(x1,y1),(x2,y2),(x3,y3)])  # points\n      - triangle_area(base, height) or triangle_area((base,height)) or triangle_area({\"base\":b,\"height\":h})\n\n    Real triangle condition (strict): for sides a,b,c:\n        a + b > c, a + c > b, b + c > a\n    \"\"\"\n    def _num(x, name=\"value\"):\n        if isinstance(x, bool):\n            raise TypeError(f\"{name} must be a number\")\n        try:\n            return float(x)\n        except Exception as e:\n            raise TypeError(f\"{name} must be a number\") from e\n\n    def _check_real(a, b, c):\n        if a <= 0 or b <= 0 or c <= 0:\n            raise ValueError(\"sides must be positive\")\n        if not (a + b > c and a + c > b and b + c > a):\n            raise ValueError(\"a real triangle cannot be formed from these sides\")\n\n    def _heron(a, b, c):\n        _check_real(a, b, c)\n        s = (a + b + c) / 2.0\n        return (s * (s - a) * (s - b) * (s - c)) ** 0.5\n\n    def _dist(p, q):\n        x1, y1 = _num(p[0], \"x\"), _num(p[1], \"y\")\n        x2, y2 = _num(q[0], \"x\"), _num(q[1], \"y\")\n        dx, dy = x2 - x1, y2 - y1\n        return (dx * dx + dy * dy) ** 0.5\n\n    def _area_points(p1, p2, p3):\n        a = _dist(p1, p2)\n        b = _dist(p2, p3)\n        c = _dist(p3, p1)\n        return _heron(a, b, c)\n\n    def _area_base_height(b, h):\n        b = _num(b, \"base\")\n        h = _num(h, \"height\")\n        if b <= 0 or h <= 0:\n            raise ValueError(\"base and height must be positive\")\n        return (b * h) / 2.0\n\n    # unwrap single argument container\n    if len(args) == 1:\n        a = args[0]\n        if isinstance(a, dict):\n            if \"base\" in a and \"height\" in a:\n                return _area_base_height(a[\"base\"], a[\"height\"])\n            raise ValueError(\"dict input must contain 'base' and 'height'\")\n        if isinstance(a, (list, tuple)):\n            # points\n            if len(a) == 3 and all(isinstance(p, (list, tuple)) and len(p) == 2 for p in a):\n                return _area_points(a[0], a[1], a[2])\n            # sides\n            if len(a) == 3:\n                sa, sb, sc = _num(a[0], \"a\"), _num(a[1], \"b\"), _num(a[2], \"c\")\n                return _heron(sa, sb, sc)\n            # base/height\n            if len(a) == 2:\n                return _area_base_height(a[0], a[1])\n        raise ValueError(\"unsupported input format\")\n\n    # base/height\n    if len(args) == 2:\n        return _area_base_height(args[0], args[1])\n\n    # sides or points\n    if len(args) == 3:\n        if all(isinstance(p, (list, tuple)) and len(p) == 2 for p in args):\n            return _area_points(args[0], args[1], args[2])\n        sa, sb, sc = _num(args[0], \"a\"), _num(args[1], \"b\"), _num(args[2], \"c\")\n        return _heron(sa, sb, sc)\n\n    raise ValueError(\"unsupported input format\")",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(a, b, c):\n    \"\"\"\n    Return the area of a triangle from side lengths a, b, c.\n\n    Raises ValueError if the sides cannot form a real (non-degenerate) triangle:\n        a + b > c, a + c > b, b + c > a\n    \"\"\"\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0 or not (a + b > c and a + c > b and b + c > a):\n        raise ValueError(\"Sides do not form a real triangle\")\n\n    s = (a + b + c) / 2.0  # semiperimeter\n    return (s * (s - a) * (s - b) * (s - c)) ** 0.5",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(a, b, c):\n    \"\"\"\n    Return the area of a triangle given side lengths a, b, c.\n    If the sides cannot form a real (non-degenerate) triangle, return -1.\n\n    Real triangle condition:\n        a + b > c, a + c > b, b + c > a\n    \"\"\"\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0 or not (a + b > c and a + c > b and b + c > a):\n        return -1\n\n    s = (a + b + c) / 2.0\n    return (s * (s - a) * (s - b) * (s - c)) ** 0.5",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def triangle_area(a, b, c):\n    a = float(a)\n    b = float(b)\n    c = float(c)\n\n    if a <= 0 or b <= 0 or c <= 0 or not (a + b > c and a + c > b and b + c > a):\n        return -1\n\n    s = (a + b + c) / 2.0\n    return round((s * (s - a) * (s - b) * (s - c)) ** 0.5, 2)",
+          "is_correct": true,
+          "score": 1
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}

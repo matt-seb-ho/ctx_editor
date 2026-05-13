@@ -1,0 +1,274 @@
+{
+  "sample_id": "sharded-HumanEval/93",
+  "task_name": "code",
+  "experiment_type": "lic_baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "t-gpt-5.2",
+    "user": "t-gpt-4o-mini",
+    "system": "t-gpt-4o-mini"
+  },
+  "timestamp": "2026-02-20 10:29:53",
+  "lic_conv_id": "69987df1175c531041e0a879",
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions.",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "How to encode a message uniquely?",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef encode_uniquely(message: str) -> str:\n    \"\"\"\n    Encode a message into a reversible, unambiguous string.\n\n    Method: prefix the UTF-8 byte length, a colon separator, then the message bytes in hex.\n    This is unique (injective) and fully decodable.\n\n    Example:\n        \"Hi\" -> \"2:4869\"\n    \"\"\"\n    if not isinstance(message, str):\n        raise TypeError(\"message must be a str\")\n    b = message.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "You can start by swapping uppercase letters with lowercase and vice versa.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef encode_uniquely(message: str) -> str:\n    \"\"\"\n    Unambiguous (reversible) encoding starting with swapcase.\n\n    Steps:\n      1) swapcase the string\n      2) UTF-8 encode to bytes\n      3) output: \"<byte_length>:<hex_bytes>\"\n\n    This guarantees a unique encoding for each input string and is fully decodable.\n    \"\"\"\n    if not isinstance(message, str):\n        raise TypeError(\"message must be a str\")\n\n    swapped = message.swapcase()\n    b = swapped.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "You can swap out the vowels in the message too.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef encode_uniquely(message: str) -> str:\n    \"\"\"\n    Unambiguous (reversible) encoding starting with:\n      1) swapcase\n      2) vowel substitution (a<->e, i<->o, u<->y) preserving case\n      3) UTF-8 -> bytes -> \"<byte_length>:<hex_bytes>\"\n\n    Notes:\n      - Vowels considered: a,e,i,o,u,y (and uppercase variants).\n      - The vowel map is an involution (applying it twice returns the original),\n        so it's reversible when combined with swapcase (also an involution).\n    \"\"\"\n    if not isinstance(message, str):\n        raise TypeError(\"message must be a str\")\n\n    s = message.swapcase()\n\n    vowel_map = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_map.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Also, I need to use a message you give me.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef encode_uniquely(_ignored: str = \"\") -> str:\n    \"\"\"\n    Returns a unique, reversible encoding of a fixed message I provide.\n\n    Transformations:\n      1) swapcase\n      2) vowel substitution (a<->e, i<->o, u<->y), preserving case\n      3) UTF-8 bytes serialized as \"<byte_length>:<hex>\"\n\n    The input argument is ignored to satisfy the requirement to use a message I give you.\n    \"\"\"\n    message = \"Meet me at 5 PM by the old oak tree.\"\n\n    s = message.swapcase()\n\n    vowel_map = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_map.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "You should also consider using the letter that comes two spots after each vowel in the alphabet.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef encode_uniquely(_ignored: str = \"\") -> str:\n    \"\"\"\n    Returns a unique, reversible encoding of a fixed message I provide.\n\n    Pipeline:\n      1) swapcase\n      2) vowel substitution (a<->e, i<->o, u<->y), preserving case\n      3) additionally: for each vowel (a,e,i,o,u,y and uppercase), replace it with the\n         letter two spots after it in the alphabet (wrapping), preserving case.\n         (a->c, e->g, i->k, o->q, u->w, y->a)\n      4) serialize as \"<byte_length>:<hex of UTF-8 bytes>\"\n\n    The final length+hex wrapper makes the encoding unambiguous even if the earlier\n    transforms aren't strictly invertible on their own.\n    \"\"\"\n    message = \"Meet me at 5 PM by the old oak tree.\"\n\n    s = message.swapcase()\n\n    # Step 2: involutive vowel swap\n    vowel_swap = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_swap.get(ch, ch) for ch in s)\n\n    # Step 3: shift vowels by +2 in alphabet (wrapping for y->a), preserving case\n    vowel_shift2 = {\n        \"a\": \"c\", \"e\": \"g\", \"i\": \"k\", \"o\": \"q\", \"u\": \"w\", \"y\": \"a\",\n        \"A\": \"C\", \"E\": \"G\", \"I\": \"K\", \"O\": \"Q\", \"U\": \"W\", \"Y\": \"A\",\n    }\n    s = \"\".join(vowel_shift2.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Just stick to using letters from the English alphabet.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef encode_uniquely(_ignored: str = \"\") -> str:\n    \"\"\"\n    Unique encoding using only English alphabet letters [A-Za-z].\n\n    Fixed message (provided by me), then:\n      1) swapcase\n      2) vowel swap: a<->e, i<->o, u<->y (case-preserving)\n      3) vowel shift by +2 in alphabet for vowels only (case-preserving):\n         a->c, e->g, i->k, o->q, u->w, y->a\n      4) encode UTF-8 bytes into base-26 letters (A-Z) with a length header (also A-Z)\n\n    Output is A-Z only.\n    \"\"\"\n    message = \"Meet me at 5 PM by the old oak tree.\"\n\n    s = message.swapcase()\n\n    vowel_swap = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_swap.get(ch, ch) for ch in s)\n\n    vowel_shift2 = {\n        \"a\": \"c\", \"e\": \"g\", \"i\": \"k\", \"o\": \"q\", \"u\": \"w\", \"y\": \"a\",\n        \"A\": \"C\", \"E\": \"G\", \"I\": \"K\", \"O\": \"Q\", \"U\": \"W\", \"Y\": \"A\",\n    }\n    s = \"\".join(vowel_shift2.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n\n    # Base-26 (A-Z) encode bytes as a big integer.\n    n = int.from_bytes(b, \"big\", signed=False)\n\n    # Encode the byte length in base-26 too (so decode can recover leading zero bytes).\n    blen = len(b)\n    if blen == 0:\n        len_part = \"A\"  # 0\n    else:\n        digits = []\n        x = blen\n        while x:\n            x, r = divmod(x, 26)\n            digits.append(chr(ord(\"A\") + r))\n        len_part = \"\".join(reversed(digits))\n\n    # Separator must also be a letter; use 'Z' as a delimiter with length-prefixing to avoid ambiguity:\n    # We'll prefix len_part with its own length in one base-26 digit (A=0..Z=25). Supports up to 25 digits.\n    if len(len_part) > 25:\n        raise ValueError(\"Message too long to encode with this header scheme.\")\n    header = chr(ord(\"A\") + len(len_part)) + len_part\n\n    if n == 0:\n        body = \"A\"\n    else:\n        digits = []\n        x = n\n        while x:\n            x, r = divmod(x, 26)\n            digits.append(chr(ord(\"A\") + r))\n        body = \"\".join(reversed(digits))\n\n    return header + body\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "Only use letters from the English alphabet, no numbers or symbols.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef encode_uniquely(_ignored: str = \"\") -> str:\n    \"\"\"\n    Returns an encoding made ONLY of English letters A-Z/a-z (no digits, no symbols).\n\n    Fixed message (provided by me). Transform:\n      1) swapcase\n      2) vowel swap: a<->e, i<->o, u<->y (case-preserving)\n      3) vowel shift +2 for vowels only: a->c, e->g, i->k, o->q, u->w, y->a (case-preserving)\n      4) UTF-8 bytes -> base-52 letters (A-Z then a-z) with an all-letter header that\n         stores the byte length AND the count of leading zero bytes so decoding is unique.\n\n    Output alphabet: \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\"\n    \"\"\"\n    message = \"Meet me at 5 PM by the old oak tree.\"\n\n    # Steps 1-3 (text transforms)\n    s = message.swapcase()\n\n    vowel_swap = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_swap.get(ch, ch) for ch in s)\n\n    vowel_shift2 = {\n        \"a\": \"c\", \"e\": \"g\", \"i\": \"k\", \"o\": \"q\", \"u\": \"w\", \"y\": \"a\",\n        \"A\": \"C\", \"E\": \"G\", \"I\": \"K\", \"O\": \"Q\", \"U\": \"W\", \"Y\": \"A\",\n    }\n    s = \"\".join(vowel_shift2.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n\n    # All-letter base52 encoding helpers (implemented inline).\n    alphabet = \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\"\n    base = 52\n\n    # Count leading zero bytes to make the integer encoding bijective for byte strings.\n    lz = 0\n    for byte in b:\n        if byte == 0:\n            lz += 1\n        else:\n            break\n\n    n = int.from_bytes(b, \"big\", signed=False)\n\n    # Encode nonnegative integer in base52 as letters; 0 -> 'A'\n    def enc_int(x: int) -> str:\n        if x == 0:\n            return alphabet[0]\n        digs = []\n        while x:\n            x, r = divmod(x, base)\n            digs.append(alphabet[r])\n        return \"\".join(reversed(digs))\n\n    # Header is self-delimiting with all letters:\n    #   [L1][len(lz_part)][lz_part][len(len_part)][len_part][body]\n    # Where each length is a single base52 digit (so up to 51 chars per part).\n    lz_part = enc_int(lz)\n    len_part = enc_int(len(b))\n\n    if len(lz_part) > 51 or len(len_part) > 51:\n        raise ValueError(\"Message too long for this all-letter header scheme.\")\n\n    header = (\n        alphabet[len(lz_part)] + lz_part +\n        alphabet[len(len_part)] + len_part\n    )\n\n    body = enc_int(n)\n    return header + body\n```",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "For example, if the message is 'This is a message', it would turn into 'tHKS KS C MGSSCGG'.",
+        "visible": true
+      },
+      {
+        "role": "assistant",
+        "content": "```python\ndef encode_uniquely(message: str) -> str:\n    \"\"\"\n    Encode by:\n      1) swapping case\n      2) shifting vowels forward by 2 letters in the English alphabet (wrap y->a),\n         preserving case. Vowels here: a e i o u y (and uppercase).\n\n    Example:\n      \"This is a message\" -> \"tHKS KS C MGSSCGG\"\n    \"\"\"\n    if not isinstance(message, str):\n        raise TypeError(\"message must be a str\")\n\n    s = message.swapcase()\n\n    vowel_shift2 = {\n        \"a\": \"c\", \"e\": \"g\", \"i\": \"k\", \"o\": \"q\", \"u\": \"w\", \"y\": \"a\",\n        \"A\": \"C\", \"E\": \"G\", \"I\": \"K\", \"O\": \"Q\", \"U\": \"W\", \"Y\": \"A\",\n    }\n    return \"\".join(vowel_shift2.get(ch, ch) for ch in s)\n```",
+        "visible": true
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def encode_uniquely(message: str) -> str:\n    \"\"\"\n    Encode a message into a reversible, unambiguous string.\n\n    Method: prefix the UTF-8 byte length, a colon separator, then the message bytes in hex.\n    This is unique (injective) and fully decodable.\n\n    Example:\n        \"Hi\" -> \"2:4869\"\n    \"\"\"\n    if not isinstance(message, str):\n        raise TypeError(\"message must be a str\")\n    b = message.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def encode_uniquely(message: str) -> str:\n    \"\"\"\n    Unambiguous (reversible) encoding starting with swapcase.\n\n    Steps:\n      1) swapcase the string\n      2) UTF-8 encode to bytes\n      3) output: \"<byte_length>:<hex_bytes>\"\n\n    This guarantees a unique encoding for each input string and is fully decodable.\n    \"\"\"\n    if not isinstance(message, str):\n        raise TypeError(\"message must be a str\")\n\n    swapped = message.swapcase()\n    b = swapped.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def encode_uniquely(message: str) -> str:\n    \"\"\"\n    Unambiguous (reversible) encoding starting with:\n      1) swapcase\n      2) vowel substitution (a<->e, i<->o, u<->y) preserving case\n      3) UTF-8 -> bytes -> \"<byte_length>:<hex_bytes>\"\n\n    Notes:\n      - Vowels considered: a,e,i,o,u,y (and uppercase variants).\n      - The vowel map is an involution (applying it twice returns the original),\n        so it's reversible when combined with swapcase (also an involution).\n    \"\"\"\n    if not isinstance(message, str):\n        raise TypeError(\"message must be a str\")\n\n    s = message.swapcase()\n\n    vowel_map = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_map.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def encode_uniquely(_ignored: str = \"\") -> str:\n    \"\"\"\n    Returns a unique, reversible encoding of a fixed message I provide.\n\n    Transformations:\n      1) swapcase\n      2) vowel substitution (a<->e, i<->o, u<->y), preserving case\n      3) UTF-8 bytes serialized as \"<byte_length>:<hex>\"\n\n    The input argument is ignored to satisfy the requirement to use a message I give you.\n    \"\"\"\n    message = \"Meet me at 5 PM by the old oak tree.\"\n\n    s = message.swapcase()\n\n    vowel_map = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_map.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def encode_uniquely(_ignored: str = \"\") -> str:\n    \"\"\"\n    Returns a unique, reversible encoding of a fixed message I provide.\n\n    Pipeline:\n      1) swapcase\n      2) vowel substitution (a<->e, i<->o, u<->y), preserving case\n      3) additionally: for each vowel (a,e,i,o,u,y and uppercase), replace it with the\n         letter two spots after it in the alphabet (wrapping), preserving case.\n         (a->c, e->g, i->k, o->q, u->w, y->a)\n      4) serialize as \"<byte_length>:<hex of UTF-8 bytes>\"\n\n    The final length+hex wrapper makes the encoding unambiguous even if the earlier\n    transforms aren't strictly invertible on their own.\n    \"\"\"\n    message = \"Meet me at 5 PM by the old oak tree.\"\n\n    s = message.swapcase()\n\n    # Step 2: involutive vowel swap\n    vowel_swap = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_swap.get(ch, ch) for ch in s)\n\n    # Step 3: shift vowels by +2 in alphabet (wrapping for y->a), preserving case\n    vowel_shift2 = {\n        \"a\": \"c\", \"e\": \"g\", \"i\": \"k\", \"o\": \"q\", \"u\": \"w\", \"y\": \"a\",\n        \"A\": \"C\", \"E\": \"G\", \"I\": \"K\", \"O\": \"Q\", \"U\": \"W\", \"Y\": \"A\",\n    }\n    s = \"\".join(vowel_shift2.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n    return f\"{len(b)}:{b.hex()}\"",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 6
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def encode_uniquely(_ignored: str = \"\") -> str:\n    \"\"\"\n    Unique encoding using only English alphabet letters [A-Za-z].\n\n    Fixed message (provided by me), then:\n      1) swapcase\n      2) vowel swap: a<->e, i<->o, u<->y (case-preserving)\n      3) vowel shift by +2 in alphabet for vowels only (case-preserving):\n         a->c, e->g, i->k, o->q, u->w, y->a\n      4) encode UTF-8 bytes into base-26 letters (A-Z) with a length header (also A-Z)\n\n    Output is A-Z only.\n    \"\"\"\n    message = \"Meet me at 5 PM by the old oak tree.\"\n\n    s = message.swapcase()\n\n    vowel_swap = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_swap.get(ch, ch) for ch in s)\n\n    vowel_shift2 = {\n        \"a\": \"c\", \"e\": \"g\", \"i\": \"k\", \"o\": \"q\", \"u\": \"w\", \"y\": \"a\",\n        \"A\": \"C\", \"E\": \"G\", \"I\": \"K\", \"O\": \"Q\", \"U\": \"W\", \"Y\": \"A\",\n    }\n    s = \"\".join(vowel_shift2.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n\n    # Base-26 (A-Z) encode bytes as a big integer.\n    n = int.from_bytes(b, \"big\", signed=False)\n\n    # Encode the byte length in base-26 too (so decode can recover leading zero bytes).\n    blen = len(b)\n    if blen == 0:\n        len_part = \"A\"  # 0\n    else:\n        digits = []\n        x = blen\n        while x:\n            x, r = divmod(x, 26)\n            digits.append(chr(ord(\"A\") + r))\n        len_part = \"\".join(reversed(digits))\n\n    # Separator must also be a letter; use 'Z' as a delimiter with length-prefixing to avoid ambiguity:\n    # We'll prefix len_part with its own length in one base-26 digit (A=0..Z=25). Supports up to 25 digits.\n    if len(len_part) > 25:\n        raise ValueError(\"Message too long to encode with this header scheme.\")\n    header = chr(ord(\"A\") + len(len_part)) + len_part\n\n    if n == 0:\n        body = \"A\"\n    else:\n        digits = []\n        x = n\n        while x:\n            x, r = divmod(x, 26)\n            digits.append(chr(ord(\"A\") + r))\n        body = \"\".join(reversed(digits))\n\n    return header + body",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 7
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def encode_uniquely(_ignored: str = \"\") -> str:\n    \"\"\"\n    Returns an encoding made ONLY of English letters A-Z/a-z (no digits, no symbols).\n\n    Fixed message (provided by me). Transform:\n      1) swapcase\n      2) vowel swap: a<->e, i<->o, u<->y (case-preserving)\n      3) vowel shift +2 for vowels only: a->c, e->g, i->k, o->q, u->w, y->a (case-preserving)\n      4) UTF-8 bytes -> base-52 letters (A-Z then a-z) with an all-letter header that\n         stores the byte length AND the count of leading zero bytes so decoding is unique.\n\n    Output alphabet: \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\"\n    \"\"\"\n    message = \"Meet me at 5 PM by the old oak tree.\"\n\n    # Steps 1-3 (text transforms)\n    s = message.swapcase()\n\n    vowel_swap = {\n        \"a\": \"e\", \"e\": \"a\",\n        \"i\": \"o\", \"o\": \"i\",\n        \"u\": \"y\", \"y\": \"u\",\n        \"A\": \"E\", \"E\": \"A\",\n        \"I\": \"O\", \"O\": \"I\",\n        \"U\": \"Y\", \"Y\": \"U\",\n    }\n    s = \"\".join(vowel_swap.get(ch, ch) for ch in s)\n\n    vowel_shift2 = {\n        \"a\": \"c\", \"e\": \"g\", \"i\": \"k\", \"o\": \"q\", \"u\": \"w\", \"y\": \"a\",\n        \"A\": \"C\", \"E\": \"G\", \"I\": \"K\", \"O\": \"Q\", \"U\": \"W\", \"Y\": \"A\",\n    }\n    s = \"\".join(vowel_shift2.get(ch, ch) for ch in s)\n\n    b = s.encode(\"utf-8\")\n\n    # All-letter base52 encoding helpers (implemented inline).\n    alphabet = \"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz\"\n    base = 52\n\n    # Count leading zero bytes to make the integer encoding bijective for byte strings.\n    lz = 0\n    for byte in b:\n        if byte == 0:\n            lz += 1\n        else:\n            break\n\n    n = int.from_bytes(b, \"big\", signed=False)\n\n    # Encode nonnegative integer in base52 as letters; 0 -> 'A'\n    def enc_int(x: int) -> str:\n        if x == 0:\n            return alphabet[0]\n        digs = []\n        while x:\n            x, r = divmod(x, base)\n            digs.append(alphabet[r])\n        return \"\".join(reversed(digs))\n\n    # Header is self-delimiting with all letters:\n    #   [L1][len(lz_part)][lz_part][len(len_part)][len_part][body]\n    # Where each length is a single base52 digit (so up to 51 chars per part).\n    lz_part = enc_int(lz)\n    len_part = enc_int(len(b))\n\n    if len(lz_part) > 51 or len(len_part) > 51:\n        raise ValueError(\"Message too long for this all-letter header scheme.\")\n\n    header = (\n        alphabet[len(lz_part)] + lz_part +\n        alphabet[len(len_part)] + len_part\n    )\n\n    body = enc_int(n)\n    return header + body",
+          "is_correct": false,
+          "score": 0
+        }
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 8
+        }
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        }
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def encode_uniquely(message: str) -> str:\n    \"\"\"\n    Encode by:\n      1) swapping case\n      2) shifting vowels forward by 2 letters in the English alphabet (wrap y->a),\n         preserving case. Vowels here: a e i o u y (and uppercase).\n\n    Example:\n      \"This is a message\" -> \"tHKS KS C MGSSCGG\"\n    \"\"\"\n    if not isinstance(message, str):\n        raise TypeError(\"message must be a str\")\n\n    s = message.swapcase()\n\n    vowel_shift2 = {\n        \"a\": \"c\", \"e\": \"g\", \"i\": \"k\", \"o\": \"q\", \"u\": \"w\", \"y\": \"a\",\n        \"A\": \"C\", \"E\": \"G\", \"I\": \"K\", \"O\": \"Q\", \"U\": \"W\", \"Y\": \"A\",\n    }\n    return \"\".join(vowel_shift2.get(ch, ch) for ch in s)",
+          "is_correct": false,
+          "score": 0
+        }
+      }
+    ],
+    "num_resets": 0
+  }
+}
