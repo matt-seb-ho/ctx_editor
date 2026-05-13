@@ -148,12 +148,13 @@ class RoleUsageStats:
         self.input_tokens += response.prompt_tokens
         self.output_tokens += response.completion_tokens
         self.cached_tokens += response.prompt_tokens_cached
-        # reasoning_tokens would come from response if available
-        if response.raw_response and "usage" in response.raw_response:
-            usage = response.raw_response["usage"]
-            details = usage.get("completion_tokens_details")
-            if details:
-                self.reasoning_tokens += details.get("reasoning_tokens", 0) or 0
+        # reasoning_tokens would come from response if available. Some
+        # Foundry-hosted models return usage=None or omit
+        # completion_tokens_details — coerce to empty dict.
+        usage = (response.raw_response or {}).get("usage") or {}
+        details = usage.get("completion_tokens_details") if isinstance(usage, dict) else None
+        if details:
+            self.reasoning_tokens += details.get("reasoning_tokens", 0) or 0
         self.cost_usd += response.total_usd
 
     def to_dict(self) -> dict[str, Any]:

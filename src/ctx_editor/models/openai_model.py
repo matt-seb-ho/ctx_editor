@@ -251,24 +251,32 @@ class OpenAIModelClient(BaseModelClient):
     def _parse_response(self, response: Any, model: str) -> ModelResponse:
         """Parse API response into ModelResponse."""
         response_dict = response.model_dump()
-        usage = response_dict["usage"]
+        # Some Foundry-hosted non-OpenAI models (e.g. DeepSeek-V4-Flash) may
+        # return usage=None or omit prompt_tokens_details. Coerce missing
+        # fields to zero rather than crashing.
+        usage = response_dict.get("usage") or {}
 
         prompt_tokens_cached = 0
-        if "prompt_tokens_details" in usage and usage["prompt_tokens_details"]:
-            prompt_tokens_cached = usage["prompt_tokens_details"].get("cached_tokens", 0)
+        details = usage.get("prompt_tokens_details") if isinstance(usage, dict) else None
+        if details:
+            prompt_tokens_cached = details.get("cached_tokens", 0) or 0
+
+        prompt_tokens = usage.get("prompt_tokens", 0) or 0
+        completion_tokens = usage.get("completion_tokens", 0) or 0
+        total_tokens = usage.get("total_tokens", prompt_tokens + completion_tokens) or 0
 
         total_usd = self._calculate_cost(
             model=model,
-            prompt_tokens=usage["prompt_tokens"],
-            completion_tokens=usage["completion_tokens"],
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
             prompt_tokens_cached=prompt_tokens_cached,
         )
 
         return ModelResponse(
             content=response_dict["choices"][0]["message"]["content"],
-            total_tokens=usage["total_tokens"],
-            prompt_tokens=usage["prompt_tokens"],
-            completion_tokens=usage["completion_tokens"],
+            total_tokens=total_tokens,
+            prompt_tokens=prompt_tokens,
+            completion_tokens=completion_tokens,
             prompt_tokens_cached=prompt_tokens_cached,
             total_usd=total_usd,
             raw_response=response_dict,
