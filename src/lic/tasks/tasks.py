@@ -1,4 +1,4 @@
-from lic.tasks.actions import TaskActions
+from lic.tasks.actions import TaskActions, TaskActionsV2
 from lic.tasks.aime import TaskAIME
 from lic.tasks.code import TaskCode, TaskCodeV2
 # from lic.tasks.data2text import TaskData2Text
@@ -33,6 +33,8 @@ def get_task(task_name, version=None):
         return TaskMathV2(**kwargs)
     elif task_name == "aime":
         return TaskAIME(**kwargs)
+    elif task_name == "actions_v2":
+        return TaskActionsV2(**kwargs)
     elif task_name.startswith("actions"):
         return TaskActions(**kwargs)
     else:
