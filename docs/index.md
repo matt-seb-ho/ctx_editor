@@ -29,6 +29,7 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`scaling_experiments.md`](scaling_experiments.md) — Recipes for sweeps / new variants / new benchmarks after Phase 3.
 - [`tau2_absorption_decision.md`](tau2_absorption_decision.md) — Whether to absorb tau2-bench/ctx_edit into this repo (recommendation: hybrid).
 - [`reports/2026-05-12_local_main_cleanup.md`](reports/2026-05-12_local_main_cleanup.md) — Backup-branch + replay cleanup of local `main` before pulling the infra refactor.
+- [`reports/post_neurips_lic_vanilla.md`](reports/post_neurips_lic_vanilla.md) — Post-NeurIPS vanilla LiC matrix: gpt-5.4 / DeepSeek-V4-Flash / Kimi-K2.6 / gpt-5.5 × {math, code, database, actions} on htn50_52.
 
 ### Per-benchmark
 - [`lost_in_conversation_paper.md`](lost_in_conversation_paper.md) — LiC paper summary.
@@ -149,6 +150,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-16 | `reports/post_neurips_lic_vanilla.md` | Vanilla LiC matrix on htn50_52 across 4 frontier/open models. |
 | 2026-05-12 | `htn50_52_subset.md` | Top-50 hard subset (TN>=1) from gpt-5.2 LiC logs. |
 | 2026-05-12 | `reports/2026-05-12_local_main_cleanup.md` | Cleanup writeup: backup-branch + replay process to land the infra pull. |
 | 2026-05-12 | `archive/v12_attempt/notes.md` | v12 analyzer-prompt attempt archive + port hints for new infra. |
