@@ -63,13 +63,19 @@ class AnalysisCache:
 
     @staticmethod
     def _hash_trace(trace) -> str:
-        """Stable hash of the trace's message stream (role + content only)."""
+        """Stable hash of the trace's message stream (role + content only).
+
+        Handles both Message dataclasses (attribute access) and dict messages
+        (mapping access). Empty role/content are coerced to empty strings.
+        """
         msgs = []
-        # ConversationTrace exposes .messages (list[Message]). Some entries may
-        # be system / compacted / etc. — we serialize role + content only.
         for m in getattr(trace, "messages", []) or []:
-            role = getattr(m, "role", None) or m.get("role", "")
-            content = getattr(m, "content", None) or m.get("content", "")
+            if hasattr(m, "role"):
+                role = getattr(m, "role", "") or ""
+                content = getattr(m, "content", "") or ""
+            else:
+                role = m.get("role", "") if isinstance(m, dict) else ""
+                content = m.get("content", "") if isinstance(m, dict) else ""
             msgs.append({"role": role, "content": content})
         canonical = json.dumps(msgs, sort_keys=False, separators=(",", ":"))
         return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
