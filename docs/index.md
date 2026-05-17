@@ -35,6 +35,8 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`prefix_gathering_process.md`](prefix_gathering_process.md) — Tally → fill-in → curate → replay process for the valid-prefix pool.
 - [`analyzer_prompt_design_notes.md`](analyzer_prompt_design_notes.md) — Consolidated v8 / s1 / archived-v12 / contingent-v13 prompt history and CF trade-offs.
 - [`reports/post_neurips_ac3_phase1.md`](reports/post_neurips_ac3_phase1.md) — AC3 Phase 1 results (DeepSeek-V4-Flash, last-turn replay, n=3 prefixes).
+- [`reports/post_neurips_ac3_phase2.md`](reports/post_neurips_ac3_phase2.md) — AC3 Phase 2 results (gpt-5.4 + Kimi-K2.6; gpt-5.5 dropped).
+- [`reports/post_neurips_ac3_summary.md`](reports/post_neurips_ac3_summary.md) — Cross-phase overnight summary with takeaways.
 
 ### Per-benchmark
 - [`lost_in_conversation_paper.md`](lost_in_conversation_paper.md) — LiC paper summary.
@@ -155,6 +157,8 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-17 | `reports/post_neurips_ac3_summary.md` | Overnight summary: Phase 1 + Phase 2 + Phase 3 (in flight). |
+| 2026-05-17 | `reports/post_neurips_ac3_phase2.md` | AC3 Phase 2: Reset overtakes AO on gpt-5.4 + Kimi (+15.3pp avg). |
 | 2026-05-17 | `reports/post_neurips_ac3_phase1.md` | AC3 Phase 1: 6 strategies vs Baseline/AO on DeepSeek-V4-Flash, last-turn replay. |
 | 2026-05-16 | `post_neurips_ac3_experiment_plan.md` | Plan rev.3 — AC3 scale-up (Phase 1+2+3) + analysis-cache infra. |
 | 2026-05-16 | `analyzer_prompt_design_notes.md` | v8 / s1 / archived-v12 / contingent-v13 prompt history + CF trade-offs. |
