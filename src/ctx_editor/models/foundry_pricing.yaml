@@ -1,0 +1,91 @@
+# Estimated per-million-token pricing for assistant + analyzer models that
+# are not in src/ctx_editor/models/openai_pricing.py (i.e. the Foundry-hosted
+# models and the internal gpt-5.4 / gpt-5.5 deployments).
+#
+# All numbers are in USD per 1M tokens. Fill in from public pricing where
+# the model has an upstream provider; for internal-only deployments, leave
+# blank and we will report token counts without dollar cost.
+#
+# Cached input pricing: the OpenAI API returns
+# usage.prompt_tokens_details.cached_tokens when the response benefits from
+# server-side prompt caching. We already pick that up via openai_model.py and
+# multiply it by the "cached_input" rate, so filling in this column gives more
+# accurate Σ cost on long-prefix runs (e.g. last-turn replay across variants
+# all share the same prefix and should hit the cache).
+#
+# How `_calculate_cost` uses these:
+#   total_usd = (input_tokens - cached_tokens) * input/1e6
+#             + cached_tokens * cached_input/1e6
+#             + output_tokens * output/1e6
+# (with cached_input defaulting to input when null.)
+#
+# Models we currently route to (please fill anything missing):
+
+models:
+  # gpt-5.4 — Azure internal deployment. Public OpenAI price card doesn't
+  # list this version; use gpt-5/gpt-5.1 as a stand-in if you don't have
+  # specific numbers.
+  gpt-5.4:
+    input: null            # e.g. 1.25 (per 1M tokens, public OpenAI)
+    cached_input: null     # e.g. 0.125
+    output: null           # e.g. 10.0
+    notes: |
+      Azure OAI deployment, dl-openai-1 + dl-openai-3. No public price card
+      for gpt-5.4 specifically; closest analogue is gpt-5.
+
+  # gpt-5.5 — Foundry-only as of 2026-05-13.
+  gpt-5.5:
+    input: null
+    cached_input: null
+    output: null
+    notes: |
+      Foundry deployment at mgalley-foundry2. No public price card.
+
+  # DeepSeek-V4-Flash via Foundry. Public DeepSeek API pricing for
+  # equivalent tier as a reasonable upper bound for "what would the open
+  # market charge?".
+  DeepSeek-V4-Flash:
+    input: null            # public DeepSeek chat: ~$0.27/M ?
+    cached_input: null
+    output: null           # public DeepSeek chat: ~$1.10/M ?
+    notes: |
+      Foundry deployment. The public DeepSeek API publishes prices for
+      its v3.x line; v4-flash may not have an official price yet. Use a
+      reasonable estimate or leave null and we'll report tokens only.
+
+  # Kimi-K2.6 via Foundry. Public Moonshot pricing or DeepInfra rates can
+  # serve as an estimate.
+  Kimi-K2.6:
+    input: null
+    cached_input: null
+    output: null
+    notes: |
+      Foundry deployment. Public Moonshot Kimi pricing not directly
+      mapped to K2.6 yet.
+
+  # Phi-4 / Phi-4-reasoning via Foundry. Probably out-of-scope for this
+  # batch (1 RPM quota) but listing here for completeness.
+  Phi-4:
+    input: null
+    cached_input: null
+    output: null
+    notes: |
+      Foundry deployment. Open-weight model; cost is "estimated public
+      compute cost" rather than a list price.
+
+  Phi-4-reasoning:
+    input: null
+    cached_input: null
+    output: null
+
+  gpt-oss-120b:
+    input: null
+    cached_input: null
+    output: null
+    notes: |
+      Foundry deployment, 250 RPM. Open-weight; same caveat as Phi-4.
+
+# Tracking note: any model populated here is loaded into the cost
+# calculator merged with openai_pricing.py. Tokens without a price entry
+# still get logged in usage_stats; you can backfill later by editing
+# this file and re-running the aggregator over the saved tokens.

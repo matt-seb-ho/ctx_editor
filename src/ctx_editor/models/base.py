@@ -12,8 +12,40 @@ from .openai_pricing import OPENAI_PRICING
 
 @cache
 def get_model_pricing() -> dict[str, dict[str, float]]:
-    # TODO: mix other providers' pricing here
-    return OPENAI_PRICING
+    """Merged pricing table.
+
+    Starts from the OpenAI public price card and overlays anything present
+    in src/ctx_editor/models/foundry_pricing.yaml (Foundry-hosted models and
+    internal Azure deployments). Any model with null/missing fields is
+    skipped — those models still log token counts but get cost=$0.
+    """
+    pricing = dict(OPENAI_PRICING)
+
+    foundry_path = __import__("pathlib").Path(__file__).parent / "foundry_pricing.yaml"
+    if foundry_path.exists():
+        try:
+            import yaml
+            data = yaml.safe_load(foundry_path.read_text()) or {}
+        except Exception:
+            data = {}
+        for name, entry in (data.get("models") or {}).items():
+            if not isinstance(entry, dict):
+                continue
+            # Only register if at least input + output prices are set.
+            inp = entry.get("input")
+            out = entry.get("output")
+            if inp is None or out is None:
+                continue
+            pricing[name] = {
+                "input": float(inp),
+                "cached_input": (
+                    float(entry["cached_input"])
+                    if entry.get("cached_input") is not None
+                    else None
+                ),
+                "output": float(out),
+            }
+    return pricing
 
 
 def format_messages(messages: list[dict], variables: dict[str, str]) -> list[dict]:
