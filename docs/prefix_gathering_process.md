@@ -130,10 +130,28 @@ The aggregator then averages the three.
 
 We do not need to modify the replay infrastructure for this batch.
 
+**Verified end-to-end** by a 3-sample smoke test on
+`data/valid_prefixes_htn50_52/gpt5_4/math_v2/conv0/`:
+1/3 correct at last-turn replay (math is the hardest task to recover on a
+single-turn budget), 7.3 average turns preserved from prefix, 0 errors,
+$0.01 total cost. The prefix loader, the per-trace truncation
+(`build_replay_trace(replay_turns=1)`), and the baseline-strategy
+last-turn regeneration all worked as expected.
+
 If we later want to fold the 3-prefix dispatch into a single invocation
 (e.g., to amortize Python startup), the change is small: modify
 `load_baseline_traces` to optionally return a list per sample_id and tweak
 the runner to dispatch one task per (sample, prefix). Out of scope for now.
+
+**Pre-existing infra footgun** (caught during the smoke):
+`run_experiment.py` computes `outputs_root = output_dir.parent.parent` to
+locate `runs.yaml`. If `logging.output_dir` is < 2 levels deep under the
+repo root (e.g. a `/tmp/...` path), the ledger write tries to land at
+`/runs.yaml` and crashes the run with `PermissionError`. The experiment
+itself completes — metrics.json + traces are saved — but the ledger update
+fails. **Always pass an `logging.output_dir` that is ≥ 2 levels deep under
+the repo root** (the existing
+`outputs/post_neurips_lic_vanilla*/{exp_name}_{ts}` convention is fine).
 
 ### 5. Document and commit
 

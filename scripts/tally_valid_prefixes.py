@@ -39,6 +39,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 MAIN_OUT_DIRS = [
     PROJECT_ROOT / "outputs" / "2026-05-16",                # main matrix
     PROJECT_ROOT / "outputs" / "post_neurips_lic_vanilla_redo",
+    PROJECT_ROOT / "outputs" / "post_neurips_lic_vanilla_fillin",
 ]
 
 MODEL_LABELS = {
@@ -77,17 +78,24 @@ def discover_cells():
             # Pull (model_key, task_key, run_label) from experiment_name like
             # baseline_sharded_<model>_<task>_run<i>  or  ..._redo<i>
             m = re.match(
-                r"^baseline_sharded_(?P<model>.+?)_(?P<task>math|code|database|actions)_v2_(?P<kind>run|redo)(?P<idx>\d+)$",
+                r"^baseline_sharded_(?P<model>.+?)_(?P<task>math|code|database|actions)_v2_(?P<kind>run|redo|fillin)(?P<idx>\d+)(?:_(?P<ts>\d+))?$",
                 exp,
             )
             if not m:
                 continue
+            # Include the timestamp suffix in the label so multiple invocations
+            # with the same kind+idx (e.g. two "fillin1" passes at different times)
+            # don't collide in the (model, task, label) dedup map.
+            ts = m.group("ts")
+            label_parts = [m.group("kind") + m.group("idx")]
+            if ts:
+                label_parts.append(ts)
             yield {
                 "out_dir": d,
                 "rs": rs,
                 "model_key": m.group("model"),
                 "task_key": m.group("task") + "_v2",
-                "label": m.group("kind") + m.group("idx"),
+                "label": "_".join(label_parts),
             }
 
 

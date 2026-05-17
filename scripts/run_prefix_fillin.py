@@ -80,9 +80,13 @@ def build_subset(task_cfg: str, sample_ids: list[str], suffix: str) -> Path:
 def launch_one(model_key: str, task_cfg: str, data_file: Path, pass_idx: int,
                user_model_override: str | None) -> dict:
     model_cfg, lb, mc = MODELS[model_key]
-    label = f"fillin_p{pass_idx}__{model_key}__{task_cfg}"
-    logfile = LOG_DIR / f"{label}.log"
     start_ts = int(time.time())
+    # Use start_ts in BOTH label and experiment_name so multiple fill-in
+    # invocations don't collide on the (model, task, label) key in the tally
+    # dedup step (which can only keep one cell per label).
+    suffix = f"p{pass_idx}t{start_ts}"
+    label = f"fillin_{suffix}__{model_key}__{task_cfg}"
+    logfile = LOG_DIR / f"{label}.log"
     exp_name = f"baseline_sharded_{model_key}_{task_cfg}_fillin{pass_idx}_{start_ts}"
     out_override = f"outputs/{RUN_TAG}/{exp_name}"
 

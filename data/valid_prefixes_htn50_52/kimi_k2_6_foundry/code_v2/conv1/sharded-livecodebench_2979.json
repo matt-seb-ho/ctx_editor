@@ -1,0 +1,227 @@
+{
+  "sample_id": "sharded-livecodebench/2979",
+  "task_name": "code",
+  "experiment_type": "baseline",
+  "is_correct": true,
+  "score": 1,
+  "models": {
+    "assistant": "Kimi-K2.6",
+    "user": "unknown",
+    "system": "unknown"
+  },
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are an expert Python programmer. You will be given a question (problem specification) and will generate a correct Python program that matches the specification and passes all tests.\n\nFormat:\n- [Standalone] Make sure that your answer consists of only one Python function at the top level. Do not wrap with a class or split into multiple functions. The only other top-level statements allowed are import statements.\n- [Arguments] The function must accept inputs as function arguments, not by reading from stdin.\n- [Code fence] Always wrap your final code in a markdown Python code fence: ```python\\n<your code here>\\n```\n",
+        "timestamp": "2026-05-16 07:41:02",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "how much gold can I make from house offers?",
+        "timestamp": "2026-05-16 07:41:02",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "I don\u2019t have any previous context about \u201chouse offers\u201d or which game or system you\u2019re referring to. Could you clarify what you\u2019re asking about? For example:\n\n- Is this a question about a specific video game (e.g., Stardew Valley, World of Warcraft, Old School RuneScape, etc.)?\n- Or is it a programming/coding problem (similar to \u201cHouse Robber\u201d)? If so, please share the full specification, including the input format, rules, and any examples.\n\nOnce you provide those details, I\u2019ll be happy to help you figure out the gold amount or write a solution!",
+        "timestamp": "2026-05-16 07:41:19",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "user",
+        "content": "I need to figure out the best way to sell the houses to make the most gold.",
+        "timestamp": "2026-05-16 07:41:22",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00016695
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "It sounds like you\u2019re describing the classic dynamic programming problem where you have a row of houses, each with a gold offer, and you can\u2019t accept offers on two adjacent houses. Here is a Python function that computes the maximum gold you can make:\n\n```python\ndef max_gold_from_houses(offers):\n    \"\"\"\n    Calculate the maximum gold earned from house offers.\n    You cannot accept offers on two adjacent houses.\n    \n    Args:\n        offers: List of integers where offers[i] is the gold for house i.\n    \n    Returns:\n        int: Maximum gold obtainable.\n    \"\"\"\n    prev2 = 0\n    prev1 = 0\n    for offer in offers:\n        current = max(prev1, prev2 + offer)\n        prev2 = prev1\n        prev1 = current\n    return prev1\n```",
+        "timestamp": "2026-05-16 07:41:35",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "user",
+        "content": "the offers are given as an array with each offer being a triplet that shows the range of houses each buyer wants and the amount of gold they would pay.",
+        "timestamp": "2026-05-16 07:41:38",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00020444999999999998
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "That changes the problem to **Weighted Interval Scheduling** (also known as maximum profit from non\u2011overlapping intervals). Each buyer makes an offer on a contiguous block of houses `[start, end]` with a given amount of gold, and you cannot accept two offers whose ranges overlap.\n\nHere is a dynamic\u2011programming solution that runs in **O(n log n)** time (where *n* is the number of offers) by sorting the offers by their ending house and using binary search to find the last compatible offer.\n\n```python\nimport bisect\nfrom typing import List\n\ndef max_gold_from_offers(offers: List[List[int]]) -> int:\n    \"\"\"\n    Calculate the maximum gold from house offers.\n    \n    Args:\n        offers: A list of triplets [start, end, gold], where each triplet\n                represents a buyer wanting houses in the inclusive range\n                [start, end] for the given amount of gold.\n    \n    Returns:\n        int: The maximum total gold obtainable from mutually non-overlapping offers.\n    \"\"\"\n    if not offers:\n        return 0\n\n    # Sort by the end of the range\n    offers.sort(key=lambda x: x[1])\n    n = len(offers)\n    \n    # Extract sorted end points for binary search\n    ends = [offer[1] for offer in offers]\n    \n    # dp[i] = max gold using the first (i+1) offers in the sorted list\n    dp = [0] * n\n    dp[0] = offers[0][2]\n    \n    for i in range(1, n):\n        start, end, gold = offers[i]\n        \n        # Find the rightmost offer that ends strictly before `start`\n        # (inclusive ranges mean end < start to avoid overlap)\n        j = bisect.bisect_left(ends, start) - 1\n        \n        if j >= 0:\n            take = gold + dp[j]\n        else:\n            take = gold\n        \n        # Either take this offer or skip it\n        dp[i] = max(dp[i - 1], take)\n    \n    return dp[-1]\n```\n\n### How it works\n1. **Sort** all offers by their `end` house.\n2. Maintain `dp[i]`, the best gold achievable considering offers `0` through `i`.\n3. For each offer `i`, binary\u2011search the sorted `ends` array to find the latest offer `j` that finishes **before** offer `i` starts.\n4. The recurrence is:  \n   `dp[i] = max(dp[i-1], gold_i + dp[j])` (skip, or take plus best up to `j`).\n5. Return `dp[-1]`.\n\nIf your ranges are half\u2011open (i.e., ending at `3` and starting at `3` is allowed), change `bisect.bisect_left` to `bisect.bisect_right`.",
+        "timestamp": "2026-05-16 07:42:00",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "user",
+        "content": "buyers can't share houses, so I can't overlap the sales to the same house.",
+        "timestamp": "2026-05-16 07:42:02",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00029174999999999996
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "That is exactly what the solution below enforces: **no two accepted offers can share any house**. Since the ranges are inclusive (e.g., `[start, end]`), two offers that merely touch at an endpoint\u2014like `[1, 3]` and `[3, 5]`\u2014both want house `3`, so they overlap and cannot both be taken. The algorithm only pairs an earlier offer with the current one if the earlier offer ends **strictly before** the current offer starts.\n\n```python\nimport bisect\nfrom typing import List\n\ndef max_gold_from_offers(offers: List[List[int]]) -> int:\n    \"\"\"\n    Returns the maximum gold obtainable from a list of house offers.\n    \n    Args:\n        offers: List of [start, end, gold] triplets, where [start, end]\n                is the inclusive range of houses the buyer wants.\n    \n    Returns:\n        int: Maximum total gold from mutually non-overlapping offers.\n    \"\"\"\n    if not offers:\n        return 0\n\n    # Sort offers by the end of their range\n    offers.sort(key=lambda x: x[1])\n    n = len(offers)\n    \n    # Sorted end points for binary search\n    ends = [offer[1] for offer in offers]\n    \n    # dp[i] = best gold using the first (i+1) sorted offers\n    dp = [0] * n\n    dp[0] = offers[0][2]\n    \n    for i in range(1, n):\n        start, end, gold = offers[i]\n        \n        # Find the rightmost offer that ends strictly before `start`\n        # (ensuring no house is shared between two accepted offers)\n        j = bisect.bisect_left(ends, start) - 1\n        \n        take = gold + (dp[j] if j >= 0 else 0)\n        dp[i] = max(dp[i - 1], take)   # max of skipping vs taking this offer\n    \n    return dp[-1]\n```\n\nIf your input uses half\u2011open ranges `[start, end)` (where touching at the endpoint is allowed), replace `bisect.bisect_left` with `bisect.bisect_right`.",
+        "timestamp": "2026-05-16 07:42:12",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "user",
+        "content": "we have n houses lined up, numbered from 0 to n-1",
+        "timestamp": "2026-05-16 07:42:15",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00036435
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "Since the houses are numbered sequentially from `0` to `n\u20111`, we can use a linear dynamic programming approach:\n\n* `dp[i]` = maximum gold obtainable from houses `0` through `i\u20111`.\n* For each house `end`, look at every offer that ends there. An offer `[start, end, gold]` can be combined with the best profit up to `start\u20111`, which is exactly `dp[start]`.\n\nThis runs in **O(n + m)** time where `m = len(offers)` and uses **O(n + m)** space.\n\n```python\nfrom typing import List\n\ndef max_gold(n: int, offers: List[List[int]]) -> int:\n    \"\"\"\n    Returns the maximum gold obtainable from non-overlapping house offers.\n    \n    Args:\n        n: Number of houses, numbered 0 to n-1.\n        offers: List of [start, end, gold] triplets with inclusive ranges.\n    \n    Returns:\n        int: Maximum total gold.\n    \"\"\"\n    # Group offers by their ending house\n    offers_by_end = [[] for _ in range(n)]\n    for start, end, gold in offers:\n        offers_by_end[end].append((start, gold))\n    \n    dp = [0] * (n + 1)  # dp[i] = best profit for houses 0..i-1\n    \n    for end in range(n):\n        # Carry forward the best profit without selling house `end`\n        dp[end + 1] = dp[end]\n        \n        # Try each offer that ends at this house\n        for start, gold in offers_by_end[end]:\n            dp[end + 1] = max(dp[end + 1], dp[start] + gold)\n    \n    return dp[n]\n```",
+        "timestamp": "2026-05-16 07:42:30",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        },
+        "timestamp": "2026-05-16 07:41:02"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "interrogation",
+          "is_answer_attempt": false
+        },
+        "timestamp": "2026-05-16 07:41:20"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        },
+        "timestamp": "2026-05-16 07:41:22"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-05-16 07:41:37"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "def max_gold_from_houses(offers):\n    \"\"\"\n    Calculate the maximum gold earned from house offers.\n    You cannot accept offers on two adjacent houses.\n    \n    Args:\n        offers: List of integers where offers[i] is the gold for house i.\n    \n    Returns:\n        int: Maximum gold obtainable.\n    \"\"\"\n    prev2 = 0\n    prev1 = 0\n    for offer in offers:\n        current = max(prev1, prev2 + offer)\n        prev2 = prev1\n        prev1 = current\n    return prev1",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-05-16 07:41:37"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        },
+        "timestamp": "2026-05-16 07:41:38"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-05-16 07:42:01"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import bisect\nfrom typing import List\n\ndef max_gold_from_offers(offers: List[List[int]]) -> int:\n    \"\"\"\n    Calculate the maximum gold from house offers.\n    \n    Args:\n        offers: A list of triplets [start, end, gold], where each triplet\n                represents a buyer wanting houses in the inclusive range\n                [start, end] for the given amount of gold.\n    \n    Returns:\n        int: The maximum total gold obtainable from mutually non-overlapping offers.\n    \"\"\"\n    if not offers:\n        return 0\n\n    # Sort by the end of the range\n    offers.sort(key=lambda x: x[1])\n    n = len(offers)\n    \n    # Extract sorted end points for binary search\n    ends = [offer[1] for offer in offers]\n    \n    # dp[i] = max gold using the first (i+1) offers in the sorted list\n    dp = [0] * n\n    dp[0] = offers[0][2]\n    \n    for i in range(1, n):\n        start, end, gold = offers[i]\n        \n        # Find the rightmost offer that ends strictly before `start`\n        # (inclusive ranges mean end < start to avoid overlap)\n        j = bisect.bisect_left(ends, start) - 1\n        \n        if j >= 0:\n            take = gold + dp[j]\n        else:\n            take = gold\n        \n        # Either take this offer or skip it\n        dp[i] = max(dp[i - 1], take)\n    \n    return dp[-1]",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-05-16 07:42:01"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        },
+        "timestamp": "2026-05-16 07:42:02"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-05-16 07:42:13"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "import bisect\nfrom typing import List\n\ndef max_gold_from_offers(offers: List[List[int]]) -> int:\n    \"\"\"\n    Returns the maximum gold obtainable from a list of house offers.\n    \n    Args:\n        offers: List of [start, end, gold] triplets, where [start, end]\n                is the inclusive range of houses the buyer wants.\n    \n    Returns:\n        int: Maximum total gold from mutually non-overlapping offers.\n    \"\"\"\n    if not offers:\n        return 0\n\n    # Sort offers by the end of their range\n    offers.sort(key=lambda x: x[1])\n    n = len(offers)\n    \n    # Sorted end points for binary search\n    ends = [offer[1] for offer in offers]\n    \n    # dp[i] = best gold using the first (i+1) sorted offers\n    dp = [0] * n\n    dp[0] = offers[0][2]\n    \n    for i in range(1, n):\n        start, end, gold = offers[i]\n        \n        # Find the rightmost offer that ends strictly before `start`\n        # (ensuring no house is shared between two accepted offers)\n        j = bisect.bisect_left(ends, start) - 1\n        \n        take = gold + (dp[j] if j >= 0 else 0)\n        dp[i] = max(dp[i - 1], take)   # max of skipping vs taking this offer\n    \n    return dp[-1]",
+          "is_correct": false,
+          "score": 0
+        },
+        "timestamp": "2026-05-16 07:42:14"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        },
+        "timestamp": "2026-05-16 07:42:15"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-05-16 07:42:31"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "from typing import List\n\ndef max_gold(n: int, offers: List[List[int]]) -> int:\n    \"\"\"\n    Returns the maximum gold obtainable from non-overlapping house offers.\n    \n    Args:\n        n: Number of houses, numbered 0 to n-1.\n        offers: List of [start, end, gold] triplets with inclusive ranges.\n    \n    Returns:\n        int: Maximum total gold.\n    \"\"\"\n    # Group offers by their ending house\n    offers_by_end = [[] for _ in range(n)]\n    for start, end, gold in offers:\n        offers_by_end[end].append((start, gold))\n    \n    dp = [0] * (n + 1)  # dp[i] = best profit for houses 0..i-1\n    \n    for end in range(n):\n        # Carry forward the best profit without selling house `end`\n        dp[end + 1] = dp[end]\n        \n        # Try each offer that ends at this house\n        for start, gold in offers_by_end[end]:\n            dp[end + 1] = max(dp[end + 1], dp[start] + gold)\n    \n    return dp[n]",
+          "is_correct": true,
+          "score": 1
+        },
+        "timestamp": "2026-05-16 07:42:31"
+      }
+    ],
+    "num_resets": 0
+  },
+  "timestamp": "2026-05-16 07:42:31"
+}

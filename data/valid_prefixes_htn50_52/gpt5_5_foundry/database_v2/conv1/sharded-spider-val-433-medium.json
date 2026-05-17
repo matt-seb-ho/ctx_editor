@@ -1,0 +1,218 @@
+{
+  "sample_id": "sharded-spider-val-433-medium",
+  "task_name": "database",
+  "experiment_type": "baseline",
+  "is_correct": false,
+  "score": 0.0,
+  "models": {
+    "assistant": "gpt-5.5",
+    "user": "unknown",
+    "system": "unknown"
+  },
+  "trace": {
+    "messages": [
+      {
+        "role": "system",
+        "content": "You are helping a user write SQL queries to a database. If something is not clear, you can ask the user to clarify what they need. The schema for the database being accessed is the following:\n\nCREATE TABLE players (\n    player_id INT   PRIMARY KEY,\n    first_name TEXT,\n    last_name TEXT,\n    hand TEXT,\n    birth_date DATE,\n    country_code TEXT,\n    UNIQUE (player_id)\n);\n\nCREATE TABLE matches (\n    best_of INT,\n    draw_size INT,\n    loser_age FLOAT,\n    loser_entry TEXT,\n    loser_hand TEXT,\n    loser_ht INT,\n    loser_id INT,\n    loser_ioc TEXT,\n    loser_name TEXT,\n    loser_rank INT,\n    loser_rank_points INT,\n    loser_seed INT,\n    match_num INT,\n    minutes INT,\n    round TEXT,\n    score TEXT,\n    surface TEXT,\n    tourney_date DATE,\n    tourney_id TEXT,\n    tourney_level TEXT,\n    tourney_name TEXT,\n    winner_age FLOAT,\n    winner_entry TEXT,\n    winner_hand TEXT,\n    winner_ht INT,\n    winner_id INT,\n    winner_ioc TEXT,\n    winner_name TEXT,\n    winner_rank INT,\n    winner_rank_points INT,\n    winner_seed INT,\n    year INT,\n    FOREIGN KEY (winner_id) REFERENCES players(player_id),\n    FOREIGN KEY (loser_id) REFERENCES players(player_id)\n);\n\nCREATE TABLE rankings (\n    ranking_date DATE,\n    ranking INT,\n    player_id INT,\n    ranking_points INT,\n    tours INT,\n    FOREIGN KEY (player_id) REFERENCES players(player_id)\n);\n\nWhen you have a final SQL query to present, always wrap it in a sql markdown code fence like this:\n\n```sql\nSELECT ...\n```\n\nThis makes it easy to identify your answer. Only use one ```sql fence for your final query.",
+        "timestamp": "2026-05-16 07:10:00",
+        "visible": true
+      },
+      {
+        "role": "user",
+        "content": "datasheet on specific players",
+        "timestamp": "2026-05-16 07:10:00",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "Which specific players do you want the datasheet for?\n\nPlease provide one of the following:\n\n- Player names, e.g. `Roger Federer`, `Rafael Nadal`\n- Player IDs, if you know them\n- Whether you want:\n  - basic player info only\n  - ranking history\n  - match results\n  - win/loss summary\n  - surface-level performance\n  - head-to-head comparisons\n  - all of the above\n\nFor example, you could say:\n\n\u201cCreate a datasheet for Roger Federer and Rafael Nadal with player info, ranking history, and match win/loss summaries.\u201d",
+        "timestamp": "2026-05-16 07:10:04",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0031825
+        }
+      },
+      {
+        "role": "user",
+        "content": "let's focus on players from a specific country",
+        "timestamp": "2026-05-16 07:10:05",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0001365
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "Sure \u2014 which country should we focus on?\n\nYou can provide either:\n\n- country code, e.g. `ESP`, `USA`, `FRA`, `SUI`\n- country name, e.g. Spain, United States, France, Switzerland\n\nAlso, what kind of datasheet would you like for those players?\n\nOptions include:\n\n1. Basic player info  \n2. Current/latest ranking  \n3. Best ranking in available data  \n4. Match win/loss record  \n5. Surface-level win/loss record  \n6. Tournament results  \n7. All of the above\n\nFor example:\n\n\u201cShow datasheets for players from Spain with latest ranking and win/loss records.\u201d",
+        "timestamp": "2026-05-16 07:10:07",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00209625
+        }
+      },
+      {
+        "role": "user",
+        "content": "let's say the country identified by the code USA",
+        "timestamp": "2026-05-16 07:10:09",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0001599
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "Here\u2019s a datasheet query for all players with `country_code = 'USA'`, including basic info, latest ranking, best ranking, and overall win/loss record:\n\n```sql\nWITH usa_players AS (\n    SELECT\n        player_id,\n        first_name,\n        last_name,\n        hand,\n        birth_date,\n        country_code\n    FROM players\n    WHERE country_code = 'USA'\n),\n\nlatest_rankings AS (\n    SELECT\n        player_id,\n        ranking_date AS latest_ranking_date,\n        ranking AS latest_ranking,\n        ranking_points AS latest_ranking_points\n    FROM (\n        SELECT\n            r.*,\n            ROW_NUMBER() OVER (\n                PARTITION BY r.player_id\n                ORDER BY r.ranking_date DESC\n            ) AS rn\n        FROM rankings r\n        JOIN usa_players p\n            ON r.player_id = p.player_id\n    ) ranked\n    WHERE rn = 1\n),\n\nbest_rankings AS (\n    SELECT\n        player_id,\n        MIN(ranking) AS best_ranking\n    FROM rankings\n    GROUP BY player_id\n),\n\nmatch_records AS (\n    SELECT\n        player_id,\n        SUM(wins) AS wins,\n        SUM(losses) AS losses\n    FROM (\n        SELECT\n            winner_id AS player_id,\n            COUNT(*) AS wins,\n            0 AS losses\n        FROM matches\n        GROUP BY winner_id\n\n        UNION ALL\n\n        SELECT\n            loser_id AS player_id,\n            0 AS wins,\n            COUNT(*) AS losses\n        FROM matches\n        GROUP BY loser_id\n    ) records\n    GROUP BY player_id\n)\n\nSELECT\n    p.player_id,\n    p.first_name,\n    p.last_name,\n    p.first_name || ' ' || p.last_name AS player_name,\n    p.hand,\n    p.birth_date,\n    p.country_code,\n    lr.latest_ranking_date,\n    lr.latest_ranking,\n    lr.latest_ranking_points,\n    br.best_ranking,\n    COALESCE(mr.wins, 0) AS wins,\n    COALESCE(mr.losses, 0) AS losses,\n    COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) AS total_matches,\n    CASE\n        WHEN COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) > 0\n        THEN ROUND(\n            100.0 * COALESCE(mr.wins, 0) /\n            (COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0)),\n            1\n        )\n        ELSE NULL\n    END AS win_percentage\nFROM usa_players p\nLEFT JOIN latest_rankings lr\n    ON p.player_id = lr.player_id\nLEFT JOIN best_rankings br\n    ON p.player_id = br.player_id\nLEFT JOIN match_records mr\n    ON p.player_id = mr.player_id\nORDER BY\n    lr.latest_ranking ASC NULLS LAST,\n    p.last_name,\n    p.first_name;\n```",
+        "timestamp": "2026-05-16 07:10:26",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.0124575
+        }
+      },
+      {
+        "role": "user",
+        "content": "also want to include each player's birth date in the results.",
+        "timestamp": "2026-05-16 07:10:28",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00025829999999999994
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "The query already includes each player\u2019s birth date as `p.birth_date`. Here is the full query with birth date included in the results:\n\n```sql\nWITH usa_players AS (\n    SELECT\n        player_id,\n        first_name,\n        last_name,\n        hand,\n        birth_date,\n        country_code\n    FROM players\n    WHERE country_code = 'USA'\n),\n\nlatest_rankings AS (\n    SELECT\n        player_id,\n        ranking_date AS latest_ranking_date,\n        ranking AS latest_ranking,\n        ranking_points AS latest_ranking_points\n    FROM (\n        SELECT\n            r.*,\n            ROW_NUMBER() OVER (\n                PARTITION BY r.player_id\n                ORDER BY r.ranking_date DESC\n            ) AS rn\n        FROM rankings r\n        JOIN usa_players p\n            ON r.player_id = p.player_id\n    ) ranked\n    WHERE rn = 1\n),\n\nbest_rankings AS (\n    SELECT\n        r.player_id,\n        MIN(r.ranking) AS best_ranking\n    FROM rankings r\n    JOIN usa_players p\n        ON r.player_id = p.player_id\n    GROUP BY r.player_id\n),\n\nmatch_records AS (\n    SELECT\n        player_id,\n        SUM(wins) AS wins,\n        SUM(losses) AS losses\n    FROM (\n        SELECT\n            winner_id AS player_id,\n            COUNT(*) AS wins,\n            0 AS losses\n        FROM matches\n        GROUP BY winner_id\n\n        UNION ALL\n\n        SELECT\n            loser_id AS player_id,\n            0 AS wins,\n            COUNT(*) AS losses\n        FROM matches\n        GROUP BY loser_id\n    ) records\n    GROUP BY player_id\n)\n\nSELECT\n    p.player_id,\n    p.first_name,\n    p.last_name,\n    p.first_name || ' ' || p.last_name AS player_name,\n    p.hand,\n    p.birth_date,\n    p.country_code,\n    lr.latest_ranking_date,\n    lr.latest_ranking,\n    lr.latest_ranking_points,\n    br.best_ranking,\n    COALESCE(mr.wins, 0) AS wins,\n    COALESCE(mr.losses, 0) AS losses,\n    COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) AS total_matches,\n    CASE\n        WHEN COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) > 0\n        THEN ROUND(\n            100.0 * COALESCE(mr.wins, 0) /\n            (COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0)),\n            1\n        )\n        ELSE NULL\n    END AS win_percentage\nFROM usa_players p\nLEFT JOIN latest_rankings lr\n    ON p.player_id = lr.player_id\nLEFT JOIN best_rankings br\n    ON p.player_id = br.player_id\nLEFT JOIN match_records mr\n    ON p.player_id = mr.player_id\nORDER BY\n    lr.latest_ranking ASC NULLS LAST,\n    p.last_name,\n    p.first_name;\n```",
+        "timestamp": "2026-05-16 07:10:36",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.008955
+        }
+      },
+      {
+        "role": "user",
+        "content": "I also want to include the birth date of each player in the results too.",
+        "timestamp": "2026-05-16 07:10:38",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00036074999999999996
+        }
+      },
+      {
+        "role": "assistant",
+        "content": "Yes \u2014 the query includes each player\u2019s birth date as `birth_date` in the final results.\n\n```sql\nWITH usa_players AS (\n    SELECT\n        player_id,\n        first_name,\n        last_name,\n        hand,\n        birth_date,\n        country_code\n    FROM players\n    WHERE country_code = 'USA'\n),\n\nlatest_rankings AS (\n    SELECT\n        player_id,\n        ranking_date AS latest_ranking_date,\n        ranking AS latest_ranking,\n        ranking_points AS latest_ranking_points\n    FROM (\n        SELECT\n            r.*,\n            ROW_NUMBER() OVER (\n                PARTITION BY r.player_id\n                ORDER BY r.ranking_date DESC\n            ) AS rn\n        FROM rankings r\n        JOIN usa_players p\n            ON r.player_id = p.player_id\n    ) ranked\n    WHERE rn = 1\n),\n\nbest_rankings AS (\n    SELECT\n        r.player_id,\n        MIN(r.ranking) AS best_ranking\n    FROM rankings r\n    JOIN usa_players p\n        ON r.player_id = p.player_id\n    GROUP BY r.player_id\n),\n\nmatch_records AS (\n    SELECT\n        player_id,\n        SUM(wins) AS wins,\n        SUM(losses) AS losses\n    FROM (\n        SELECT\n            winner_id AS player_id,\n            COUNT(*) AS wins,\n            0 AS losses\n        FROM matches\n        GROUP BY winner_id\n\n        UNION ALL\n\n        SELECT\n            loser_id AS player_id,\n            0 AS wins,\n            COUNT(*) AS losses\n        FROM matches\n        GROUP BY loser_id\n    ) records\n    GROUP BY player_id\n)\n\nSELECT\n    p.player_id,\n    p.first_name,\n    p.last_name,\n    p.first_name || ' ' || p.last_name AS player_name,\n    p.hand,\n    p.birth_date AS birth_date,\n    p.country_code,\n    lr.latest_ranking_date,\n    lr.latest_ranking,\n    lr.latest_ranking_points,\n    br.best_ranking,\n    COALESCE(mr.wins, 0) AS wins,\n    COALESCE(mr.losses, 0) AS losses,\n    COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) AS total_matches,\n    CASE\n        WHEN COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) > 0\n        THEN ROUND(\n            100.0 * COALESCE(mr.wins, 0) /\n            (COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0)),\n            1\n        )\n        ELSE NULL\n    END AS win_percentage\nFROM usa_players p\nLEFT JOIN latest_rankings lr\n    ON p.player_id = lr.player_id\nLEFT JOIN best_rankings br\n    ON p.player_id = br.player_id\nLEFT JOIN match_records mr\n    ON p.player_id = mr.player_id\nORDER BY\n    lr.latest_ranking ASC NULLS LAST,\n    p.last_name,\n    p.first_name;\n```",
+        "timestamp": "2026-05-16 07:10:43",
+        "visible": true,
+        "metadata": {
+          "cost_usd": 0.00944375
+        }
+      }
+    ],
+    "logs": [
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 1
+        },
+        "timestamp": "2026-05-16 07:10:00"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "interrogation",
+          "is_answer_attempt": false
+        },
+        "timestamp": "2026-05-16 07:10:04"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 2
+        },
+        "timestamp": "2026-05-16 07:10:05"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "interrogation",
+          "is_answer_attempt": false
+        },
+        "timestamp": "2026-05-16 07:10:08"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 3
+        },
+        "timestamp": "2026-05-16 07:10:09"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-05-16 07:10:27"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "WITH usa_players AS (\n    SELECT\n        player_id,\n        first_name,\n        last_name,\n        hand,\n        birth_date,\n        country_code\n    FROM players\n    WHERE country_code = 'USA'\n),\n\nlatest_rankings AS (\n    SELECT\n        player_id,\n        ranking_date AS latest_ranking_date,\n        ranking AS latest_ranking,\n        ranking_points AS latest_ranking_points\n    FROM (\n        SELECT\n            r.*,\n            ROW_NUMBER() OVER (\n                PARTITION BY r.player_id\n                ORDER BY r.ranking_date DESC\n            ) AS rn\n        FROM rankings r\n        JOIN usa_players p\n            ON r.player_id = p.player_id\n    ) ranked\n    WHERE rn = 1\n),\n\nbest_rankings AS (\n    SELECT\n        player_id,\n        MIN(ranking) AS best_ranking\n    FROM rankings\n    GROUP BY player_id\n),\n\nmatch_records AS (\n    SELECT\n        player_id,\n        SUM(wins) AS wins,\n        SUM(losses) AS losses\n    FROM (\n        SELECT\n            winner_id AS player_id,\n            COUNT(*) AS wins,\n            0 AS losses\n        FROM matches\n        GROUP BY winner_id\n\n        UNION ALL\n\n        SELECT\n            loser_id AS player_id,\n            0 AS wins,\n            COUNT(*) AS losses\n        FROM matches\n        GROUP BY loser_id\n    ) records\n    GROUP BY player_id\n)\n\nSELECT\n    p.player_id,\n    p.first_name,\n    p.last_name,\n    p.first_name || ' ' || p.last_name AS player_name,\n    p.hand,\n    p.birth_date,\n    p.country_code,\n    lr.latest_ranking_date,\n    lr.latest_ranking,\n    lr.latest_ranking_points,\n    br.best_ranking,\n    COALESCE(mr.wins, 0) AS wins,\n    COALESCE(mr.losses, 0) AS losses,\n    COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) AS total_matches,\n    CASE\n        WHEN COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) > 0\n        THEN ROUND(\n            100.0 * COALESCE(mr.wins, 0) /\n            (COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0)),\n            1\n        )\n        ELSE NULL\n    END AS win_percentage\nFROM usa_players p\nLEFT JOIN latest_rankings lr\n    ON p.player_id = lr.player_id\nLEFT JOIN best_rankings br\n    ON p.player_id = br.player_id\nLEFT JOIN match_records mr\n    ON p.player_id = mr.player_id\nORDER BY\n    lr.latest_ranking ASC NULLS LAST,\n    p.last_name,\n    p.first_name;",
+          "is_correct": false,
+          "score": 0.0
+        },
+        "timestamp": "2026-05-16 07:10:27"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 4
+        },
+        "timestamp": "2026-05-16 07:10:28"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-05-16 07:10:37"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "WITH usa_players AS (\n    SELECT\n        player_id,\n        first_name,\n        last_name,\n        hand,\n        birth_date,\n        country_code\n    FROM players\n    WHERE country_code = 'USA'\n),\n\nlatest_rankings AS (\n    SELECT\n        player_id,\n        ranking_date AS latest_ranking_date,\n        ranking AS latest_ranking,\n        ranking_points AS latest_ranking_points\n    FROM (\n        SELECT\n            r.*,\n            ROW_NUMBER() OVER (\n                PARTITION BY r.player_id\n                ORDER BY r.ranking_date DESC\n            ) AS rn\n        FROM rankings r\n        JOIN usa_players p\n            ON r.player_id = p.player_id\n    ) ranked\n    WHERE rn = 1\n),\n\nbest_rankings AS (\n    SELECT\n        r.player_id,\n        MIN(r.ranking) AS best_ranking\n    FROM rankings r\n    JOIN usa_players p\n        ON r.player_id = p.player_id\n    GROUP BY r.player_id\n),\n\nmatch_records AS (\n    SELECT\n        player_id,\n        SUM(wins) AS wins,\n        SUM(losses) AS losses\n    FROM (\n        SELECT\n            winner_id AS player_id,\n            COUNT(*) AS wins,\n            0 AS losses\n        FROM matches\n        GROUP BY winner_id\n\n        UNION ALL\n\n        SELECT\n            loser_id AS player_id,\n            0 AS wins,\n            COUNT(*) AS losses\n        FROM matches\n        GROUP BY loser_id\n    ) records\n    GROUP BY player_id\n)\n\nSELECT\n    p.player_id,\n    p.first_name,\n    p.last_name,\n    p.first_name || ' ' || p.last_name AS player_name,\n    p.hand,\n    p.birth_date,\n    p.country_code,\n    lr.latest_ranking_date,\n    lr.latest_ranking,\n    lr.latest_ranking_points,\n    br.best_ranking,\n    COALESCE(mr.wins, 0) AS wins,\n    COALESCE(mr.losses, 0) AS losses,\n    COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) AS total_matches,\n    CASE\n        WHEN COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) > 0\n        THEN ROUND(\n            100.0 * COALESCE(mr.wins, 0) /\n            (COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0)),\n            1\n        )\n        ELSE NULL\n    END AS win_percentage\nFROM usa_players p\nLEFT JOIN latest_rankings lr\n    ON p.player_id = lr.player_id\nLEFT JOIN best_rankings br\n    ON p.player_id = br.player_id\nLEFT JOIN match_records mr\n    ON p.player_id = mr.player_id\nORDER BY\n    lr.latest_ranking ASC NULLS LAST,\n    p.last_name,\n    p.first_name;",
+          "is_correct": false,
+          "score": 0.0
+        },
+        "timestamp": "2026-05-16 07:10:37"
+      },
+      {
+        "type": "shard_revealed",
+        "data": {
+          "shard_id": 5
+        },
+        "timestamp": "2026-05-16 07:10:38"
+      },
+      {
+        "type": "verification",
+        "data": {
+          "response_type": "answer_attempt",
+          "is_answer_attempt": true
+        },
+        "timestamp": "2026-05-16 07:10:44"
+      },
+      {
+        "type": "answer_evaluation",
+        "data": {
+          "extracted_answer": "WITH usa_players AS (\n    SELECT\n        player_id,\n        first_name,\n        last_name,\n        hand,\n        birth_date,\n        country_code\n    FROM players\n    WHERE country_code = 'USA'\n),\n\nlatest_rankings AS (\n    SELECT\n        player_id,\n        ranking_date AS latest_ranking_date,\n        ranking AS latest_ranking,\n        ranking_points AS latest_ranking_points\n    FROM (\n        SELECT\n            r.*,\n            ROW_NUMBER() OVER (\n                PARTITION BY r.player_id\n                ORDER BY r.ranking_date DESC\n            ) AS rn\n        FROM rankings r\n        JOIN usa_players p\n            ON r.player_id = p.player_id\n    ) ranked\n    WHERE rn = 1\n),\n\nbest_rankings AS (\n    SELECT\n        r.player_id,\n        MIN(r.ranking) AS best_ranking\n    FROM rankings r\n    JOIN usa_players p\n        ON r.player_id = p.player_id\n    GROUP BY r.player_id\n),\n\nmatch_records AS (\n    SELECT\n        player_id,\n        SUM(wins) AS wins,\n        SUM(losses) AS losses\n    FROM (\n        SELECT\n            winner_id AS player_id,\n            COUNT(*) AS wins,\n            0 AS losses\n        FROM matches\n        GROUP BY winner_id\n\n        UNION ALL\n\n        SELECT\n            loser_id AS player_id,\n            0 AS wins,\n            COUNT(*) AS losses\n        FROM matches\n        GROUP BY loser_id\n    ) records\n    GROUP BY player_id\n)\n\nSELECT\n    p.player_id,\n    p.first_name,\n    p.last_name,\n    p.first_name || ' ' || p.last_name AS player_name,\n    p.hand,\n    p.birth_date AS birth_date,\n    p.country_code,\n    lr.latest_ranking_date,\n    lr.latest_ranking,\n    lr.latest_ranking_points,\n    br.best_ranking,\n    COALESCE(mr.wins, 0) AS wins,\n    COALESCE(mr.losses, 0) AS losses,\n    COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) AS total_matches,\n    CASE\n        WHEN COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0) > 0\n        THEN ROUND(\n            100.0 * COALESCE(mr.wins, 0) /\n            (COALESCE(mr.wins, 0) + COALESCE(mr.losses, 0)),\n            1\n        )\n        ELSE NULL\n    END AS win_percentage\nFROM usa_players p\nLEFT JOIN latest_rankings lr\n    ON p.player_id = lr.player_id\nLEFT JOIN best_rankings br\n    ON p.player_id = br.player_id\nLEFT JOIN match_records mr\n    ON p.player_id = mr.player_id\nORDER BY\n    lr.latest_ranking ASC NULLS LAST,\n    p.last_name,\n    p.first_name;",
+          "is_correct": false,
+          "score": 0.0
+        },
+        "timestamp": "2026-05-16 07:10:44"
+      }
+    ],
+    "num_resets": 0
+  },
+  "timestamp": "2026-05-16 07:10:44"
+}
