@@ -560,6 +560,9 @@ class ConversationAnalyzer:
         spec_only: bool = False,
         memory_target_query: str = "compare",
         enforce_compliance: bool = False,
+        *,
+        cache: Optional["AnalysisCache"] = None,  # noqa: F821 - quoted forward-ref
+        cache_provenance: Optional[dict] = None,
     ) -> AnalysisResult:
         """Analyze the current conversation state.
 
@@ -567,24 +570,70 @@ class ConversationAnalyzer:
         If spec_only=True, only runs Query 1 (task spec) and skips Query 2.
         memory_target_query: "compare" (default), "spec", or "both".
         enforce_compliance: if True, append compliance rules to Query 2 prompt.
+
+        If ``cache`` is provided, look up by content hash before running and
+        store the result for re-use across strategies that share the same
+        (prefix, analyzer model, prompt version, knobs) tuple. Use this for
+        last-turn replay where Augment / Reset / Gated-Reset / Rewrite all
+        share the same prefix and would otherwise issue redundant analyzer
+        queries.
         """
+        cache_key = None
+        if cache is not None:
+            from .analysis_cache import AnalysisCache  # local import to avoid cycles
+            trace_hash = AnalysisCache._hash_trace(trace)
+            cache_key = AnalysisCache.make_key(
+                trace_hash=trace_hash,
+                analyzer_model=self.model,
+                prompt_version=self.prompt_version,
+                spec_only=spec_only,
+                memory_target_query=memory_target_query,
+                enforce_compliance=enforce_compliance,
+                memory_present=memory is not None,
+            )
+            hit = cache.lookup(cache_key)
+            if hit is not None:
+                return hit
+
         flow = self._version_spec.flow
         if flow == "two_query":
-            return await self._analyze_v6(
+            result = await self._analyze_v6(
                 trace, model_client, memory, spec_only=spec_only,
                 memory_target_query=memory_target_query,
                 enforce_compliance=enforce_compliance,
             )
-        if flow == "two_query_soft":
-            return await self._analyze_v8_soft(
+        elif flow == "two_query_soft":
+            result = await self._analyze_v8_soft(
                 trace, model_client, memory, spec_only=spec_only,
                 memory_target_query=memory_target_query,
             )
-        if flow == "single_query_combined":
-            return await self._analyze_v8_single(trace, model_client, memory)
-        if flow == "single_query_s1":
-            return await self._analyze_s1(trace, model_client, memory)
-        return await self._analyze_single(trace, model_client, memory)
+        elif flow == "single_query_combined":
+            result = await self._analyze_v8_single(trace, model_client, memory)
+        elif flow == "single_query_s1":
+            result = await self._analyze_s1(trace, model_client, memory)
+        else:
+            result = await self._analyze_single(trace, model_client, memory)
+
+        if cache is not None and cache_key is not None:
+            try:
+                cache.store(
+                    cache_key,
+                    result,
+                    key_inputs={
+                        "analyzer_model": self.model,
+                        "prompt_version": self.prompt_version,
+                        "spec_only": bool(spec_only),
+                        "memory_target_query": memory_target_query,
+                        "enforce_compliance": bool(enforce_compliance),
+                        "memory_present": memory is not None,
+                    },
+                    provenance=cache_provenance or {},
+                )
+            except Exception:
+                # Cache failures must never break the experiment.
+                pass
+
+        return result
 
     # --- parsing helpers ---
 

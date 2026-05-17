@@ -48,6 +48,7 @@ class AC3ResetStrategy(BaseStrategy):
         use_memory: bool = False,
         memory_target: str = "analyzer",
         accumulate_instruction: bool = False,
+        analysis_cache_dir: Optional[str] = None,
     ):
         self.analyzer = ConversationAnalyzer(
             model=analyzer_model,
@@ -61,6 +62,10 @@ class AC3ResetStrategy(BaseStrategy):
         self.use_memory = use_memory
         self.memory_target = memory_target
         self.accumulate_instruction = accumulate_instruction
+        self._analysis_cache = None
+        if analysis_cache_dir:
+            from .analysis_cache import AnalysisCache
+            self._analysis_cache = AnalysisCache(analysis_cache_dir)
 
     def _build_edited_context(
         self,
@@ -148,7 +153,10 @@ class AC3ResetStrategy(BaseStrategy):
 
         # Run analysis — pass memory only if targeting analyzer
         analysis_memory = memory if (self.use_memory and self.memory_target == "analyzer") else None
-        result = await self.analyzer.analyze(trace, model_client, memory=analysis_memory)
+        result = await self.analyzer.analyze(
+            trace, model_client, memory=analysis_memory,
+            cache=self._analysis_cache,
+        )
 
         # Log the analysis
         trace.add_log(

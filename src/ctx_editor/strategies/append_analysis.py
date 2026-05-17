@@ -62,6 +62,7 @@ class AC3AugmentStrategy(BaseStrategy):
         enforce_compliance: bool = False,
         spec_only: bool = False,
         analysis_after_last_user: bool = False,
+        analysis_cache_dir: Optional[str] = None,
     ):
         self.analyzer = ConversationAnalyzer(
             model=analyzer_model,
@@ -70,6 +71,10 @@ class AC3AugmentStrategy(BaseStrategy):
             reasoning_effort=analyzer_reasoning_effort,
             prompt_version=analyzer_prompt_version,
         )
+        self._analysis_cache = None
+        if analysis_cache_dir:
+            from .analysis_cache import AnalysisCache
+            self._analysis_cache = AnalysisCache(analysis_cache_dir)
         # min_turns="auto" is resolved by run_experiment before instantiation,
         # but default to 3 if it somehow reaches here unresolved.
         self.min_turns = min_turns if isinstance(min_turns, int) else 3
@@ -113,18 +118,21 @@ class AC3AugmentStrategy(BaseStrategy):
         if trace.num_assistant_turns == 0:
             return trace.get_active_messages()
 
-        # Add system addendum (once)
-        if not self._is_analysis_addendum_added(trace):
-            trace.append_to_system_message(ANALYSIS_SYSTEM_ADDENDUM)
-            trace.add_log("analysis_addendum_added", {})
-
-        # Generate analysis — pass memory only if targeting analyzer
+        # Generate analysis — pass memory only if targeting analyzer.
+        # (System addendum is added AFTER analyze, so the analyzer sees the
+        # raw trace and the cache key matches what Reset/Rewrite see.)
         analysis_memory = memory if (self.use_memory and self.memory_target == "analyzer") else None
         result = await self.analyzer.analyze(
             trace, model_client, memory=analysis_memory, spec_only=self.spec_only,
             memory_target_query=self.memory_target_query,
             enforce_compliance=self.enforce_compliance,
+            cache=self._analysis_cache,
         )
+
+        # Add system addendum (once) — applies to the assistant, not the analyzer.
+        if not self._is_analysis_addendum_added(trace):
+            trace.append_to_system_message(ANALYSIS_SYSTEM_ADDENDUM)
+            trace.add_log("analysis_addendum_added", {})
 
         trace.add_log(
             "conversation_analysis",
