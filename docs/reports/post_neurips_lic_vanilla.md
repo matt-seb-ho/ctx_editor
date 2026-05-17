@@ -208,3 +208,112 @@ Aggregate "(model, domain) means over the N runs" lives below.
 
 - Total ctx-editor invocations: **58** (includes tainted and redo runs)
 - Total cost across all runs: **$23.06**
+
+## Single-Turn (STQ) Upper Bound
+
+Each cell sends the original unsharded `full_spec_q` prompt as ONE user message,
+extracts the answer with the same task evaluator, scores it. N=3 runs per cell.
+Cost = $0 for foundry-side models because the Foundry endpoint does not surface
+OpenAI-style token usage; treat foundry STQ cost as `unreported` rather than zero.
+
+| Model | math_v2 | code_v2 | database_v2 | actions_v2 |
+|---|---|---|---|---|
+| gpt-5.4 | 100.0% ± 0.0pp (n=3) | 99.2% ± 1.3pp (n=3) | 91.3% ± 3.1pp (n=3) | 97.3% ± 1.2pp (n=3) |
+| DeepSeek-V4-Flash | 98.0% ± 2.0pp (n=3) | 92.4% ± 1.3pp (n=3) | 94.7% ± 2.3pp (n=3) | 96.7% ± 2.3pp (n=3) |
+| Kimi-K2.6 | 93.3% ± 2.3pp (n=3) | 85.6% ± 1.3pp (n=3) | 90.0% ± 3.5pp (n=3) | 98.0% ± 2.0pp (n=3) |
+| gpt-5.5 | 100.0% ± 0.0pp (n=3) | 99.2% ± 1.3pp (n=3) | 93.3% ± 1.2pp (n=3) | 98.7% ± 1.2pp (n=3) |
+
+Per-run detail:
+
+| Model | Task | Run | Accuracy | Wall | Cost |
+|---|---|---|---|---|---|
+| gpt-5.4 | math_v2 | 1 | 100.0% (50/50) | 10s | $0.11 |
+| gpt-5.4 | math_v2 | 2 | 100.0% (50/50) | 9s | $0.11 |
+| gpt-5.4 | math_v2 | 3 | 100.0% (50/50) | 9s | $0.11 |
+| gpt-5.4 | code_v2 | 1 | 100.0% (44/44) | 41s | $0.21 |
+| gpt-5.4 | code_v2 | 2 | 100.0% (44/44) | 29s | $0.20 |
+| gpt-5.4 | code_v2 | 3 | 97.7% (43/44) | 53s | $0.19 |
+| gpt-5.4 | database_v2 | 1 | 88.0% (44/50) | 11s | $0.14 |
+| gpt-5.4 | database_v2 | 2 | 92.0% (46/50) | 8s | $0.13 |
+| gpt-5.4 | database_v2 | 3 | 94.0% (47/50) | 10s | $0.13 |
+| gpt-5.4 | actions_v2 | 1 | 98.0% (49/50) | 10s | $0.09 |
+| gpt-5.4 | actions_v2 | 2 | 98.0% (49/50) | 8s | $0.08 |
+| gpt-5.4 | actions_v2 | 3 | 96.0% (48/50) | 21s | $0.10 |
+| DeepSeek-V4-Flash | math_v2 | 1 | 100.0% (50/50) | 28s | $0.00 |
+| DeepSeek-V4-Flash | math_v2 | 2 | 98.0% (49/50) | 23s | $0.00 |
+| DeepSeek-V4-Flash | math_v2 | 3 | 96.0% (48/50) | 24s | $0.00 |
+| DeepSeek-V4-Flash | code_v2 | 1 | 90.9% (40/44) | 32s | $0.00 |
+| DeepSeek-V4-Flash | code_v2 | 2 | 93.2% (41/44) | 26s | $0.00 |
+| DeepSeek-V4-Flash | code_v2 | 3 | 93.2% (41/44) | 27s | $0.00 |
+| DeepSeek-V4-Flash | database_v2 | 1 | 92.0% (46/50) | 21s | $0.00 |
+| DeepSeek-V4-Flash | database_v2 | 2 | 96.0% (48/50) | 15s | $0.00 |
+| DeepSeek-V4-Flash | database_v2 | 3 | 96.0% (48/50) | 13s | $0.00 |
+| DeepSeek-V4-Flash | actions_v2 | 1 | 94.0% (47/50) | 13s | $0.00 |
+| DeepSeek-V4-Flash | actions_v2 | 2 | 98.0% (49/50) | 14s | $0.00 |
+| DeepSeek-V4-Flash | actions_v2 | 3 | 98.0% (49/50) | 18s | $0.00 |
+| Kimi-K2.6 | math_v2 | 1 | 92.0% (46/50) | 109s | $0.00 |
+| Kimi-K2.6 | math_v2 | 2 | 92.0% (46/50) | 83s | $0.00 |
+| Kimi-K2.6 | math_v2 | 3 | 96.0% (48/50) | 83s | $0.00 |
+| Kimi-K2.6 | code_v2 | 1 | 84.1% (37/44) | 287s | $0.00 |
+| Kimi-K2.6 | code_v2 | 2 | 86.4% (38/44) | 350s | $0.00 |
+| Kimi-K2.6 | code_v2 | 3 | 86.4% (38/44) | 337s | $0.00 |
+| Kimi-K2.6 | database_v2 | 1 | 86.0% (43/50) | 252s | $0.00 |
+| Kimi-K2.6 | database_v2 | 2 | 92.0% (46/50) | 225s | $0.00 |
+| Kimi-K2.6 | database_v2 | 3 | 92.0% (46/50) | 307s | $0.00 |
+| Kimi-K2.6 | actions_v2 | 1 | 100.0% (50/50) | 46s | $0.00 |
+| Kimi-K2.6 | actions_v2 | 2 | 98.0% (49/50) | 67s | $0.00 |
+| Kimi-K2.6 | actions_v2 | 3 | 96.0% (48/50) | 59s | $0.00 |
+| gpt-5.5 | math_v2 | 1 | 100.0% (50/50) | 55s | $0.09 |
+| gpt-5.5 | math_v2 | 2 | 100.0% (50/50) | 55s | $0.09 |
+| gpt-5.5 | math_v2 | 3 | 100.0% (50/50) | 52s | $0.09 |
+| gpt-5.5 | code_v2 | 1 | 100.0% (44/44) | 96s | $0.18 |
+| gpt-5.5 | code_v2 | 2 | 100.0% (44/44) | 93s | $0.18 |
+| gpt-5.5 | code_v2 | 3 | 97.7% (43/44) | 86s | $0.17 |
+| gpt-5.5 | database_v2 | 1 | 94.0% (47/50) | 119s | $0.22 |
+| gpt-5.5 | database_v2 | 2 | 92.0% (46/50) | 113s | $0.22 |
+| gpt-5.5 | database_v2 | 3 | 94.0% (47/50) | 106s | $0.21 |
+| gpt-5.5 | actions_v2 | 1 | 98.0% (49/50) | 33s | $0.07 |
+| gpt-5.5 | actions_v2 | 2 | 100.0% (50/50) | 31s | $0.07 |
+| gpt-5.5 | actions_v2 | 3 | 98.0% (49/50) | 32s | $0.07 |
+
+## v1 vs v2 Task Evaluators — DeepSeek-V4-Flash, sharded
+
+Same model, same data, same sharded protocol — only the *task evaluator and
+system prompt* change between rows. v2 = math_v2/code_v2/database_v2/actions_v2
+(the active task configs); v1 = math/code/database/actions (the pre-v2 evaluators
+without the system-prompt and extraction tweaks). N=3 runs each.
+
+| Task | v1 mean | v1 per-run | v2 mean | Δ (v2−v1) |
+|---|---|---|---|---|
+| math | 65.0% ± 6.0pp | 66.7% / 58.3% / 70.0% | 73.2% ± 3.0pp | +8.2pp |
+| code | 30.3% ± 1.3pp | 29.5% / 31.8% / 29.5% | 40.2% ± 4.7pp | +9.9pp |
+| database | 98.7% ± 1.2pp | 98.0% / 100.0% / 98.0% | 24.7% ± 8.3pp | -74.0pp |
+| actions | 44.0% ± 10.6pp | 48.0% / 52.1% / 32.0% | 75.2% ± 5.9pp | +31.2pp |
+
+### Caveats on this comparison
+
+- **Conversation length differs systematically.** Eyeballing matched traces, v1
+  conversations tend to be shorter (fewer user turns) than v2 conversations on the
+  same problem. The difference is not coming from the user agent or shard list — the
+  user-sim, shards, and `max_turns` cap are the same — but from the system agent's
+  answer-attempt detection. v2's stricter answer-format expectations (e.g. requiring
+  `\boxed{}` or `\`\`\`sql` fences) seem to delay the answer_attempt classification
+  for longer, so the user-sim reveals more shards. v1's looser format is satisfied
+  earlier, the simulation terminates, and the model is graded on a partial-shard
+  conversation. Net effect: v1 is graded on *easier* conversational state but with a
+  *less reliable* extraction.
+- **Database in particular swings the wrong direction (v1 ~98% vs v2 ~25%).** This
+  is dominated by the conversation-length effect above. The model's intuition often
+  produces a correct query from just the first 1–2 shards; v2's longer protocol gives
+  the model more chances to be misdirected by later shards.
+- **Actions swings strongly in v2's favor (+31pp).** This is the `accumulate`
+  instruction in the v2 system prompt: BFCL grades the final assistant turn, and v1's
+  prompt does not tell the model to re-emit the full consolidated function-call list.
+  This was a known gap; we documented it in `docs/mar21_bug_discovery.md`.
+- **Math and code show modest v2 gains (~8–10pp).** Driven by extraction fixes
+  (v2's `\*\*ANSWER: N\*\*` plus integer coercion for math; v2's import/def split
+  fix for code).
+
+Net read: v2 is the right default for forward experiments. The headline-grabbing
+v1 database number is a measurement artifact (premature termination), not the model
+being better.
