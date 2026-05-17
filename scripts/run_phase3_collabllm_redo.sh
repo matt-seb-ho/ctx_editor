@@ -36,7 +36,7 @@ run_one() {
     else task_name=collabllm_code; fi
 
     echo "[$(date +%H:%M:%S)] BEGIN ${label}"
-    ctx-editor-collabllm \
+    python -m ctx_editor.run_collabllm \
         experiment="${strategy}" \
         model="${MODEL}" \
         load_balancer="${LB}" \

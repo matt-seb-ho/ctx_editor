@@ -51,7 +51,7 @@ run_one() {
     esac
 
     echo "[$(date +%H:%M:%S)] BEGIN ${label}"
-    ctx-editor-huang-phase2 \
+    python -m ctx_editor.huang_eval.run_phase2 \
         phase1_dir="${PHASE1_DIR}" \
         respondent_model="${RESPONDENT}" \
         judge_model="${JUDGE}" \
