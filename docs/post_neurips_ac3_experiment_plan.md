@@ -1,237 +1,225 @@
-# Post-NeurIPS AC3 Experiment Plan (rev. 2)
+# Post-NeurIPS AC3 Experiment Plan (rev. 3)
 
 **Date**: 2026-05-16
-**Status**: revised after first round of feedback (see "Changes from rev.1" at the bottom). Awaiting approval to launch.
+**Status**: revision 3 after two feedback rounds. Pending final approval.
 
-## Pre-deliberation context (the questions the user raised)
+This rev addresses three changes from rev.2:
 
-Re-statement of what I checked in the code:
+- **Gating moves into Phase 1** (still last-turn replay; small scope). The full multi-turn gating study is set aside for now.
+- **Phase 3 becomes a cross-benchmark study** (CollabLLM + WildChat redos with the winning method, for error bars).
+- **Content-filter discussion deepened**: pulled in the v12-archive history; s1 is *not* a complete CF fix; proposed contingency is a fresh "v13" prompt taking v12's structural fix and back-porting v8's analyzer-content quality, documented if needed.
 
-- **Current default analyzer prompt**: `DEFAULT_ANALYZER_VERSION = "v8"`
-  (`src/ctx_editor/strategies/analyzer_prompts.py:143`).
-- **Paper prompt correspondence** (`docs/paper_experiments_provenance.md`):
-  LiC = `v8`, CollabLLM = `s1`, Huang/WildChat = `v8` (Reset/Rewrite) + `v11` (Gated-Reset), τ² = `v10`.
-- **Cost reporting**: pricing comes from `src/ctx_editor/models/openai_pricing.py`. **gpt-5.4, gpt-5.5, and all Foundry-hosted models are not in that table**, so they report `$0`. Token counts (`usage_stats`) are recorded regardless, so any model can be cost-backfilled by editing the pricing table.
-- **Cached input**: `openai_model.py` already extracts `usage.prompt_tokens_details.cached_tokens` from Azure responses and `_calculate_cost` applies a `cached_input` rate when present. So filling in cached-input pricing actually matters for long-prefix replay (every variant cell re-uses the same prefix; the second variant on a prefix should be mostly cached server-side).
-- **Content filter risk**: `v8` analyzer tripped Azure's `jailbreak` filter at 60-70% on gpt-5-mini through Azure OAI in May 2026 (`docs/archive/v12_attempt/azure_jailbreak_filter_triggers.md`). `s1` was the May workaround — content-filter-safe but with weaker numbers (it never made the paper, was a defensive fallback). **Foundry is still part of Azure**, so non-OAI Foundry models *might* still trip the filter; we don't have data either way yet.
+The pricing scaffold is now populated by the user (thank you). Token counts and dollar-cost will flow into reports automatically.
 
-## Decision points, revised
+## Decision points (post rev.3)
 
-### 1. Prompt strategy — use `v8` across all conversation benchmarks
+### 1. Prompt strategy — `v8` default, escalation chain documented
 
-User confirmed in rev.1 feedback: "v8 prompts for all conversational benchmark experiments... I think this makes sense."
+Unchanged from rev.2 in spirit. `v8` is the default for LiC, CollabLLM, WildChat. Concrete escalation chain if Azure CF trips fire:
 
-**Decision**: `v8` is the default for LiC (Phase 1+2) AND for CollabLLM / WildChat / Huang in any cross-benchmark consistency study (Phase 4 if we get there). `s1` is held in reserve as a **content-filter fallback** only; we expect to NOT use it for headline numbers.
+1. **`v8`** — paper default. First attempt for every cell.
+2. **`s1`** — content-filter-aware single-query header-format prompt. *Caveat: s1 also tripped CF at ~65% on gpt-5-mini with embedded system message in May 2026* (see `docs/archive/v12_attempt/azure_jailbreak_filter_triggers.md` table). It is a *partial* fix, not a complete one — viable only when the embedded system message is benign / short.
+3. **`v13` (new, only built if needed)** — port the v12 structural fix (drops conversation's original system message, uses markdown-only delimiters, no XML, no `[system]` role prefix in the conversation dump) but reuse v8's analyzer-content design (the two-query split with Q1 = task-spec extraction from user-only messages, Q2 = aligned/issues comparison against full conversation). v12 hit 0% trip rate but its raw content was rushed and analyzer quality regressed — v13 keeps the structural fix, fixes the content. Build only if `s1` also trips above 5% on a cell.
 
-- For LiC Phase 1+2 this matches the published paper directly (Table 1(a) used `v8`).
-- For CollabLLM the headline paper row used `s1` because `v8` tripped the filter then. If `v8` works for us now (different models, different prompts in the analyzer's input from rev'd `v8` text), we report `v8` and treat the original `s1` cell as historical.
-- For Huang the paper used `v8` for Reset/Rewrite and `v11` for Gated-Reset — we'll use `v8` everywhere here and keep `v11` documented as a comparison if we revisit gating-prompt design.
+If we build v13, we register it in `analyzer_prompts.py` alongside the existing versions and document the diff in a new `docs/v13_analyzer_design.md`. The doc spec: differences from v8 (structural-only), example input + output, expected analyzer-quality comparison to v8 on a small probe set (10 problems × 1 task) before any large run uses it.
 
-If Phase-2 Azure OAI calls (gpt-5.4 / gpt-5.5 analyzer paths) trip the filter > 10% on any cell, we fall back to `s1` for THAT cell only and log the trip rate alongside the score.
+### s1 background (what the user asked about)
 
-### 2. Single-model exploration → scale-up — DeepSeek-V4-Flash
+s1's design is in code (`src/ctx_editor/strategies/prompts/s1_analysis.txt`) and partial provenance in:
 
-Unchanged from rev.1. Phase 1 uses DeepSeek-V4-Flash (cheapest, fastest, no Azure-OAI content filter in the path). Phase 2 promotes Augment unconditionally + the better of Reset/Rewrite (with the 3pp tiebreak going to Reset).
+- `docs/archive/v12_attempt/azure_jailbreak_filter_triggers.md` — table of trip rates by template family; s1 is the "no-XML" row at ~65% on gpt-5-mini.
+- `docs/reports/dev_set_round2_content_filter_fix.md` — the March 2026 round-2 fix attempt; this is where s1 was first deployed.
+- `docs/context_strategies.md` — describes s1 as `single_query_s1` flow: simplified header-format (TASK SPECIFICATION/ALIGNED/ISSUES), drops XML, designed for CollabLLM where the original `v8` was triggering CF.
 
-### 3. Gating — promoted to a first-class phase
+There is no dedicated "s1 design doc" with rationale. The closest thing is `docs/archive/v12_attempt/notes.md` for the *v12* design (which superseded s1's CF strategy and actually achieved 0% trips). I'd propose **writing a fresh `docs/analyzer_prompt_design_notes.md`** that consolidates:
 
-User feedback: "in setting where we are not just replaying the last turn, I think we want to use the gated mode... Please make sure to consider gating properly (and plan experiments around this piece because I genuinely think it's important for realistic deployment)."
+- The trip-rate evidence (from azure_jailbreak_filter_triggers.md)
+- What each surviving prompt version is *for* (v8 = paper default, s1 = CF-aware fallback, v13 = structural fix port if we need it)
+- The quality vs CF-safety trade-off table
 
-This is the right call. Phase 1+2 are last-turn replay, where gating collapses ("we always intervene on the final turn or we don't"). The deployment-realistic question — "should we intervene every turn, or selectively?" — only surfaces in **multi-turn fresh simulation**, which we haven't done since the paper batch.
+I'll write that doc as part of the pre-launch checklist, regardless of whether we end up needing v13. It serves as the "here are the prompt adjustments and why" appendix the user asked for in the original `post_nips_exp_plan_pr.md`.
 
-#### Phase 3 — Multi-turn gating study
+### 2. Single-model exploration → scale-up (unchanged)
 
-Run fresh multi-turn LiC simulations (no replay) with the winning AC3 variant from Phase 1, comparing **gated vs ungated** behavior:
+Phase 1 = DeepSeek-V4-Flash, Phase 2 = the other three. Promotion logic stays the same: Augment is always promoted (it's the ablation); the best of {Reset, Gated-Reset, Rewrite} also advances; 3pp tiebreak favors Reset over Gated-Reset and Reset over Rewrite (simpler / cheaper).
 
-- **Model**: DeepSeek-V4-Flash (same as Phase 1, for fastest iteration). Worth re-running on one slower model (e.g. gpt-5.4) once we trust the design.
-- **Tasks**: math + database. These had the largest sharded-vs-STQ gap, so gating decisions are most likely to matter. (Code + actions are saturated either at the low or high end and would give weaker signal.)
-- **Strategies**:
-  - **AC3-Reset (always-on)**: analyzer runs every turn, edits every turn. `min_turns=1`, `max_resets=1000` (effectively unbounded).
-  - **AC3-Gated-Reset**: analyzer runs every turn, gate decides whether to edit. `min_turns=3, max_resets=3` (the paper's setting).
-  - **Baseline + AO** as references.
-- **Sample size**: full 50 problems per task, N=3 fresh sims each (the paper's N=3 setting). The 3 sims here are *sampling* reps on the same problem — no shared prefix, because each fresh sim creates its own conversation. This is consistent with the variance decomposition the prefix-decision doc outlines (Phase 1+2 measure cross-prefix variance; Phase 3 measures cross-sampling-rep variance).
-- **What we measure**:
-  - Final accuracy.
-  - **Edit rate** — fraction of turns where the gate fired. Critical context-dependent metric.
-  - **Cost per conversation** — gated should be cheaper if it's edit-rate <100%.
-  - **Latency per conversation** — gated should also be faster.
-- **Decision rule**: gated wins if accuracy is within −2pp of always-on AND edit rate is ≤ 50%. Otherwise always-on is the recommended deployment. We report both numbers either way.
+### 3. Gating — folded into Phase 1 (last-turn replay)
 
-Multi-turn fresh sims are slower per problem than replay (we re-do the whole conversation). Estimated wall time for Phase 3 on DeepSeek: 50 problems × 3 reps × 2 strategies × 2 tasks × ~2 min/sim = ~10-12 hours. Run overnight as a separate batch after Phase 1+2.
+Per the user's feedback: the 10-12 h multi-turn fresh-sim Phase 3 is too expensive right now. We keep the gating question alive but scope it to **last-turn replay** for now, where it can be answered cheaply alongside the rest of Phase 1.
 
-Phase 1 / Phase 2 do NOT vary gating — they treat the single-turn-replay scenario where it's a no-op.
+How gating manifests in last-turn replay:
 
-### 4. Content filter mitigation, deeper
+- **AC3-Reset (always-on)**: analyzer runs on the prefix; the edit is applied to the final turn regardless. (`min_turns=1`, `max_resets=large`.)
+- **AC3-Gated-Reset**: analyzer runs on the prefix; the analyzer's `needs_edit` signal (the `issues` block being non-empty in v8's output) decides whether to apply the edit. If gate=False, the final turn is generated from the original (un-edited) full context, i.e. behaves like Baseline. (`min_turns=3, max_resets=3` — the paper setting.)
 
-User flagged Foundry-being-part-of-Azure ambiguity. Concrete plan:
+In replay we get exactly one decision point per prefix, so this measures "given a prefix that ended in a failure (or a success), does the analyzer correctly decide whether intervention is warranted?". Two metrics matter:
 
-- **Phase 1 on Foundry DeepSeek**: monitor `content_filter_errors.jsonl` (the log already exists). Trip rate of zero is expected but not assumed.
-- **Phase 2 cells on gpt-5.4 / gpt-5.5 OAI endpoints**: same monitoring. If trip rate on any cell exceeds 5% of analyzer calls, fall back to `s1` analyzer for that cell.
-- **`s1` reminder**: looking at `src/ctx_editor/strategies/prompts/s1_analysis.txt`, `s1` is a single-query, header-format prompt with no XML wrappers and no nested-instruction patterns. It's literally the workaround for the May 2026 Azure CF crisis — your recollection is right; numbers were marginally weaker than `v8` on the CollabLLM cells. Acceptable fallback for cells that wouldn't run otherwise.
-- **What we will NOT do**: redesign the analyzer prompt mid-flight just to dodge the filter. If `s1` doesn't work either, we document the cell as `partial coverage (CF skips: N)` and move on — keeping prompt design changes for a future targeted pass rather than poisoning the data pool.
+- **Accuracy** on the 50-problem replay set (already what we measure).
+- **Gate-fire rate** — the fraction of prefixes where the gate decided to edit. Critical for the deployment-cost story; an analyzer that always fires is just AC3-Reset rebranded. We log this per cell.
 
-### 5. Analysis reuse + registry
+Decision rules:
 
-User feedback: "if we're testing the same model and are only changing the intervention between (augment/reset/rewrite) then we can reuse the same analysis and save the LLM query cost… let's make sure that in addition to being able to reuse conversation prefixes (from replaying), we can also reuse analysis outputs."
+- Gated-Reset ≥ Reset (always-on) in accuracy → gating preferred.
+- Gated-Reset within −2pp of Reset AND gate-fire rate ≤ 75% → gating preferred (cost win without accuracy loss).
+- Gated-Reset ≪ Reset → gate is mis-calibrated; report and recommend always-on.
 
-**This is the most consequential infra change in the rev.2 plan.** Today the analyzer is called fresh inside each strategy invocation. Across Phase-1 cells `{augment, reset, rewrite}` × same `(prefix, analyzer model)` we are paying for the same analyzer query 3 times — and worse, the three "shared" cells get *different* analyzer outputs because the analyzer call is non-deterministic, which adds noise to the variant comparison.
+The full multi-turn gating study (where the gate fires repeatedly per conversation, not once per prefix) is **deferred** — captured below as "Future work: multi-turn gating study" but not in this batch.
 
-#### Design
+### 4. Content filter — escalation chain (rev.3 enhancement)
 
-A two-layer cache:
+Mostly unchanged from rev.2 but with the s1 caveat made explicit and v13 added as a documented contingency. Also: **Foundry is part of Azure**, so we will explicitly monitor `content_filter_errors.jsonl` on every Foundry cell, not just OAI cells.
 
-1. **Cache backend** (`src/ctx_editor/strategies/analysis_cache.py`): content-addressable filesystem cache.
-   - Key inputs: hash of the trace's message list (system + user + assistant content), analyzer model name, prompt version, plus the call-time knobs (`spec_only`, `memory_target_query`, `enforce_compliance`, presence/absence of memory).
-   - Cache key = `sha256(json_dumps_canonical(key_inputs))`.
-   - Storage: `outputs/analysis_cache/{key[:2]}/{key}.json` (one shard byte to keep dir sizes reasonable).
-   - Each cache file holds `{"key_inputs": {...}, "result": {...AnalysisResult fields...}, "raw_query_outputs": {...}, "created_at": "...", "experiment_origin": "<exp_name>"}`.
+### 5. Analysis reuse + registry — unchanged from rev.2
 
-2. **Registry** (`outputs/analysis_cache/registry.json`): an index file with one line per cache entry. Append-only. Lets us:
-   - Quickly see how many cached analyses exist per (analyzer_model, prompt_version).
-   - Find the original experiment that produced each (for provenance).
-   - Sanity-check "would my upcoming run hit the cache?" before launch.
+Cache backend, registry, and Hydra integration as previously specified. This is the single largest engineering lift in the rev.2 → rev.3 transition and stays.
 
-A `scripts/inspect_analysis_cache.py` tool prints summary stats (count by analyzer_model × prompt_version, age distribution) and supports `--invalidate-by-prompt-version v8 --before 2026-05-01` to bulk-evict stale entries.
-
-#### Integration
-
-`ConversationAnalyzer.analyze(...)` gets a `cache` param:
-
-```python
-async def analyze(self, trace, model_client, memory=None, *, cache: Optional[AnalysisCache] = None, ...):
-    if cache is not None:
-        hit = cache.lookup(...)
-        if hit is not None:
-            return hit
-    result = await self._analyze_impl(...)
-    if cache is not None:
-        cache.store(..., result, experiment_origin=...)
-    return result
-```
-
-The strategies (`AppendAnalysis`, `AC3Reset`, `AC3Rewrite`) accept an `analysis_cache` constructor arg (defaulting to `None`). The Hydra runner instantiates one cache at the top of the experiment and threads it through.
-
-A CLI knob `experiment.analysis_cache=outputs/analysis_cache` (or `=null`) controls whether to read/write. Set to a real path → reuse + extend. Set to null → recompute every time. The Phase-1 launcher uses the same cache dir across all 5 strategies, so:
-
-- The first variant that runs on each (prefix, analyzer-model, prompt-version) populates the cache.
-- The subsequent variants find the same key and skip the analyzer call entirely.
-- Total analyzer-call savings: roughly **2/3** of analyzer queries in Phase 1 (5 strategies, but 2 — Baseline, AO — don't analyze; among the 3 that do, only 1 actually runs, the other 2 hit cache).
-
-#### What invalidates a cached analysis
-
-Cache is keyed on the inputs; **any change to the prefix or the analyzer prompt invalidates it automatically**. Things that do NOT change the key (so they DON'T trigger re-compute):
-
-- The downstream strategy (cache is shared across Augment/Reset/Rewrite).
-- The assistant model (we're caching analyses, not last-turn outputs).
-- Sampling reps (cache is deterministic by design — that's the point).
-
-Things that DO trigger re-compute:
-
-- Switching analyzer model (e.g. Phase 2 with gpt-5.4 as analyzer).
-- Switching `prompt_version` (`v8` → `s1` fallback).
-- A user edit to the prefix conversation.
-- A user `--invalidate ...` via the inspect script.
-
-#### Registry sketch
-
-```json
-{
-  "entries": [
-    {
-      "key": "a4f9...3b2",
-      "analyzer_model": "DeepSeek-V4-Flash",
-      "prompt_version": "v8",
-      "task": "math_v2",
-      "sample_id": "sharded-GSM8K/1011",
-      "prefix_source": "data/valid_prefixes_htn50_52/deepseek_v4_flash_foundry/math_v2/conv0/sharded-GSM8K_1011.json",
-      "spec_only": false,
-      "created_at": "2026-05-17T01:14:33-07:00",
-      "experiment_origin": "phase1_append_analysis_deepseek_math_v2_conv0_<ts>",
-      "file": "outputs/analysis_cache/a4/a4f9...3b2.json"
-    },
-    ...
-  ]
-}
-```
-
-Future work the registry enables:
-
-- Cross-cell consistency check ("did Augment and Reset really see the same analysis?").
-- Cheap re-aggregation when a new variant is introduced (no analyzer cost if cache hits).
-- Audit trail for the paper appendix (Did we run analyzer N times or 3 times? Registry knows.).
-
-## Phase summary (rev.2)
+## Phase summary (rev.3)
 
 | Phase | What | Model(s) | Strategies | Mode | Est. wall time | Notes |
 |---|---|---|---|---|---|---|
-| **1** | Variant exploration | DeepSeek-V4-Flash | S0, AO, Augment, Reset, Rewrite | Last-turn replay (3 prefixes/problem) | ~1 h | Analysis cache populates here. |
-| **2** | Scale-up | gpt-5.4, Kimi-K2.6, gpt-5.5 | S0, AO, Augment, + best of Reset/Rewrite | Last-turn replay | ~5-6 h | Each model is a fresh analyzer-model cache namespace. |
-| **3** | Gating study | DeepSeek-V4-Flash (+ gpt-5.4 if time) | Winning AC3 variant ± gating, S0, AO | Multi-turn fresh sims | ~10-12 h overnight | Measures edit rate + accuracy + cost-per-conversation. |
-| **4** (optional) | Cross-benchmark consistency | One model | Winning AC3 variant with v8 prompt | LiC, CollabLLM, WildChat | TBD per benchmark | Tests "is the LiC prompt portable?" |
+| **1** | Variant exploration incl. gating | DeepSeek-V4-Flash | S0, AO, Augment, Reset, **Gated-Reset**, Rewrite | Last-turn replay (3 prefixes/problem) | ~1.5 h | 6 strategies. Cache populates here. |
+| **2** | Scale-up | gpt-5.4, Kimi-K2.6, gpt-5.5 | S0, AO, Augment, + winner of {Reset, Gated-Reset, Rewrite} | Last-turn replay | ~5-6 h | Each new analyzer-model is a fresh cache namespace. |
+| **3** | Cross-benchmark error bars | DeepSeek-V4-Flash (and Phase-2 winning model if cheap) | S0, AO, Augment, + winner | CollabLLM, WildChat — both N=3 reps with reuse of paper prompts where possible | ~3-5 h | Replaces the multi-turn gating Phase from rev.2. Variance-bar redo of the paper-equivalent setup with our winning method. |
+| **Future** | Multi-turn gating study | DeepSeek (then gpt-5.4) | Reset (always-on) vs Gated-Reset, S0, AO | Fresh multi-turn LiC sims | ~10-12 h | Deferred per user feedback. Re-eval after Phase 3 results. |
 
-Phase 1 alone is overnight-safe and self-contained. Phase 2 fires after Phase 1's aggregator picks the winner. Phase 3 fires after Phase 2.
+## Phase 1 cell math (rev.3)
 
-## Phase 1 cell math (unchanged from rev.1)
+- 4 tasks × **6** strategies (S0, AO, Augment, Reset, Gated-Reset, Rewrite) × 3 prefixes = **72 invocations**.
+- Each: last-turn replay on 44-50 problems, wall ~30-90 s on DeepSeek (varies by strategy — Rewrite is slowest).
+- Cache savings: Augment + Reset + Gated-Reset + Rewrite all use the same v8 analyzer output on each prefix → 4 strategies share 1 cached analysis. Out of 4×4×3 = 48 analyzing cells, only 4×3 = 12 unique (task, prefix) pairs need a fresh analyzer call. **~75% of analyzer queries are cached after the first variant per (task, prefix) finishes.**
+- Total wall: roughly 1.5 h.
 
-- 4 tasks × 5 strategies (S0, AO, Augment, Reset, Rewrite) × 3 prefixes (conv0/1/2) = 60 invocations.
-- Each invocation: last-turn replay on ~50 problems (≤44 for code), wall time 30-90s on DeepSeek.
-- Analyzer calls saved by cache: ~2/3 of analyzer queries in the three AC3 cells.
+## Phase 2 cell math (rev.3)
 
-## Phase 2 cell math (unchanged from rev.1)
+- 3 models × 4 strategies (S0, AO, Augment, winner) × 4 tasks × 3 prefixes = **144 invocations**.
+- gpt-5.4 dominates dollar cost (~$0.85 / 50-problem run, ~$50 total).
+- Kimi dominates wall time (100 RPM cap).
+- Within-model cache hits across Augment + winner.
 
-- 3 models × 4 strategies (S0, AO, Augment, + 1 winner from Reset/Rewrite) × 4 tasks × 3 prefixes = 144 invocations.
-- gpt-5.4 dominates cost (~$0.85/run, ~$50 total).
-- Kimi + gpt-5.5 dominate wall time (Kimi 100 RPM, gpt-5.5 reasoning).
-- Cache hits for Augment + winning variant on the same prefix.
+## Phase 3 — Cross-benchmark error-bar redos (replaces rev.2's multi-turn gating)
 
-## Phase 3 cell math (new)
+Cross-benchmark validation that the winning AC3 variant survives outside LiC. Two sub-phases:
 
-- 1 model × 4 strategies (S0, AO, Reset always-on, Reset gated — substituting the Phase-1 winner for "Reset" if it's Rewrite) × 2 tasks × 50 problems × 3 fresh sampling reps.
-- = 1200 multi-turn fresh sims if every cell goes the full 50; smaller if we trim.
-- Wall time on DeepSeek: ~2 min per fresh sim × 1200 ≈ 40 hours of single-process work, but parallelized at mc=20 → ~2-3 hours per task per condition. So ~10-12 h overnight.
-- A second-model pass (gpt-5.4) on Phase 3 is desirable if time permits — would roughly double overnight.
+### 3a. CollabLLM N=3 redo
 
-## Ready-to-launch checklist (rev.2)
+- Driver: `ctx-editor-collabllm` (i.e. `run_collabllm.py`).
+- Tasks: math (MATH-Hard) and code (BigCodeBench) — the two CollabLLM tasks.
+- Model: **DeepSeek-V4-Flash** initially. If Phase 2 picks a different headline model, run that too — it's a small batch.
+- Strategies: S0, AO, Augment, + winning AC3 variant from Phase 1/2.
+- N=3 sampling reps per (strategy, task). The original CollabLLM batch was N=1 with high variance (40-60% on math across seeds per `docs/reports/collabllm_baseline_comparison.md`); the N=3 here is specifically to put error bars on the headline numbers.
+- Cell count: 4 strategies × 2 tasks × 3 reps = **24 invocations**.
+- Wall time: each invocation is ~5-10 min on DeepSeek per the CollabLLM record → ~2 h.
 
-Engineering deliverables before Phase 1 kicks off:
+### 3b. WildChat / Huang N=3 redo
 
-- [ ] **Pricing file** `src/ctx_editor/models/foundry_pricing.yaml` — already scaffolded, awaits user-filled prices. Token counts log regardless; cost numbers will fill in retroactively as soon as the file is populated. (DONE — file scaffolded; user to fill in prices.)
-- [ ] **Cost-merge wiring** `src/ctx_editor/models/base.py` — already merges the foundry pricing on top of the OpenAI table. (DONE.)
-- [ ] **Analysis cache backend** `src/ctx_editor/strategies/analysis_cache.py` — new file. Synchronous JSON write/read on the filesystem, content-addressed. Lightweight; no DB.
-- [ ] **Registry helper** `scripts/inspect_analysis_cache.py` — list/summarize/invalidate.
-- [ ] **ConversationAnalyzer integration** — add optional `cache=` kwarg; thread through strategies.
-- [ ] **Hydra knob** `experiment.analysis_cache=...` — defaults to a session-shared path under `outputs/analysis_cache/`.
-- [ ] **Phase 1 launcher** `scripts/run_phase1_ac3_deepseek.sh` — 5 strategies × 4 tasks × 3 convs; uses the cache.
-- [ ] **`context_edit_v2_no_gate.yaml` experiment config** for the always-on Reset variant (already explained in rev.1).
-- [ ] **`ac3_rewrite_lic.yaml` experiment config** adapting `collabllm_compaction.yaml` for LiC tasks.
-- [ ] **One-cell smoke test** end-to-end with cache enabled — confirm cache hit happens on second variant.
+- Driver: the post-refactor `huang_eval/strategies.py` exposes `HuangAC3{Augment, Reset, GatedReset, Rewrite}Strategy` so the same variant works.
+- Phase structure: Huang's pipeline has its own Phase 1 (AO-failure detection) + Phase 2 (strategy evaluation on those). Our "redo" is the Phase 2 step.
+- Model: DeepSeek-V4-Flash.
+- Strategies: S0 (full context), AO, Augment, + winning AC3 variant.
+- N=3 sampling reps per (strategy, conversation pool).
+- Conversation pool: the existing 30-conversation WildChat sample from the paper (`outputs/huang_eval/...`).
+- Cell count: 4 strategies × 1 pool × 3 reps = **12 invocations** (each one processes the full pool).
+- Wall time: ~1-2 h based on the paper's Huang-eval timings.
+
+### 3c. Total Phase 3 estimate
+
+36 invocations, ~3-5 h. Fits comfortably in the same overnight slot as Phase 1+2 plus headroom.
+
+### Scoping caveat
+
+If Phase 2 reveals that the Augment ablation is essential (or that the winner differs by benchmark), we can extend Phase 3 with more variants. The 36-invocation budget above is the **minimum needed for error bars on the winning method**, not the full cross-benchmark sweep.
+
+## Future work — multi-turn gating study (deferred)
+
+Scoped exactly as rev.2 said but explicitly off the table for this batch. Re-evaluate after Phase 3 if gating is the bottleneck for the deployment-realism narrative; build incrementally then.
+
+## Content filter — concrete monitoring + escalation
+
+For each cell, we tail `content_filter_errors.jsonl` in the run dir and compute:
+
+```
+cf_rate = num_filtered_calls / num_total_analyzer_calls
+```
+
+per cell. Thresholds:
+
+- `cf_rate == 0`: green; report as `v8`.
+- `0 < cf_rate ≤ 5%`: yellow; report `v8 (CF skips: N)` and continue.
+- `cf_rate > 5%`: red; abort the cell, re-run with `analyzer_prompt_version=s1`, mark in the per-cell metadata.
+- `s1` cell still red: write up the cell as red-skipped, raise a flag, propose building v13 before Phase 2 expands to that variable.
+
+Phase 1 on Foundry DeepSeek is expected green (no Azure-OAI route in the analyzer call path). Phase 2 on gpt-5.4 / gpt-5.5 is where we expect to need the escalation.
+
+## Engineering deliverables (rev.3 — what we build before launching)
+
+The list grew slightly vs rev.2 — splitting out the gating piece and the cross-benchmark cell math.
+
+1. **Pricing file** `src/ctx_editor/models/foundry_pricing.yaml` — DONE, populated by user.
+2. **Cost-merge wiring** `src/ctx_editor/models/base.py` — DONE.
+3. **Analysis cache backend** `src/ctx_editor/strategies/analysis_cache.py` — new file.
+4. **Registry / inspector** `scripts/inspect_analysis_cache.py` — new file.
+5. **Analyzer integration** — add optional `cache=` kwarg to `ConversationAnalyzer.analyze()`, thread through strategies and the runner.
+6. **Hydra knob** `experiment.analysis_cache=outputs/analysis_cache` default.
+7. **`context_edit_v2_no_gate.yaml`** experiment config — `max_resets: 1, min_turns: 1` (always edit on final turn in replay).
+8. **`context_edit_v2_gated.yaml`** experiment config — `max_resets: 3, min_turns: 3` (paper-default gating).
+9. **`ac3_rewrite_lic.yaml`** experiment config — LiC adaptation of `collabllm_compaction.yaml`.
+10. **Phase 1 launcher** `scripts/run_phase1_ac3_deepseek.sh` — 6 strategies × 4 tasks × 3 convs, with the cache.
+11. **One-cell smoke** end-to-end on a small subset (1 task × 1 conv × 1 strategy) to confirm: replay + analyzer + accumulate + cache + gate-rate logging all wire up.
+12. **Prompt design doc** `docs/analyzer_prompt_design_notes.md` — capture v8, s1, archived-v12, contingent-v13. Useful regardless of whether we build v13.
 
 After Phase 1:
 
-- [ ] **Phase 2 launcher** `scripts/run_phase2_ac3_other_models.sh` (depends on Phase 1 winner).
+13. **Phase 2 launcher** `scripts/run_phase2_ac3_other_models.sh` (winner-aware).
 
 After Phase 2:
 
-- [ ] **Phase 3 launcher** for the multi-turn gating study.
-- [ ] **`context_edit_v2_no_gate_fresh.yaml`** or equivalent config (sets `min_turns=1, max_resets=1000` to make every turn an edit).
+14. **Phase 3 cross-benchmark launchers**: `scripts/run_phase3_collabllm_redo.sh` + `scripts/run_phase3_huang_redo.sh`.
 
-## Changes from rev.1
+## Budget summary
 
-| Topic | rev.1 | rev.2 |
+| Phase | Invocations | Wall time | Reported cost | Notes |
+|---|---|---|---|---|
+| Phase 1 (DeepSeek explore) | 72 | ~1.5 h | will fill in via pricing.yaml | 6 strategies incl. gating. |
+| Phase 2 (3 other models) | 144 | ~5-6 h | ~$50 measurable (gpt-5.4 dominates) + tokens for Foundry models | Cache hits across Augment + winner. |
+| Phase 3 (cross-benchmark redos) | 36 | ~3-5 h | smaller, mostly DeepSeek-Foundry tokens | |
+| **Total this batch** | ~252 | ~10-12 h | ~$50 + tokens | Fits in one overnight slot. |
+| Future: multi-turn gating | ~1200 | ~10-12 h | + DeepSeek tokens / gpt-5.4 $ | Held for later. |
+
+## Risks and contingencies (rev.3)
+
+| Risk | Mitigation |
+|---|---|
+| Azure CF trips on Phase-2 gpt-5.4/gpt-5.5 cells | Escalation: v8 → s1 → v13 (build only if needed). v13 design noted above. |
+| Phase 1 winner is model-specific | Promote 2 variants to Phase 2 (Augment + winner of Reset/Gated/Rewrite); 3pp tiebreak rules documented above. |
+| AC3-Rewrite LLM compaction adds noise | Cache analyzer output for variant-comparison cleanliness; if Phase-1 within-cell std > 8pp for Rewrite, flag as unstable, prefer Reset. |
+| Cost unknown for unpriced models | Pricing file populated; token counts always logged regardless. |
+| Output-dir collision | Every launcher uses `logging.output_dir=outputs/<runtag>/<exp>_<ts>` (≥ 2 levels deep). |
+| Cache poisoning (bad prompt commit, etc.) | Cache key encodes prompt_version and analyzer_model; registry records experiment_origin → can invalidate per origin or full reset. |
+| Phase 3 huang_eval port issues | If `HuangAC3{Variant}Strategy` classes have integration gaps (per `ac3_variants_per_benchmark.md`), defer 3b to a follow-up batch; report 3a alone. |
+
+## Changes from rev.2
+
+| Topic | rev.2 | rev.3 |
 |---|---|---|
-| Prompts | Use paper-specific prompt per benchmark; v8 normalization deferred to Phase 4 | v8 default for all conversation benchmarks (LiC, CollabLLM, WildChat); s1 only as CF fallback |
-| Gating | Mentioned briefly as "collapses in 1-turn replay" | Promoted to **Phase 3**, dedicated multi-turn fresh-sim study comparing always-on Reset vs Gated-Reset on DeepSeek (and maybe gpt-5.4) |
-| Cost reporting | Noted as "unknown for Foundry models" | Scaffolded `foundry_pricing.yaml` for user to fill; `get_model_pricing()` already merges it; token counts saved regardless |
-| Content filter | Mitigation plan v8 → s1 → degraded | Same plan but stronger callout that Foundry IS Azure and could trip CF; we monitor `content_filter_errors.jsonl` per cell from Phase 1 onward |
-| Analysis reuse | Not addressed | **New** caching backend + registry, integrated into ConversationAnalyzer; saves ~2/3 of analyzer calls in Phase 1 and removes noise across the variant comparison |
+| Gating | Dedicated multi-turn fresh-sim Phase 3 (~10-12 h) | Folded into Phase 1 as a 6th strategy in last-turn replay. Multi-turn gating deferred to "future work". |
+| Phase 3 | Multi-turn gating study | **Cross-benchmark error-bar redos** (CollabLLM + WildChat N=3 with winning AC3 method). |
+| Content-filter chain | v8 → s1 → degraded | v8 → s1 → (build v13 if needed). s1's limitations documented. v13 design noted but not pre-built. |
+| Prompt design doc | Implied but not on the deliverable list | Explicit deliverable: `docs/analyzer_prompt_design_notes.md` capturing v8/s1/v12/v13 history and trade-offs. |
 
-## Risks and contingencies (unchanged from rev.1 unless noted)
+## Ready-to-launch checklist (rev.3)
 
-- Content filter on Phase 2 OAI cells — mitigation chain above.
-- Phase 1 winner is benchmark-specific — we promote 2 variants (Augment + best Reset/Rewrite) to hedge.
-- AC3-Rewrite LLM compaction adds noise — caching the analysis removes one source of noise, but the rewrite step is its own LLM call (also cacheable on (prefix, rewrite-model, rewrite-prompt) — **TODO**: extend cache to cover rewrite outputs if Phase 1 shows the rewrite step is high-variance).
-- Cost unknown for Foundry models — pricing-file scaffolded, user-fillable; token counts always logged.
-- Output-dir collision — all launchers use unique `logging.output_dir=outputs/<runtag>/<exp>_<ts>` (≥ 2 levels deep).
-- **New**: cache poisoning — a buggy analyzer commit lands and writes wrong analyses to disk. Mitigation: cache key includes `prompt_version` and `analyzer_model`; in addition, the registry entry records `experiment_origin`, so we can `--invalidate-by-experiment-origin <bad_exp>` if needed. The cache directory can also be force-reset by `rm -rf outputs/analysis_cache/` between major prompt revisions.
+Pre-launch:
 
-Pending your sign-off — happy to adjust any of the decisions or scope further. If approved, I'll execute the checklist top-to-bottom and kick off Phase 1.
+- [x] Pricing file populated by user.
+- [ ] Analysis cache backend (`src/ctx_editor/strategies/analysis_cache.py`).
+- [ ] Cache inspector (`scripts/inspect_analysis_cache.py`).
+- [ ] `ConversationAnalyzer.analyze` cache integration.
+- [ ] Hydra knob.
+- [ ] `context_edit_v2_no_gate.yaml` + `context_edit_v2_gated.yaml` + `ac3_rewrite_lic.yaml`.
+- [ ] Phase 1 launcher.
+- [ ] `docs/analyzer_prompt_design_notes.md`.
+- [ ] One-cell end-to-end smoke (1 task × 1 conv × 1 strategy with cache enabled; verify cache hit on rerun).
+
+Then: user approval → execute Phase 1.
+
+Pending your sign-off.
