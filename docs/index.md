@@ -30,6 +30,11 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`tau2_absorption_decision.md`](tau2_absorption_decision.md) — Whether to absorb tau2-bench/ctx_edit into this repo (recommendation: hybrid).
 - [`reports/2026-05-12_local_main_cleanup.md`](reports/2026-05-12_local_main_cleanup.md) — Backup-branch + replay cleanup of local `main` before pulling the infra refactor.
 - [`reports/post_neurips_lic_vanilla.md`](reports/post_neurips_lic_vanilla.md) — Post-NeurIPS vanilla LiC matrix: gpt-5.4 / DeepSeek-V4-Flash / Kimi-K2.6 / gpt-5.5 × {math, code, database, actions} on htn50_52.
+- [`post_neurips_ac3_experiment_plan.md`](post_neurips_ac3_experiment_plan.md) — Plan rev.3 for the AC3 scale-up (Phase 1 explore + Phase 2 scale-up + Phase 3 cross-benchmark redo).
+- [`prefix_variance_decision.md`](prefix_variance_decision.md) — Decision: 3 distinct prefixes per problem (option B) for the AC3 evaluation.
+- [`prefix_gathering_process.md`](prefix_gathering_process.md) — Tally → fill-in → curate → replay process for the valid-prefix pool.
+- [`analyzer_prompt_design_notes.md`](analyzer_prompt_design_notes.md) — Consolidated v8 / s1 / archived-v12 / contingent-v13 prompt history and CF trade-offs.
+- [`reports/post_neurips_ac3_phase1.md`](reports/post_neurips_ac3_phase1.md) — AC3 Phase 1 results (DeepSeek-V4-Flash, last-turn replay, n=3 prefixes).
 
 ### Per-benchmark
 - [`lost_in_conversation_paper.md`](lost_in_conversation_paper.md) — LiC paper summary.
@@ -150,6 +155,11 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-17 | `reports/post_neurips_ac3_phase1.md` | AC3 Phase 1: 6 strategies vs Baseline/AO on DeepSeek-V4-Flash, last-turn replay. |
+| 2026-05-16 | `post_neurips_ac3_experiment_plan.md` | Plan rev.3 — AC3 scale-up (Phase 1+2+3) + analysis-cache infra. |
+| 2026-05-16 | `analyzer_prompt_design_notes.md` | v8 / s1 / archived-v12 / contingent-v13 prompt history + CF trade-offs. |
+| 2026-05-16 | `prefix_gathering_process.md` | Tally → fill-in → curate → replay process for the valid-prefix pool. |
+| 2026-05-16 | `prefix_variance_decision.md` | Decision: 3 distinct prefixes per problem for the AC3 evaluation. |
 | 2026-05-16 | `reports/post_neurips_lic_vanilla.md` | Vanilla LiC matrix on htn50_52 across 4 frontier/open models. |
 | 2026-05-12 | `htn50_52_subset.md` | Top-50 hard subset (TN>=1) from gpt-5.2 LiC logs. |
 | 2026-05-12 | `reports/2026-05-12_local_main_cleanup.md` | Cleanup writeup: backup-branch + replay process to land the infra pull. |
