@@ -32,6 +32,7 @@ from omegaconf import DictConfig, OmegaConf
 load_dotenv(Path(__file__).parent.parent.parent.parent / ".env")
 
 from ..models import get_model_client
+from ..models.endpoint_config import LoadBalancerConfig
 from .pairwise_judge import judge_pairwise
 from .replay import generate_ao, generate_augment, generate_fc, generate_s2, generate_s3, generate_s15
 from .aggregate import aggregate_phase2, load_turn_results, format_summary, write_breakdown_csv
@@ -265,7 +266,14 @@ async def run_phase2(cfg: DictConfig) -> None:
     logger.info(f"Variants enabled: {[k for k, v in variants.items() if v]}")
     logger.info(f"Analyzer prompt versions: {analyzer_prompt_versions}")
 
-    model_client = get_model_client(cfg.respondent_model)
+    load_balancer_config = None
+    if getattr(cfg, "load_balancer", None):
+        lb_dict = OmegaConf.to_container(cfg.load_balancer, resolve=True)
+        load_balancer_config = LoadBalancerConfig.from_dict(lb_dict)
+        logger.info(
+            f"Using load_balancer with {len(load_balancer_config.endpoints)} endpoints"
+        )
+    model_client = get_model_client(cfg.respondent_model, load_balancer_config)
 
     results_file = output_dir / "turn_results.jsonl"
     results_file.touch()

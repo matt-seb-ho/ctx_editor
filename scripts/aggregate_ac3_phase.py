@@ -36,6 +36,7 @@ EXP_TO_STRAT = {
     "context_edit_v2_gated": "Gated-Reset",
     "context_edit_v2_gated_accumulate": "Gated-Reset",
     "ac3_rewrite_lic": "Rewrite",
+    "ac3_rewrite_v2_lic": "Rewrite-v2",
     "context_edit_v2_accumulate": "Reset",  # historical (paper's row)
     "collabllm_compaction": "Rewrite",
 }

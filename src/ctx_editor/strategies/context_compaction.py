@@ -58,6 +58,8 @@ class AC3RewriteStrategy(BaseStrategy):
         min_turns: int = 4,
         use_memory: bool = False,
         memory_target: str = "system",
+        compaction_prompt: str = "context_compaction",
+        analysis_prompt: str = "compaction_analysis",
     ):
         self.model = compaction_model
         self.timeout = compaction_timeout
@@ -67,8 +69,11 @@ class AC3RewriteStrategy(BaseStrategy):
         self.use_memory = use_memory
         self.memory_target = memory_target
 
-        self._analysis_template = _load_prompt("compaction_analysis")
-        self._compaction_template = _load_prompt("context_compaction")
+        self._analysis_template = _load_prompt(analysis_prompt)
+        self._compaction_template = _load_prompt(compaction_prompt)
+        # Detect tag name used by the compaction prompt for the work-so-far section
+        # (v1: <work_so_far>; v2: <verified_work>). Both stay supported.
+        self._work_tag = "verified_work" if "verified_work" in self._compaction_template else "work_so_far"
 
     async def _generate(self, prompt: str, model_client: "ModelClient") -> str:
         """Run a single LLM generation."""
@@ -140,7 +145,7 @@ class AC3RewriteStrategy(BaseStrategy):
         output = await self._generate(prompt, model_client)
 
         task_spec = self._extract_tag(output, "task_spec") or analysis["task_spec"]
-        work_so_far = self._extract_tag(output, "work_so_far")
+        work_so_far = self._extract_tag(output, self._work_tag)
 
         return {
             "task_spec": task_spec,
