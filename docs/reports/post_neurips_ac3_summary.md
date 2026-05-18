@@ -1,7 +1,7 @@
 # Post-NeurIPS AC3 Scale-up — Overnight Summary
 
 **Run window**: 2026-05-16 evening → 2026-05-17 afternoon
-**Status**: Phase 1 + Phase 2 + Phase 3a (CollabLLM) complete. Phase 3b (Huang) in re-flight (see below).
+**Status**: Phase 1 + Phase 2 + Phase 3a (CollabLLM) + Phase 3b (Huang/WildChat) all **complete**.
 **Author**: Claude (autonomous overnight)
 
 ---
@@ -11,11 +11,16 @@
 - **Phase 1** (DeepSeek-V4-Flash, 6 strategies × 4 tasks × 3 prefixes, last-turn replay): AO leads (+18.1pp), AC3-Reset is right behind (+17.1pp). Reset and Gated-Reset tie (within 0.1pp); Reset wins on the tiebreak (simpler/cheaper). Rewrite (LLM compaction) underperforms Baseline.
 - **Phase 2** (gpt-5.4 + Kimi-K2.6, S0/AO/Augment/Reset, 4 tasks × 3 prefixes, last-turn replay): **Reset overtakes AO** at the average (+15.3pp vs +10.8pp over Baseline). Reset dominates AO on **database by +26pp**. Reset is within ±5pp of AO on math/code/actions. gpt-5.5 was dropped (deferred per cost/throughput note).
 - **Phase 3a** (CollabLLM N=3, DeepSeek-V4-Flash): **AO wins math-hard** (+10pp vs Baseline). AC3-Augment **regresses below Baseline on CollabLLM math** (-10pp) — multi-turn fresh-sim seems to penalize the appended-analysis pattern as analyses pile up turn after turn. AC3-Reset ties Baseline on math-hard. Bigcodebench is functionally unsolvable by DeepSeek-V4-Flash at this scale (all-zero except Reset rep1 at 5%). See `docs/reports/post_neurips_ac3_phase3_collabllm.md`.
-- **Phase 3b** (Huang/WildChat N=3): first attempt with DeepSeek as respondent failed because the Huang pipeline doesn't go through our Foundry load balancer — all DeepSeek calls 404'd; the first 6 cells reported 0 evaluated turns. Re-launched with gpt-5-mini (the paper's default). Re-run currently in flight; ETA finish ≈ 18:40 PT today. Results will land in `outputs/post_neurips_ac3_phase3_huang/`; report at `docs/reports/post_neurips_ac3_phase3_huang.md` when complete.
+- **Phase 3b** (Huang/WildChat N=3, gpt-5-mini after a DeepSeek-routing detour): **both AC3 variants dominate on WildChat**. AC3-Reset wins **89.8% ± 1.4pp** of AO-failure turns vs AO (and 82.6% vs FC). AC3-Augment is slightly better — **92.1% ± 1.3pp** vs AO, 85.9% vs FC. This is the strongest cross-benchmark validation we got tonight — the Phase-1/2 winner generalizes to multi-turn human-conversation settings, decisively. See `docs/reports/post_neurips_ac3_phase3_huang.md`.
 
 The flipped narrative across Phase 1→2 (AO led on DeepSeek, Reset leads on gpt-5.4+Kimi) is the most interesting empirical finding so far: the cost of *retaining* a stronger model's prior assistant turns (good but partially wrong) is recoverable by AC3-Reset's compacted-context rewrite, whereas the weaker DeepSeek benefits more from a clean slate (AO).
 
-**Cross-benchmark complication**: Phase 3a shows that in CollabLLM multi-turn fresh sims, AO is back to being the winner on math-hard, and AC3-Augment actively regresses. This is the first evidence that the Phase-1/2 takeaway ("AC3-Reset close to AO; sometimes better") does NOT transfer cleanly to the multi-turn fresh-sim regime where the strategy fires every turn. Likely root cause: AC3 strategies are designed for one-shot intervention in last-turn replay; firing on every turn (especially Augment's analysis-pile-on) introduces compounding noise. **Multi-turn gating (the Phase-3-from-rev.2 idea we deferred) suddenly looks much more important than rev.3 suggested.**
+**Cross-benchmark picture is split**:
+- **WildChat (Phase 3b)**: AC3 dominates by ~90pp wins-vs-AO at gpt-5-mini scale. Strongest validation of AC3 generalization.
+- **CollabLLM (Phase 3a)**: AC3-Augment regresses below baseline at DeepSeek scale, multi-turn fresh sim. AO is back to winning.
+- **LiC (Phase 1+2)**: Mixed — DeepSeek prefers AO, gpt-5.4/Kimi prefer AC3-Reset (especially on database, +25pp over AO).
+
+The CollabLLM-style regression is real and worth investigating. It contrasts sharply with WildChat where AC3-Augment is the *strongest* variant — likely because WildChat conversations are shorter (median ~6-10 turns vs CollabLLM's 14), so the analysis-pile-on effect that hurts CollabLLM Augment doesn't accumulate as much. **Multi-turn gating (the Phase-3-from-rev.2 idea we deferred) suddenly looks much more important than rev.3 suggested** — it's the deployment-realism story for AC3 on longer multi-turn conversations.
 
 ## Plan recap (rev.3)
 
@@ -105,13 +110,18 @@ Full report: `docs/reports/post_neurips_ac3_phase3_collabllm.md`.
 
 The gap between Phase 2 (Reset wins +25pp on database) and Phase 3a (AO wins +10pp on math-hard) is the central paper-narrative tension. Section "Methodological notes for the paper" below sketches the writeup.
 
-### 3b WildChat/Huang (in re-flight)
+### 3b WildChat/Huang (DONE — gpt-5-mini after a DeepSeek-routing detour)
 
-First attempt at 11:07 with DeepSeek-V4-Flash as respondent failed: the Huang pipeline (`run_phase2.py`) instantiates a plain `OpenAIModelClient` without passing through our `LoadBalancerConfig`, so calls to `DeepSeek-V4-Flash` got routed at the Azure OpenAI endpoint `dl-openai-3` which does not host that deployment → 404 `DeploymentNotFound`. The first 6 cells reported 0 evaluated turns. **Engineering fix needed**: thread `load_balancer_config` through `huang_eval/run_phase2.py` so Foundry routing works.
+Full report: `docs/reports/post_neurips_ac3_phase3_huang.md`.
 
-Re-launched at 16:09 with `respondent_model=gpt-5-mini` (the paper's default). gpt-5-mini routes through the standard Azure OpenAI deployments, so no load-balancer hack needed. Currently in flight; ETA finish ≈ 18:40 PT.
+**Engineering footnote**: first attempt at 11:07 with `respondent_model=DeepSeek-V4-Flash` failed — `huang_eval/run_phase2.py` instantiates a plain `OpenAIModelClient` without passing our `LoadBalancerConfig`, so DeepSeek calls 404'd at the Azure OpenAI endpoint that doesn't host that deployment. The first 6 cells reported 0 evaluated turns. Re-launched 16:09 with `respondent_model=gpt-5-mini` (matches paper Table 1(c)). **Engineering fix that should land**: thread `load_balancer_config` through `huang_eval/run_phase2.py`. Logged in `docs/post_neurips_ac3_followups.md` (created below).
 
-Variants tested: `s15` (= AC3-Reset, Phase 1 winner) and `augment` (= AC3-Augment), both with `v8` analyzer. 3 seeds each = 6 invocations. Results will populate `outputs/post_neurips_ac3_phase3_huang/` and a fresh `docs/reports/post_neurips_ac3_phase3_huang.md` when complete.
+| Variant | n | Wins vs AO | Wins vs FC |
+|---|---|---|---|
+| AC3-Reset (S15), avg | 75 | **89.8% ± 1.4pp** | 82.6% ± 1.7pp |
+| AC3-Augment, avg | 76 | **92.1% ± 1.3pp** | 85.9% ± 3.2pp |
+
+Both AC3 variants dominate. Augment slightly beats Reset on WildChat — opposite of CollabLLM where Augment regresses. Likely conversation-length effect.
 
 ## Methodological notes for the paper
 
