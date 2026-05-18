@@ -132,27 +132,75 @@ The cross-phase results suggest a clear narrative split, useful for the paper:
 
 The deployment-realism implication: **multi-turn AC3 with gating** becomes the actually-useful production setup — fire the intervention only when needed, not every turn. The rev.2 multi-turn gating Phase that was deferred to "future work" now looks more important than I anticipated when scoping for tonight.
 
-## Outstanding items for morning review
+## Next session — start here
 
-- **Final Phase 3a (CollabLLM) numbers** — should land before the user wakes up (ETA ~10:00 PT).
-- **Phase 3b (Huang/WildChat) numbers** — chained after 3a; ETA depends on 3a finish time. May or may not complete by morning.
-- **Aggregator output for Phase 3** — `aggregate_ac3_phase.py` works for CollabLLM (same metrics.json shape). Huang aggregator may need a custom path.
-- **Cross-phase cost analysis** — once the populated `foundry_pricing.yaml` is merged with the token counts, fill in the dollar cost across phases.
-- **Content-filter audit** — was there any trip during Phase 1 / 2? Spot-checked `content_filter_errors.jsonl` files; none observed in Phase 1, none in Phase 2 (yet).
+This doc is the canonical entry-point for picking up the AC3 thread. Suggested
+reading order before any new questions:
+
+1. This summary (TL;DR + cross-phase picture at the top).
+2. `docs/post_neurips_ac3_followups.md` — the engineering + experimental
+   follow-up backlog the overnight surfaced. **This is where the next
+   session's agenda starts**: load_balancer plumbing for Huang eval, the
+   multi-turn-gating experiment we deferred, gpt-5.5 Phase 2 follow-on,
+   bigcodebench investigation, etc.
+3. The per-phase reports for any specific cell-level detail you want:
+   - `docs/reports/post_neurips_ac3_phase1.md` (DeepSeek, all variants)
+   - `docs/reports/post_neurips_ac3_phase2.md` (gpt-5.4 + Kimi)
+   - `docs/reports/post_neurips_ac3_phase3_collabllm.md` (CollabLLM)
+   - `docs/reports/post_neurips_ac3_phase3_huang.md` (WildChat)
+4. `docs/post_neurips_ac3_experiment_plan.md` — rev.3 plan that scoped this
+   batch, useful for understanding *what was intentionally out of scope*
+   (e.g., multi-turn gating was deferred).
+5. `docs/analyzer_prompt_design_notes.md` — only if the next session
+   touches prompt design or the Azure content-filter story.
 
 ## File map
 
-- Plan: `docs/post_neurips_ac3_experiment_plan.md`
+### Documents (this batch)
+
+- Plan: `docs/post_neurips_ac3_experiment_plan.md` (rev.3, pre-launch)
+- Prompt design + CF history: `docs/analyzer_prompt_design_notes.md`
+- Follow-up backlog: `docs/post_neurips_ac3_followups.md`
 - Phase 1 results: `docs/reports/post_neurips_ac3_phase1.md`
 - Phase 2 results: `docs/reports/post_neurips_ac3_phase2.md`
+- Phase 3a (CollabLLM): `docs/reports/post_neurips_ac3_phase3_collabllm.md`
+- Phase 3b (WildChat): `docs/reports/post_neurips_ac3_phase3_huang.md`
 - This summary: `docs/reports/post_neurips_ac3_summary.md`
-- Prompt design + CF history: `docs/analyzer_prompt_design_notes.md`
-- Per-cell traces / metrics / configs: `outputs/post_neurips_ac3_phase{1,2,3_collabllm,3_huang}/`
-- Analysis cache + provenance: `outputs/analysis_cache/registry.json`
 
-## Cost / time accounting (best estimates as of now)
+(All entries above are listed in `docs/index.md`.)
+
+### Data / artifacts
+
+- Per-cell traces / metrics / configs: `outputs/post_neurips_ac3_phase{1,2,3_collabllm,3_huang}/`
+- Per-cell launcher logs: `outputs/post_neurips_ac3_phase{1,2,3_collabllm,3_huang}/logs/`
+- Analysis cache + provenance: `outputs/analysis_cache/registry.json`
+- Winners files (consumed by Phase 2 launcher): `outputs/post_neurips_ac3_phase{1,2}/winners.json`
+
+### Scripts (this batch)
+
+- `scripts/run_phase1_ac3_deepseek.sh` — Phase 1 launcher.
+- `scripts/run_phase2_ac3_other_models.sh` — Phase 2 launcher (winner-aware via `winners.json`).
+- `scripts/run_phase3_collabllm_redo.sh` — Phase 3a CollabLLM launcher.
+- `scripts/run_phase3_huang_redo.sh` — Phase 3b Huang launcher.
+- `scripts/aggregate_ac3_phase.py` — Generic phase aggregator (LiC-cells regex; doesn't yet handle CollabLLM / Huang cell-name shapes — see follow-ups).
+
+### Code (this batch)
+
+- `src/ctx_editor/strategies/analysis_cache.py` (new) — content-addressed analyzer-output cache.
+- `src/ctx_editor/strategies/analyzer.py` — `analyze()` takes optional `cache` kwarg.
+- `src/ctx_editor/strategies/append_analysis.py`, `context_edit_v2.py` — thread cache through.
+- `src/ctx_editor/models/foundry_pricing.yaml` — user-populated cost table; merged into `get_model_pricing()`.
+- `src/ctx_editor/config/experiment/context_edit_v2_{no_gate,gated}{,_accumulate}.yaml`, `ac3_rewrite_lic.yaml`, `collabllm_ac3_{augment,reset}_v8.yaml` — new experiment configs.
+
+## Cost / time accounting (final)
 
 - Phase 1: ~1.5h wall, ~$0.05 reported (DeepSeek Foundry not priced).
-- Phase 2: ~4h wall (gpt-5.4 parallel done in ~1.5h; Kimi serialized took ~3.5h; gpt-5.5 dropped). Reported cost: gpt-5.4 ≈ $35, Kimi unpriced.
-- Phase 3a (CollabLLM): in flight; per-cell ≈ $0.03 baseline → ~$0.50 total.
-- Phase 3b (Huang): TBD.
+- Phase 2: ~4h wall (gpt-5.4 parallel done in ~1.5h; Kimi serialized took ~3.5h; gpt-5.5 dropped). Reported cost: gpt-5.4 ≈ $35; Kimi unpriced.
+- Phase 3a (CollabLLM): ~3.3h wall (07:40 → 11:04 PT). ~$0.65 reported.
+- Phase 3b (Huang/WildChat): ~3.3h wall (16:09 → 19:28 PT, second batch). Cost not yet priced; respondent was gpt-5-mini (in OpenAI pricing table — backfill at any time).
+
+Foundry-side dollar cost on DeepSeek + Kimi is `$0` reported, but token counts are saved per cell; if `foundry_pricing.yaml` is filled in, backfill is mechanical.
+
+## Content-filter audit
+
+Spot-checked `content_filter_errors.jsonl` across phases — **zero filter trips observed** in Phase 1, 2, 3a, or 3b. Foundry-side (DeepSeek, Kimi) and Azure-OAI-side (gpt-5.4, gpt-5-mini) all clean. The `v8 → s1 → v13` escalation chain was not needed.
