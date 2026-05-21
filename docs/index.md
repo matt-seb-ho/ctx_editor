@@ -48,6 +48,8 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`reports/post_may18_r3_summary.md`](reports/post_may18_r3_summary.md) — R3 overnight: Rewrite-vs-Reset hierarchical diagnosis + v3/v4 interventions + mega-table fills.
 - [`reports/post_may18_r3_mega_table.md`](reports/post_may18_r3_mega_table.md) — Auto-generated model × benchmark × method mega table after R3.
 - [`post_may18_r3_followups.md`](post_may18_r3_followups.md) — Follow-up backlog from the R3 batch (CF filter on Reset bigcodebench, Gated-Reset cross-model, tau2 replay).
+- [`reports/post_may18_r4_summary.md`](reports/post_may18_r4_summary.md) — R4: v5 Reset-like + GEPA-optimized v6 Rewrite (first variant to beat Baseline on LiC).
+- [`notes/literature/combee_notes.md`](notes/literature/combee_notes.md) — Combee paper notes; doesn't apply to our latency profile.
 - [`notes/literature/gepa_notes.md`](notes/literature/gepa_notes.md) — Notes on GEPA prompt-optimization framework (candidate for next-batch Rewrite optimization).
 - [`notes/literature/textgrad_notes.md`](notes/literature/textgrad_notes.md) — Notes on TextGrad (GEPA precursor; subsumed).
 - [`notes/literature/tau2_replay_scoping.md`](notes/literature/tau2_replay_scoping.md) — Why tau2 last-turn replay is ~2 dev-days of work (defer).
@@ -171,6 +173,8 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-21 | `notes/literature/combee_notes.md` | Combee notes — addresses aggregator overload, not our per-candidate latency problem. |
+| 2026-05-21 | `reports/post_may18_r4_summary.md` | R4: v5 Reset-like flat; GEPA-optimized v6 = +5.6pp vs Baseline (first Rewrite variant to beat Baseline). |
 | 2026-05-20 | `post_may18_r3_followups.md` | R3 follow-ups: Reset CF filter on bigcodebench, Gated-Reset cross-model, tau2 replay infra. |
 | 2026-05-20 | `notes/literature/tau2_replay_scoping.md` | tau2 last-turn replay needs ~2 dev-days (dual-control state); defer. |
 | 2026-05-20 | `notes/literature/textgrad_notes.md` | TextGrad — autograd-for-text; GEPA precursor (subsumed). |
