@@ -826,6 +826,122 @@ def display_analysis_block(log_data: dict) -> None:
         st.markdown(analysis_text)
 
 
+def display_prompt_versions_panel(run_dir: str) -> None:
+    """Surface the analyzer / compaction prompt versions used by a run.
+
+    Reads `run_dir/config.yaml`, extracts the prompt names referenced by the
+    strategy block, and renders them in a collapsible panel — including the
+    file path under `src/ctx_editor/strategies/prompts/` and the full prompt
+    text (collapsed by default) so you can see exactly what was used.
+    """
+    cfg_path = Path(run_dir) / "config.yaml"
+    if not cfg_path.exists():
+        return
+    try:
+        cfg = yaml.safe_load(cfg_path.read_text())
+    except Exception:
+        return
+    strategy = (cfg or {}).get("experiment", {}).get("strategy", {}) or {}
+    if not isinstance(strategy, dict):
+        return
+
+    # Collect every (label, prompt_name) the strategy uses. AC3-Rewrite uses
+    # `compaction_prompt` + `analysis_prompt`. AC3-Reset / Augment / Gated use
+    # `analyzer_prompt_version` (a registry key, not a file).
+    prompts: list[tuple[str, str, str]] = []  # (label, value, kind)
+    if strategy.get("compaction_prompt"):
+        prompts.append(("compaction_prompt", strategy["compaction_prompt"], "file"))
+    if strategy.get("analysis_prompt"):
+        prompts.append(("analysis_prompt", strategy["analysis_prompt"], "file"))
+    if strategy.get("analyzer_prompt_version"):
+        prompts.append(("analyzer_prompt_version", strategy["analyzer_prompt_version"], "registry"))
+    if not prompts:
+        return
+
+    prompts_dir = Path(__file__).resolve().parent / "strategies" / "prompts"
+    with st.expander("Prompt Versions (analyzer / rewriter)", expanded=False):
+        for label, value, kind in prompts:
+            st.markdown(f"**{label}**: `{value}`  _(kind: {kind})_")
+            if kind == "file":
+                # Try both the named .txt and a versioned name
+                candidates = [
+                    prompts_dir / f"{value}.txt",
+                    prompts_dir / value,
+                ]
+                fpath = next((p for p in candidates if p.exists()), None)
+                if fpath:
+                    st.caption(f"file: `{fpath.relative_to(Path('/home/v-homatthew/ctx_editor'))}`")
+                    with st.expander(f"View {fpath.name}", expanded=False):
+                        st.code(fpath.read_text(), language="text")
+                else:
+                    st.caption(f"(prompt file `{value}.txt` not found under {prompts_dir})")
+            else:
+                st.caption(
+                    "see `src/ctx_editor/strategies/analyzer_prompts.py` for the "
+                    "registry (`ANALYZER_PROMPT_REGISTRY`)."
+                )
+
+
+def display_compaction_analysis(log_data: dict) -> None:
+    """Display AC3-Rewrite's step-1 analysis (compaction_analysis log).
+
+    This is the first LLM call in the AC3-Rewrite strategy — it reads the
+    conversation and emits ``task_spec`` / ``aligned`` / ``issues``. The
+    second LLM call (context_compaction) consumes this plus the conversation.
+    """
+    parts = []
+    if log_data.get("task_spec"):
+        parts.append(f"**Task Spec (analyzer)**\n{log_data['task_spec']}")
+    if log_data.get("aligned"):
+        parts.append(f"**What Looks Right (analyzer)**\n{log_data['aligned']}")
+    if log_data.get("issues"):
+        parts.append(f"**Issues (analyzer)**\n{log_data['issues']}")
+    analyzer_model = log_data.get("model", "")
+    model_str = (
+        f' <span style="font-size: 0.8em; color: #888;">({analyzer_model})</span>'
+        if analyzer_model else ""
+    )
+    analysis_text = "\n\n".join(parts) if parts else "(empty)"
+    with st.expander("AC3-Rewrite — Step 1: Analyzer Output", expanded=False):
+        st.markdown(
+            f'<div style="background-color: #1a2a3a; padding: 12px; border-radius: 5px; '
+            f'border-left: 4px solid #17a2b8;">'
+            f'<strong style="color: #7ab3e0;">compaction_analysis (LLM call #1)</strong>'
+            f"{model_str}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(analysis_text)
+
+
+def display_context_compaction(log_data: dict) -> None:
+    """Display AC3-Rewrite's step-2 compaction (context_compaction log).
+
+    This is the second LLM call. It reads the analyzer's output plus the
+    conversation and emits the final compacted task_spec + verified_work
+    that becomes the new context message.
+    """
+    parts = []
+    if log_data.get("compacted_task_spec"):
+        parts.append(f"**Compacted Task Spec (rewriter)**\n{log_data['compacted_task_spec']}")
+    if log_data.get("compacted_work_so_far"):
+        parts.append(f"**Compacted Work So Far (rewriter)**\n{log_data['compacted_work_so_far']}")
+    compaction_model = log_data.get("model", "")
+    model_str = (
+        f' <span style="font-size: 0.8em; color: #888;">({compaction_model})</span>'
+        if compaction_model else ""
+    )
+    body = "\n\n".join(parts) if parts else "(empty)"
+    with st.expander("AC3-Rewrite — Step 2: Rewriter Output", expanded=True):
+        st.markdown(
+            f'<div style="background-color: #2d2d4a; padding: 12px; border-radius: 5px; '
+            f'border-left: 4px solid #9c27b0;">'
+            f'<strong style="color: #d4a8e6;">context_compaction (LLM call #2)</strong>'
+            f"{model_str}</div>",
+            unsafe_allow_html=True,
+        )
+        st.markdown(body)
+
+
 def display_edit_decision_inline(log_data: dict) -> None:
     """Display an edit decision as an inline indicator."""
     should_edit = log_data.get("should_edit", False)
@@ -1030,6 +1146,12 @@ def display_conversation(sample: dict, exp_type: str = "", run_dir: str = "") ->
 
             if log_type == "conversation_analysis":
                 display_analysis_block(log_data)
+
+            elif log_type == "compaction_analysis":
+                display_compaction_analysis(log_data)
+
+            elif log_type == "context_compaction":
+                display_context_compaction(log_data)
 
             elif log_type == "edit_decision":
                 display_edit_decision_inline(log_data)
@@ -1420,11 +1542,30 @@ def main():
         st.warning("No samples match the current filters.")
         return
 
+    # Deep-link: ?sample=<sample_id> pre-selects that sample if present in the
+    # filtered set. Useful for opening two browser tabs side-by-side comparing
+    # the same sample under different variants (e.g., Reset vs Rewrite).
+    sample_from_query = st.query_params.get("sample")
+    initial_idx = 0
+    if sample_from_query:
+        for i, s in enumerate(task_samples):
+            if s.get("sample_id") == sample_from_query:
+                initial_idx = i
+                break
+
     selected_sample_idx = st.sidebar.selectbox(
         "Sample",
         range(len(task_samples)),
         format_func=lambda i: sample_labels[i],
+        index=initial_idx,
     )
+    # Echo the selection back into the URL so opening a new tab off this page
+    # preserves the sample context.
+    chosen_sample_id = task_samples[selected_sample_idx].get("sample_id", "")
+    if chosen_sample_id:
+        st.query_params["sample"] = chosen_sample_id
+    if selected_run:
+        st.query_params["run"] = selected_run
 
     selected_sample = task_samples[selected_sample_idx]
 
@@ -1452,12 +1593,33 @@ def main():
     has_memory = "memory" in effective_exp_type
     memory_tag = " + Memory" if has_memory else ""
 
-    if "context_edit_v2" in effective_exp_type:
+    if "ac3_rewrite" in effective_exp_type or "compaction" in effective_exp_type:
+        strategy_desc = (
+            f"**Strategy:** AC3-Rewrite{memory_tag} — Two LLM calls "
+            "(compaction_analysis → context_compaction) replace the conversation "
+            "with a compacted message every turn after `min_turns`."
+        )
+    elif "omit_assistant" in effective_exp_type:
+        strategy_desc = (
+            f"**Strategy:** AO (Assistant-Omitted){memory_tag} — drop all assistant "
+            "turns from context before each generation."
+        )
+    elif "context_edit_v2_no_gate" in effective_exp_type:
+        strategy_desc = (
+            f"**Strategy:** AC3-Reset (no-gate){memory_tag} — analyzer output is "
+            "templated into a `compacted conversation` message every turn."
+        )
+    elif "context_edit_v2_gated" in effective_exp_type:
+        strategy_desc = (
+            f"**Strategy:** AC3-Gated-Reset{memory_tag} — analyzer fires every turn, "
+            "but context is reset only when issues are detected."
+        )
+    elif "context_edit_v2" in effective_exp_type:
         strategy_desc = f"**Strategy:** S2 — Context Edit{memory_tag} — Analyzer-driven context rewriting when issues found"
     elif "context_edit" in effective_exp_type and "agentic" not in effective_exp_type:
         strategy_desc = f"**Strategy:** S2 — Context Edit{memory_tag} — Conversation is compressed before each assistant turn"
     elif "append_analysis" in effective_exp_type:
-        strategy_desc = f"**Strategy:** S1 — Append Analysis{memory_tag} — Analysis appended to context (no rewriting)"
+        strategy_desc = f"**Strategy:** AC3-Augment{memory_tag} — Analyzer output appended to context as a user-role note (no rewriting)"
     elif "agentic_edit" in effective_exp_type:
         strategy_desc = (
             f"**Strategy:** Agentic Edit{memory_tag} — Model decides when to compress context"
@@ -1482,6 +1644,10 @@ def main():
         strategy_desc += f"  |  **User Mode:** {mode_label}"
 
     st.info(strategy_desc)
+
+    # Surface the analyzer / compaction prompt versions used by this run, with a
+    # link to the source file under src/ctx_editor/strategies/prompts/.
+    display_prompt_versions_panel(selected_run)
 
     # Display the conversation
     display_conversation(

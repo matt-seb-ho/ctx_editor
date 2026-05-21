@@ -74,3 +74,49 @@ Tracked items that should be addressed in the next session.
   failure-mode analysis pinpoints LLM hallucination (63%) as the
   dominant cause and explains why prompt instructions can reduce
   but not suppress it.
+
+## tau2 blocker (logged 2026-05-21)
+
+**Cannot run tau2 in the current shared Python env (3.13.11).** The
+`tau2-bench` upstream package requires Python `>=3.12,<3.14`, but
+its `tau2.voice.synthesis.audio_effects.effects` module
+unconditionally imports the stdlib `audioop` module which was
+**removed in Python 3.13**. So a fresh `import tau2.agent.llm_agent`
+fails with `ModuleNotFoundError: No module named 'audioop'`.
+
+Options for next session:
+
+1. **Set up a dedicated Python 3.12 venv for tau2** (e.g.,
+   `uv venv --python=3.12 ~/tau2_ctxe/.venv && uv pip install -e .`)
+   and run all tau2 commands inside it. Cleanest.
+2. **Vendor an `audioop` shim** or monkey-patch the voice module to
+   defer the import. Brittle.
+3. **Drop the voice dependency** if our work doesn't need it.
+   The `effects.py` is only imported transitively when the voice
+   subsystem is touched; we never hit it directly. A small upstream
+   patch to make the import lazy would fix this.
+
+I did **not** modify the env tonight (the user denied `pip install
+-e .`). All other R3 tau2 work — implementing Augment + always-on
+Reset agents, launching cross-model — depends on resolving this
+blocker first.
+
+### Inventory of what's available + what's missing in `tau2_ctxe/ctx_edit/agents.py`
+
+- **`LLMAgent`** (built-in): Baseline (s0).
+- **`AssistantOmitAgent`**: AO.
+- **`ContextEditAgent`** (s2): **already Gated-Reset** — it only
+  compacts when `analyze_conversation()` returns `needs_edit=True`.
+  In LiC terminology this is `context_edit_v2_gated`, not
+  `context_edit_v2_no_gate`.
+- **`ContextRewriteAgent`** (s3): Rewrite (extra LLM compaction call).
+- **Missing**: an Augment variant that appends the analyzer's
+  `task_spec / valid_progress / corrective_direction` to the most
+  recent user message without ever compacting. Could be derived
+  from the "no issues → inject strategic hint" branch in
+  `ContextEditAgent.generate_next_message`.
+- **Missing**: an always-on Reset variant (compact every turn
+  regardless of `needs_edit`).
+
+Both new agents are 30–60 min of code each but require the env
+unblocked first.
