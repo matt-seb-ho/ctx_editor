@@ -12,6 +12,7 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`README.md`](README.md) — Quickstart, CLI examples, code map.
 - [`benchmarks_index.md`](benchmarks_index.md) — One-stop reference for the four benchmarks (LiC, CollabLLM, WildChat/Huang, Tau2).
 - [`scaling_experiments.md`](scaling_experiments.md) — How to run new experiments + sweeps with the post-Phase-3 setup.
+- [`global_todos.md`](global_todos.md) — Long-running cross-batch TODOs (sys-prompt preprocessing, input-order ablation, negative-guidance).
 - [`index.md`](index.md) — This file.
 
 ### Core method & architecture
@@ -53,6 +54,8 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`post_may18_r5_analyzer_parity_plan.md`](post_may18_r5_analyzer_parity_plan.md) — Plan to refactor Rewrite onto the shared analyzer and re-run with unbiased GEPA.
 - [`analyzer_parity_finding.md`](analyzer_parity_finding.md) — **⚠ The architecture bug**: AC3-Rewrite was using a bespoke (worse) analyzer instead of the shared `ConversationAnalyzer + v8` used by Augment / Reset / Gated-Reset. Invalidates pre-2026-05-21 Rewrite-vs-other-variant comparisons. Augment / Reset / Gated-Reset unaffected.
 - [`reports/post_may18_r5_resume.md`](reports/post_may18_r5_resume.md) — Resume doc for the next session after the analyzer-parity refactor lands.
+- [`post_may18_r6_plan.md`](post_may18_r6_plan.md) — R6 plan: re-evaluate Rewrite with v8 analyzer (v1, v3-no-conv) then unbiased GEPA fallback; wall-clock budget for tau2 follow-up.
+- [`post_may18_r6_design_iterations.md`](post_may18_r6_design_iterations.md) — Design-decision log: v1 warts, open-ended output mode, `<new_context>` wrapper, role-boundary fix, system-prompt audit.
 - [`notes/literature/combee_notes.md`](notes/literature/combee_notes.md) — Combee paper notes; doesn't apply to our latency profile.
 - [`notes/literature/gepa_notes.md`](notes/literature/gepa_notes.md) — Notes on GEPA prompt-optimization framework (candidate for next-batch Rewrite optimization).
 - [`notes/literature/textgrad_notes.md`](notes/literature/textgrad_notes.md) — Notes on TextGrad (GEPA precursor; subsumed).
@@ -177,6 +180,9 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-22 | `post_may18_r6_design_iterations.md` | R6 design-iteration log: v1 warts, open-ended `<new_context>` mode, role-boundary fix, system-prompt audit. |
+| 2026-05-21 | `global_todos.md` | Global TODOs: sys-prompt preprocessing, rewriter input-order ablation, negative-guidance in compacted context. |
+| 2026-05-21 | `post_may18_r6_plan.md` | R6 plan: v1+v8 / v3-no-conv+v8 re-runs then unbiased GEPA fallback; wall-clock budget for tau2 follow-up. |
 | 2026-05-21 | `notes/literature/combee_notes.md` | Combee notes — addresses aggregator overload, not our per-candidate latency problem. |
 | 2026-05-21 | `reports/post_may18_r5_resume.md` | Resume doc for next session after analyzer-parity refactor. |
 | 2026-05-21 | `analyzer_parity_finding.md` | ⚠ Architecture bug: AC3-Rewrite was using a bespoke analyzer instead of the shared one — invalidates all prior Rewrite-vs-Reset comparisons. |

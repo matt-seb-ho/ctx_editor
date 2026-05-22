@@ -79,6 +79,7 @@ class AC3RewriteStrategy(BaseStrategy):
         use_memory: bool = False,
         memory_target: str = "system",
         compaction_prompt: str = "context_compaction",
+        open_ended_output: bool = False,
         # --- Analyzer parameters (mirror context_edit_v2.AC3ResetStrategy) ---
         analyzer_model: Optional[str] = None,
         analyzer_timeout: int = 60,
@@ -139,6 +140,7 @@ class AC3RewriteStrategy(BaseStrategy):
 
         self._compaction_template = _load_prompt(compaction_prompt)
         self._compaction_prompt_name = compaction_prompt
+        self._open_ended_output = open_ended_output
         # Detect tag name used by the compaction prompt for the work-so-far section
         # (v1: <work_so_far>; v2: <verified_work>). Both stay supported.
         self._work_tag = "verified_work" if "verified_work" in self._compaction_template else "work_so_far"
@@ -209,6 +211,18 @@ class AC3RewriteStrategy(BaseStrategy):
         )
         output = await self._generate(prompt, model_client)
 
+        if self._open_ended_output:
+            # Prefer the wrapped <new_context>...</new_context> region if the
+            # rewriter used it (lets non-reasoning models put scratchpad CoT
+            # before the tag). Fall back to the whole output otherwise.
+            wrapped = self._extract_tag(output, "new_context")
+            return {
+                "task_spec": "",
+                "work_so_far": "",
+                "open_ended_text": wrapped or output.strip(),
+                "raw_output": output,
+            }
+
         task_spec = self._extract_tag(output, "task_spec") or analysis.user_intent
         work_so_far = self._extract_tag(output, self._work_tag)
 
@@ -232,14 +246,20 @@ class AC3RewriteStrategy(BaseStrategy):
             new_messages.append(Message(role="system", content=system_msg.content))
 
         # Compacted conversation
-        compact_parts = [
-            "The conversation history has been compacted. Below is a summary of the "
-            "user's full specification and the work completed so far that is consistent "
-            "with it.",
-            f"# User Task Specification (So Far)\n{compaction['task_spec']}",
-        ]
-        if compaction["work_so_far"] and compaction["work_so_far"].lower() != "none":
-            compact_parts.append(f"# What Looks Right So Far\n{compaction['work_so_far']}")
+        if compaction.get("open_ended_text"):
+            compact_parts = [
+                "The conversation history has been compacted. Below is the prepared summary.",
+                compaction["open_ended_text"],
+            ]
+        else:
+            compact_parts = [
+                "The conversation history has been compacted. Below is a summary of the "
+                "user's full specification and the work completed so far that is consistent "
+                "with it.",
+                f"# User Task Specification (So Far)\n{compaction['task_spec']}",
+            ]
+            if compaction["work_so_far"] and compaction["work_so_far"].lower() != "none":
+                compact_parts.append(f"# What Looks Right So Far\n{compaction['work_so_far']}")
 
         new_messages.append(
             Message(role="compacted conversation", content="\n\n".join(compact_parts))
@@ -305,6 +325,7 @@ class AC3RewriteStrategy(BaseStrategy):
             {
                 "compacted_task_spec": compaction["task_spec"],
                 "compacted_work_so_far": compaction["work_so_far"],
+                "compacted_open_ended_text": compaction.get("open_ended_text", ""),
                 "model": self.model,
                 "original_turn_count": trace.total_user_turns,
                 "active_turn_count": trace.num_user_turns,
