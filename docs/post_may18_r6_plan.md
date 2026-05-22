@@ -262,10 +262,39 @@ prompt), run it through the 12-cell DSV4F sweep. **~20 min**.
 ### B3 — cross-benchmark fills (CollabLLM + WildChat × 3 models)
 
 Both benchmarks already have last-turn-replay infrastructure (each
-cell = one rewrite + assistant call). Analyzer cache hits: confirmed
-for the htn50_52 LiC prefix set; WildChat / CollabLLM may have
-partial cache — check before running. Worst case: pay for analysis on
-cold cells.
+cell = one rewrite + assistant call). Analyzer cache state (verified
+this session):
+
+- **CollabLLM analyses**: in the shared cache (the CollabLLM
+  AC3-Reset / AC3-Augment / Compaction configs all set
+  `analysis_cache_dir: outputs/analysis_cache`, and the Phase 3a runs
+  populated the cache during 2026-05-17). B3 CollabLLM hits cache
+  for free.
+- **WildChat analyses**: imported this session via
+  `scripts/import_huang_analyses_to_cache.py` from the existing
+  `post_may18_r3_wildchat_fills/` run dirs (+ legacy
+  `post_neurips_ac3_phase3_huang/`, etc.). All cached WildChat
+  analyses used **`analyzer_model=gpt-5-mini`** (Huang's convention,
+  matches the paper).
+
+  **Implication**: B3 WildChat cells will hit cache **only when the
+  analyzer is gpt-5-mini**. The default Rewrite config sets
+  `analyzer_model = compaction_model` (LiC convention: same model for
+  rewriter and analyzer), so DSV4F/Kimi WildChat cells would compute
+  fresh analyses unless we override `analyzer_model: gpt-5-mini` in
+  the B3 WildChat configs. Two reasonable choices:
+
+  - **(a) Lock analyzer to gpt-5-mini for B3 WildChat across all
+    respondent models.** Matches Huang's published convention, hits
+    cache, isolates the rewriter-prompt variable. Recommended.
+  - **(b) Use respondent-matched analyzer per cell (LiC convention).**
+    Cleaner comparison to LiC numbers but pays cold-cache cost
+    (~25–30 min/cell × 2 cells ≈ +60 min wall).
+
+  Going-forward Huang phase2 runs will populate the cache
+  automatically (`AC3RewriteStrategy` already uses it; this session
+  also wired `analysis_cache_dir` through `huang_eval/strategies.py`
+  + `replay.py` + `run_phase2.py` + `config/huang_phase2.yaml`).
 
 - **CollabLLM × winner × 3 models**: 2 datasets × 20 problems × 3
   models. **~30–35 min** combined when parallel across models.

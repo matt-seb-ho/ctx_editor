@@ -198,6 +198,7 @@ async def generate_s3(
     respondent_model: str,
     analyzer_model: str,
     analyzer_prompt_version: str = "v8",
+    analysis_cache_dir: Optional[str] = None,
 ) -> tuple[str, dict[str, Any]]:
     """Generate S3 response: AC3-Rewrite (analyzer + LLM compaction).
 
@@ -210,6 +211,7 @@ async def generate_s3(
     strategy = HuangAC3RewriteStrategy(
         analyzer_model=analyzer_model,
         analyzer_prompt_version=analyzer_prompt_version,
+        analysis_cache_dir=analysis_cache_dir,
     )
     return await _generate_with_strategy(
         strategy, turns, turn_index, model_client, respondent_model
@@ -228,6 +230,7 @@ async def generate_s2(
     analyzer_model: str,
     analyzer_prompt_version: str = "v11",
     min_turns: int = 2,
+    analysis_cache_dir: Optional[str] = None,
 ) -> tuple[str, dict[str, Any]]:
     """Generate S2 response: AC3-Gated-Reset (programmatic reset, gated by needs_edit + min_turns).
 
@@ -241,6 +244,7 @@ async def generate_s2(
         analyzer_model=analyzer_model,
         analyzer_prompt_version=analyzer_prompt_version,
         min_user_turns=min_turns,
+        analysis_cache_dir=analysis_cache_dir,
     )
     response, meta = await _generate_with_strategy(
         strategy, turns, turn_index, model_client, respondent_model
@@ -261,6 +265,7 @@ async def generate_s15(
     analyzer_model: str,
     memory: Optional[Any] = None,
     analyzer_prompt_version: str = "v8",
+    analysis_cache_dir: Optional[str] = None,
 ) -> tuple[str, dict[str, Any]]:
     """Generate S1.5 response: AC3-Reset (programmatic, no LLM rewrite).
 
@@ -276,6 +281,7 @@ async def generate_s15(
     strategy = HuangAC3ResetStrategy(
         analyzer_model=analyzer_model,
         analyzer_prompt_version=analyzer_prompt_version,
+        analysis_cache_dir=analysis_cache_dir,
     )
     # Route memory through prepare_context — the strategy passes it to the analyzer.
     trace = build_fc_trace(turns, turn_index)
@@ -308,6 +314,7 @@ async def generate_augment(
     analyzer_model: str,
     memory: Optional[Any] = None,
     analyzer_prompt_version: str = "v8",
+    analysis_cache_dir: Optional[str] = None,
 ) -> tuple[str, dict[str, Any]]:
     """Generate Augment response: AC3-Augment for Huang eval (new in Phase 2).
 
@@ -320,6 +327,7 @@ async def generate_augment(
     strategy = HuangAC3AugmentStrategy(
         analyzer_model=analyzer_model,
         analyzer_prompt_version=analyzer_prompt_version,
+        analysis_cache_dir=analysis_cache_dir,
     )
     trace = build_fc_trace(turns, turn_index)
     messages = await strategy.prepare_context(trace, memory=memory, model_client=model_client)

@@ -86,12 +86,18 @@ class _HuangAC3Base(BaseStrategy):
         analyzer_prompt_version: str = "v8",
         analyzer_timeout: int = 120,
         min_user_turns: int = 0,
+        analysis_cache_dir: Optional[str] = None,
     ):
         self.analyzer_model = analyzer_model
         self.analyzer_prompt_version = analyzer_prompt_version
         self.analyzer_timeout = analyzer_timeout
         self.min_user_turns = min_user_turns
         self.last_result: Optional[HuangContextEditResult] = None
+
+        self._analysis_cache = None
+        if analysis_cache_dir:
+            from ..strategies.analysis_cache import AnalysisCache
+            self._analysis_cache = AnalysisCache(analysis_cache_dir)
 
     def _make_analyzer(self) -> ConversationAnalyzer:
         return ConversationAnalyzer(
@@ -114,7 +120,9 @@ class _HuangAC3Base(BaseStrategy):
             return trace.get_active_messages()
 
         analyzer = self._make_analyzer()
-        analysis = await analyzer.analyze(trace, model_client, memory=memory)
+        analysis = await analyzer.analyze(
+            trace, model_client, memory=memory, cache=self._analysis_cache,
+        )
 
         if not analysis.needs_edit:
             self.last_result = HuangContextEditResult(edited=False, analysis=analysis)
@@ -177,12 +185,14 @@ class HuangAC3GatedResetStrategy(_HuangAC3Base):
         analyzer_prompt_version: str = "v11",
         analyzer_timeout: int = 120,
         min_user_turns: int = 2,
+        analysis_cache_dir: Optional[str] = None,
     ):
         super().__init__(
             analyzer_model=analyzer_model,
             analyzer_prompt_version=analyzer_prompt_version,
             analyzer_timeout=analyzer_timeout,
             min_user_turns=min_user_turns,
+            analysis_cache_dir=analysis_cache_dir,
         )
 
     async def _build_edited_messages(

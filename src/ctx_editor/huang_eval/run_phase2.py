@@ -90,6 +90,7 @@ async def process_failure_turn(
     results_file: Path,
     rng: random.Random,
     memory=None,
+    analysis_cache_dir: str | None = None,
 ) -> dict | None:
     """Process one AO-failure turn through the requested AC3 variants.
 
@@ -130,6 +131,7 @@ async def process_failure_turn(
             s3_response, s3_analysis = await generate_s3(
                 turns, turn_index, model_client, respondent_model, analyzer_model,
                 analyzer_prompt_version=analyzer_prompt_versions.get("s3", "v8"),
+                analysis_cache_dir=analysis_cache_dir,
             )
             ao_vs_s3, fc_vs_s3 = await asyncio.gather(
                 judge_pairwise(turns, turn_index, ao_response, s3_response, "ao", "s3",
@@ -148,6 +150,7 @@ async def process_failure_turn(
                 turns, turn_index, model_client, respondent_model, analyzer_model,
                 memory=memory,
                 analyzer_prompt_version=analyzer_prompt_versions.get("s15", "v8"),
+                analysis_cache_dir=analysis_cache_dir,
             )
             ao_vs_s15, fc_vs_s15 = await asyncio.gather(
                 judge_pairwise(turns, turn_index, ao_response, s15_response, "ao", "s15",
@@ -166,6 +169,7 @@ async def process_failure_turn(
                 turns, turn_index, model_client, respondent_model, analyzer_model,
                 analyzer_prompt_version=analyzer_prompt_versions.get("s2", "v11"),
                 min_turns=min_turns_s2,
+                analysis_cache_dir=analysis_cache_dir,
             )
             ao_vs_s2, fc_vs_s2 = await asyncio.gather(
                 judge_pairwise(turns, turn_index, ao_response, s2_response, "ao", "s2",
@@ -184,6 +188,7 @@ async def process_failure_turn(
                 turns, turn_index, model_client, respondent_model, analyzer_model,
                 memory=memory,
                 analyzer_prompt_version=analyzer_prompt_versions.get("augment", "v8"),
+                analysis_cache_dir=analysis_cache_dir,
             )
             ao_vs_aug, fc_vs_aug = await asyncio.gather(
                 judge_pairwise(turns, turn_index, ao_response, augment_response, "ao", "augment",
@@ -307,6 +312,7 @@ async def run_phase2(cfg: DictConfig) -> None:
                 regenerate_baselines=cfg.regenerate_baselines,
                 results_file=results_file,
                 rng=rng,
+                analysis_cache_dir=getattr(cfg, "analysis_cache_dir", None),
             )
 
     tasks = [process_with_semaphore(f) for f in valid_failures]
