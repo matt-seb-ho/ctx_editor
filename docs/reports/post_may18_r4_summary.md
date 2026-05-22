@@ -1,5 +1,8 @@
 # Post-May-18 R4 — get Rewrite working on LiC
 
+> ⚠️ **Caveat — Rewrite numbers pre-analyzer-parity (2026-05-21)**: any AC3-Rewrite result in this doc was computed with `AC3RewriteStrategy._run_analysis` using the bespoke `compaction_analysis.txt` prompt — **not** the shared `ConversationAnalyzer + v8` used by Augment / Reset / Gated-Reset. Some unknown fraction of the Rewrite-vs-Reset gap is attributable to analyzer divergence rather than the rewriter step. Augment / Reset / Gated-Reset numbers in this doc are unaffected. See [`docs/analyzer_parity_finding.md`](../analyzer_parity_finding.md) for the smoking gun and [`docs/post_may18_r5_analyzer_parity_plan.md`](../post_may18_r5_analyzer_parity_plan.md) for the re-run plan.
+
+
 **Run window**: 2026-05-21 (start TBD) → (in progress)
 **Prior batches**: R3 (`post_may18_r3_summary.md`) found rewriter-LLM
 hallucination = 63% of failures; v2/v3/v4 prompts all net-negative.
