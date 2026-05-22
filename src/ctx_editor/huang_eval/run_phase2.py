@@ -91,6 +91,8 @@ async def process_failure_turn(
     rng: random.Random,
     memory=None,
     analysis_cache_dir: str | None = None,
+    s3_compaction_prompt_name: str = "context_compaction",
+    s3_open_ended_output: bool = False,
 ) -> dict | None:
     """Process one AO-failure turn through the requested AC3 variants.
 
@@ -132,6 +134,8 @@ async def process_failure_turn(
                 turns, turn_index, model_client, respondent_model, analyzer_model,
                 analyzer_prompt_version=analyzer_prompt_versions.get("s3", "v8"),
                 analysis_cache_dir=analysis_cache_dir,
+                compaction_prompt_name=s3_compaction_prompt_name,
+                open_ended_output=s3_open_ended_output,
             )
             ao_vs_s3, fc_vs_s3 = await asyncio.gather(
                 judge_pairwise(turns, turn_index, ao_response, s3_response, "ao", "s3",
@@ -313,6 +317,8 @@ async def run_phase2(cfg: DictConfig) -> None:
                 results_file=results_file,
                 rng=rng,
                 analysis_cache_dir=getattr(cfg, "analysis_cache_dir", None),
+                s3_compaction_prompt_name=getattr(cfg, "s3_compaction_prompt_name", "context_compaction"),
+                s3_open_ended_output=getattr(cfg, "s3_open_ended_output", False),
             )
 
     tasks = [process_with_semaphore(f) for f in valid_failures]

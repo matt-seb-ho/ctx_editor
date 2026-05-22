@@ -56,6 +56,9 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`reports/post_may18_r5_resume.md`](reports/post_may18_r5_resume.md) — Resume doc for the next session after the analyzer-parity refactor lands.
 - [`post_may18_r6_plan.md`](post_may18_r6_plan.md) — R6 plan: re-evaluate Rewrite with v8 analyzer (v1, v3-no-conv) then unbiased GEPA fallback; wall-clock budget for tau2 follow-up.
 - [`post_may18_r6_design_iterations.md`](post_may18_r6_design_iterations.md) — Design-decision log: v1 warts, open-ended output mode, `<new_context>` wrapper, role-boundary fix, system-prompt audit.
+- [`reports/post_may18_r6_summary.md`](reports/post_may18_r6_summary.md) — **R6 final**: winner = v8 (open-ended) at 64.7% DSV4F avg; cross-model (gpt-5.4 76.6%, Kimi 74.8%) + cross-benchmark (WildChat S3>AO 79-93%) validated. Tau2 handoff contract included.
+- [`reports/post_may18_r6_overnight_progress.md`](reports/post_may18_r6_overnight_progress.md) — Running progress log for the R6 overnight execution.
+- [`post_may18_tau2_plan.md`](post_may18_tau2_plan.md) — tau2 telecom_small execution plan; gated on R6 winner (now satisfied).
 - [`notes/literature/combee_notes.md`](notes/literature/combee_notes.md) — Combee paper notes; doesn't apply to our latency profile.
 - [`notes/literature/gepa_notes.md`](notes/literature/gepa_notes.md) — Notes on GEPA prompt-optimization framework (candidate for next-batch Rewrite optimization).
 - [`notes/literature/textgrad_notes.md`](notes/literature/textgrad_notes.md) — Notes on TextGrad (GEPA precursor; subsumed).
@@ -180,6 +183,9 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-05-22 | `reports/post_may18_r6_summary.md` | R6 final: winner = v8 (open-ended) at 64.7% on DSV4F; cross-model + cross-benchmark validated; tau2 handoff. |
+| 2026-05-22 | `reports/post_may18_r6_overnight_progress.md` | Running progress log for the R6 overnight execution (commands, configs, output paths). |
+| 2026-05-22 | `post_may18_tau2_plan.md` | tau2 telecom_small execution plan (waits on R6 LiC Rewrite winner). |
 | 2026-05-22 | `post_may18_r6_design_iterations.md` | R6 design-iteration log: v1 warts, open-ended `<new_context>` mode, role-boundary fix, system-prompt audit. |
 | 2026-05-21 | `global_todos.md` | Global TODOs: sys-prompt preprocessing, rewriter input-order ablation, negative-guidance in compacted context. |
 | 2026-05-21 | `post_may18_r6_plan.md` | R6 plan: v1+v8 / v3-no-conv+v8 re-runs then unbiased GEPA fallback; wall-clock budget for tau2 follow-up. |

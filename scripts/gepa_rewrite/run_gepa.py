@@ -126,42 +126,36 @@ def main(args: argparse.Namespace) -> None:
     seed_text = seed_path.read_text()
     print(f"Seed prompt: {seed_path.name} ({len(seed_text)} chars)")
 
+    # Unbiased R6 framing per docs/post_may18_r6_plan.md § "Objective string"
+    # and § "Background string". No Reset reference, no faithful re-emitter
+    # editorial, {conversation} explicitly OPTIONAL.
     objective = (
-        "You are optimizing the prompt for the second LLM call of an "
-        "AC3-Rewrite context-editing pipeline. The rewriter LLM takes "
-        "three inputs from an upstream analyzer — {analysis_user_intent} "
-        "(consolidated task spec), {analysis_aligned} (what the assistant "
-        "got right so far), {analysis_issues} (problems detected) — plus "
-        "{conversation} (the full multi-turn conversation), and produces a "
-        "compacted context message that REPLACES the conversation when the "
-        "assistant continues. The downstream assistant sees only "
-        "(system_message, compacted_context, last_user_message). "
-        "GOAL: maximize accuracy on a held-out LiC math eval. The current "
-        "prompt under-performs Baseline (no editing) and Reset (a deterministic "
-        "template-fill from the same analyzer output). The dominant failure "
-        "mode is the rewriter LLM hallucinating content (re-computing numbers, "
-        "inlining prior code verbatim, adding phantom requirements). Your "
-        "improved prompt should reduce hallucination while still producing a "
-        "useful compacted message. Keep the format with <task_spec>...</task_spec> "
-        "and <work_so_far>...</work_so_far> or <verified_work>...</verified_work> "
-        "XML tags since downstream parsing depends on them. The four placeholder "
-        "tokens {analysis_user_intent}, {analysis_aligned}, {analysis_issues}, "
-        "{conversation} must appear in your prompt (use Python str.format-style)."
+        "Optimize the prompt template for the second LLM call of a "
+        "two-stage context-editing pipeline. The first stage already "
+        "produced an analysis of a multi-turn conversation. Your prompt "
+        "tells the second LLM how to turn (some subset of) the available "
+        "inputs into a single 'compacted context' message that will "
+        "REPLACE the conversation history before a downstream assistant "
+        "generates its next response on a fixed last user message.\n\n"
+        "Maximize the downstream task accuracy (LiC math eval on "
+        "DeepSeek-V4-Flash).\n\n"
+        "Available inputs (use any subset):\n"
+        "- {analysis_user_intent} — analyzer's consolidated task spec.\n"
+        "- {analysis_aligned} — analyzer's notes on what the assistant got right.\n"
+        "- {analysis_issues} — analyzer's notes on what the assistant got wrong.\n"
+        "- {conversation} — the full multi-turn conversation (OPTIONAL).\n\n"
+        "Output format: the rewriter may put free-form scratchpad text "
+        "first; wrap the final compacted message in "
+        "<new_context>...</new_context>. Only the wrapped contents reach "
+        "the downstream assistant."
     )
 
     background = (
-        "Reference: the deterministic Reset baseline produces exactly this "
-        "template:\n\n"
-        "  # User Task Specification (So Far)\n"
-        "  <analysis_user_intent verbatim>\n"
-        "  # What Looks Right So Far\n"
-        "  <analysis_aligned verbatim>\n\n"
-        "Reset typically scores ~80-85% on the eval; the current Rewrite prompt "
-        "scores ~50-75%. Empirically the rewriter LLM is too inventive — adding "
-        "interpretations, recomputing arithmetic, or inlining verbatim code that "
-        "anchors the downstream assistant on a wrong path. A successful prompt "
-        "will steer the rewriter to be a faithful re-emitter of the analyzer's "
-        "content, not an interpreter."
+        "The compacted context is the only summary the downstream assistant "
+        "sees of the conversation history (besides the unchanged system "
+        "prompt and the last user message). The compacted message should "
+        "give the assistant enough state to continue the task correctly "
+        "without dragging in distractions that might pull it off course."
     )
 
     reflection_lm = DeepSeekReflectionLM(

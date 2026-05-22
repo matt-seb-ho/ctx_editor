@@ -199,12 +199,18 @@ async def generate_s3(
     analyzer_model: str,
     analyzer_prompt_version: str = "v8",
     analysis_cache_dir: Optional[str] = None,
+    compaction_prompt_name: str = "context_compaction",
+    open_ended_output: bool = False,
 ) -> tuple[str, dict[str, Any]]:
     """Generate S3 response: AC3-Rewrite (analyzer + LLM compaction).
 
     Thin wrapper around :class:`HuangAC3RewriteStrategy`. ``analyzer_prompt_version``
     selects the registered analyzer prompt set; see
     :mod:`ctx_editor.strategies.analyzer_prompts` for the registry.
+
+    ``compaction_prompt_name`` picks the rewriter prompt file (default = legacy
+    v1 ``context_compaction``). Pair ``compaction_prompt_name=context_compaction_v8``
+    with ``open_ended_output=True`` to run the R6 open-ended winner.
     """
     from .strategies import HuangAC3RewriteStrategy
 
@@ -212,6 +218,8 @@ async def generate_s3(
         analyzer_model=analyzer_model,
         analyzer_prompt_version=analyzer_prompt_version,
         analysis_cache_dir=analysis_cache_dir,
+        compaction_prompt_name=compaction_prompt_name,
+        open_ended_output=open_ended_output,
     )
     return await _generate_with_strategy(
         strategy, turns, turn_index, model_client, respondent_model

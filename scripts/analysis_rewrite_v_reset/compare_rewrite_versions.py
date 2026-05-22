@@ -42,6 +42,14 @@ DIRS = {
     "post_may18_r4_rewrite_v6": [
         (re.compile(r"^ac3_rewrite_v6_gepa_lic_(?P<task>[a-z_]+)_v2_conv(?P<conv>\d+)_\d+$"), "Rewrite-v6-GEPA"),
     ],
+    "post_may18_r6_a_stage": [
+        (re.compile(r"^ac3_rewrite_lic_(?P<task>[a-z_]+)_v2_conv(?P<conv>\d+)_\d+$"), "Rewrite-A1-v1+v8analyzer"),
+        (re.compile(r"^ac3_rewrite_v8_lic_(?P<task>[a-z_]+)_v2_conv(?P<conv>\d+)_\d+$"), "Rewrite-A2-v8"),
+        (re.compile(r"^ac3_rewrite_v9_no_conv_lic_(?P<task>[a-z_]+)_v2_conv(?P<conv>\d+)_\d+$"), "Rewrite-A3-v9-no-conv"),
+    ],
+    "post_may18_r6_a4_gepa_sweep": [
+        (re.compile(r"^ac3_rewrite_v10_gepa_lic_(?P<task>[a-z_]+)_v2_conv(?P<conv>\d+)_\d+$"), "Rewrite-A4-v10-GEPA"),
+    ],
 }
 
 TASKS_ORDER = ["math", "code", "database", "actions"]
@@ -77,7 +85,9 @@ def main() -> None:
     data = collect()
     variants_order = ["Baseline", "AO", "Reset", "Rewrite-v1", "Rewrite-v2",
                       "Rewrite-v3-no-conv", "Rewrite-v3-conv-first", "Rewrite-v4-strict",
-                      "Rewrite-v5-resetlike", "Rewrite-v6-GEPA"]
+                      "Rewrite-v5-resetlike", "Rewrite-v6-GEPA",
+                      "Rewrite-A1-v1+v8analyzer", "Rewrite-A2-v8",
+                      "Rewrite-A3-v9-no-conv", "Rewrite-A4-v10-GEPA"]
     variants = [v for v in variants_order if v in data]
 
     md = ["# Rewrite versions vs Baseline / Reset on LiC (DeepSeek-V4-Flash, last-turn replay, htn50_52)\n"]

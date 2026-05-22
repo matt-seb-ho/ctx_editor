@@ -42,9 +42,11 @@ if TYPE_CHECKING:
 
 # Compaction prompt for the LLM-rewrite variant (S3). Shared with LiC's
 # AC3RewriteStrategy; lives under strategies/prompts/ as the single copy.
-_COMPACTION_PROMPT_PATH = (
-    Path(__file__).parent.parent / "strategies" / "prompts" / "context_compaction.txt"
-)
+# Default = v1 (legacy two-tag output: <task_spec> + <work_so_far>).
+# To use an open-ended R6 prompt (v8/v9/v10) pass compaction_prompt_name +
+# open_ended_output=True to HuangAC3RewriteStrategy.
+_COMPACTION_PROMPTS_DIR = Path(__file__).parent.parent / "strategies" / "prompts"
+_COMPACTION_PROMPT_PATH = _COMPACTION_PROMPTS_DIR / "context_compaction.txt"
 
 
 def _extract_tag(text: str, tag: str) -> str:
@@ -208,10 +210,35 @@ class HuangAC3RewriteStrategy(_HuangAC3Base):
     """AC3-Rewrite for Huang eval — analyzer + LLM compaction.
 
     Equivalent to the legacy ``generate_s3`` in :mod:`replay`. After the
-    analyzer flags issues, calls the compaction prompt to produce
-    ``<task_spec>`` and ``<work_so_far>`` tags, then builds the compacted
-    message layout from those.
+    analyzer flags issues, calls the compaction prompt to produce either:
+
+    - **legacy** (``open_ended_output=False``, default) —
+      ``<task_spec>`` and ``<work_so_far>`` tags; layout is the two-section
+      compacted message R5 used.
+    - **open-ended** (``open_ended_output=True``) — the R6 v8/v9/v10 family.
+      Output is wrapped in ``<new_context>...</new_context>`` and the
+      contents pass through as the compacted message body verbatim.
     """
+
+    def __init__(
+        self,
+        analyzer_model: str = "gpt-5-mini",
+        analyzer_prompt_version: str = "v8",
+        analyzer_timeout: int = 120,
+        min_user_turns: int = 0,
+        analysis_cache_dir: Optional[str] = None,
+        compaction_prompt_name: str = "context_compaction",
+        open_ended_output: bool = False,
+    ):
+        super().__init__(
+            analyzer_model=analyzer_model,
+            analyzer_prompt_version=analyzer_prompt_version,
+            analyzer_timeout=analyzer_timeout,
+            min_user_turns=min_user_turns,
+            analysis_cache_dir=analysis_cache_dir,
+        )
+        self.compaction_prompt_name = compaction_prompt_name
+        self.open_ended_output = open_ended_output
 
     async def _build_edited_messages(
         self,
@@ -219,7 +246,11 @@ class HuangAC3RewriteStrategy(_HuangAC3Base):
         analysis: AnalysisResult,
         model_client: "ModelClient",
     ) -> tuple[list[Message], str]:
-        return await _build_s3_messages(trace, analysis, model_client, self.analyzer_model)
+        return await _build_s3_messages(
+            trace, analysis, model_client, self.analyzer_model,
+            compaction_prompt_name=self.compaction_prompt_name,
+            open_ended_output=self.open_ended_output,
+        )
 
 
 class HuangAC3AugmentStrategy(_HuangAC3Base):
@@ -333,20 +364,33 @@ async def _build_s3_messages(
     analysis: AnalysisResult,
     model_client: "ModelClient",
     compaction_model: str,
+    compaction_prompt_name: str = "context_compaction",
+    open_ended_output: bool = False,
 ) -> tuple[list[Message], str]:
     """S3 / AC3-Rewrite message layout. Mirrors generate_s3 in replay.py.
+
+    Supports two output modes:
+      - legacy (``open_ended_output=False``): extract ``<task_spec>`` and
+        ``<work_so_far>`` tags and assemble into the R5 two-section layout.
+      - open-ended (``open_ended_output=True``): extract ``<new_context>``
+        contents (lenient fallback to whole output) and use them as the
+        compacted message body verbatim. Matches LiC's
+        ContextCompactionStrategy + open_ended_output behavior.
 
     Returns (messages, compaction_output) so the caller can log the raw
     compaction-LLM output if desired.
     """
     conversation_str = trace.get_conversation_string(skip_system=True)
-    compaction_template = _COMPACTION_PROMPT_PATH.read_text()
-    compaction_prompt = compaction_template.format(
-        conversation=conversation_str,
-        analysis_user_intent=analysis.user_intent,
-        analysis_aligned=analysis.aligned,
-        analysis_issues=analysis.issues,
-    )
+    prompt_path = _COMPACTION_PROMPTS_DIR / f"{compaction_prompt_name}.txt"
+    compaction_template = prompt_path.read_text()
+    fmt_args = {
+        "analysis_user_intent": analysis.user_intent,
+        "analysis_aligned": analysis.aligned,
+        "analysis_issues": analysis.issues,
+    }
+    if "{conversation}" in compaction_template:
+        fmt_args["conversation"] = conversation_str
+    compaction_prompt = compaction_template.format(**fmt_args)
     compaction_response = await model_client.generate(
         messages=[{"role": "user", "content": compaction_prompt}],
         model=compaction_model,
@@ -354,20 +398,28 @@ async def _build_s3_messages(
         timeout=120,
     )
     compaction_output = compaction_response.content
-    task_spec = _extract_tag(compaction_output, "task_spec") or analysis.user_intent
-    work_so_far = _extract_tag(compaction_output, "work_so_far")
 
     sys_msg = trace.system_message
     last_user = trace.last_user_message
 
-    compact_parts = [
-        "The conversation history has been compacted. Below is a summary of the "
-        "user's full specification and the work completed so far that is consistent "
-        "with it.",
-        f"# User Task Specification (So Far)\n{task_spec}",
-    ]
-    if work_so_far and work_so_far.lower() != "none":
-        compact_parts.append(f"# What Looks Right So Far\n{work_so_far}")
+    if open_ended_output:
+        body = _extract_tag(compaction_output, "new_context") or compaction_output.strip()
+        compact_parts = [
+            "The conversation history has been compacted; the message below "
+            "summarizes everything the assistant needs to continue.",
+            body,
+        ]
+    else:
+        task_spec = _extract_tag(compaction_output, "task_spec") or analysis.user_intent
+        work_so_far = _extract_tag(compaction_output, "work_so_far")
+        compact_parts = [
+            "The conversation history has been compacted. Below is a summary of the "
+            "user's full specification and the work completed so far that is consistent "
+            "with it.",
+            f"# User Task Specification (So Far)\n{task_spec}",
+        ]
+        if work_so_far and work_so_far.lower() != "none":
+            compact_parts.append(f"# What Looks Right So Far\n{work_so_far}")
 
     new_messages: list[Message] = []
     if sys_msg:
