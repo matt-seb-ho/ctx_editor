@@ -195,7 +195,8 @@ async def diagnose_one(client: OpenAIModelClient, row: dict, model: str) -> dict
 
 
 async def main(args: argparse.Namespace) -> None:
-    rows = [json.loads(l) for l in (DATA_DIR / "pairs.jsonl").open()]
+    pairs_path = Path(args.pairs) if args.pairs else (DATA_DIR / "pairs.jsonl")
+    rows = [json.loads(l) for l in pairs_path.open()]
     # Balanced sample per task
     by_task: dict[str, list[dict]] = {}
     for r in rows:
@@ -211,7 +212,7 @@ async def main(args: argparse.Namespace) -> None:
     lb = build_lb()
     client = OpenAIModelClient(load_balancer_config=lb)
     sem = asyncio.Semaphore(args.concurrency)
-    out_path = DATA_DIR / "diagnoses.jsonl"
+    out_path = Path(args.out) if args.out else (DATA_DIR / "diagnoses.jsonl")
     done = [0]
 
     async def worker(row):
@@ -246,4 +247,6 @@ if __name__ == "__main__":
     p.add_argument("--n-per-task", type=int, default=12)
     p.add_argument("--concurrency", type=int, default=8)
     p.add_argument("--seed", type=int, default=1)
+    p.add_argument("--pairs", default=None, help="Override pairs.jsonl path")
+    p.add_argument("--out", default=None, help="Override output diagnoses.jsonl path")
     asyncio.run(main(p.parse_args()))
