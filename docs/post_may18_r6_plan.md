@@ -333,19 +333,49 @@ After R6 wraps, tau2 work picks up:
 A same-day session covering R6 + tau2 step 5 + first tau2 sweep is
 realistic if R6 stays in the ~3h envelope.
 
-## Risks and open sign-off questions
+## Resolved sign-offs (signed off 2026-05-22)
 
-1. **GEPA hint** — include "remove pollution / reorganize for
-   downstream use" in `background`? Recommendation: **omit**.
-2. **GEPA budget** — 20 metric calls (default) or 30 (stretch)?
-   Recommendation: **20**.
-3. **GEPA always-on** — A4 runs even if A2/A3 already beat Reset.
-   Confirmed this session.
-4. **B2 trigger threshold** — ≥3pp avg margin over prior Rewrite
-   numbers (default).
-5. **B3 scope** — both CollabLLM and WildChat parallel (default).
-6. **WildChat / CollabLLM analyzer cache** — precheck cache hits
-   before running B3; cold cells add ~$1–3 in foundry credits.
+All previously-open items are locked in to the recommended defaults
+so a fresh executor agent has unambiguous instructions:
+
+1. **GEPA hint** — *omit* "remove pollution / reorganize for
+   downstream use" from `background`. Let GEPA discover.
+2. **GEPA budget** — **20 metric calls**. Bump to 30 only if the
+   reflection log shows the curve still climbing at 20.
+3. **GEPA always-on** — A4 runs regardless of A2/A3 outcome.
+4. **B2 trigger threshold** — ≥3pp avg margin over prior pre-parity
+   Rewrite numbers. If margin is smaller, skip B2 and route effort
+   to tau2.
+5. **B3 scope** — both CollabLLM and WildChat in parallel.
+6. **B3 WildChat analyzer model** — **lock to `gpt-5-mini`** across
+   all respondent models (matches Huang paper convention, hits the
+   76 cached gpt-5-mini analyses imported this session). Implement
+   via per-cell config override: pass
+   `experiment.strategy.analyzer_model=gpt-5-mini` when launching
+   B3 WildChat. CollabLLM cells continue using the LiC default
+   (analyzer == compaction_model) since the cache was populated
+   that way for CollabLLM.
+
+## Handoff to tau2 (`docs/post_may18_tau2_plan.md`)
+
+When R6 wraps, the tau2 plan picks up. Contract for the handoff:
+
+- **Gate**: tau2 Phase 2 begins ONLY after R6's `winner` is selected
+  AND `docs/reports/post_may18_r6_summary.md` is written.
+- **What R6 must leave behind for the tau2 agent**:
+  - `docs/reports/post_may18_r6_summary.md` with: A-stage table,
+    B-stage table (if run), declared winner (one of `v1`, `v8`,
+    `v9_no_conv`, `v4_gepa` etc.), the absolute path to the winning
+    prompt file (e.g. `src/ctx_editor/strategies/prompts/context_compaction_v8.txt`),
+    and the open_ended_output mode that won (true / false).
+  - The winning prompt file should be left at its current path
+    (don't rename), with no further edits.
+- **tau2 Phase 0–1** (venv setup, analyzer parity audit) can start
+  even before R6 wraps if foundry contention is acceptable — they
+  don't depend on the R6 winner.
+- **tau2 Phase 2** is the first phase that needs the R6 winner. The
+  port from LiC to tau2 is NOT verbatim; see tau2 plan § Phase 2 for
+  the porting heuristics.
 
 ## Execution checklist
 
@@ -368,10 +398,13 @@ B-stage:
 
 - [ ] If winner = A4: run B1.
 - [ ] If winner beats prior by ≥3pp: run B2.
-- [ ] If winner clears the bar: precheck WildChat/CollabLLM analyzer
-  cache, then run B3.
-- [ ] Update `post_may18_r6_summary.md` with B-stage table + paper
-  cells.
+- [ ] If winner clears the bar:
+  - [ ] CollabLLM: run with default analyzer (== compaction_model).
+  - [ ] WildChat: run with `experiment.strategy.analyzer_model=gpt-5-mini`
+        across all respondents (hits the imported gpt-5-mini cache).
+- [ ] Update `post_may18_r6_summary.md` with B-stage table + the
+  declared winner (variant name + prompt file path +
+  `open_ended_output` value) so the tau2 agent can pick up cleanly.
 
 ## File map
 
