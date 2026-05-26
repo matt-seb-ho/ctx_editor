@@ -466,6 +466,54 @@ This is what made it look like Rewrite was structurally lossy. In fact, <strong>
 
 <p class="small">Notes: v1-Rewrite cells are pre-analyzer-parity (treat as historical). AC3-Reset gpt-5.4/Kimi <em>bigcodebench</em> cells are NaN, not 0 — re-runs revealed Azure content-filter rejections (gpt-5.4) and foundry transient errors (Kimi) preventing clean evaluation; see drill-down below for the diagnosis. WildChat for AC3-Rewrite uses v8 with cached gpt-5-mini analyses (per R6 sign-off 6).</p>
 
+<h3>tau2 telecom_small (n=20 tasks per cell, full trajectories — NEW)</h3>
+
+<p>Filled this overnight. <strong>Different AC3 variants win on different respondent models</strong> — strong support for the "appropriate intensity" framing.</p>
+
+<table class="compact">
+  <thead>
+    <tr>
+      <th rowspan="2">Strategy</th>
+      <th class="group" colspan="3">tau2 telecom_small (reward%)</th>
+    </tr>
+    <tr>
+      <th>gpt-5.4</th>
+      <th>deepseek-chat†</th>
+      <th>kimi-k2-0905‡</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-head">Baseline (s0)</td>
+      <td class="num">65.0</td><td class="num">25.0</td><td class="num">50.0</td>
+    </tr>
+    <tr><td class="row-head">AO</td>
+      <td class="num bad">0.0</td><td class="num bad">5.0</td><td class="num bad">15.0</td>
+    </tr>
+    <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Augment (s1, NEW)</strong></td>
+      <td class="num win-strong">85.0</td><td class="num">35.0</td><td class="num">40.0</td>
+    </tr>
+    <tr><td class="row-head">AC3-Gated-Reset (s2, V10)</td>
+      <td class="num">50.0</td><td class="num win-strong">45.0</td><td class="num">55.0</td>
+    </tr>
+    <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Rewrite (s3, V11 = R6-aligned port)</strong></td>
+      <td class="num">70.0</td><td class="num">35.0</td><td class="num win-strong">60.0</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout win">
+  <strong>Three different AC3 winners</strong>:
+  <ul style="margin-bottom: 0">
+    <li><strong>gpt-5.4 → AC3-Augment</strong> (+20pp vs Baseline). Strong base agent benefits from "all the analysis, none of the destruction."</li>
+    <li><strong>deepseek-chat → AC3-Gated-Reset</strong> (+20pp). Weaker base agent benefits more from hard resets that strip pollution.</li>
+    <li><strong>kimi-k2-0905 → AC3-Rewrite v11</strong> (+10pp). The newly-ported R6-aligned rewrite prompt works best.</li>
+  </ul>
+  And: <strong>AO is catastrophic across all three models</strong> (0-15%), confirming the March-2026 finding that blanket omission destroys agentic tool-call state.
+</div>
+
+<p class="small">† DSV4F and Kimi-K2.6 are Azure-AI-Foundry exclusives, not on OpenRouter. tau2 doesn't yet have Foundry support wired in (LiC does, but it's our custom infrastructure), so we substituted via OpenRouter: <code>deepseek/deepseek-chat</code> for DSV4F (latest stable DeepSeek chat) and <code>moonshotai/kimi-k2-0905</code> for Kimi-K2.6 (the K2 variant with working tool calls). Absolute numbers don't compare to the LiC trio directly; the relative ordering of AC3 variants per-model is the load-bearing finding.<br>
+‡ tau2 ToolCall validation required a small patch (<code>field_validator(mode="before")</code> that auto-parses JSON-string arguments) for Kimi to work — OpenAI-spec providers return tool-call arguments as strings, tau2 wanted dicts. Patch committed to the tau2 fork (backward-compatible; dict args pass through). Without the patch, Kimi cells dropped 50-75% of tasks to pydantic validation errors.</p>
+
 <h3>LiC drill-down (per task, A2 v8 winner)</h3>
 <table class="compact">
   <thead>
@@ -663,11 +711,12 @@ Rewrite is more flexible than Reset's deterministic template. On strict-format /
   <li>Reuses <code>ContextEditAgentState</code> (analysis log + turn counter; no resets).</li>
 </ul>
 
-<h3>Phase 5 — sweep + foundry-contention concerns</h3>
+<h3>Phase 5 — sweep <span class="badge r6">done</span></h3>
 <ul>
-  <li>10 cells total: 2 models (gpt-5-mini, gpt-5.4) × 5 strategies (s0, ao, s2, s3-with-v11, s1-augment) on telecom_small (20 tasks each). ~2.5h wall with 2 cells in parallel.</li>
-  <li>Foundry models (Kimi, DeepSeek) explicitly deferred until R6-class foundry workloads drain. Avoids the R3 429-cascade failure.</li>
-  <li>Single-seed initial pass; multi-seed (3 seeds × headline cells) deferred to a follow-up if the directional read is informative.</li>
+  <li><strong>15 cells total</strong>: 3 models × 5 strategies. ~4h wall (sequenced gpt-5.4 → DSV4F-sub → Kimi-sub to avoid endpoint contention).</li>
+  <li>gpt-5.4 (Azure) ran cleanly first pass. DSV4F + Kimi failed first pass (wrong OpenRouter model IDs + Kimi tool-call validation). Retry pass with corrected IDs + ToolCall string-args patch succeeded.</li>
+  <li>See "tau2 telecom_small" table above and <code>docs/reports/post_may18_tau2_summary.md</code> for full results + per-cell cost.</li>
+  <li>Single-seed N=1; multi-seed deferred to follow-up.</li>
 </ul>
 
 <h3>Why we're NOT using last-turn replay on tau2</h3>
