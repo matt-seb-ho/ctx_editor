@@ -458,13 +458,13 @@ This is what made it look like Rewrite was structurally lossy. In fact, <strong>
     </tr>
     <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Rewrite v8 (post-parity, R6)</strong></td>
       <td class="num win-strong">64.7</td><td class="num win-strong">76.6</td><td class="num win-strong">74.8</td>
-      <td class="num">42.1</td><td class="num">53.8</td><td class="num win-strong">58.3</td>
+      <td class="num">44.9</td><td class="num">53.8</td><td class="num win-strong">58.3</td>
       <td class="num win-strong">93.2</td><td class="num">79.2</td><td class="num win-strong">91.5</td>
     </tr>
   </tbody>
 </table>
 
-<p class="small">Notes: v1-Rewrite cells in this table are pre-analyzer-parity; treat as historical. CollabLLM "Reset" gpt-5.4/Kimi entries are estimates from R3 (the v8-Rewrite cells include some DSV4F-side bigcodebench errors — see drill-down below). WildChat for AC3-Rewrite is now using v8 with the cached gpt-5-mini analyses (per R6 sign-off 6).</p>
+<p class="small">Notes: v1-Rewrite cells are pre-analyzer-parity (treat as historical). AC3-Reset gpt-5.4/Kimi <em>bigcodebench</em> cells are NaN, not 0 — re-runs revealed Azure content-filter rejections (gpt-5.4) and foundry transient errors (Kimi) preventing clean evaluation; see drill-down below for the diagnosis. WildChat for AC3-Rewrite uses v8 with cached gpt-5-mini analyses (per R6 sign-off 6).</p>
 
 <h3>LiC drill-down (per task, A2 v8 winner)</h3>
 <table class="compact">
@@ -527,15 +527,16 @@ This is what made it look like Rewrite was structurally lossy. In fact, <strong>
       <td class="num">15.0</td><td class="num">17.6</td><td class="num">15.8</td>
     </tr>
     <tr><td class="row-head">AC3-Reset</td><td class="num">85.0</td><td class="num">93.8</td><td class="num">93.8</td>
-      <td class="num">20.0</td><td class="num bad">0</td><td class="num bad">0</td>
+      <td class="num">20.0</td><td class="num meh">NaN‡</td><td class="num meh">NaN‡</td>
     </tr>
     <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Rewrite v8 (R6)</strong></td>
       <td class="num">84.2</td><td class="num">90.0</td><td class="num">100</td>
-      <td class="num bad">0†</td><td class="num win-strong">17.65</td><td class="num win-strong">16.67</td>
+      <td class="num">5.6†</td><td class="num win-strong">17.65</td><td class="num win-strong">16.67</td>
     </tr>
   </tbody>
 </table>
-<p class="small">† DSV4F bigcodebench had 6 analyzer-side foundry errors that excluded those cells; of the 14 that ran, none passed. Comparable to R3 (compaction-v1 on DSV4F was 10%).</p>
+<p class="small">† v8 Rewrite DSV4F bigcodebench re-ran with MC=2 and more retries: 1/18 = 5.56% (2 errors excluded). Previously reported as 0% with 6 errors; the corrected number is in the same ballpark as the historical R3 v1-compaction cell (10%) — DSV4F is simply weak at bigcodebench.<br>
+‡ <strong>AC3-Reset gpt-5.4 / Kimi on bigcodebench are NaN, not 0.</strong> Re-run results: gpt-5.4 = 0/1 (19 errors excluded) — Azure's jailbreak content filter rejected 19 of 20 prompts as policy violations. Kimi = 1/1 (19 errors excluded) — foundry endpoint threw transient JSON-decode errors (<code>'str' object has no attribute 'get'</code>) on 19 of 20. Not real method failures; would need either retry/back-off hardening or a non-filtered endpoint to get clean cells.</p>
 
 <h3>WildChat drill-down (S3 quality + ontopic vs AO, by respondent)</h3>
 <table class="compact">
@@ -609,27 +610,40 @@ Rewrite is more flexible than Reset's deterministic template. On strict-format /
 
 <p>R6 produced a clean handoff contract (winner = v8, prompt file pinned, analyzer pairing documented). The tau2 plan (<code>docs/post_may18_tau2_plan.md</code>) is unblocked. But porting is not a verbatim copy.</p>
 
-<h3>Phase 0 — Python version + dep isolation</h3>
+<h3>Phase 0 — Python version + dep isolation <span class="badge r6">done</span></h3>
+
+<p>Took longer than the planned 15 min because the system was missing several pieces. Findings logged in <code>docs/post_may18_tau2_followups.md</code>; net of workarounds:</p>
 <ul>
-  <li>tau2-bench requires Python <strong>≥3.12, &lt;3.14</strong>; our base conda env is 3.13.11 which removed <code>audioop</code>. <code>tau2.voice.synthesis.audio_effects.effects</code> imports <code>audioop</code> unconditionally → any tau2 import fails.</li>
-  <li>Solution: separate <code>/home/v-homatthew/tau2_ctxe/.venv</code> (Python 3.12). Install tau2-bench + ctx_editor as -e packages. ctx_editor pulls in for shared abstractions; tau2-bench supplies the agent/eval harness.</li>
-  <li>Wall: ~15 min.</li>
+  <li>tau2-bench requires Python ≥3.12, &lt;3.14; our base conda env is 3.13.11 (no <code>audioop</code>). Built <code>/home/v-homatthew/tau2_ctxe/.venv</code> with Python 3.12.3.</li>
+  <li><code>python3-venv</code> apt package not installed → <code>ensurepip</code> fails. Bootstrapped pip via <code>get-pip.py</code>.</li>
+  <li><code>pyaudio</code> can't build from source (PortAudio system libs unavailable). It's on the unconditional import chain (<code>tau2/__init__</code> → runner → evaluator → agent.base.streaming → voice). Worked around with a <code>.pth</code> shim that mocks <code>pyaudio</code> at startup. The voice subsystem isn't exercised by telecom_small (text-only), so the mock is never called — just needs to exist for imports.</li>
+  <li>Also had to install <code>scipy</code>, <code>elevenlabs</code>, <code>rank_bm25</code> as they're on the unconditional chain too.</li>
+  <li>Smoke imports: <code>tau2.agent.llm_agent.LLMAgent</code>, <code>ctx_edit.agents.{AssistantOmitAgent,ContextEditAgent,ContextRewriteAgent}</code>, and <code>ctx_editor.strategies.analyzer_prompts.ANALYZER_PROMPT_REGISTRY</code> — all clean.</li>
 </ul>
 
-<h3>Phase 1 — analyzer parity audit on the tau2 side</h3>
+<h3>Phase 1 — analyzer parity audit on the tau2 side <span class="badge r6">done</span></h3>
 
-<p><strong>This is the LiC bug in miniature.</strong> tau2 has its own <code>ctx_edit/analyzer.py</code> with three prompts:</p>
+<p>tau2 has its own <code>ctx_edit/analyzer.py</code> with three prompts:</p>
 <ul>
   <li><code>TASK_SPEC_PROMPT_V10</code> — Q1 (shared between S2 and S3) ✓ parity here.</li>
-  <li><code>COMPARE_PROMPT_V10_S2</code> — Q2 for S2 (Gated-Reset).</li>
-  <li><code>COMPARE_PROMPT_V10_S3</code> — Q2 for S3 (Rewrite). ⚠ <strong>different from S2's</strong>.</li>
+  <li><code>COMPARE_PROMPT_V10_S2</code> — Q2 for S2 (Gated-Reset). Output goes <strong>directly into the compacted context</strong> (assistant reads it as briefing).</li>
+  <li><code>COMPARE_PROMPT_V10_S3</code> — Q2 for S3 (Rewrite). Output feeds into Q3 (the rewriter LLM).</li>
 </ul>
 
-<p>Same architectural-asymmetry class as the LiC bug. The legitimate reason it <em>might</em> be OK: S2's Q2 output goes directly into the compacted context (assistant reads it), while S3's Q2 feeds into Q3 (the rewriter LLM). Different downstream consumers can justify different framing. But that needs to be verified, not assumed. Plan: diff the two prompts; if they diverge problematically, propose a parity refactor analogous to R5's; otherwise document and proceed.</p>
+<p>The S2/S3 Q2 prompts differ materially — same architectural-asymmetry <em>class</em> as the LiC bug. Diff'd them carefully:</p>
+<ul>
+  <li><strong>S2</strong>: first-person to the agent ("Your analysis will directly replace the agent's conversation history"), expansive, includes explicit "What should the agent do next" section.</li>
+  <li><strong>S3</strong>: third-person about the agent ("Your analysis will be passed to a separate step"), telegraph-style, data-rich, no first-person guidance.</li>
+  <li>tau2's own comment block in the file explicitly documents the asymmetry: <em>"S3 variant: the analysis is an intermediate step — a separate LLM call will use it to write the final context. Be precise and data-rich (Q3 needs the raw facts)."</em></li>
+</ul>
 
-<p><strong>Stop-and-check rule</strong>: don't refactor tau2's analyzer without confirming with the user, since this is a paper-relevant decision.</p>
+<div class="callout win">
+  <strong>Verdict: NOT the same bug class as LiC.</strong> The S2/S3 asymmetry is legitimately motivated by different downstream consumers (assistant vs another LLM). Proceeding with Phase 2 without refactoring tau2's analyzer.
+</div>
 
-<h3>Phase 2 — porting v8 to tau2 is non-trivial</h3>
+<p class="small"><strong>Latent risk to monitor</strong>: S3's Q2 is much terser than S2's. If S3 underperforms S2 by a wide margin in the eventual sweep, the asymmetry should be revisited — terseness may be dropping state. The Phase 5 cells separate S2 from S3 so we'll see this directly.</p>
+
+<h3>Phase 2 — porting v8 to tau2 <span class="badge last">next</span></h3>
 
 <p>v8 cannot be verbatim-copied. tau2's Q3 ingests inputs LiC doesn't have:</p>
 <ul>
