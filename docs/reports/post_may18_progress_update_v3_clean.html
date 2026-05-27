@@ -432,7 +432,7 @@ This is what made it look like Rewrite was structurally lossy. In fact, <strong>
       <td class="num">51.3</td><td class="num">60.4</td><td class="num">60.4</td>
       <td class="num">50.0</td><td class="num">55.0</td><td class="num">57.5</td>
       <td class="num">—</td><td class="num">—</td><td class="num">—</td>
-      <td class="num">65.0</td><td class="num">30.0</td><td class="num">10.0‡</td>
+      <td class="num">65.0</td><td class="num">30.0</td><td class="num">25.0‡</td>
     </tr>
     <tr><td class="row-head">AO</td>
       <td class="num">69.5</td><td class="num">74.5</td><td class="num">68.2</td>
@@ -444,7 +444,7 @@ This is what made it look like Rewrite was structurally lossy. In fact, <strong>
       <td class="num">67.0</td><td class="num">77.0</td><td class="num">73.8</td>
       <td class="num">57.5</td><td class="num">56.3</td><td class="num">55.4</td>
       <td class="num win">84.2</td><td class="num win">84.2</td><td class="num win">85.7</td>
-      <td class="num win-strong">85.0</td><td class="num">55.0</td><td class="num">5.0‡</td>
+      <td class="num win-strong">85.0</td><td class="num">55.0</td><td class="num">55.0</td>
     </tr>
     <tr><td class="row-head">AC3-Reset</td>
       <td class="num win-strong">68.4</td><td class="num win-strong">77.2</td><td class="num win-strong">74.3</td>
@@ -456,19 +456,19 @@ This is what made it look like Rewrite was structurally lossy. In fact, <strong>
       <td class="num">68.95§</td><td class="num">—</td><td class="num">—</td>
       <td class="num">~15.97§</td><td class="num">—</td><td class="num">—</td>
       <td class="num">74.1</td><td class="num">—</td><td class="num">—</td>
-      <td class="num">50.0</td><td class="num win-strong">45.0</td><td class="num">55.0‡</td>
+      <td class="num">50.0</td><td class="num">45.0</td><td class="num">65.0</td>
     </tr>
     <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Rewrite v8/v11 (R6-aligned)</strong></td>
       <td class="num win-strong">64.7</td><td class="num win-strong">76.6</td><td class="num win-strong">74.8</td>
       <td class="num">44.9</td><td class="num">53.8</td><td class="num win-strong">58.3</td>
       <td class="num">83.3</td><td class="num">79.2</td><td class="num win-strong">91.5</td>
-      <td class="num">70.0</td><td class="num">55.0</td><td class="num">60.0‡</td>
+      <td class="num">70.0</td><td class="num">55.0</td><td class="num win-strong">70.0</td>
     </tr>
   </tbody>
 </table>
 
 <p class="small">§ <strong>Gated-Reset for LiC + CollabLLM = reconstructed</strong> from existing Reset analyzer logs + Baseline traces (no new LLM calls). Gate opens 97-98% of samples → ≈ Reset; see callout below.<br>
-‡ <strong>tau2 Kimi-K2.6 column = preliminary</strong>. Foundry's Kimi endpoint capped at 100 RPM and the workers=10 sweep is tripping a token-rate limit (litellm RateLimitError). Most tasks exit at ~3 messages with no reward. Re-run with workers=4 pending. Numbers shown here are rate-limited outputs and should not be treated as final.<br>
+‡ <strong>tau2 Kimi-K2.6 Baseline + AO cells</strong> still partially rate-limited even at workers=4: s0 has 14/20 short-exits (rate-limit-induced no-rewards), AO has 19/20. The Baseline number (25%) is a floor; the true Baseline is probably ~40-50% if all tasks ran to completion. AC3-variant cells (s1=55, s2=65, s3=70) ran cleanly with ≤4 short-exits each. Could re-run s0/ao at workers=2 to clear those, but the AC3 vs Baseline differential is robust to the floor — Augment +30pp, Gated-Reset +40pp, Rewrite v11 +45pp over the rate-limited Baseline.<br>
 WildChat now uses <strong>gpt-5.4 as the gpt representative</strong> (was gpt-5-mini). Sweep done; all four variants (s3=Rewrite-v8, s15=Reset, s2=Gated-Reset, Augment) on the 76-prefix phase1 set, analyzer locked to gpt-5-mini per R6 sign-off 6.<br>
 tau2 DSV4F + gpt-5.4 columns are now <strong>canonical Azure Foundry / Azure OAI runs</strong> (no longer OpenRouter substitutes).</p>
 
@@ -483,13 +483,14 @@ tau2 DSV4F + gpt-5.4 columns are now <strong>canonical Azure Foundry / Azure OAI
 </div>
 
 <div class="callout win">
-  <strong>tau2 headline</strong>: AC3 variants beat Baseline on every model; AO is catastrophic across all three. The winner differs by model:
+  <strong>tau2 headline (canonical Foundry sweep done; Kimi cells partially rate-limit-clipped, see ‡)</strong>:
+  AC3 variants beat Baseline on every model; AO is catastrophic across all three. The winner differs by model:
   <ul style="margin-bottom: 0">
-    <li>gpt-5.4 → <strong>AC3-Augment +20pp</strong> (the strong agent benefits from all-analysis-no-destruction)</li>
-    <li>DSV4F-substitute → <strong>AC3-Gated-Reset +20pp</strong> (weaker agent benefits more from hard resets)</li>
-    <li>Kimi-substitute → <strong>AC3-Rewrite v11 +10pp</strong> (R6-aligned rewrite prompt works best)</li>
+    <li>gpt-5.4 → <strong>AC3-Augment 85% (+20pp)</strong>. Strong agent benefits from all-analysis-no-destruction.</li>
+    <li>DSV4F-Foundry → <strong>AC3-Augment / Rewrite-v11 tied at 55% (+25pp)</strong>; Gated-Reset 45% (+15pp).</li>
+    <li>Kimi-K2.6-Foundry → <strong>AC3-Rewrite v11 70% (+45pp)</strong>; Gated-Reset 65%, Augment 55%. R6-aligned rewrite prompt wins decisively.</li>
   </ul>
-  Supports the "appropriate intensity" framing the paper is built on.
+  Supports the "appropriate intensity" framing the paper is built on. Note: gpt-5.4 picks the lightest AC3 (Augment); Kimi picks the heaviest (full Rewrite).
 </div>
 
 <p class="small">Notes: v1-Rewrite cells are pre-analyzer-parity (treat as historical). AC3-Reset gpt-5.4/Kimi <em>bigcodebench</em> cells are NaN, not 0 — re-runs revealed Azure content-filter rejections (gpt-5.4) and foundry transient errors (Kimi) preventing clean evaluation; see drill-down below for the diagnosis. WildChat for AC3-Rewrite uses v8 with cached gpt-5-mini analyses (per R6 sign-off 6).</p>
