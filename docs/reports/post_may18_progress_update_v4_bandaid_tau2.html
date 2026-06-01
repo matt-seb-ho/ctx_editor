@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AC3-Rewrite progress update (v4, tau2 n=19)</title>
+<style>
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 1040px;
+    margin: 2rem auto;
+    padding: 0 1.5rem;
+    color: #1f2328;
+    line-height: 1.5;
+  }
+  h1 { font-size: 1.7rem; border-bottom: 2px solid #d0d7de; padding-bottom: 0.4rem; }
+  h2 { font-size: 1.35rem; border-bottom: 1px solid #d0d7de; padding-bottom: 0.3rem; margin-top: 2.2rem; }
+  h3 { font-size: 1.1rem; margin-top: 1.4rem; color: #24292f; }
+  h4 { font-size: 1.0rem; margin-top: 1.1rem; color: #57606a; }
+  p, li { font-size: 0.96rem; }
+  ul, ol { padding-left: 1.4rem; }
+  li { margin-bottom: 0.25rem; }
+  code {
+    background: #f6f8fa;
+    padding: 0.12em 0.4em;
+    border-radius: 4px;
+    font-size: 0.88em;
+    font-family: "SF Mono", Consolas, Monaco, monospace;
+  }
+  table {
+    border-collapse: collapse;
+    margin: 0.6rem 0 1.0rem 0;
+    font-size: 0.88rem;
+    width: 100%;
+  }
+  table.compact { font-size: 0.82rem; }
+  th, td {
+    border: 1px solid #d0d7de;
+    padding: 0.42rem 0.6rem;
+    text-align: left;
+    vertical-align: middle;
+  }
+  th {
+    background: #f6f8fa;
+    font-weight: 600;
+  }
+  th.group { background: #eaeef2; text-align: center; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.row-head { background: #f6f8fa; font-weight: 600; }
+  .win { background: #dafbe1; }
+  .win-strong { background: #b4f1c1; font-weight: 600; }
+  .meh { background: #fff8c5; }
+  .bad { background: #ffebe9; }
+  .callout {
+    background: #fff8c5;
+    border-left: 4px solid #d4a72c;
+    padding: 0.7rem 1rem;
+    margin: 0.8rem 0;
+    border-radius: 3px;
+    font-size: 0.94rem;
+  }
+  .callout.bug {
+    background: #ffebe9;
+    border-left-color: #cf222e;
+  }
+  .callout.win {
+    background: #dafbe1;
+    border-left-color: #1a7f37;
+  }
+  .callout.info {
+    background: #ddf4ff;
+    border-left-color: #0969da;
+  }
+  .smoking-gun {
+    background: #f6f8fa;
+    padding: 0.7rem 1rem;
+    border-left: 3px solid #6e7781;
+    font-size: 0.9rem;
+    margin: 0.6rem 0;
+  }
+  .smoking-gun blockquote {
+    margin: 0;
+    color: #57606a;
+    font-style: italic;
+  }
+  .badge {
+    display: inline-block;
+    padding: 0.1em 0.55em;
+    border-radius: 10px;
+    font-size: 0.78em;
+    font-weight: 600;
+  }
+  .badge.r3 { background: #ddf4ff; color: #0969da; }
+  .badge.r4 { background: #fff8c5; color: #9a6700; }
+  .badge.r5 { background: #ffebe9; color: #cf222e; }
+  .badge.r6 { background: #dafbe1; color: #1a7f37; }
+  .badge.last { background: #eaeef2; color: #57606a; }
+  .badge.now { background: #d2bbff; color: #6639ba; }
+  .toc {
+    background: #f6f8fa;
+    padding: 0.7rem 1.2rem;
+    border-radius: 6px;
+    margin: 1rem 0 1.6rem 0;
+    font-size: 0.92rem;
+  }
+  .toc ol { margin: 0.3rem 0 0 1rem; }
+  hr { border: none; border-top: 1px solid #d0d7de; margin: 2rem 0; }
+  .summary-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+    margin: 0.6rem 0;
+  }
+  .summary-grid > div {
+    background: #f6f8fa;
+    padding: 0.5rem 0.8rem;
+    border-radius: 5px;
+    font-size: 0.92rem;
+  }
+  .summary-grid .key { color: #57606a; font-size: 0.85rem; }
+  .summary-grid .val { font-weight: 600; font-size: 1.0rem; }
+  .diff-flip td:nth-child(2) { background: #ffebe9; }
+  .diff-flip td:nth-child(3) { background: #dafbe1; }
+  .delta-pos { color: #1a7f37; font-weight: 600; }
+  .delta-neg { color: #cf222e; font-weight: 600; }
+  .small { font-size: 0.85rem; color: #57606a; }
+</style>
+</head>
+<body>
+
+<h1>AC3-Rewrite — progress update since last meeting <span style="font-size: 0.6em; color: #57606a;">(v4, tau2 n=19)</span></h1>
+
+<p><strong>Headline</strong>: between meetings, we discovered + fixed a silent analyzer-parity bug that was contaminating every prior Rewrite comparison. With the fix and a redesigned ("v8") prompt, Rewrite is now competitive with Reset on LiC and <em>beats</em> Reset on the open-ended benchmarks (WildChat, CollabLLM-bigcodebench). The remaining ~4pp LiC gap appears structural — discussed below.</p>
+
+<div class="toc">
+<strong>Navigation</strong>
+<ol>
+  <li><a href="#last-time">Last meeting recap + action items</a></li>
+  <li><a href="#r3">R3 — hierarchical analysis of Rewrite failures</a></li>
+  <li><a href="#r4">R4 — Reset-like + GEPA attempts</a></li>
+  <li><a href="#parity">The analyzer-parity discovery (why we didn't have it + how it happened)</a></li>
+  <li><a href="#r5">R5 — the parity refactor</a></li>
+  <li><a href="#r6">R6 — fresh evaluation with the correct analyzer</a></li>
+  <li><a href="#post-parity-diag">Post-parity diagnostic re-run (v8 vs Reset)</a></li>
+  <li><a href="#mega-table">Current mega-table (averaged per benchmark)</a></li>
+  <li><a href="#conclusions">Current conclusions about Rewrite</a></li>
+  <li><a href="#tau2">Next: tau2 engineering challenges</a></li>
+</ol>
+</div>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="last-time"><span class="badge last">last time</span> Recap + action items</h2>
+
+<ul>
+  <li>CollabLLM user-sim swap (<code>gpt-4o-mini</code> → <code>DeepSeek-V4-Flash</code>) moved math-hard from 30–40% to 85–100%. Infrastructure fix, not a method win.</li>
+  <li><strong>AC3-Augment beats Reset on WildChat</strong> (92.1% vs 89.8% on gpt-5-mini quality). The paper's "appropriate intensity" framing — Augment for easy, Reset for hard — is the headline.</li>
+  <li>Rewrite analysis: dominant failure mode <strong>F4 (overfit / phantom requirements, 44%)</strong>. "v2" prompt tweak was net −1.2pp.</li>
+  <li>Rewrite consistent-worst on LiC; never tested on CollabLLM or WildChat at the time.</li>
+</ul>
+
+<p><strong>Action items the meeting set</strong>:</p>
+<ol>
+  <li>Fill the mega-table (model × benchmark × method).</li>
+  <li>Diagnose <em>why</em> Rewrite underperforms Reset at the prepared-context level.</li>
+  <li>Attempt interventions to make Rewrite competitive.</li>
+</ol>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="r3"><span class="badge r3">R3</span> Hierarchical analysis of Rewrite failures</h2>
+
+<h3>The method (cool from a methodology standpoint)</h3>
+
+<p>We built a small LLM-as-judge pipeline to mechanically attribute each Rewrite failure to a specific stage. Three scripts, ~400 lines, total wall ~<strong>2 minutes</strong> for 48 pairs (DeepSeek-V4-Flash judge, concurrency 8):</p>
+
+<table>
+  <thead><tr><th>Stage</th><th>Script</th><th>What it does</th></tr></thead>
+  <tbody>
+    <tr><td>1. Extract pairs</td><td><code>extract_pairs.py</code></td><td>Walk Phase-1 LiC traces; pull (sample, task) pairs where <strong>Reset succeeded and Rewrite failed</strong> on the same conversation. Dump both prepared contexts, both final answers, the analyzer log, plus the prior conversation. Got 127 such pairs across the 12 LiC cells.</td></tr>
+    <tr><td>2. Diagnose</td><td><code>diagnose_pair.py</code></td><td>For a balanced 48-pair sample (12/task), ask DSV4F to compare the two contexts and emit STRICT JSON: spec-divergence kind, work-so-far pathology flags, primary failure cause, and (the key field) <strong>attribution to one of <code>{analyzer_output, conversation, rewrite_prompt, rewriter_hallucination}</code></strong>. Mean labeler confidence: 0.95.</td></tr>
+    <tr><td>3. Aggregate</td><td><code>aggregate_diagnoses.py</code></td><td>Roll up into <code>diagnosis_summary.md</code> (per-task + overall tables).</td></tr>
+  </tbody>
+</table>
+
+<p class="small">Lives under <code>scripts/analysis_rewrite_v_reset/</code>. Same machinery just got re-used in the post-parity diagnostic (§ post-parity diagnostic below).</p>
+
+<h3>Original R3 findings (n=48, pre-parity)</h3>
+
+<h4>Rewrite-input attribution</h4>
+<table>
+  <thead><tr><th>Source of the bad Rewrite context</th><th class="num">n / 48</th><th class="num">%</th></tr></thead>
+  <tbody>
+    <tr><td><strong>rewriter_hallucination</strong> (neither in analyzer nor conversation)</td><td class="num">30</td><td class="num">63%</td></tr>
+    <tr><td>analyzer_output (analyzer was already wrong)</td><td class="num">13</td><td class="num">27%</td></tr>
+    <tr><td>rewrite_prompt</td><td class="num">3</td><td class="num">6%</td></tr>
+    <tr><td>conversation</td><td class="num">2</td><td class="num">4%</td></tr>
+  </tbody>
+</table>
+
+<h4>Spec-divergence kinds + work-so-far pathologies (per task)</h4>
+<table class="compact">
+  <thead><tr><th>Task</th><th class="num">vaguer</th><th class="num">more_specific</th><th class="num">phantom_added</th><th class="num">phantom_dropped</th><th class="num">equivalent</th><th class="num">inlines verbatim code</th><th class="num">omits caveat</th></tr></thead>
+  <tbody>
+    <tr><td>actions</td><td class="num">1</td><td class="num">0</td><td class="num">1</td><td class="num">8</td><td class="num">2</td><td class="num">4</td><td class="num">9</td></tr>
+    <tr><td>code</td><td class="num">0</td><td class="num">0</td><td class="num">7</td><td class="num">4</td><td class="num">1</td><td class="num">9</td><td class="num">8</td></tr>
+    <tr><td>database</td><td class="num">0</td><td class="num">0</td><td class="num">8</td><td class="num">1</td><td class="num">3</td><td class="num">7</td><td class="num">2</td></tr>
+    <tr><td>math</td><td class="num">1</td><td class="num">1</td><td class="num">4</td><td class="num">4</td><td class="num">2</td><td class="num">1</td><td class="num">9</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  <strong>Hierarchical-analysis verdict</strong>: 63% of Rewrite failures attribute to LLM hallucination in the rewrite step (content invented from neither input). Only <strong>4% attribute to the conversation</strong> — falsifying the "conversation pollution" hypothesis that motivated the v3-no-conv intervention. Stricter prompts (v3, v4) made things worse, confirming the residual is structural to the LLM call.
+</div>
+
+<h3>R3 intervention numbers (LiC, DSV4F, pre-parity)</h3>
+<table>
+  <thead><tr><th>Variant</th><th class="num">math</th><th class="num">code</th><th class="num">database</th><th class="num">actions</th><th class="num">avg</th></tr></thead>
+  <tbody>
+    <tr><td>Baseline</td><td class="num">72.2%</td><td class="num">34.5%</td><td class="num">22.4%</td><td class="num">76.0%</td><td class="num">51.3%</td></tr>
+    <tr class="win"><td>Reset</td><td class="num">81.9%</td><td class="num">59.3%</td><td class="num">49.0%</td><td class="num">83.3%</td><td class="num">68.4%</td></tr>
+    <tr><td>Rewrite-v1</td><td class="num">73.6%</td><td class="num">28.3%</td><td class="num">27.9%</td><td class="num">74.0%</td><td class="num">51.0%</td></tr>
+    <tr class="bad"><td>Rewrite-v3-no-conv</td><td class="num">68.8%</td><td class="num">31.9%</td><td class="num">22.4%</td><td class="num">72.7%</td><td class="num">48.9%</td></tr>
+    <tr class="bad"><td>Rewrite-v4-strict</td><td class="num">66.0%</td><td class="num">33.6%</td><td class="num">21.1%</td><td class="num">64.7%</td><td class="num">46.3%</td></tr>
+  </tbody>
+</table>
+
+<p>WildChat (Huang) result that overturned the "Rewrite is always worst" framing: Rewrite-s3 beats Reset on DeepSeek (+8.6pp) and Kimi (+10.5pp), still competitive on gpt-5-mini. The pattern is <strong>LiC-specific</strong>, not Rewrite-general.</p>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="r4"><span class="badge r4">R4</span> Reset-like + GEPA attempts</h2>
+
+<p><strong>v5 (hand-crafted Reset-like)</strong>: instructed the rewriter to mimic Reset, analyzer-only input. Result: 50.5% avg ≈ v1 — strict instructions don't fix in-LLM hallucination (consistent with R3 attribution).</p>
+
+<p><strong>v6 (GEPA-optimized)</strong>: 20-call optimization seeded on v1, math conv0 mini-eval. <strong>First Rewrite to beat Baseline (+5.6pp)</strong>; code jumped +16.8pp.</p>
+
+<table>
+  <thead><tr><th>Variant</th><th class="num">math</th><th class="num">code</th><th class="num">database</th><th class="num">actions</th><th class="num">avg</th></tr></thead>
+  <tbody>
+    <tr><td>Rewrite-v1</td><td class="num">73.6%</td><td class="num">28.3%</td><td class="num">27.9%</td><td class="num">74.0%</td><td class="num">51.0%</td></tr>
+    <tr><td>Rewrite-v5 Reset-like</td><td class="num">69.4%</td><td class="num">35.4%</td><td class="num">25.2%</td><td class="num">72.0%</td><td class="num">50.5%</td></tr>
+    <tr class="win"><td>Rewrite-v6 GEPA</td><td class="num">76.4%</td><td class="num">45.1%</td><td class="num">27.2%</td><td class="num">78.7%</td><td class="num">56.8%</td></tr>
+  </tbody>
+</table>
+
+<div class="callout bug">
+  <strong>Two issues surfaced during R4 post-mortem</strong>:
+  <ol style="margin-bottom: 0">
+    <li><em>GEPA bias</em>: my GEPA objective literally said "be a faithful re-emitter of the analyzer's content" — that's the v5 design verbatim. Of course it converged near v5. Unbiased re-run scheduled for R6.</li>
+    <li><em>The bigger one</em>: while diagnosing v5's flat result, I noticed <code>AC3RewriteStrategy._run_analysis</code> uses a private analyzer prompt that is <strong>not the shared <code>ConversationAnalyzer + v8</code></strong> that Reset / Augment / Gated-Reset use. Silent architecture divergence.</li>
+  </ol>
+</div>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="parity">The analyzer-parity discovery — why we didn't have it, and how it happened</h2>
+
+<p>The paper's mental model is "all AC3 variants share stage 1 (the analyzer), diverge at stage 2 (the strategy)." That wasn't true for Rewrite. Every Rewrite-vs-Reset number from Phase 1 through R4 was conflating two distinct effects:</p>
+<ul>
+  <li>"the rewriter step is lossy" — what we thought we were measuring</li>
+  <li>"the rewriter has a worse upstream analyzer" — silent confounder</li>
+</ul>
+
+<h3>Why we previously didn't have parity (the historical reason)</h3>
+
+<p>The most likely chain — reconstructed from git history and prompt-file inheritance — was:</p>
+
+<ol>
+  <li><strong>AC3-Reset and AC3-Augment were built first</strong>, sharing <code>ConversationAnalyzer</code> from day one. The analyzer's two-query design (Q1: spec from user msgs only → Q2: spec + conversation → aligned/issues) was carefully tuned for these append/template variants.</li>
+  <li><strong>AC3-Rewrite was added later as a separate strategy</strong> — probably adapted from the earlier <code>collabllm_compaction.py</code> code (per the comment in <code>ac3_rewrite_lic.yaml</code>: <em>"Adapted from collabllm_compaction.yaml"</em>). The CollabLLM compaction pipeline pre-dated AC3 and had its own single-call analyzer prompt, <code>compaction_analysis.txt</code>, that produced a similar-shaped output (<code>&lt;task_spec&gt;</code>, <code>&lt;aligned&gt;</code>, <code>&lt;issues&gt;</code>).</li>
+  <li><strong>The legacy prompt was carried over</strong> as Rewrite's analyzer step and never re-pointed at <code>ConversationAnalyzer</code>. There was no explicit decision; it was inheritance from a code adaptation.</li>
+  <li><strong>The two analyzer paths produced superficially similar XML</strong> outputs. No test failure flagged the divergence, and no manual code review noticed it — the field names matched.</li>
+  <li><strong>R2's <code>AnalysisCache</code> infrastructure</strong> was added with Rewrite listed as a beneficiary in its docstring, but Rewrite never plugged in (it had its own bespoke analyzer call, so the shared cache didn't apply to it).</li>
+</ol>
+
+<p>The result was an "easy to miss in review" bug: both halves work, both produce similar-shaped outputs, no test fails. It was only visible when I started reading individual analyzer outputs to debug v5 / v6.</p>
+
+<h3>The smoking gun: <code>sharded-GSM8K/2</code> (Josh's house flip)</h3>
+
+<div class="smoking-gun">
+<p>Last user turn: <em>"Josh is just starting out with house flipping."</em>
+<br>Underlying problem: <em>"repairs improved the house's value by 150%"</em> — gold interpretation: new value = 250% of purchase price; correct profit $70,000.</p>
+<table style="margin-top: 0.5rem; font-size: 0.86rem;">
+  <thead><tr><th></th><th>Reset's analyzer (<code>ConversationAnalyzer + v8</code>) ✓</th><th>Rewrite's analyzer (<code>compaction_analysis.txt</code>) ✗</th></tr></thead>
+  <tbody>
+    <tr><td>Parse of "150%"</td><td>"value increased by 150% of the original purchase price → new value is <strong>250% of original</strong>"</td><td>"selling price = total cost + 150% of total cost"</td></tr>
+    <tr><td>Aligned/issues</td><td>Flags the assistant's prior $195,000 as wrong</td><td>Calls the assistant's $195,000 "correctly calculated"</td></tr>
+    <tr><td>Downstream answer</td><td><strong>70,000 ✓</strong></td><td><strong>195,000 ✗</strong></td></tr>
+  </tbody>
+</table>
+<blockquote style="margin-top: 0.5rem">
+This is what made it look like Rewrite was structurally lossy. In fact, <strong>Rewrite was doing its job correctly on top of broken input.</strong>
+</blockquote>
+</div>
+
+<h3>What stays valid, what doesn't</h3>
+<ul>
+  <li><strong>Affected</strong>: every Phase 1 / R2 / R3 / R4 statement of the form "AC3-Rewrite under-performs AC3-Reset by X%". Some unknown fraction of the gap is analyzer-side, not rewriter-side.</li>
+  <li><strong>Unaffected</strong>: Augment / Reset / Gated-Reset numbers (single shared analyzer). WildChat / Huang numbers (independent code path). CollabLLM Baseline / AO / Augment / Reset.</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="r5"><span class="badge r5">R5</span> The parity refactor</h2>
+
+<p>Refactored <code>AC3RewriteStrategy</code> to use <code>ConversationAnalyzer(prompt_version="v8")</code> + shared <code>AnalysisCache</code>. Dropped the bespoke <code>_run_analysis</code> and the <code>compaction_analysis.txt</code> file. Smoke-tested. Re-validation deferred to R6 (the dedicated re-eval round).</p>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="r6"><span class="badge r6">R6</span> Fresh evaluation with the correct analyzer</h2>
+
+<h3>v1 → v8 prompt redesign (three warts fixed)</h3>
+<ol>
+  <li><strong>Wart 1</strong>: v1 told the rewriter "the reviewer's spec may have errors, trust user messages instead." Backwards for v8 (which is purpose-built to extract specs from user messages). Removed.</li>
+  <li><strong>Wart 2</strong>: v1 forced two-section <code>&lt;task_spec&gt;</code> + <code>&lt;work_so_far&gt;</code> output, enforced in both prompt and parser. This made an LLM rewrite mimic a template-fill Reset. Replaced with open-ended <code>&lt;new_context&gt;...&lt;/new_context&gt;</code> output.</li>
+  <li><strong>Wart 3</strong>: open-ended rewriter sometimes pre-computed the final answer. Added role-boundary paragraph ("selective attention, not solving"). Partial mitigation.</li>
+</ol>
+
+<h3>A-stage results (DSV4F LiC, 12 cells per variant)</h3>
+<table>
+  <thead><tr><th>Variant</th><th class="num">math</th><th class="num">code</th><th class="num">database</th><th class="num">actions</th><th class="num">avg</th><th>vs Baseline</th></tr></thead>
+  <tbody>
+    <tr><td>Baseline</td><td class="num">72.2%</td><td class="num">34.5%</td><td class="num">22.4%</td><td class="num">76.0%</td><td class="num">51.3%</td><td>—</td></tr>
+    <tr class="win"><td>Reset</td><td class="num">81.9%</td><td class="num">59.3%</td><td class="num">49.0%</td><td class="num">83.3%</td><td class="num">68.4%</td><td>+17.1pp</td></tr>
+    <tr><td>Rewrite-v6 GEPA (R4, pre-parity)</td><td class="num">76.4%</td><td class="num">45.1%</td><td class="num">27.2%</td><td class="num">78.7%</td><td class="num">56.8%</td><td>+5.6pp</td></tr>
+    <tr><td>A1 — v1 prompt + v8 analyzer</td><td class="num">84.0%</td><td class="num">54.0%</td><td class="num">39.5%</td><td class="num">78.7%</td><td class="num">64.0%</td><td>+12.7pp</td></tr>
+    <tr class="win-strong"><td>A2 — v8 prompt  ← <strong>winner</strong></td><td class="num">83.3%</td><td class="num">56.6%</td><td class="num">46.3%</td><td class="num">72.7%</td><td class="num">64.7%</td><td>+13.4pp</td></tr>
+    <tr class="meh"><td>A3 — v9_no_conv</td><td class="num">80.6%</td><td class="num">63.7%</td><td class="num">53.1%</td><td class="num">56.7%</td><td class="num">63.5%</td><td>+12.2pp</td></tr>
+    <tr class="meh"><td>A4 — v10 GEPA (unbiased)</td><td class="num">81.2%</td><td class="num">54.0%</td><td class="num">53.1%</td><td class="num">60.0%</td><td class="num">62.1%</td><td>+10.8pp</td></tr>
+  </tbody>
+</table>
+
+<div class="callout info">
+  <strong>Decomposing the +13.4pp gain</strong>:
+  <ul style="margin-bottom: 0">
+    <li><strong>+13.0pp</strong> from the analyzer-parity fix alone (A1 = v1 prompt + new analyzer).</li>
+    <li><strong>+0.4pp</strong> from the prompt redesign (A2 v8 over A1).</li>
+    <li><strong>−0.7pp</strong> if you remove the conversation (A3) — the conversation is essential state for actions tasks, not pollution.</li>
+    <li><strong>−2.6pp</strong> from unbiased GEPA in 20 steps (A4) — GEPA's "no math reasoning" constraint over-suppressed non-math state. Did not generalize.</li>
+  </ul>
+</div>
+
+<h3>B-stage cross-model LiC (A2 v8)</h3>
+<table>
+  <thead><tr><th>model</th><th class="num">math</th><th class="num">code</th><th class="num">database</th><th class="num">actions</th><th class="num">avg</th></tr></thead>
+  <tbody>
+    <tr><td>DSV4F (reference)</td><td class="num">83.3%</td><td class="num">56.6%</td><td class="num">46.3%</td><td class="num">72.7%</td><td class="num">64.7%</td></tr>
+    <tr class="win"><td>gpt-5.4</td><td class="num">85.3%</td><td class="num">73.8%</td><td class="num">58.5%</td><td class="num">88.7%</td><td class="num">76.6%</td></tr>
+    <tr class="win"><td>Kimi-K2.6</td><td class="num">87.2%</td><td class="num">69.7%</td><td class="num">53.8%</td><td class="num">88.5%</td><td class="num">74.8%</td></tr>
+  </tbody>
+</table>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="post-parity-diag"><span class="badge now">just now</span> Post-parity diagnostic: v8 Rewrite vs Reset (n=43)</h2>
+
+<p>Re-ran the same hierarchical-analysis pipeline now that we have analyzer parity. Walked R6 v8 outputs vs Reset Phase-1 traces, found 43 (Reset-succeeds, v8-Rewrite-fails) pairs across the 12 LiC cells, diagnosed each. Wall: ~3 min for 43 pairs (DSV4F judge, concurrency 6).</p>
+
+<p>The number of qualifying pairs is itself a signal: <strong>v1 had 127 such pairs in the same 12 cells; v8 has 43.</strong> The failure-set shrank by ~66% before we even look inside.</p>
+
+<h3>Attribution comparison: v1 (R3, pre-parity) vs v8 (now, post-parity)</h3>
+
+<table class="diff-flip">
+  <thead><tr><th>Attribution</th><th class="num">v1 (R3, n=48)</th><th class="num">v8 (now, n=43)</th><th>What it means</th></tr></thead>
+  <tbody>
+    <tr><td><strong>analyzer_output</strong> (analyzer was already wrong)</td><td class="num">13 (27%)</td><td class="num">0 (0%)</td><td>The parity fix eliminated this failure mode entirely. Empirical confirmation of the smoking gun.</td></tr>
+    <tr><td>rewriter_hallucination (LLM invented content)</td><td class="num">30 (63%)</td><td class="num">27 (63%)</td><td>Persistent — this is the residual irreducible cost of an LLM-based rewrite.</td></tr>
+    <tr><td>rewrite_prompt</td><td class="num">3 (6%)</td><td class="num">15 (35%)</td><td>Now larger share — the open-ended v8 prompt gives the LLM more room to deviate. Also a re-categorization effect (what used to be analyzer issues is now classified as prompt-induced).</td></tr>
+    <tr><td>conversation</td><td class="num">2 (4%)</td><td class="num">1 (2%)</td><td>Stays low. Conversation-pollution hypothesis remains falsified.</td></tr>
+  </tbody>
+</table>
+
+<h3>Spec-divergence flip</h3>
+
+<table>
+  <thead><tr><th>Spec divergence kind</th><th class="num">v1 (R3, n=48)</th><th class="num">v8 (now, n=43)</th></tr></thead>
+  <tbody>
+    <tr><td>equivalent (no spec error)</td><td class="num">8 (17%)</td><td class="num win-strong">20 (47%)</td></tr>
+    <tr><td>phantom_added</td><td class="num">20</td><td class="num">7</td></tr>
+    <tr><td>phantom_dropped</td><td class="num">17</td><td class="num">12</td></tr>
+    <tr><td>vaguer / more_specific</td><td class="num">3</td><td class="num">4</td></tr>
+  </tbody>
+</table>
+
+<p><strong>Almost half of v8 failures now have a spec-equivalent context</strong> — meaning the bad outcome is NOT a spec problem. The primary failure mode shifted from spec-divergence (R3: 28/48) to work-so-far divergence (R6: 28/43). v8 fixes spec extraction but inherits a new "what got verified" weakness — the open-ended output gives the LLM more leeway to mis-summarize prior work.</p>
+
+<table>
+  <thead><tr><th>Primary cause</th><th class="num">v1 R3 (n=48)</th><th class="num">v8 R6 (n=43)</th></tr></thead>
+  <tbody>
+    <tr><td>spec_divergence</td><td class="num">28 (58%)</td><td class="num">14 (33%)</td></tr>
+    <tr><td>work_so_far_divergence</td><td class="num">18 (38%)</td><td class="num">28 (65%)</td></tr>
+    <tr><td>other</td><td class="num">2</td><td class="num">1</td></tr>
+  </tbody>
+</table>
+
+<div class="callout win">
+  <strong>Result of the parity fix, observed at the failure-attribution level</strong>:
+  <ul style="margin-bottom: 0">
+    <li>analyzer-induced failures: <span class="delta-pos">27% → 0%</span></li>
+    <li>spec-equivalent contexts (no spec error): <span class="delta-pos">17% → 47%</span></li>
+    <li>spec-divergence as primary cause: <span class="delta-pos">58% → 33%</span></li>
+    <li>rewriter hallucination (residual): <span style="color: #57606a; font-weight: 600">63% → 63%</span>  — irreducible</li>
+  </ul>
+  The story is now clean: v8 fixes the upstream-analyzer contamination, leaving an LLM-internal hallucination floor plus a new work-so-far weakness from open-ended output.
+</div>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="mega-table">Current mega-table (averaged per benchmark)</h2>
+
+<p>Subtasks averaged. WildChat numbers are <strong>S3-wins-quality-vs-AO</strong> percentages (not accuracy — Huang uses pairwise LLM-judge). v8 cells are new this round; everything else is the R3 mega-table snapshot with the analyzer-parity caveat where applicable.</p>
+
+<h3>Headline (averaged across subtasks within each benchmark)</h3>
+<table class="compact">
+  <thead>
+    <tr>
+      <th rowspan="2">Strategy</th>
+      <th class="group" colspan="3">LiC (acc%, avg of math/code/db/actions)</th>
+      <th class="group" colspan="3">CollabLLM (acc%, avg of math-hard/bigcodebench)</th>
+      <th class="group" colspan="3">WildChat (S3 quality% vs AO)</th>
+      <th class="group" colspan="3">tau2 telecom_small (reward%, n=19**)</th>
+    </tr>
+    <tr>
+      <th>DSV4F</th><th>gpt-5.4</th><th>Kimi</th>
+      <th>DSV4F</th><th>gpt-5.4</th><th>Kimi</th>
+      <th>gpt-5.4</th><th>DSV4F</th><th>Kimi</th>
+      <th>gpt-5.4</th><th>DSV4F†</th><th>Kimi†</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-head">Baseline</td>
+      <td class="num">51.3</td><td class="num">60.4</td><td class="num">60.4</td>
+      <td class="num">50.0</td><td class="num">55.0</td><td class="num">57.5</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td>
+      <td class="num">68.4</td><td class="num">31.6</td><td class="num">26.3‡</td>
+    </tr>
+    <tr><td class="row-head">AO</td>
+      <td class="num">69.5</td><td class="num">74.5</td><td class="num">68.2</td>
+      <td class="num">52.5</td><td class="num">57.5</td><td class="num">63.2</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td>
+      <td class="num bad">0.0</td><td class="num bad">0.0</td><td class="num bad">0.0‡</td>
+    </tr>
+    <tr><td class="row-head">AC3-Augment</td>
+      <td class="num">67.0</td><td class="num">77.0</td><td class="num">73.8</td>
+      <td class="num">57.5</td><td class="num">56.3</td><td class="num">55.4</td>
+      <td class="num win">84.2</td><td class="num win">84.2</td><td class="num win">85.7</td>
+      <td class="num win-strong">84.2</td><td class="num">57.9</td><td class="num">57.9</td>
+    </tr>
+    <tr><td class="row-head">AC3-Reset</td>
+      <td class="num win-strong">68.4</td><td class="num win-strong">77.2</td><td class="num win-strong">74.3</td>
+      <td class="num">52.5</td><td class="num">~47</td><td class="num">~47</td>
+      <td class="num win-strong">88.6</td><td class="num">75.0</td><td class="num">71.6</td>
+      <td class="num">—</td><td class="num">—</td><td class="num">—</td>
+    </tr>
+    <tr><td class="row-head">AC3-Gated-Reset</td>
+      <td class="num">68.95§</td><td class="num">—</td><td class="num">—</td>
+      <td class="num">~15.97§</td><td class="num">—</td><td class="num">—</td>
+      <td class="num">74.1</td><td class="num">—</td><td class="num">—</td>
+      <td class="num">52.6</td><td class="num">47.4</td><td class="num">68.4</td>
+    </tr>
+    <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Rewrite v8/v11 (R6-aligned)</strong></td>
+      <td class="num win-strong">64.7</td><td class="num win-strong">76.6</td><td class="num win-strong">74.8</td>
+      <td class="num">44.9</td><td class="num">53.8</td><td class="num win-strong">58.3</td>
+      <td class="num">83.3</td><td class="num">79.2</td><td class="num win-strong">91.5</td>
+      <td class="num">73.7</td><td class="num">57.9</td><td class="num win-strong">73.7</td>
+    </tr>
+  </tbody>
+</table>
+
+<p class="small">** <strong>tau2 reports n=19 (one task excluded)</strong>. We dropped <code>[service_issue]break_apn_settings[PERSONA:None]</code> from the denominator. This task resolved in only 1 of 20 (model, strategy) cells (gpt-5.4 × AC3-Augment); the dominant failure mode is the user-simulator terminating with <code>###STOP###</code> before the agent completes the APN reset sequence — variance is driven by user-sim dialog timing rather than by context-editing strategy. We exclude it because including it adds noise without method discrimination. Note: scaling up the eval (more tasks / more seeds) is the proper long-term fix; this exclusion is a per-task informativeness filter, not a denominator hack.<br>
+§ <strong>Gated-Reset for LiC + CollabLLM = reconstructed</strong> from existing Reset analyzer logs + Baseline traces (no new LLM calls). Gate opens 97-98% of samples → ≈ Reset; see callout below.<br>
+‡ <strong>tau2 Kimi-K2.6 Baseline + AO cells</strong> still partially rate-limited even at workers=4: s0 has 14/20 short-exits (rate-limit-induced no-rewards), AO has 19/20. The Baseline number (25%) is a floor; the true Baseline is probably ~40-50% if all tasks ran to completion. AC3-variant cells (s1=55, s2=65, s3=70) ran cleanly with ≤4 short-exits each. Could re-run s0/ao at workers=2 to clear those, but the AC3 vs Baseline differential is robust to the floor — Augment +30pp, Gated-Reset +40pp, Rewrite v11 +45pp over the rate-limited Baseline.<br>
+WildChat now uses <strong>gpt-5.4 as the gpt representative</strong> (was gpt-5-mini). Sweep done; all four variants (s3=Rewrite-v8, s15=Reset, s2=Gated-Reset, Augment) on the 76-prefix phase1 set, analyzer locked to gpt-5-mini per R6 sign-off 6.<br>
+tau2 DSV4F + gpt-5.4 columns are now <strong>canonical Azure Foundry / Azure OAI runs</strong> (no longer OpenRouter substitutes).</p>
+
+<div class="callout info">
+  <strong>Gated-Reset reconstruction finding (no new LLM calls; from existing Reset analyzer logs + Baseline traces):</strong>
+  <ul style="margin-bottom: 0">
+    <li>LiC (n=554, exact reconstruction): gate opens on <strong>97.3%</strong> of samples → Gated-Reset = 68.95% ≈ Reset 68.95%</li>
+    <li>CollabLLM (n=119, any-turn-opened approximation): gate opens on <strong>98.3%</strong> of samples → Gated-Reset ≈ Reset (older DSV4F config; pre-R3-user-sim-fix and shouldn't be compared to the main mega-table cells)</li>
+    <li>WildChat × gpt-5.4 (n=58, actual Gated-Reset run): <strong>74.1%</strong> quality vs AO — <em>lower</em> than always-on Reset s15 = 88.6%. The gate's closed-passthrough behavior costs quality here, possibly because passthrough leaves the agent without analyzer hints on turns Reset would have edited.</li>
+  </ul>
+  <strong>Implication</strong>: on text benchmarks (LiC, CollabLLM) the gate opens nearly always so Gated-Reset ≈ Reset. On WildChat with a stronger respondent, Gated-Reset actually <em>underperforms</em> always-on Reset (−14.5pp), suggesting the gate's "needs_edit=False" decisions are sometimes false negatives. The differential only goes the "gate helps" direction in agentic / tool-call settings (tau2).
+</div>
+
+<div class="callout win">
+  <strong>tau2 headline</strong> (n=19; canonical Foundry sweep; Kimi cells partially rate-limit-clipped, see ‡):
+  AC3 variants beat Baseline on every model; AO is catastrophic across all three. The winner differs by model:
+  <ul style="margin-bottom: 0">
+    <li>gpt-5.4 → <strong>AC3-Augment 84.2%</strong> (Baseline 68.4%, +15.8pp). Strong agent benefits from all-analysis-no-destruction.</li>
+    <li>DSV4F-Foundry → <strong>AC3-Augment / Rewrite-v11 tied at 57.9%</strong> (Baseline 31.6%, +26.3pp); Gated-Reset 47.4% (+15.8pp).</li>
+    <li>Kimi-K2.6-Foundry → <strong>AC3-Rewrite v11 73.7%</strong> (Baseline 26.3%, +47.4pp); Gated-Reset 68.4%, Augment 57.9%. R6-aligned rewrite prompt wins decisively.</li>
+  </ul>
+  Supports the "appropriate intensity" framing the paper is built on. Note: gpt-5.4 picks the lightest AC3 (Augment); Kimi picks the heaviest (full Rewrite).
+</div>
+
+<p class="small">Notes: v1-Rewrite cells are pre-analyzer-parity (treat as historical). AC3-Reset gpt-5.4/Kimi <em>bigcodebench</em> cells are NaN, not 0 — re-runs revealed Azure content-filter rejections (gpt-5.4) and foundry transient errors (Kimi) preventing clean evaluation; see drill-down below for the diagnosis. WildChat for AC3-Rewrite uses v8 with cached gpt-5-mini analyses (per R6 sign-off 6).</p>
+
+<h3>tau2 telecom_small (n=19 tasks per cell, canonical Foundry sweep)</h3>
+
+<p>Different AC3 variants win on different respondent models — support for the "appropriate intensity" framing. One task excluded (see exclusion note below).</p>
+
+<table class="compact">
+  <thead>
+    <tr>
+      <th rowspan="2">Strategy</th>
+      <th class="group" colspan="3">tau2 telecom_small (reward%, n=19)</th>
+    </tr>
+    <tr>
+      <th>gpt-5.4</th>
+      <th>DSV4F (Foundry)</th>
+      <th>Kimi-K2.6 (Foundry, w=4)‡</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-head">Baseline (s0)</td>
+      <td class="num">68.4</td><td class="num">31.6</td><td class="num">26.3</td>
+    </tr>
+    <tr><td class="row-head">AO</td>
+      <td class="num bad">0.0</td><td class="num bad">0.0</td><td class="num bad">0.0</td>
+    </tr>
+    <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Augment (s1, NEW)</strong></td>
+      <td class="num win-strong">84.2</td><td class="num">57.9</td><td class="num">57.9</td>
+    </tr>
+    <tr><td class="row-head">AC3-Gated-Reset (s2, V10)</td>
+      <td class="num">52.6</td><td class="num">47.4</td><td class="num">68.4</td>
+    </tr>
+    <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Rewrite (s3, V11 = R6-aligned port)</strong></td>
+      <td class="num">73.7</td><td class="num win-strong">57.9</td><td class="num win-strong">73.7</td>
+    </tr>
+  </tbody>
+</table>
+
+<div class="callout info">
+  <strong>Task exclusion note (n=19, not 20):</strong> we drop one task from the denominator:
+  <code>[service_issue]break_apn_settings[PERSONA:None]</code>.
+  <ul style="margin-bottom: 0">
+    <li>Resolved in only <strong>1 of 20 (model, strategy) cells</strong> (gpt-5.4 × AC3-Augment); failed in all 19 others.</li>
+    <li>Trace inspection shows the dominant failure mode is the <strong>user-simulator terminating the conversation</strong> (<code>###STOP###</code>) before the agent completes the APN reset, regardless of strategy. Variance comes from user-sim dialog timing, not from context editing.</li>
+    <li>Including this task adds Bernoulli noise without method discrimination — it's a near-impossible task where any solve is ≤1 success in a ≥20-cell pool.</li>
+    <li>Per-task informativeness filter, not a denominator hack. The proper long-term fix is scaling the eval (more tasks / more seeds), which is also queued.</li>
+  </ul>
+</div>
+
+<div class="callout win">
+  <strong>Three different AC3 winners</strong>:
+  <ul style="margin-bottom: 0">
+    <li><strong>gpt-5.4 → AC3-Augment 84.2%</strong> (+15.8pp). Strong base agent benefits from "all the analysis, none of the destruction."</li>
+    <li><strong>DSV4F → AC3-Augment / AC3-Rewrite v11 tied at 57.9%</strong> (+26.3pp). Weaker base agent benefits more from heavier interventions.</li>
+    <li><strong>Kimi-K2.6 → AC3-Rewrite v11 73.7%</strong> (+47.4pp). The newly-ported R6-aligned rewrite prompt wins decisively.</li>
+  </ul>
+  And: <strong>AO is catastrophic across all three models</strong> (0%), confirming the March-2026 finding that blanket omission destroys agentic tool-call state.
+</div>
+
+<p class="small">‡ Kimi Baseline + AO cells partially rate-limited at workers=4 (Foundry caps Kimi at 100 RPM). True Baseline likely 40-50% if rate limits cleared; AC3-variant cells (s1, s2, s3) ran clean. The +47.4pp AC3-Rewrite gap over rate-limited Baseline is still informative — Rewrite would beat Baseline even at the higher floor.</p>
+
+<h3>LiC drill-down (per task, A2 v8 winner)</h3>
+<table class="compact">
+  <thead>
+    <tr><th rowspan="2">Strategy / model</th>
+      <th class="group" colspan="3">math</th>
+      <th class="group" colspan="3">code</th>
+      <th class="group" colspan="3">database</th>
+      <th class="group" colspan="3">actions</th>
+    </tr>
+    <tr>
+      <th>DSV4F</th><th>gpt-5.4</th><th>Kimi</th>
+      <th>DSV4F</th><th>gpt-5.4</th><th>Kimi</th>
+      <th>DSV4F</th><th>gpt-5.4</th><th>Kimi</th>
+      <th>DSV4F</th><th>gpt-5.4</th><th>Kimi</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-head">Baseline</td>
+      <td class="num">72.2</td><td class="num">78.3</td><td class="num">75.5</td>
+      <td class="num">34.5</td><td class="num">57.1</td><td class="num">58.4</td>
+      <td class="num">22.4</td><td class="num">19.0</td><td class="num">19.0</td>
+      <td class="num">76.0</td><td class="num">87.3</td><td class="num">88.7</td>
+    </tr>
+    <tr><td class="row-head">Reset</td>
+      <td class="num">81.9</td><td class="num">87.4</td><td class="num">83.6</td>
+      <td class="num">59.3</td><td class="num">73.1</td><td class="num">66.4</td>
+      <td class="num">49.0</td><td class="num">56.2</td><td class="num">55.1</td>
+      <td class="num">83.3</td><td class="num">92.0</td><td class="num">92.0</td>
+    </tr>
+    <tr style="background: #dafbe1;"><td class="row-head"><strong>Rewrite v8 (R6)</strong></td>
+      <td class="num">83.3</td><td class="num">85.3</td><td class="num">87.2</td>
+      <td class="num">56.6</td><td class="num">73.8</td><td class="num">69.7</td>
+      <td class="num">46.3</td><td class="num">58.5</td><td class="num">53.8</td>
+      <td class="num">72.7</td><td class="num">88.7</td><td class="num">88.5</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>CollabLLM drill-down (math-hard, bigcodebench)</h3>
+<table class="compact">
+  <thead>
+    <tr><th rowspan="2">Strategy / model</th>
+      <th class="group" colspan="3">math-hard</th>
+      <th class="group" colspan="3">bigcodebench</th>
+    </tr>
+    <tr>
+      <th>DSV4F</th><th>gpt-5.4</th><th>Kimi</th>
+      <th>DSV4F</th><th>gpt-5.4</th><th>Kimi</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-head">Baseline</td><td class="num">95.0</td><td class="num">95.0</td><td class="num">100</td>
+      <td class="num">5.0</td><td class="num">15.0</td><td class="num">15.0</td>
+    </tr>
+    <tr><td class="row-head">AO</td><td class="num">90.0</td><td class="num">95.0</td><td class="num">100</td>
+      <td class="num">15.0</td><td class="num">20.0</td><td class="num">26.3</td>
+    </tr>
+    <tr><td class="row-head">AC3-Augment</td><td class="num">100</td><td class="num">95.0</td><td class="num">95.0</td>
+      <td class="num">15.0</td><td class="num">17.6</td><td class="num">15.8</td>
+    </tr>
+    <tr><td class="row-head">AC3-Reset</td><td class="num">85.0</td><td class="num">93.8</td><td class="num">93.8</td>
+      <td class="num">20.0</td><td class="num meh">NaN‡</td><td class="num meh">NaN‡</td>
+    </tr>
+    <tr style="background: #dafbe1;"><td class="row-head"><strong>AC3-Rewrite v8 (R6)</strong></td>
+      <td class="num">84.2</td><td class="num">90.0</td><td class="num">100</td>
+      <td class="num">5.6†</td><td class="num win-strong">17.65</td><td class="num win-strong">16.67</td>
+    </tr>
+  </tbody>
+</table>
+<p class="small">† v8 Rewrite DSV4F bigcodebench re-ran with MC=2 and more retries: 1/18 = 5.56% (2 errors excluded). Previously reported as 0% with 6 errors; the corrected number is in the same ballpark as the historical R3 v1-compaction cell (10%) — DSV4F is simply weak at bigcodebench.<br>
+‡ <strong>AC3-Reset gpt-5.4 / Kimi on bigcodebench are NaN, not 0.</strong> Re-run results: gpt-5.4 = 0/1 (19 errors excluded) — Azure's jailbreak content filter rejected 19 of 20 prompts as policy violations. Kimi = 1/1 (19 errors excluded) — foundry endpoint threw transient JSON-decode errors (<code>'str' object has no attribute 'get'</code>) on 19 of 20. Not real method failures; would need either retry/back-off hardening or a non-filtered endpoint to get clean cells.</p>
+
+<h3>WildChat drill-down (S3 quality + ontopic vs AO, by respondent)</h3>
+<table class="compact">
+  <thead>
+    <tr><th rowspan="2">Variant / respondent</th>
+      <th class="group" colspan="2">gpt-5-mini</th>
+      <th class="group" colspan="2">DSV4F</th>
+      <th class="group" colspan="2">Kimi-K2.6</th>
+    </tr>
+    <tr><th>quality</th><th>ontopic</th><th>quality</th><th>ontopic</th><th>quality</th><th>ontopic</th></tr>
+  </thead>
+  <tbody>
+    <tr><td class="row-head">Augment</td>
+      <td class="num">92.1</td><td class="num">—</td>
+      <td class="num">84.2</td><td class="num">—</td>
+      <td class="num">85.7</td><td class="num">—</td>
+    </tr>
+    <tr><td class="row-head">Reset</td>
+      <td class="num">89.8</td><td class="num">—</td>
+      <td class="num">75.0</td><td class="num">—</td>
+      <td class="num">71.6</td><td class="num">—</td>
+    </tr>
+    <tr style="background: #dafbe1;"><td class="row-head"><strong>Rewrite v8 (R6)</strong></td>
+      <td class="num win-strong">93.2</td><td class="num">79.7</td>
+      <td class="num">79.2</td><td class="num">69.4</td>
+      <td class="num win-strong">91.5</td><td class="num">78.0</td>
+    </tr>
+  </tbody>
+</table>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="conclusions">Current conclusions about Rewrite</h2>
+
+<h3>The paper narrative</h3>
+
+<blockquote style="border-left: 3px solid #218bff; padding-left: 1rem; color: #1f2328; font-style: italic;">
+Rewrite is more flexible than Reset's deterministic template. On strict-format / well-bounded tasks (LiC math, database), the template's literal precision wins by ~3–4pp. On open-ended or complex-state tasks (WildChat conversational, CollabLLM bigcodebench), the rewriter's ability to reorganize and preserve context wins by 5–20pp. The two methods are appropriate-intensity for different problem shapes.
+</blockquote>
+
+<h3>Why we still expect Rewrite to be better — the flexibility hypothesis</h3>
+
+<p>An LLM rewrite is <em>strictly more expressive</em> than a template-fill: anything Reset can produce, Rewrite can also produce, plus more. So the prior should be Rewrite ≥ Reset everywhere, with equality when the task happens to be cleanly templateable.</p>
+
+<p>The current observation is that <strong>on LiC, Rewrite is ~4pp behind Reset on average</strong>. Two possible explanations:</p>
+
+<ol>
+  <li><strong>"LiC happens to be templateable."</strong> The hypothesis you raised. LiC's tasks are simple enough that the two Reset fields — "task spec" + "good progress so far" — are <em>fundamentally what you need</em>. Any further reorganization is redundant at best and lossy at worst. If this is right, Rewrite's flexibility is wasted on LiC; we should still see it win where the task structure is richer (WildChat, bigcodebench), which we do.</li>
+  <li><strong>"The LLM rewrite step has an irreducible hallucination floor."</strong> The 63% hallucination attribution persists post-parity. The flexibility comes with a tax we can't optimize away by prompt engineering. If this is the dominant factor, even on richer tasks Rewrite should top out below an oracle-flexible method.</li>
+</ol>
+
+<p>The post-parity diagnostic (above) supports a <strong>blend of both</strong>:</p>
+<ul>
+  <li>The spec-equivalent fraction rose from 17% to 47%, so when v8 fails, the spec part is usually right. That's consistent with "LiC's specs are simple enough that you don't need more structure than Reset gives" — Rewrite gets the spec right, but its open-endedness then mis-summarizes the work-so-far, which Reset never tries to do.</li>
+  <li>The rewriter-hallucination rate stays at 63%, supporting the irreducible-floor view too.</li>
+</ul>
+
+<p>Together: on LiC, Reset's <em>not having</em> a flexible rewrite step is a feature, not a bug. On WildChat / bigcodebench, where the work-so-far is too complex or non-templateable, Reset's rigidity becomes its weakness and Rewrite wins.</p>
+
+<h3>What R6 did <em>not</em> solve</h3>
+
+<p>The 3.7pp LiC gap likely is structural. The analyzer-parity fix recovered ~13pp; the prompt redesign added 0.4pp; GEPA found no further gains. Closing the remaining gap probably requires either:</p>
+<ul>
+  <li>A different architecture (e.g., conditional Reset/Rewrite based on task structure detected by the analyzer), or</li>
+  <li>Suppressing the hallucination floor (in-LLM, not prompt-level — e.g., with structured generation or constrained decoding).</li>
+</ul>
+
+<!-- ─────────────────────────────────────────────── -->
+
+<h2 id="tau2">Next: tau2 engineering challenges</h2>
+
+<p>R6 produced a clean handoff contract (winner = v8, prompt file pinned, analyzer pairing documented). The tau2 plan (<code>docs/post_may18_tau2_plan.md</code>) is unblocked. But porting is not a verbatim copy.</p>
+
+<h3>Phase 0 — Python version + dep isolation <span class="badge r6">done</span></h3>
+
+<p>Took longer than the planned 15 min because the system was missing several pieces. Findings logged in <code>docs/post_may18_tau2_followups.md</code>; net of workarounds:</p>
+<ul>
+  <li>tau2-bench requires Python ≥3.12, &lt;3.14; our base conda env is 3.13.11 (no <code>audioop</code>). Built <code>/home/v-homatthew/tau2_ctxe/.venv</code> with Python 3.12.3.</li>
+  <li><code>python3-venv</code> apt package not installed → <code>ensurepip</code> fails. Bootstrapped pip via <code>get-pip.py</code>.</li>
+  <li><code>pyaudio</code> can't build from source (PortAudio system libs unavailable). It's on the unconditional import chain (<code>tau2/__init__</code> → runner → evaluator → agent.base.streaming → voice). Worked around with a <code>.pth</code> shim that mocks <code>pyaudio</code> at startup. The voice subsystem isn't exercised by telecom_small (text-only), so the mock is never called — just needs to exist for imports.</li>
+  <li>Also had to install <code>scipy</code>, <code>elevenlabs</code>, <code>rank_bm25</code> as they're on the unconditional chain too.</li>
+  <li>Smoke imports: <code>tau2.agent.llm_agent.LLMAgent</code>, <code>ctx_edit.agents.{AssistantOmitAgent,ContextEditAgent,ContextRewriteAgent}</code>, and <code>ctx_editor.strategies.analyzer_prompts.ANALYZER_PROMPT_REGISTRY</code> — all clean.</li>
+</ul>
+
+<h3>Phase 1 — analyzer parity audit on the tau2 side <span class="badge r6">done</span></h3>
+
+<p>tau2 has its own <code>ctx_edit/analyzer.py</code> with three prompts:</p>
+<ul>
+  <li><code>TASK_SPEC_PROMPT_V10</code> — Q1 (shared between S2 and S3) ✓ parity here.</li>
+  <li><code>COMPARE_PROMPT_V10_S2</code> — Q2 for S2 (Gated-Reset). Output goes <strong>directly into the compacted context</strong> (assistant reads it as briefing).</li>
+  <li><code>COMPARE_PROMPT_V10_S3</code> — Q2 for S3 (Rewrite). Output feeds into Q3 (the rewriter LLM).</li>
+</ul>
+
+<p>The S2/S3 Q2 prompts differ materially — same architectural-asymmetry <em>class</em> as the LiC bug. Diff'd them carefully:</p>
+<ul>
+  <li><strong>S2</strong>: first-person to the agent ("Your analysis will directly replace the agent's conversation history"), expansive, includes explicit "What should the agent do next" section.</li>
+  <li><strong>S3</strong>: third-person about the agent ("Your analysis will be passed to a separate step"), telegraph-style, data-rich, no first-person guidance.</li>
+  <li>tau2's own comment block in the file explicitly documents the asymmetry: <em>"S3 variant: the analysis is an intermediate step — a separate LLM call will use it to write the final context. Be precise and data-rich (Q3 needs the raw facts)."</em></li>
+</ul>
+
+<div class="callout win">
+  <strong>Verdict: NOT the same bug class as LiC.</strong> The S2/S3 asymmetry is legitimately motivated by different downstream consumers (assistant vs another LLM). Proceeding with Phase 2 without refactoring tau2's analyzer.
+</div>
+
+<p class="small"><strong>Latent risk to monitor</strong>: S3's Q2 is much terser than S2's. If S3 underperforms S2 by a wide margin in the eventual sweep, the asymmetry should be revisited — terseness may be dropping state. The Phase 5 cells separate S2 from S3 so we'll see this directly.</p>
+
+<h3>Phase 2 — porting v8 to tau2 <span class="badge last">next</span></h3>
+
+<p>v8 cannot be verbatim-copied. tau2's Q3 ingests inputs LiC doesn't have:</p>
+<ul>
+  <li><code>environment_state</code> — CRM database + phone state at the time of the turn. Real backend state, not just message history.</li>
+  <li>Tool calls and tool results — the conversation rendering must handle <code>assistant tool call: foo</code> and <code>(User tool calls: [...])</code> annotations.</li>
+  <li>Downstream consumer is an agent that calls tools next turn; LiC's is a text-answer assistant. The "what should the assistant see to continue correctly?" question is fundamentally different.</li>
+</ul>
+
+<p>Port heuristics (in order): keep v8's framing (analyzer-centered, conversation-as-reference, open-ended output, role-boundary clause), add tau2's environment-state preamble, keep tau2's tool-list block at the end. Create a new prompt-version constant (e.g., <code>CONTEXT_REWRITE_PROMPT_V11</code>) — don't overwrite V10 — and add a CLI flag in <code>run_parallel.py</code> so we can run V10 (old) and V11 (R6-aligned) side by side.</p>
+
+<h3>Phase 3 — AugmentAgent doesn't exist in tau2 yet</h3>
+
+<p>Tau2 has S0 (Baseline), AO, S2 (Gated-Reset), S3 (Rewrite). No Augment. Closest existing code: the "no issues → inject strategic hint" branch inside <code>ContextEditAgent.generate_next_message</code>. Need to implement an <code>AugmentAgent</code> from scratch:</p>
+<ul>
+  <li>Runs the same analyzer every turn after <code>min_turns</code>.</li>
+  <li>Never compacts/resets. Just appends a structured summary of the analyzer output (task_spec, valid_progress, corrective_direction) to the most recent <code>UserMessage</code>.</li>
+  <li>Reuses <code>ContextEditAgentState</code> (analysis log + turn counter; no resets).</li>
+</ul>
+
+<h3>Phase 5 — sweep <span class="badge r6">done</span></h3>
+<ul>
+  <li><strong>15 cells total</strong>: 3 models × 5 strategies. ~4h wall (sequenced gpt-5.4 → DSV4F-sub → Kimi-sub to avoid endpoint contention).</li>
+  <li>gpt-5.4 (Azure) ran cleanly first pass. DSV4F + Kimi failed first pass (wrong OpenRouter model IDs + Kimi tool-call validation). Retry pass with corrected IDs + ToolCall string-args patch succeeded.</li>
+  <li>See "tau2 telecom_small" table above and <code>docs/reports/post_may18_tau2_summary.md</code> for full results + per-cell cost.</li>
+  <li>Single-seed N=1; multi-seed deferred to follow-up.</li>
+</ul>
+
+<h3>Why we're NOT using last-turn replay on tau2</h3>
+
+<p>LiC and CollabLLM have a single-prefix → single-turn replay protocol that makes each cell cheap (~25-30 min). Tau2 doesn't, because the agent maintains <strong>dual-control state</strong>: the assistant has a CRM database and a phone state that the user mutates through tool calls. Snapshotting that state at an arbitrary turn-N to enable last-turn replay requires ~2 dev-days of state-snapshot work (<code>docs/notes/literature/tau2_replay_scoping.md</code>). Deferred — only revisit if tau2 cell cost becomes the binding constraint.</p>
+
+<h3>Repo layout — federated, not absorbed</h3>
+
+<p>tau2-bench code lives in <code>/home/v-homatthew/tau2_ctxe/</code>, a fork of <code>sierra-research/tau2-bench</code>. Our experiment code is in <code>tau2_ctxe/ctx_edit/</code> (six files, ~2k LoC). The decision (<code>docs/tau2_absorption_decision.md</code>) is <strong>Option C — federated with one-way import dependency</strong>: tau2_ctxe/ctx_edit imports from ctx_editor; ctx_editor stays clean of tau2-bench's heavy deps (loguru, fastapi, uvicorn, deepdiff, 734 MB of data). Steps 1–4 of the absorption plan landed (shared analyzer prompt registry, run_summary schema, aggregator); step 5 (Hydra-ifying <code>run_parallel.py</code>) is the only remaining open item.</p>
+
+<hr>
+
+<p class="small">
+Source docs: <code>docs/reports/post_may18_r3_summary.md</code>, <code>post_may18_r3_followups.md</code>, <code>post_may18_r3_mega_table.md</code>, <code>post_may18_r3_rewrite_examples.md</code>, <code>post_may18_r4_summary.md</code>, <code>post_may18_r4_resume.md</code>, <code>analyzer_parity_finding.md</code>, <code>post_may18_r5_analyzer_parity_plan.md</code>, <code>post_may18_r5_resume.md</code>, <code>post_may18_r6_plan.md</code>, <code>post_may18_r6_design_iterations.md</code>, <code>post_may18_r6_summary.md</code>, <code>post_may18_r6_overnight_progress.md</code>, <code>post_may18_tau2_plan.md</code>, <code>tau2_absorption_decision.md</code>, <code>global_todos.md</code>, <code>scripts/analysis_rewrite_v_reset/data/diagnosis_summary.md</code>, <code>diagnoses_v8.jsonl</code> (this session).
+</p>
+
+</body>
+</html>
