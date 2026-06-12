@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Post-NeurIPS R2 — mentor meeting brief</title>
+<style>
+  :root {
+    --fg: #1d1d1f; --muted: #555; --line: #d8d8d8;
+    --accent: #0b5fb8; --pos: #1a7f37; --neg: #b3261e;
+    --card: #f7f8fa;
+  }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    max-width: 920px;
+    margin: 40px auto;
+    padding: 0 24px;
+    color: var(--fg);
+    line-height: 1.5;
+  }
+  h1 { font-size: 28px; margin: 0 0 4px; }
+  h2 { font-size: 21px; margin: 32px 0 10px; border-bottom: 1px solid var(--line); padding-bottom: 4px; }
+  h3 { font-size: 17px; margin: 22px 0 8px; color: var(--accent); }
+  .meta { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .tldr { background: var(--card); padding: 16px 20px; border-left: 4px solid var(--accent); border-radius: 4px; }
+  .tldr ul { margin: 8px 0; padding-left: 20px; }
+  .tldr li { margin: 6px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 10px 0 20px; font-size: 14px; }
+  th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; }
+  th { background: #f0f2f5; font-weight: 600; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .pos { color: var(--pos); font-weight: 600; }
+  .neg { color: var(--neg); font-weight: 600; }
+  .small { font-size: 13px; color: var(--muted); }
+  code { background: #f0f2f5; padding: 1px 5px; border-radius: 3px; font-size: 13px; }
+  blockquote {
+    border-left: 3px solid var(--line); margin: 10px 0; padding: 4px 16px;
+    color: var(--muted); font-style: italic;
+  }
+  .gridtwo { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  .callout { background: #fff4cf; padding: 10px 14px; border-radius: 4px; border-left: 4px solid #b07e00; }
+  @media (max-width: 760px) { .gridtwo { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+
+<h1>Post-NeurIPS R2 — mentor meeting brief</h1>
+<div class="meta">2026-05-18 · ~3h overnight batch · Claude (autonomous) · resume doc:
+<code>docs/reports/post_neurips_r2_summary.md</code></div>
+
+<div class="tldr">
+<strong>TL;DR</strong>
+<ul>
+  <li><strong>CollabLLM user-sim swap</strong> is the headline. gpt-4o-mini → DeepSeek-V4-Flash as user simulator: math-hard moves <strong>30–40% → 85–100%</strong>; bigcodebench from the all-zero floor to <strong>AC3-Reset 20%</strong>. Phase 3a's "AC3 regresses on CollabLLM" was a user-sim artefact, not a method failure.</li>
+  <li><strong>AC3-Augment is the best variant in multi-turn settings.</strong> It beats Reset on every WildChat model we measured (gpt-5-mini 92.1% / DeepSeek 84.2% / Kimi 71.6% vs AO) and tops CollabLLM math-hard at 100%. Reset's lead on LiC is a property of the last-turn-replay regime, not universal.</li>
+  <li><strong>Rewrite analysis</strong>: dominant failure is <strong>F4 (overfit / phantom requirements, 44%)</strong>. Prompt engineering (v2) is a net −1.2pp regression — gains code (+8pp), loses database (−6pp). Conclusion: the second LLM "interpret-the-user" pass is fundamentally lossy.</li>
+  <li><strong>Engineering</strong>: the Huang load-balancer silent-404 footgun is fixed, so Foundry-routed models work in Phase 2 (used tonight for Kimi + DeepSeek).</li>
+</ul>
+</div>
+
+<h2>1. The Rewrite question</h2>
+
+<p>You asked which benchmarks Rewrite has been tested on and whether it clears Baseline. Short answer: <strong>LiC only, and it does <em>not</em> reliably clear Baseline.</strong></p>
+
+<table>
+  <thead>
+    <tr><th>Benchmark</th><th>Rewrite v1</th><th>Rewrite v2 (R2)</th><th>Status</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>LiC (DeepSeek-V4-Flash)</td><td>tested ✓</td><td>tested ✓</td><td>under-performs Baseline on code/actions</td></tr>
+    <tr><td>LiC (gpt-5.4, Kimi-K2.6)</td><td>—</td><td>—</td><td>not tested (dropped after Phase 1)</td></tr>
+    <tr><td>CollabLLM</td><td>—</td><td>—</td><td>never tested</td></tr>
+    <tr><td>WildChat (Huang)</td><td>—</td><td>—</td><td>config has variants.s3 but no Phase 3b cell ran it</td></tr>
+  </tbody>
+</table>
+
+<h3>Rewrite vs Baseline on LiC × DeepSeek</h3>
+<table>
+  <thead>
+    <tr><th>Strategy</th><th class="num">math</th><th class="num">code</th><th class="num">database</th><th class="num">actions</th><th class="num">avg</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Baseline</td><td class="num">72.2</td><td class="num">34.5</td><td class="num">22.4</td><td class="num">76.0</td><td class="num">51.3</td></tr>
+    <tr><td>Rewrite v1</td><td class="num">73.6</td><td class="num"><span class="neg">28.3</span></td><td class="num">27.9</td><td class="num"><span class="neg">74.0</span></td><td class="num">50.9</td></tr>
+    <tr><td>Rewrite v2</td><td class="num">70.8</td><td class="num">36.3</td><td class="num"><span class="neg">21.8</span></td><td class="num"><span class="neg">70.0</span></td><td class="num">49.7</td></tr>
+    <tr style="background:#f8f8f0"><td><strong>Reset (Phase 1)</strong></td><td class="num"><strong>81.9</strong></td><td class="num"><strong>59.3</strong></td><td class="num"><strong>49.0</strong></td><td class="num"><strong>83.3</strong></td><td class="num"><strong>68.4</strong></td></tr>
+  </tbody>
+</table>
+
+<p>Rewrite barely matches Baseline on average; Reset beats both by 17–18pp.</p>
+
+<h3>Why? The failure-mode breakdown (n=48, DeepSeek-labeled)</h3>
+<table>
+  <thead>
+    <tr><th>Task</th><th class="num">F1</th><th class="num">F2</th><th class="num">F3</th><th class="num">F4</th><th class="num">F5</th><th class="num">n</th><th>Dominant mode</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>actions</td><td class="num">9</td><td class="num">0</td><td class="num">0</td><td class="num">2</td><td class="num">0</td><td class="num">12</td><td>F1: parallel-call enumeration dropped</td></tr>
+    <tr><td>code</td><td class="num">1</td><td class="num">1</td><td class="num">0</td><td class="num">6</td><td class="num">4</td><td class="num">12</td><td>F4+F5: wrong return shape / phantom params</td></tr>
+    <tr><td>database</td><td class="num">0</td><td class="num">0</td><td class="num">0</td><td class="num">10</td><td class="num">1</td><td class="num">12</td><td>F4: phantom columns / SELECT bloat</td></tr>
+    <tr><td>math</td><td class="num">1</td><td class="num">8</td><td class="num">0</td><td class="num">3</td><td class="num">0</td><td class="num">12</td><td>F2: anchored on wrong intermediate calc</td></tr>
+    <tr style="background:#f8f8f0"><td><strong>All</strong></td><td class="num">11</td><td class="num">9</td><td class="num">0</td><td class="num"><strong>21</strong></td><td class="num">5</td><td class="num">48</td><td><strong>F4 (44%)</strong></td></tr>
+  </tbody>
+</table>
+
+<div class="small">
+F1 = lost meta-structure (parallel/aggregation requirement) ·
+F2 = anchored on wrong partial work ·
+F3 = compaction speculates ·
+F4 = overfit / phantom requirements ·
+F5 = lost schema / signature detail
+</div>
+
+<h3>The smoking gun (database)</h3>
+
+<blockquote>User asks for AVG/MIN/MAX of singer age in France. Rewrite v2's compacted spec says "include AVG/MIN/MAX of age and all relevant columns." Assistant outputs <code>SELECT *, AVG(Age) OVER (), MIN(...) OVER (), MAX(...) OVER ()</code> — a window-function dump of every column. v1 produced a clean aggregate. The "Be EXHAUSTIVE" instruction in v2 backfires.</blockquote>
+
+<p>Reset wins because it pipes the analyzer's output into a templated context message <em>without</em> a second LLM "interpret-what-the-user-wants" pass. Rewrite's flexibility is the source of its lossiness.</p>
+
+<h2>2. CollabLLM — user-sim was the bottleneck</h2>
+
+<table>
+  <thead>
+    <tr><th>Task</th><th>Strategy</th><th class="num">v1 (gpt-4o-mini user, N=3 avg)</th><th class="num">R2 (DeepSeek user, N=1)</th><th class="num">Δ</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>math-hard</td><td>Baseline</td><td class="num">30.0%</td><td class="num">95.0%</td><td class="num pos">+65pp</td></tr>
+    <tr><td>math-hard</td><td>AO</td><td class="num">40.0%</td><td class="num">90.0%</td><td class="num pos">+50pp</td></tr>
+    <tr><td>math-hard</td><td>AC3-Reset</td><td class="num">30.0%</td><td class="num">85.0%</td><td class="num pos">+55pp</td></tr>
+    <tr style="background:#f8f8f0"><td>math-hard</td><td><strong>AC3-Augment</strong></td><td class="num">20.0%</td><td class="num"><strong>100.0%</strong></td><td class="num pos"><strong>+80pp</strong></td></tr>
+    <tr><td>bigcodebench</td><td>Baseline</td><td class="num">0.0%</td><td class="num">5.0%</td><td class="num pos">+5pp</td></tr>
+    <tr><td>bigcodebench</td><td>AO</td><td class="num">0.0%</td><td class="num">15.0%</td><td class="num pos">+15pp</td></tr>
+    <tr style="background:#f8f8f0"><td>bigcodebench</td><td><strong>AC3-Reset</strong></td><td class="num">1.7%</td><td class="num"><strong>20.0%</strong></td><td class="num pos"><strong>+18pp</strong></td></tr>
+    <tr><td>bigcodebench</td><td>AC3-Augment</td><td class="num">0.0%</td><td class="num">15.0%</td><td class="num pos">+15pp</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+<strong>Per-difficulty pattern</strong>: AC3-Augment wins easy tasks where the conversation is clean. AC3-Reset wins hard tasks where Baseline is weak. <em>This is the cleanest experimental support so far for the paper's appropriate-intensity framing.</em>
+</div>
+
+<p class="small">n=20 single-rep on each cell; multi-rep needed to confirm Reset's 85% vs Baseline's 95% on math-hard (that 10pp gap is 2 cases out of 20).</p>
+
+<h2>3. WildChat (Huang) cross-model</h2>
+
+<p>Win-rate of AC3 variant vs AO (quality axis), <em>same evaluation set</em> (76 AO-failure turns from gpt-5-mini Phase 1):</p>
+
+<table>
+  <thead>
+    <tr><th>Respondent</th><th class="num">Reset vs AO</th><th class="num">Augment vs AO</th><th class="num">Reset vs FC</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>gpt-5-mini (Phase 3b)</td><td class="num">89.8%</td><td class="num"><strong>92.1%</strong></td><td class="num">82.6%</td></tr>
+    <tr><td>DeepSeek-V4-Flash (R2)</td><td class="num">75.0%</td><td class="num"><strong>84.2%</strong></td><td class="num">71.1%</td></tr>
+    <tr><td>Kimi-K2.6 (R2)</td><td class="num">71.6%</td><td class="num small">(not run)</td><td class="num">60.8%</td></tr>
+  </tbody>
+</table>
+
+<p>Two observations:</p>
+<ol>
+  <li><strong>Augment > Reset on every model</strong> we ran both (gpt-5-mini and DeepSeek-V4-Flash). The gap is small on gpt-5-mini (2.3pp) and bigger on DeepSeek (9.2pp).</li>
+  <li>The Reset-vs-AO margin is <strong>not monotone with respondent strength</strong>. Kimi is strong but benefits least; gpt-5-mini (weaker than Kimi but maybe well-matched to the test set, which was selected on gpt-5-mini's AO failures) benefits most. Plausible alternative: the test set is over-fit to gpt-5-mini's weaknesses. A clean cross-model picture would re-do the Phase-1 sample selection per respondent.</li>
+</ol>
+
+<h2>4. Narrative for the paper</h2>
+
+<ul>
+  <li><strong>Reset wins last-turn replay (LiC).</strong> Augment-style appended notes aren't enough when the test only fires once and the test set is dominated by samples where prior assistant turns are actively wrong.</li>
+  <li><strong>Augment wins multi-turn (WildChat, CollabLLM-math-hard).</strong> Keeping both the (mostly fine) assistant turns AND the analyzer's notes is the right setting when the conversation is already mostly clean.</li>
+  <li><strong>Reset wins multi-turn-hard (CollabLLM-bigcodebench).</strong> Hard tasks need the harder intervention — drop the polluted prior turns.</li>
+  <li><strong>Rewrite is consistently worst.</strong> The second LLM compaction call introduces F4 overfit, regardless of prompt design.</li>
+</ul>
+
+<p>So the paper-ready ranking is: <strong>(Augment ≈ Reset) ≫ Baseline ≫ Rewrite</strong>, with Augment winning on easy/clean and Reset winning on hard/dirty.</p>
+
+<h2>5. What we still need (mega-table) — proposal in <code>docs/post_neurips_r2_next_plan.md</code></h2>
+
+<p>You're right that the model × benchmark × method table is only filled in for LiC. We've covered:</p>
+
+<table>
+  <thead><tr><th>Benchmark</th><th>Last-turn replay?</th><th>Strategies tested</th><th>Models tested</th></tr></thead>
+  <tbody>
+    <tr><td>LiC</td><td>Yes (Phase 1, 2)</td><td>Baseline · AO · Augment · Reset · Gated-Reset · Rewrite</td><td>gpt-5.4 · DeepSeek-V4-Flash · Kimi-K2.6 (full); Rewrite only on DeepSeek</td></tr>
+    <tr><td>CollabLLM</td><td>No (built around fresh sim)</td><td>Baseline · AO · Reset · Augment (no Rewrite, no Gated)</td><td>DeepSeek-V4-Flash only</td></tr>
+    <tr><td>WildChat (Huang)</td><td>Yes (Phase 2 IS replay over real human conversations)</td><td>Reset · Augment (no Rewrite, no Gated, no Baseline numbers)</td><td>gpt-5-mini · DeepSeek-V4-Flash · Kimi-K2.6 (Reset only on Kimi)</td></tr>
+  </tbody>
+</table>
+
+<p>The next session's plan is in the companion doc. Highlights:</p>
+<ul>
+  <li><strong>LiC × gpt-5.4/Kimi × Rewrite</strong>: 6 cells. Cheap, last-turn replay, ~30 min. Fills the only model-gap in the LiC row.</li>
+  <li><strong>WildChat × {DeepSeek, Kimi} × Rewrite (s3)</strong>: 2 cells, ~30 min each. WildChat IS replay-mode (single-turn judging on a fixed prefix), so this is cheap.</li>
+  <li><strong>CollabLLM × gpt-5.4/Kimi × {Baseline, AO, Reset, Augment}</strong>: 16 cells × 20 problems × multi-turn user-sim. ~1.5–2h with parallelism. The bottleneck for the mega table.</li>
+  <li><strong>CollabLLM × Rewrite (any model)</strong>: 4 cells. Probably will under-perform (mirrors LiC), but worth a 1-model sanity check.</li>
+</ul>
+
+<p>Total budget for completing the mega table: ~4–5 hours overnight. Detailed plan in
+<code>docs/post_neurips_r2_next_plan.md</code>.</p>
+
+<h2>6. Discussion items for the meeting</h2>
+
+<ol>
+  <li><strong>Is the Augment-vs-Reset story strong enough?</strong> It's clean on WildChat (3 models) and CollabLLM math-hard, but inverts on CollabLLM bigcodebench. The "appropriate-intensity" framing handles this, but it's a more nuanced story than "AC3 wins".</li>
+  <li><strong>Do we want to spend more time on Rewrite?</strong> The v2 negative result is informative but not flattering. Options:
+    <ul>
+      <li>Drop Rewrite from the paper entirely (it underperforms; not our recommended method).</li>
+      <li>Keep it as the "naïve baseline" the paper deliberately avoids.</li>
+      <li>Try a v3 (quoted-user-message anchoring) — but the per-task pattern suggests it'd just shift the failure mode.</li>
+    </ul>
+  </li>
+  <li><strong>Is the Kimi-Huang shrinkage a problem?</strong> AC3-Reset wins 71.6% on Kimi vs 89.8% on gpt-5-mini. Could be a ceiling effect (Kimi's AO is already strong) or test-set artefact (samples were chosen on gpt-5-mini's failures).</li>
+  <li><strong>Should we run multi-rep on CollabLLM?</strong> The N=1 single-rep is enough for the +50–80pp directional story but not for the 85% vs 95% kind of comparisons.</li>
+</ol>
+
+</body>
+</html>

@@ -146,6 +146,7 @@ Variance:
 - [`neurips_revision_changelog.md`](neurips_revision_changelog.md) — NeurIPS revision pass log.
 - [`figure1_candidates.md`](figure1_candidates.md) — Figure 1 design options.
 - [`changelog_v2_v3_memory.md`](changelog_v2_v3_memory.md) — V2/V3 prompt + memory fix changelog.
+- [`jun1_megatable_findings.md`](jun1_megatable_findings.md) — Cross-model mega-table findings: new claims to add, contradicted claims to fix, discussion-direction shifts.
 
 ### Advisor & collaborator feedback
 - [`lianhui_feedback_analysis.md`](lianhui_feedback_analysis.md) — Analysis of Lianhui's abstract/intro feedback.
@@ -183,6 +184,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-06-01 | `jun1_megatable_findings.md` | Mega-table findings: new paper claims, contradicted claims, discussion-direction shifts. |
 | 2026-05-22 | `reports/post_may18_r6_summary.md` | R6 final: winner = v8 (open-ended) at 64.7% on DSV4F; cross-model + cross-benchmark validated; tau2 handoff. |
 | 2026-05-22 | `reports/post_may18_r6_overnight_progress.md` | Running progress log for the R6 overnight execution (commands, configs, output paths). |
 | 2026-05-22 | `post_may18_tau2_plan.md` | tau2 telecom_small execution plan (waits on R6 LiC Rewrite winner). |

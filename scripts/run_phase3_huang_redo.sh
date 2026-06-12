@@ -27,9 +27,11 @@ if [[ ! -d "$PHASE1_DIR" ]]; then
     exit 2
 fi
 
-RESPONDENT="DeepSeek-V4-Flash"  # Foundry deployment name
-JUDGE="gpt-5-mini"   # keep judge consistent with the paper to make
-ANALYZER="DeepSeek-V4-Flash"
+RESPONDENT="gpt-5-mini"  # Huang's pipeline doesn't go through our Foundry
+                          # load balancer; restrict to Azure-OAI-routable models
+                          # for this batch. (Paper used gpt-5-mini too.)
+JUDGE="gpt-5-mini"
+ANALYZER="gpt-5-mini"
 
 SEEDS=(42 43 44)
 
