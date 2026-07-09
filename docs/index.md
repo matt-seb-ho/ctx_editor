@@ -148,6 +148,15 @@ Variance:
 - [`changelog_v2_v3_memory.md`](changelog_v2_v3_memory.md) — V2/V3 prompt + memory fix changelog.
 - [`jun1_megatable_findings.md`](jun1_megatable_findings.md) — Cross-model mega-table findings: new claims to add, contradicted claims to fix, discussion-direction shifts.
 
+### arXiv push (2026-07)
+- [`arxiv_push/state_of_project.md`](arxiv_push/state_of_project.md) — Get-back-up-to-speed overview: what AC3 is, paper status, mega-table adds, recovery status, what's left.
+- [`arxiv_push/arxiv_revision_plan.md`](arxiv_push/arxiv_revision_plan.md) — Prioritized edit plan (tau2 reconciliation, jun1 items, polish) + debate reconciliation.
+- [`arxiv_push/worklog.md`](arxiv_push/worklog.md) — Session work log: recovery, debate, applied edits, known issues.
+- [`arxiv_push/followup_experiments.md`](arxiv_push/followup_experiments.md) — Experiments deferred to future paper versions.
+- [`arxiv_push/debate/01_reviewer_skeptic.md`](arxiv_push/debate/01_reviewer_skeptic.md) — Adversarial claim-evidence review (rejection risks).
+- [`arxiv_push/debate/02_writing_editor.md`](arxiv_push/debate/02_writing_editor.md) — Writing/clarity review + before→after rewrites.
+- [`arxiv_push/debate/03_synthesis.md`](arxiv_push/debate/03_synthesis.md) — Adjudication reconciling both reviews vs the jun1 framing.
+
 ### Advisor & collaborator feedback
 - [`lianhui_feedback_analysis.md`](lianhui_feedback_analysis.md) — Analysis of Lianhui's abstract/intro feedback.
 - [`lianhui_feedback_changelog.md`](lianhui_feedback_changelog.md) — Round 1 changes responding to feedback.
@@ -184,6 +193,13 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-07-09 | `arxiv_push/worklog.md` | arXiv-push session log: paper recovery, adversarial debate, applied claim/polish edits, known issues. |
+| 2026-07-09 | `arxiv_push/debate/03_synthesis.md` | Adjudication of skeptic vs writing-editor vs jun1-optimism; honest-framing ruling. |
+| 2026-07-09 | `arxiv_push/debate/02_writing_editor.md` | Writing-editor review: reverse outline + terminology sweep + before→after rewrites. |
+| 2026-07-09 | `arxiv_push/debate/01_reviewer_skeptic.md` | Skeptic review: false universal + stale tau2 framing + evidence weaknesses. |
+| 2026-07-09 | `arxiv_push/arxiv_revision_plan.md` | Prioritized arxiv edit plan + debate reconciliation. |
+| 2026-07-09 | `arxiv_push/followup_experiments.md` | Deferred experiments for future paper versions. |
+| 2026-07-09 | `arxiv_push/state_of_project.md` | State-of-project overview after time away; recovery + what's left for arxiv. |
 | 2026-06-01 | `jun1_megatable_findings.md` | Mega-table findings: new paper claims, contradicted claims, discussion-direction shifts. |
 | 2026-05-22 | `reports/post_may18_r6_summary.md` | R6 final: winner = v8 (open-ended) at 64.7% on DSV4F; cross-model + cross-benchmark validated; tau2 handoff. |
 | 2026-05-22 | `reports/post_may18_r6_overnight_progress.md` | Running progress log for the R6 overnight execution (commands, configs, output paths). |
