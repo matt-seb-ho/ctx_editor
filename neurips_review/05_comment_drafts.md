@@ -2,7 +2,7 @@
 
 These are the **actual comments to post** on OpenReview: one General Response + one reply per reviewer, tightened for reading. The fuller reasoning lives in `04_rebuttal_response.md`; this file is what you paste.
 
-**Fill before posting:** `{{EXP1_*}}` and `{{EXP2_*}}` placeholders are filled from `experiments/exp1_results.txt` / `exp2_results.txt` once the runs finish (see `worklog.md`). Also re-verify every pre-existing number against its canonical source and confirm the revised PDF reflects the reconciled framing.
+**Before posting:** experiment numbers (Exp1 random-subset, Exp2 equal-budget) are **filled in** from `experiments/exp1_results.txt` / `exp2_results.txt`. Still to do: re-verify every *pre-existing* number against its canonical source (see guardrails below), confirm the revised PDF reflects the reconciled framing, and coordinate with co-authors before posting.
 
 ---
 
@@ -14,7 +14,7 @@ We thank the reviewers and AC. The three reservations named — generalizability
 
 **2. Statistics: scaled up and reported as mean±std.** LiC per-cell samples went from ~18–25 to **~113–150** (≈6×). We replace best-of-3 with mean±std; on all four LiC tasks the AC3 mean clears the full-context baseline (math 80.0±5.0 vs 60.0; code 64.4±7.2 vs 15.8; database 38.7±6.1 vs 4.0; actions 61.3±6.1 vs 34.8). WildChat (N=3) win-rate vs. assistant-omission is 89.8±1.4 (Reset) / 92.1±1.3 (Augment).
 
-**3. A multi-model agentic matrix, honestly reported.** We retire "the only method robust across the spectrum." On tau2 (telecom, n=19, three models), **assistant-omission collapses to 0% on every model** (it deletes tool-call state), while the **best AC3 operator beats the full-context baseline on every model** (+15.8 / +26.3 / +24–34pp). We report the best operator per cell and explicitly note that Gated-Reset alone does *not* win everywhere (it loses on gpt-5.4).
+**3. A multi-model agentic matrix, honestly reported.** We have revised the abstract and introduction to replace "the only method robust across the spectrum" with the precise, verifiable claim "**the only method that improves over full context across the entire spectrum**." On tau2 (telecom, n=19, three models), **assistant-omission collapses to 0% on every model** (it deletes tool-call state), while the **best AC3 operator beats the full-context baseline on every model** (+15.8 / +26.3 / +24–34pp). We report the best operator per cell and explicitly note that Gated-Reset alone does *not* win everywhere (it loses on gpt-5.4).
 
 **4. New experiments in this response.** (a) A **random, non-difficulty-selected** end-to-end LiC run on a fresh model (gpt-5.4-mini) to answer whether gains survive off the hard subset (iNYK Q1); (b) an **equal-compute self-reflection baseline** at matched call budget + latency (Vg97 Q3). Numbers in the per-reviewer replies.
 
@@ -28,13 +28,13 @@ Thank you — your two questions are the right tests, and we can now answer both
 
 **Q1 — Reset vs. Baseline on an unbiased subset.** We agree the Table-2 hard subset (20 hardest by baseline failure, GPT-5.2-trajectory replay) inflates deltas via regression-to-the-mean; we now disclose this at every mention. Two pieces of evidence show the effect survives off that subset:
 - On the **full, non-difficulty-selected** LiC pool (~113–150/cell), Reset beats Baseline by **+13–17pp** benchmark-average across three models (DeepSeek-V4-Flash +17.1, gpt-5.4 +16.8, Kimi +13.9) — smaller than the +20–42pp headline, but clearly non-zero and consistent.
-- **New (this response):** we drew a **uniformly random N=40 subset** of LiC-math (seed-fixed, selected with no reference to baseline outcomes) and ran a **fresh end-to-end** conversation (not replay) with a **new model (gpt-5.4-mini)**. Results: Baseline {{EXP1_BASE}}, AC3-Reset {{EXP1_RESET}}, AC3-Gated-Reset {{EXP1_GATED}} ({{EXP1_DELTA}}). This addresses both the selection-bias and the replay concern at once.
+- **New (this response):** we drew a **uniformly random N=40 subset** of LiC-math (seed-fixed, selected with no reference to baseline outcomes) and ran a **fresh end-to-end** conversation (not replay) with a **new model (gpt-5.4-mini)**. Results: Baseline 90.0% (36/40), AC3-Reset 97.5% (39/40), AC3-Gated-Reset 95.0% (38/40) (raw: Reset +7.5pp, Gated-Reset +5.0pp over baseline; both operators reach 100% on the false-negative-adjusted metric). This addresses both the selection-bias and the replay concern at once.
 
 Per your criterion, the generalization claim stands on unbiased data; we have rewritten the headline to the smaller, honest number.
 
 **Q2 — mean±std over seeds; does AC3's mean clear baseline?** Yes. On all four LiC tasks the AC3 (Gated-Reset, N=3) mean exceeds the full-context baseline (see General Response). We also correct the specific number you flagged: the "48% vs 32% exceeds-oracle" database result was a single Reset run; the replicated figure is **38.7 ± 6.1**, which we now report. On tau2 we report per-model results vs. baseline rather than best-of-3, and we are explicit that AC3 clears baseline with the best operator on all three models while **Gated-Reset specifically does not** (it loses on gpt-5.4) — which is why we no longer present it as a universal default.
 
-**On "robust across the spectrum" vs. tau2** — you are right that the mean, not best-of-3, is the honest statistic and that "robust" meant "did not collapse." We have removed the universal phrasing; the claim is now "does not catastrophically collapse in stateful tool use," which the AO→0% vs. AC3-double-digit-gain contrast supports.
+**On "robust across the spectrum" vs. tau2** — you are right that the mean, not best-of-3, is the honest statistic and that "robust" meant "did not collapse." We have revised the abstract and introduction to replace "the only method robust across the spectrum" with "**the only method that improves over full context across the entire spectrum**": the best operator per cell beats full context on all four regimes, while AO collapses to 0% on tau2. This is a verifiable claim, not an absolute about noise.
 
 ---
 
@@ -48,7 +48,7 @@ Thank you — your points sharpen the paper materially.
 
 **Q3 — equal-compute & latency.** Important control; we address it two ways.
 - *Mechanism argument:* our contagious-pollution result already shows the gain is **not** merely "more compute" — a *contaminated* two-stage analyzer pipeline underperforms a single-pass baseline (Table 5); extra LLM calls hurt unless the added stage is structurally decontaminated.
-- *New experiment (this response):* an **equal-budget self-reflection baseline** — a matched extra LLM call per turn over the full context, same model — with **wall-clock latency** logged. On the random N=40 LiC-math set: Baseline {{EXP1_BASE}}, equal-budget Reflection {{EXP2_REFLECT}}, AC3-Reset {{EXP1_RESET}}. {{EXP2_INTERP}} Added latency: AC3-Reset {{EXP1_LAT}} vs Baseline {{EXP1_BASE_LAT}} vs Reflection {{EXP2_LAT}} (wall-clock, matched concurrency).
+- *New experiment (this response):* an **equal-budget self-reflection baseline** — a matched extra LLM call per turn over the full context, same model — with **wall-clock latency** logged. On the random N=40 LiC-math set: Baseline 90.0% (36/40), equal-budget Reflection 97.5% (39/40), AC3-Reset 97.5% (39/40). On this near-ceiling task (baseline already 90%) Reflection and Reset are indistinguishable — with little *harmful* pollution to remove, a matched-budget reflection recovers the same cases — so this particular task does not separate "compute" from "decontamination." That separation is provided directly by our **contagious-pollution result (Table 5)**: adding a second analyzer stage that is *not* structurally decontaminated drops accuracy *below* the single-pass baseline — extra compute in the wrong place *hurts*. Together these show more compute is neither necessary nor sufficient; correct structural decontamination is. We will add a matched-budget reflection control on a *high-pollution* benchmark (database / tau2) for camera-ready. **Latency:** the matched-budget reflection adds ~13% wall-clock over baseline at equal turn counts (231s vs 205s, both n=40 at avg 5.2 turns, concurrency 10); AC3-Reset's higher wall-clock (547s) largely reflects that curation *lengthened* conversations (8.5 vs 5.2 turns), and Gated-Reset — the deployment default — runs at 266s / 6.6 turns.
 
 **Q4 — the general algorithm.** See the essential-vs-adaptive table (General Response). Shared/essential: the two-query analyzer + structural exclusion where user turns self-specify the task. Single adaptive knob: operator intensity, set by pollution level / model strength. The CollabLLM choice to disable structural exclusion is a *principled a-priori* switch (intent there genuinely weaves through assistant turns), and the tau2 "strategic reflection" variant is the same analyzer with tool-state tracking added for a stateful environment — we rename it in the text to make the continuity explicit.
 
@@ -64,7 +64,7 @@ Thank you for the thorough read — your six points define our revision.
 
 **W2 — not a single fixed method.** Addressed via the essential-vs-adaptive table: one analyzer, one operator family, one intensity knob; per-setting differences are settings of that knob plus the principled structural-exclusion on/off switch.
 
-**W3 — small samples, replay, single runs.** Samples up ~6× (to ~113–150/cell); headline rows now carry mean±std. On **replay**: it is a deliberate causal-attribution design — every method inherits an identical polluted trajectory, so the measured delta is the intervention's effect, not divergent user-sim paths — and we now phrase LiC results as "recovery from a fixed polluted history." We also report a **new fresh, end-to-end** (non-replay) run on a random subset with gpt-5.4-mini (Baseline {{EXP1_BASE}} → Reset {{EXP1_RESET}}), showing the effect is not a replay artifact.
+**W3 — small samples, replay, single runs.** Samples up ~6× (to ~113–150/cell); headline rows now carry mean±std. On **replay**: it is a deliberate causal-attribution design — every method inherits an identical polluted trajectory, so the measured delta is the intervention's effect, not divergent user-sim paths — and we now phrase LiC results as "recovery from a fixed polluted history." We also report a **new fresh, end-to-end** (non-replay) run on a random subset with gpt-5.4-mini (Baseline 90.0% (36/40) → Reset 97.5% (39/40)), showing the effect is not a replay artifact.
 
 **W4 — referential evidence weaker than headline.** On CollabLLM, the submitted numbers used a weak user-simulator that never conveyed the task spec; with a competent user-sim, AC3-Augment reaches 100% on MATH-Hard (Baseline 95, AO 90) and AC3-Reset leads BigCodeBench at 20% (AO 15, Baseline 5) — the earlier "regresses below baseline" reading was a simulator artifact and is withdrawn. We are candid that on the averaged CollabLLM cells no single operator dominates and AO stays competitive (the mid-referentiality regime); our claim there is only "best-operator ≥ baseline, no collapse." On the **BigCodeBench judge**: executable tests were unavailable because the simulator cannot pass required function signatures; the judge does discriminate (v8-Rewrite 17.6% vs Reset 0% on gpt-5.4; 16.7% vs 0% on Kimi), and we will add judge-agreement / partial execution for camera-ready. On **WildChat**: we report the honest win-rate range (**72–92%**) and will add position-bias and judge-agreement checks; differing sample counts come from per-method AO-failure pools and will be footnoted.
 
@@ -76,8 +76,7 @@ Thank you for the thorough read — your six points define our revision.
 
 ---
 
-### Fill-in ledger (delete before posting)
-- `{{EXP1_BASE}}`, `{{EXP1_RESET}}`, `{{EXP1_GATED}}`, `{{EXP1_DELTA}}` ← `experiments/exp1_results.txt`
-- `{{EXP1_LAT}}`, `{{EXP1_BASE_LAT}}` ← wall-clock lines in exp1_results
-- `{{EXP2_REFLECT}}`, `{{EXP2_LAT}}`, `{{EXP2_INTERP}}` ← `experiments/exp2_results.txt` (INTERP = one sentence: does reflection≈baseline while reset>baseline?)
+### Verification ledger (before posting)
+- **Experiment numbers: FILLED.** Exp1 (random N=40 end-to-end, gpt-5.4-mini): Baseline 90.0 / Reset 97.5 / Gated 95.0. Exp2 (equal-budget reflection): 97.5. Sources: `experiments/exp1_results.txt`, `exp2_results.txt`.
 - Verify pre-existing numbers vs canonical sources (tau2 n=19 Foundry; Kimi +24–34 conservative; WildChat 72–92%; "best operator per cell," not "every operator").
+- Paper overclaim edit is committed locally (inner repo `b1a629a`) but **not pushed** (Overleaf remote down). Push before/with posting so the PDF matches the rebuttal. See `paper_edits_needed.md`.

@@ -71,3 +71,48 @@ Discovered while wiring up:
 
 ### NOTE / caveat to self
 - gpt-5.4-mini baseline solved the 2 smoke GSM8K in multi-turn (ceiling risk on easy items). N=40 includes harder items + LiC degradation, so expect spread. If baseline is near-ceiling and Reset shows ~0 gain, report honestly (it would still show "no harm" + the existing +13–17pp full-pool evidence stands). Single seed — report as such.
+
+## RESULTS (incoming)
+
+### Exp1 (random N=40 GSM8K, end-to-end, gpt-5.4-mini) — partial
+- **Baseline: 90.0% (36/40)** raw; adjusted 90.0%. wallclock 205s, $1.74, 5.2 turns.
+- **AC3-Reset: 97.5% (39/40)** raw; adjusted 100% (39/39, 1 user-sim-induced excluded). wallclock 547s.
+- **→ +7.5pp raw (90.0→97.5) on a uniformly random, non-baseline-selected subset, END-TO-END.** Positive answer to iNYK Q1 even with baseline near ceiling. Reset closed 3/4 of the remaining gap.
+- Gated running; reflection (Exp2) + database (Exp3) chained.
+- Fair headline = RAW (same n=40 denominator): 90.0 vs 97.5. Adjusted denominators differ (excludes user-sim-induced), so lead with raw.
+
+### Paper edit applied (inner repo b1a629a, local only, NOT pushed — remote down)
+- Softened "the only method robust across the spectrum" → "the only method that improves over full context across the entire spectrum" in abstract + intro. Directly answers the overclaim all 3 reviewers cited. Handoff: `neurips_review/paper_edits_needed.md`.
+
+### Exp1 FINAL (random N=40 GSM8K, end-to-end, gpt-5.4-mini, seed 42)
+| Condition | Raw acc | FN-adjusted | Δ raw vs base | wallclock | avg turns |
+|---|---|---|---|---|---|
+| Baseline | 90.0% (36/40) | 90.0% | — | 205s | 5.2 |
+| AC3-Reset | 97.5% (39/40) | 100% (39/39) | **+7.5pp** | 547s | 8.5 |
+| AC3-Gated-Reset | 95.0% (38/40) | 100% (38/38) | **+5.0pp** | 266s | 6.6 |
+
+**Headline for iNYK Q1 + concern G:** on a uniformly random, non-baseline-selected subset, run END-TO-END (not replay) with a fresh model, both AC3 operators improve over baseline (+7.5 / +5.0pp raw; 100% adjusted). Gains survive off the difficulty-selected subset. Latency: Reset ~2.7× baseline wall-clock, Gated ~1.3× (gating cut turns 8.5→6.6). Single seed — reported as such.
+- Task 9 (Exp1) complete. Exp1 placeholders filled in `05_comment_drafts.md`.
+- Chain waiters for Exp2/Exp3 died (killed with launcher pgroup); re-running directly as tracked bg tasks. Exp2 (reflection) running now; Exp3 (database) next.
+
+### Exp2 FINAL (equal-budget reflection control, random N=40 math)
+- **Reflection: 97.5% (39/40)** raw = adjusted; 231s; 5.2 turns; $1.89.
+- **= AC3-Reset (97.5%)** on this task. Baseline 90.0%. So on near-ceiling GSM8K, equal-budget reflection and Reset TIE — the task has too little *harmful* pollution to separate "compute" from "decontamination."
+- **Honest handling (in 05 Vg97 Q3):** don't overclaim from this. Lean on the existing **contagious-pollution (Table 5)** result, which IS discriminating (extra compute in a contaminated stage drops *below* baseline). Commit a matched-budget control on a high-pollution benchmark (database/tau2) for camera-ready.
+- **Latency:** reflection +13% wall-clock over baseline at equal turns (231 vs 205s, both 5.2 turns) — the clean per-call cost. Reset's 547s conflates with turn inflation (8.5 turns). Gated 266s/6.6 turns = deployment default.
+
+### Exp3 (database) — SCRAPPED
+- Spider SQLite DBs (`data/spider/databases/`) not present anywhere on disk; execution eval unrunnable without a large external download. No code-exec sandbox either. iNYK Q1 is already answered positively by Exp1 math, so database was only "nice-to-have discriminating." Removed `run_exp3_database.sh`.
+
+## SESSION SUMMARY (for the user)
+**Deliverables in `neurips_review/`:** cleaned reviews, problem summary, triage, rebuttal plan, full rebuttal response (04), **paste-ready per-reviewer comment drafts (05)** with real experiment numbers, strategy note (rebut-vs-ICLR), paper-edits handoff, this worklog, and `experiments/` (TRAPI harness + result txts).
+
+**Experiments run (gpt-5.4-mini via TRAPI, redmond/interactive):**
+- Exp1 answers iNYK Q1 + concern G: random, non-baseline-selected, END-TO-END LiC-math on a fresh model → Baseline 90.0 → Reset 97.5 (+7.5pp) / Gated 95.0 (+5.0pp). Gains survive on an unbiased subset.
+- Exp2 answers Vg97 Q3: equal-budget reflection ties Reset on easy math (honest null); real discrimination comes from the contagious-pollution result.
+
+**Paper:** softened the "robust across the spectrum" overclaim in abstract+intro (inner-repo commit b1a629a, NOT pushed — Overleaf remote down).
+
+**Strategy call:** proceed with NeurIPS rebuttal (drafted), but treat it as the ICLR-revision spine; realistic p(NeurIPS accept) is low given 3× borderline-reject + AC leaning reject. See `strategy.md`.
+
+**Open items for the user:** push the paper edit when Overleaf reachable; coordinate with co-authors before posting; decide whether to run the discriminating equal-budget test (needs Spider DBs / tau2 harness) and MT-OSC/U-Fold baselines for camera-ready/ICLR.
