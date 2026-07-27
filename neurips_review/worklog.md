@@ -116,3 +116,14 @@ Discovered while wiring up:
 **Strategy call:** proceed with NeurIPS rebuttal (drafted), but treat it as the ICLR-revision spine; realistic p(NeurIPS accept) is low given 3× borderline-reject + AC leaning reject. See `strategy.md`.
 
 **Open items for the user:** push the paper edit when Overleaf reachable; coordinate with co-authors before posting; decide whether to run the discriminating equal-budget test (needs Spider DBs / tau2 harness) and MT-OSC/U-Fold baselines for camera-ready/ICLR.
+
+### Exp1 N=3 variance (rep1+rep2+rep3, random N=40 math, gpt-5.4-mini) — de-risks the "single seed" critique of our own new experiment
+| Condition | raw runs | raw mean±std | FN-adjusted mean±std |
+|---|---|---|---|
+| Baseline | 90.0 / 87.5 / 85.0 | 87.5±2.0 | 87.5±2.0 |
+| AC3-Reset | 97.5 / 95.0 / 87.5 | 93.3±4.2 | **100.0±0.0** (+12.5pp) |
+| AC3-Gated-Reset | 95.0 / 95.0 / 95.0 | 95.0±0.0 | **99.1±1.2** (+11.6pp) |
+
+- **Both operators beat baseline in every rerun.** FN-adjusted (paper's metric): Reset +12.5pp, Gated +11.6pp with tiny std. Raw: Reset +5.8, Gated +7.5 (Reset raw noisier — rep3 had 5 user-sim exclusions; adjusted controls for that). Gated is the most stable (raw 95.0±0.0).
+- Updated `05_comment_drafts.md` iNYK Q1/Q2, 5YHP W3, General Response #4 to report mean±std. Aggregator inline in `neurips_review/worklog.md` history / rerun via reading `outputs/rebuttal_random/{full,rep2,rep3}_*.log`.
+- **Net effect:** the single most-attacked axis (statistics/variance) is now answered ON THE NEW EXPERIMENT ITSELF, not just the legacy tables. Task 14 done.
