@@ -1,0 +1,28 @@
+# TRAPI load balancer for the rebuttal experiments.
+# Enable with: ctx-editor load_balancer=trapi
+#
+# TRAPI (MSR gateway) speaks the OpenAI-v1 dialect at
+#   https://trapi.research.microsoft.com/{instance}/openai/v1/
+# and authenticates with the AAD scope api://trapi/.default (NOT the
+# cognitiveservices scope). The repo's `azure_foundry` client path already does
+# exactly this: AsyncOpenAI(base_url=..., api_key=<bearer-token-provider>) with a
+# configurable `aad_scope`, so we reuse type: azure_foundry.
+#
+# Auth = the active `az login` identity (verified working on redmond/interactive
+# with no subscription pinning via neurips_review/experiments/smoke_trapi.py).
+
+endpoints:
+  - name: "trapi-redmond-interactive"
+    type: "azure_foundry"
+    endpoint: "https://trapi.research.microsoft.com/redmond/interactive/openai/v1/"
+    auth_method: "azure_identity"
+    aad_scope: "api://trapi/.default"
+    max_concurrent: 20
+    priority: 1
+    supported_models:
+      gpt-5.4-mini_2026-03-17: 100
+      gpt-4o_2024-11-20: 50
+
+routing_strategy: "least_loaded"
+fallback_enabled: true
+max_retries_per_endpoint: 2
