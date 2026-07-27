@@ -20,6 +20,18 @@ We thank the reviewers and AC. The three reservations named — generalizability
 
 **5. Overclaims removed.** The paper now states the scoped conclusion the reviewers identified: AC3 improves self-contained/conversational settings *and* avoids catastrophic collapse in stateful tool use; separating useful from harmful assistant content when both must be visible (deeply-referential turns) is stated as an open problem, not a solved one.
 
+**Essential vs. adaptive components** (the "one method, one knob" table we add to §3):
+
+| Component | Status | Note |
+|---|---|---|
+| Two-query analyzer (spec-extraction → approach-evaluation) | **Essential, shared** | Identical across all four benchmarks |
+| Structural exclusion of assistant turns during spec-extraction | **Essential where user turns self-specify the task** | Principled a-priori switch: off when intent weaves through assistant turns (CollabLLM) |
+| Operator {Augment / Reset / Gated-Reset / Rewrite} | **Single tunable knob** | Intensity set by pollution level / model strength (tau2 shows the ordering) |
+| Gating (skip edit when analyzer finds no issue) | Optional | High recall; asymmetric false-negative cost on strong-model text |
+| Memory (cheatsheet) | Optional add-on | Ablated; not load-bearing for any headline claim |
+
+The tau2 "strategic reflection" variant is this *same* analyzer with tool-state tracking added for a stateful environment; we rename it in-text to make the continuity explicit.
+
 ---
 
 ## REPLY TO REVIEWER iNYK
