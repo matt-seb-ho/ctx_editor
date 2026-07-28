@@ -127,3 +127,43 @@ Discovered while wiring up:
 - **Both operators beat baseline in every rerun.** FN-adjusted (paper's metric): Reset +12.5pp, Gated +11.6pp with tiny std. Raw: Reset +5.8, Gated +7.5 (Reset raw noisier — rep3 had 5 user-sim exclusions; adjusted controls for that). Gated is the most stable (raw 95.0±0.0).
 - Updated `05_comment_drafts.md` iNYK Q1/Q2, 5YHP W3, General Response #4 to report mean±std. Aggregator inline in `neurips_review/worklog.md` history / rerun via reading `outputs/rebuttal_random/{full,rep2,rep3}_*.log`.
 - **Net effect:** the single most-attacked axis (statistics/variance) is now answered ON THE NEW EXPERIMENT ITSELF, not just the legacy tables. Task 14 done.
+
+---
+
+## SESSION 2 (2026-07-27, after user feedback)
+
+### Strategy shift (user directive)
+Push back with existing post-submission results rather than conceding. Project strength; peer review is noisy and reviewers are currently harsh. Scientific honesty is preserved by putting the complete limitations disclosure in the **camera-ready appendix**, not the rebuttal. Where something is genuinely indefensible, change the framing instead of conceding weakness.
+
+My one added guardrail (agreed): where a reviewer quoted a specific number correctly from our own appendix (iNYK on tau2 53.3 vs 48.3), reframe what it means rather than dispute it. Denying checkable facts costs credibility with the AC for no gain.
+
+### Reply version control
+`neurips_review/replies/v1/` (old draft, preserved) and `replies/v2/` (current). Each future revision gets a new folder. v2 is split one-file-per-comment for direct posting: `00_general_response.md`, `01_reviewer_iNYK.md`, `02_reviewer_Vg97.md`, `03_reviewer_5YHP.md`, plus `README.md` changelog.
+
+### T3 — NEW RESULT: paired significance across the LiC matrix (zero API cost)
+`experiments/paired_analysis.py`. Key insight: the phase1/phase2 reports already contain **per-run accuracy for every (model, task, prefix) triple**, and all strategies share the same triples, so the correct statistic is the **paired** delta, not independent per-cell std (which was inflated at 5-14pp because prefixes differ wildly in difficulty).
+
+Across 36 paired comparisons (3 models x 4 tasks x 3 prefixes):
+| Method | mean paired gain | W/L/T | sign-test p |
+|---|---|---|---|
+| AC3-Reset | **+15.9pp** | 33/2/1 | <0.0001 |
+| AC3-Augment | +15.2pp | 31/1/4 | <0.0001 |
+| AC3-Gated-Reset | +17.0pp (n=12, DeepSeek only) | 11/1/0 | 0.0063 |
+| AO (design-oracle) | +13.3pp | 31/4/1 | <0.0001 |
+
+This is the single strongest addition: it is exactly the paired test Vg97 asked for, it answers iNYK Q2, and **Reset beats the AO design-oracle on average**. Rewrite excluded (pre-analyzer-parity, superseded by R6).
+
+### Other v2 ammunition found in existing data
+- **iNYK's strongest specific attack becomes a win.** The contested "exceeds the oracle on database (48 vs 32, single run)" now replicates across all 3 models at n=147/cell: Reset 49.0 / 56.2 / 55.1 vs AO 45.6 / 27.9 / 30.6, vs Baseline 22.4 / 19.0 / 19.0.
+- **tau2 gpt-5-mini defense.** Paper already states only **1 of 11 baseline failures is pollution-attributable** on that model (tex L360, L558). So that cell was never pollution-limited and a null there is expected, not evidence against the method. Verified in the tex before using.
+- **Augment and Reset beat Baseline in all 12 LiC model x task cells** in the mega-table.
+
+### Answers written for the 2 in-flight items
+- **Compression baselines:** justified positively (we target pollution; compaction/folding target context-length pressure, a different failure mode, and can preserve invalidated reasoning in compressed form). Committed to running a matched-compute condensation baseline on high-pollution tasks to test the boundary.
+- **Pollution-detection metric:** designed as removal recall / preservation precision / gating accuracy reported as a confusion matrix. Promised in all three replies.
+
+### Blocker identified
+LiC-database runs (needed for the discriminating equal-budget test T5 and ideally T1/T2) require **Spider SQLite DBs at `data/spider/databases/`, which are not on disk**. This is the one dependency gating the highest-value remaining experiments.
+
+### Artifacts
+`neurips_review/README.md` (navigation), `experiment_todos.md` (T1-T8 with status), `replies/v2/*`, `experiments/paired_analysis.py` + results.
