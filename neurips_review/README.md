@@ -6,7 +6,7 @@ Submission 27902 (AC3). Reviews came back 3x Borderline-reject with the AC leani
 
 | What you want | File |
 |---|---|
-| **The comments to actually post** | `replies/v2/` (one file per comment) |
+| **The comments to actually post** | `replies/v3/` (post `00_general_response.md` first) |
 | What experiments to run next | `experiment_todos.md` |
 | Rebut vs withdraw-for-ICLR | `strategy.md` |
 | Paper edits the rebuttal commits to | `paper_edits_needed.md` |
@@ -16,8 +16,11 @@ Submission 27902 (AC3). Reviews came back 3x Borderline-reject with the AC leani
 
 Comment drafts are versioned in folders. Each revision gets a new folder; the previous version is preserved unchanged.
 
-* `replies/v1/` - first pass. Written in a concede-then-convert register. **Superseded.**
-* `replies/v2/` - current. Projects strength, leads with the post-submission matrix, adds paired significance. See `replies/v2/README.md` for the full changelog.
+* `replies/v1/` - first pass, concede-then-convert register. **Superseded.**
+* `replies/v2/` - projects strength, leads with the post-submission matrix, adds paired significance. **Superseded.**
+* `replies/v3/` - **current.** Restructured to the LaDiR house format recommended by the advisor: thematic Common Weakness sections, reviewer text quoted with W/Q labels, explicit revision commitments, closing summary post. See `replies/v3/README.md`.
+
+`ladir_rebuttal.md` is the reference rebuttal the format is modelled on.
 
 ## Background documents (analysis, not for posting)
 
