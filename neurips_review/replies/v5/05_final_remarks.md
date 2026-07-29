@@ -1,0 +1,50 @@
+# Final Remarks from the Authors
+
+*(Post at the end of the discussion period, after individual replies have been addressed.)*
+
+We sincerely thank all reviewers for their thoughtful and constructive feedback. The reviews were specific enough to point directly at the experiments worth running, and the paper is substantially stronger as a result — including in the places where those experiments went against us.
+
+## Common Strengths Highlighted by Reviewers
+
+* **The self-contained vs. referential framing.** Reviewers noted it "cleanly explains why AO is near-perfect in some settings and collapses to zero in others" (**iNYK**), is "well motivated" (**Vg97**), and is "a meaningful conceptual improvement over treating all assistant-generated context as uniformly harmful" (**5YHP**).
+* **The structural-exclusion (contagious pollution) result.** All three reviewers highlighted this as a central contribution, with **5YHP** calling it "one of the strongest parts of the paper" and noting it suggests "information-flow constraints, rather than prompt instructions alone, may be necessary," and **iNYK** noting it "carries a useful lesson for any multi-stage LLM pipeline."
+* **Modularity and interpretability** of the specification-extraction, approach-evaluation, and intervention separation (**5YHP**).
+
+## Summary of Key Revisions
+
+* **A unified method statement, empirically demonstrated at two levels.** Addressing the Area Chair, **Vg97 (W3, Q4)**, and **5YHP (W2)**, we add a component table separating the essential analyzer and structural-exclusion condition from the single tunable operator knob; we evaluate **the same four operators across 3 respondent models x 4 LiC tasks, plus CollabLLM, WildChat, and tau2**, with no per-benchmark tuning; and we swap the **analyzer** across five models from four families with the respondent held fixed, where every analyzer is positive and individually significant (**+12.9 to +39.9pp**, n=178 matched pairs) and weak analyzers under-detect rather than mis-detect.
+
+* **Scaled evaluation and paired significance testing.** Addressing **iNYK (W1, Q2)**, **Vg97 (W2, Q2)**, and **5YHP (W3)**, LiC now uses **up to 50 problems per task across 3 conversation prefixes** (up to 150 conversations per cell) on **3 models**, up from 18-25 on 1 model. We replace best-of-3 with mean +/- std and add paired tests on raw accuracy: **AC3-Reset improves over full context on 33 of 36 paired comparisons (+15.9pp, sign-test p < 0.0001)**, outperforming even the assistant-omission design-oracle (+13.3pp).
+
+* **A condensation baseline at measured matched compute.** Addressing **Vg97 (W1, Q1)** and the Area Chair, we implement and run a summarisation baseline and an MT-OSC reimplementation on our two highest-pollution tasks. Summarisation moves accuracy **down** (−2.8 / −8.4pp database, −4.0 / −3.0pp code) while **AC3-Reset gains +19.6 / +9.0pp**; the budget-matched summariser **over-consumed** AC3-Reset (1.02–1.19x strategy calls, 1.62–2.14x strategy tokens) and still lost by 12 to 28 points. MT-OSC at its published window engages 0.3 times per conversation on 4.1-turn conversations, which we report as a scoping result about length-triggered compaction rather than as a beaten baseline.
+
+* **A direct, judge-free evaluation of the analyzer as a detector.** Addressing **5YHP (W5)**, we inject one known-false and one known-true span per conversation and measure removal, preservation, edit precision and gate sensitivity against ground truth, with four offline positive controls. The analyzer **names** the injected pollutant in 78.6% of conversations. Selectivity turns out to be **operator-dependent**, and we correct the paper accordingly (below).
+
+* **A mechanism test for auditing vs. re-solving.** Addressing **5YHP (W1)**, we measure how often the analyzer's own output contains the verified correct answer and re-run the paired comparison on the leak-free subset: **+30.2pp on code with 0% leakage**, **+26.0pp on database**, pooling to **+20.7pp [+14.8, +25.3], p < 0.0001**. On **math** the leak-free gain is **−2.6pp** and we concede it explicitly.
+
+* **A memory split and variance analysis.** Addressing **5YHP (W6)**, contamination is measurably zero (0 of 120 duplicates against the canonical evaluation set; 0.0pp effect in a within-instance transductive probe), while the cheatsheet learner itself is high-variance (~6pp), which is a limitation we state ourselves rather than defending single-trial gains.
+
+* **An unbiased, end-to-end experiment.** Addressing **iNYK (Q1)** and **5YHP (W3)**, on a **uniformly random subset selected without reference to baseline outcomes**, run as **fresh end-to-end conversations** on a **model not used in the paper**, over **3 replicate runs** (raw accuracy): full context 87.5 +/- 2.0, **AC3-Reset 93.3 +/- 4.2**, **AC3-Gated-Reset 95.0 +/- 0.0**, with both operators ahead in every run.
+
+* **Replication of the database result.** Addressing **iNYK (W1)**, the contested "exceeds the oracle" finding now replicates across all three models at 147 conversations per cell (AC3-Reset 49.0 / 56.2 / 55.1 vs. assistant omission 45.6 / 27.9 / 30.6), and holds at +26.0pp on the leak-free subset.
+
+* **A WildChat judge audit.** Addressing **5YHP (W4)** and **Vg97 (Q2)**, 1,824 judgements across three judges from three families in both presentation orders, with positive controls: cross-family agreement 85.9–88.8% raw (PABAK 0.79–0.83, Gwet's AC1 0.84–0.87), self-consistency 96.9%, and an 82.5% win-rate under a punitive 2-of-3-in-both-orders rule.
+
+* **Corrected tau2 reporting and claim scope.** Addressing **iNYK (W3)** and **Vg97 (W2)**, we replace best-of-3 with mean +/- std over three replicates per cell, and we quantify the noise floor the reviewers were pointing at: at n=19 tasks a single cell has a binomial standard deviation of about 10.7pp. The structural result is unchanged and mechanism-corroborated — **assistant omission scores 0% on every model** because omission destroys tool-call results that exist only in assistant turns, so those rollouts exhaust the step budget instead of terminating. We sharpen the abstract and introduction to the precise claim that AC3 is **the only method tested that improves over full context across the entire spectrum**.
+
+* **Presentation.** Addressing **Vg97** and **5YHP**, we move the structural-exclusion ablation into the main body, present memory explicitly as an optional ablated extension, and tighten the narrative so the stated scope and headline claims align.
+
+## Corrections We Are Making to Our Own Reported Numbers
+
+We think it is worth listing these together rather than leaving them scattered, because all of them come from experiments the reviews prompted.
+
+1. **CollabLLM MATH-Hard.** At N=3, AC3-Augment **ties** full context (91.7 vs 91.7, identical 55/60 per-problem totals) rather than reaching the 100 we quoted from a single run on a near-ceiling benchmark. The regression 5YHP identified is refuted; an improvement is not claimed. On BigCodeBench the same re-run came out stronger (**+15pp in 3 of 3 replicates**, reproducing on a fully disjoint problem draw).
+2. **False-negative-adjusted accuracy.** The metric excludes items a judge deems under-specified from the *visible* messages only, so context-editing arms have far more of their failures excluded (62% vs 9% on one cell). We report **raw accuracy** throughout; an arm-symmetric re-judge reproduces the ordering with smaller magnitudes.
+3. **Preservation is a Rewrite claim, not a Reset claim.** "We preserve what is correct and remove what is harmful" holds for AC3-Rewrite (removal 27.0%, preservation 38.9%); AC3-Reset's edit precision on constructed pollution is at chance, and its real mechanism is detect, discard the assistant side, re-derive from the user side.
+4. **WildChat.** Order-balanced re-judging moves the headline from 89.8 / 92.1 to **87.8 +/- 2.1 / 91.2 +/- 2.1**.
+5. **Memory.** The reported +10 / +12pp effects are single-trial estimates below the learner's own ~6pp noise floor; we will re-run at N ≥ 4 or soften the claim.
+6. **BigCodeBench scoring.** We previously stated that executable tests were unavailable on the CollabLLM harness. They are not: that path scores by real test execution, and we now report execution-based pass rates together with the scoring environment, because those pass rates are library-version sensitive.
+
+> **⚠ INTERNAL — HOLD (T6 in flight).** If T6 confirms that the published tau2 DeepSeek-V4-Flash and Kimi baselines were rate-limit-clipped floors (interim N=3 baselines: 70.2 ± 11.0 and 80.4 ± 2.5, against published 31.6 and 26.3), add a seventh item here withdrawing the tau2 magnitudes on those two models, and adjust the tau2 bullet above. Do not post per-model tau2 magnitudes until T6 returns.
+
+We are grateful to the reviewers for feedback that made these improvements concrete, and we hope the additions address the concerns raised. We are happy to run further analyses during the discussion period.
