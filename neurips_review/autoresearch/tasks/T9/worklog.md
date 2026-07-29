@@ -124,3 +124,60 @@ Note this ladder gives **three** non-gpt families (DeepSeek, Moonshot, Meta), so
 - **#6 sample count:** not used — replay mode takes its n from the prefix pool.
 
 ---
+
+## 4. Infrastructure changes made
+
+**New file: `src/ctx_editor/config/load_balancer/t9_foundry_trapi.yaml`.**
+Strict superset of `multi_endpoint_foundry.yaml` as of 2026-07-29 (i.e. including T8's
+gpt-4o-mini re-listing on `dl-openai-3`) **plus** the `trapi-redmond-interactive` block copied
+verbatim from `trapi.yaml`. Also dropped `gpt-4o-mini` from the dead `fxdata-shared` block so
+nothing can route to the 401'ing endpoint. No existing config file was modified — the T8 fix was
+already in place. Verified at startup:
+```
+Load balancer initialized with 4 endpoints, supporting models: [... 'DeepSeek-V4-Flash', ...
+ 'Kimi-K2.6', 'Llama-3.3-70B-Instruct', ... 'gpt-4o-mini', 'gpt-5-mini', ...
+ 'gpt-5.4-mini_2026-03-17', 'gpt-4o_2024-11-20']
+```
+
+**New files under `neurips_review/autoresearch/tasks/T9/`:** `run_t9_sweep.sh` (the sweep driver,
+idempotent — skips arms whose `run_summary.json` already exists) and `analyze_t9.py` (paired
+analysis; statistical core lifted from `T2c/paired_split.py`).
+
+## 5. Smoke test (2026-07-29 11:00)
+
+5-sample code replay, analyzer = DeepSeek-V4-Flash, cache disabled. Completed in 1m58s,
+$0.0013, 1/5 correct. Trace audit of
+`outputs/T9/smoke/traces/code/context_edit_v2_no_gate/sharded-HumanEval_128.json` confirms the
+swap is observable per-sample:
+```
+conversation_analysis {'needs_edit': True, 'analyzer_model': 'DeepSeek-V4-Flash'}
+context_edit_output  {'analyzer_model': 'DeepSeek-V4-Flash'}
+conversation_reset   {'label': 'context_edit', 'total_resets': 1}
+provenance {'source_path': '.../code_v2/conv0', 'source_experiment': 'baseline',
+            'source_models': {'assistant': 'DeepSeek-V4-Flash'}, 'replay_turns': 1}
+```
+So every arm can be verified post hoc to have actually used the analyzer it claims — this is the
+audit trail that closes the "did the swap take effect?" question independently of the cache
+argument.
+
+## 6. Launch
+
+```bash
+bash neurips_review/autoresearch/tasks/T9/run_t9_sweep.sh code     rep1   # 6 arms, n=40
+bash neurips_review/autoresearch/tasks/T9/run_t9_sweep.sh database rep1   # 6 arms, n=49
+```
+Both launched 2026-07-29 11:02 UTC, in parallel, `execution.max_concurrent=5` each (10 in
+flight total, shared with other overnight agents). Per-arm command (baseline arm drops the
+last two overrides and uses `experiment=baseline`):
+```bash
+ctx-editor experiment=context_edit_v2_no_gate \
+  model=deepseek_v4_flash_foundry \
+  load_balancer=t9_foundry_trapi \
+  model.ctx_editor.model=<ANALYZER> \
+  experiment.strategy.analysis_cache_dir=null \
+  task=code_v2 task.data_file=data/htn50_52_code_subset.json \
+  execution.replay_source=data/valid_prefixes_htn50_52/deepseek_v4_flash_foundry/code_v2/conv0 \
+  execution.replay_turns=1 execution.max_concurrent=5 \
+  experiment_name=T9_rep1_code_<ARM> logging.output_dir=outputs/T9/rep1/code_<ARM>
+```
+Observed rate: ~4 s/sample for the replay pass + ~9 s/sample for FN analysis ⇒ ~8-12 min/arm.

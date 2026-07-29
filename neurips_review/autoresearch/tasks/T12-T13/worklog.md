@@ -250,7 +250,28 @@ Same 25 (resp. 20) trajectories, different presentation order:
 
 Qualitatively: the four cheatsheets **converge thematically and diverge operationally**. All four database cheatsheets open with the same headline principle — *rebuild the task spec from user turns only; treat the latest user turn as authoritative; do not let assistant framing enter the spec.* But the structure (flat bullet list vs. numbered sections vs. prose), the granularity, and the specific operative sub-rules differ substantially, which is what a 0.30 Jaccard means. So the learner reliably recovers the *gist* and unreliably recovers the *detail* — and it is the detail that is injected into the analyzer's Query 2 and drives the 16 pp accuracy spread.
 
-### 6.4 T13 — dose-response (free contamination probe from the online arms)
+### 6.4 T13 — clean inductive split, LiC-database
+
+Cheatsheet learned **offline** from the 10 disjoint `lic_mem_learn_set` database trajectories (generated end-to-end with Augment; 5/10 correct, `outputs/T12_T13/database/train_traj`), then **frozen** and applied to the same 25-instance replay eval set. Four cheatsheets, one per training-trajectory ordering.
+
+| Ordering of training trajectories | all 25 | clean 22 (learn-set ids removed) | on the 3 overlapping ids |
+|---|---:|---:|---:|
+| ord0 | 6/25 = 24.0% | 5/22 = 22.7% | 1/3 |
+| ord1001 | 7/25 = 28.0% | 6/22 = 27.3% | 1/3 |
+| ord1002 | 11/25 = 44.0% | 10/22 = 45.5% | 1/3 |
+| ord1003 | 8/25 = 32.0% | 7/22 = 31.8% | 1/3 |
+| **mean ± std** | **32.0 ± 8.6** | **31.8 ± 9.8** | — |
+| no memory (reference) | 9/25 = 36.0% | 8/22 = 36.4% | 1/3 |
+
+**Clean-subset delta (offline memory − no memory) = −4.5 pp**, inside the ±9.8 pp ordering spread.
+
+Two things to note, both of which cut against a contamination explanation:
+- The 3 instances that *are* shared between the learn set and the eval set score **1/3 in every single condition, including no-memory**. If the cheatsheet had memorised them we would expect them to be the easy wins; they are not.
+- Removing the 3 overlapping instances moves the number by ≤ 1.3 pp in every cell. There is no clean/contaminated gap to speak of.
+
+Cheatsheet divergence in the offline regime matches the online regime (mean pairwise Jaccard **0.302**, 804–921 words), so ordering instability is a property of the **cheatsheet learner**, not of the transductive protocol.
+
+### 6.5 T13 — dose-response (free contamination probe from the online arms)
 
 Accuracy by batch index, pooled over the four orderings (batch *b* is evaluated with a cheatsheet distilled from 5(*b*−1) **other** eval instances plus their gold answers):
 
