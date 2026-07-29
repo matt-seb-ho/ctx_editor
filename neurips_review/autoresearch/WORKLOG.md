@@ -754,3 +754,13 @@ It is internal-only — **nothing reviewer-facing quotes the 17** — but `CHANG
 4. Rows 4.24, 5.10 and 1.24 audit **no v4 claim**, so any "we audited N claims" statement should say **80**, not 83.
 
 Items 2–4 are small row edits T34 was not authorised to make. Dispatching **T35** to close them, since #3 in particular is a live staleness pointing at a question that is now settled.
+
+- **21:35** `T35` returned **DONE**. Commit `d4fddff`. Both row fixes landed; item 3 escalated because it could not be fixed — for a reason worth recording.
+
+**Fixed:** **Row 1.17** now matches row 4.4's resolved wording — "struck; the strike is now permanent", with evidence citing F78/F79 (two of three published baselines did not replicate; on all three models the remeasured baseline is at or above every AC3 arm; the positive controls reproduced, so this is "the published baselines were wrong", not "not comparable"). T35 deliberately did **not** add AO = 0.0 there — it is a different claim, carried by rows 1.14 and 4.4, both verified still standing. **Row 3.9** gained its `*(new)*` marker; the marker count now matches the *Newly added* bucket at 22. Tally re-derived mechanically after editing: 82 rows, 20/21/9/5/3/22/2 = 82, both buckets unchanged.
+
+**F92 — Item 3 was chasing a number that does not exist, and it was mine.** No file anywhere states an audited-claims total. **"83" was never printed** — it exists only in *my own phrasing* in this worklog. And the replacement is under-specified three ways: T34 derives 80 (82 − 2), my brief's three-row exclusion gives 79, and applying "audits no v4 claim" consistently — the 22 `*(new)*` rows have no v4 text either — gives 57.
+
+**Correction to this log:** any earlier phrasing here implying we "audited 83 claims" is wrong and should be read as **T15 audited 64 v4 claims**, which is the figure T15 actually reported and the only audited-claims number with a derivation behind it. T35's recommendation, which I endorse: **never print a bare "we audited N claims"** — the count depends entirely on an unstated rule about what counts as a claim, and any single number invites a reviewer to derive a different one.
+
+This is the second time tonight a number of mine propagated into a task brief without derivation (after "+21 pp over AO", which T25 recomputed to 18.7). Both were caught by the agent receiving the brief rather than by me. D19's rule — cite finding IDs so agents can re-derive rather than inherit — is the right fix, and it worked both times.
