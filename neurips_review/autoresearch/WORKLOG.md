@@ -638,3 +638,25 @@ Cheapest high-value item after PAPER-7: **PAPER-9, ten minutes**, on the `tab:ma
   The most important thing I asked for is **whether its positive control reproduced**. A teammate's control did not (ERGO/database 44.0 vs published 12.0) because `gpt-5-mini` is unreachable tonight, which meant no re-run's absolute level was substitutable into the paper. For T6 the distinction between *"the published tau2 baselines were wrong"* and *"these are not comparable measurements across model eras"* **is the entire finding**, and the second answer stated clearly is worth more than the first stated loosely. Five HOLD blocks and README Blocker 5 cannot be resolved either way without it.
 
   T28 dispatched 19 min ago, no worklog yet as expected. Queue empty; nothing to dispatch.
+
+- **20:35** `T6` returned **DONE** — the last experiment of the session, and the most consequential. Full published matrix, nothing skipped: 3 models × 5 arms × 3 replicates × 19 tasks = **855 scored rollouts**, 15/15 cells at 60/60, same hyperparameters and model identities as the committed sweep scripts. Log: `tasks/T6/worklog.md`; clone at `~/ac3/tau2_ctxe`.
+
+**F78 — ⚠️⚠️⚠️ Two of three published tau2 baselines do not replicate, and the tau2 story inverts.** DSV4F **31.6 → 70.2 ± 11.0**; Kimi **26.3 → 78.9 ± 0.0**. **On all three models the remeasured Baseline is at or above every AC3 arm.**
+
+| Model | Baseline | AO | Augment | Gated-Reset | Rewrite |
+|---|---|---|---|---|---|
+| gpt-5.4 | **68.4 ± 13.9** | 0.0 | 47.4 ± 5.3 | 57.9 ± 21.1 | 47.4 ± 5.3 |
+| DSV4F | **70.2 ± 11.0** | 0.0 | 50.9 ± 8.0 | 57.9 ± 10.5 | 57.9 ± 13.9 |
+| Kimi-K2.6 | **78.9 ± 0.0** | 0.0 | 57.9 ± 9.1 | 71.9 ± 11.0 | 66.7 ± 8.0 |
+
+Paired vs Baseline (57 pairs, exact sign test): Augment −21.1 (p=.008) / −19.3 (p=.043) / −21.1 (p=.012); Gated-Reset −10.5 / −12.3 / −7.0 (n.s.); Rewrite −21.1 (p=.012) / −12.3 / −12.3; AO −68 to −79 pp (p<.0001).
+
+**F79 — This is "the published baselines are wrong", not "not comparable" — and that distinction was tested, not assumed.** The positive control **reproduced**: gpt-5.4 Baseline 68.4 vs published 68.4, and AO 0.0 across 9 cells / 171 rollouts vs published 0/0/0. `gpt-5-mini` *was* reachable for T6 (dl-openai-1 + dl-openai-3), invocation strings byte-identical, no model substitution. Supporting evidence that the old cells were **degraded controls** rather than a shifted environment: the AC3 arms on those two models replicate well, T6's runs terminate 60/60 and 59/60 `user_stop`, and **the source report itself already concedes Kimi's baseline was rate-limit-clipped** (14/20 short-exits, described there as "floors, not honest performance").
+
+So the honest position is: **the tau2 comparison must be withdrawn.** AC3 does not beat full context on tau2 on any of the three models once the baseline is measured properly. The one tau2 result that survives and is worth keeping is **AO → 0.0 across all 9 cells / 171 rollouts**, which is structural and reproduces exactly.
+
+**F80 — The gpt-5.4 AC3 collapse is unexplained, and T6 says so rather than papering over it.** Augment 84.2 → 47.4 while that model's *baseline* reproduced exactly. T6 ruled out model substitution, gating, terminations and rate limits. It also found a **real fork bug** — 53% of analyzer Q1 calls fail tag extraction and splice escaped JSON into the context (`analyzer.py:89-95`) — but fixing it moved accuracy only **+2.3 pp**, so that is not the explanation either. An unexplained 37-point drop on our own arm is a genuine open problem and belongs in the camera-ready as one.
+
+**F81 — `--seed` genuinely threads on the tau2 fork** (`run_parallel:131` → `orchestrator:526-528` → `llm_config.py:41-48` → litellm), unlike LiC's inert `cfg.seed`. Best-effort provider seed only, so ship as "N=3 replicate runs (seeds 42/43/44)". The gpt-5.4 Gated-Reset regression **reproduces in direction** (57.9 ± 21.1 vs 68.4; paired −10.5 pp, p=0.24) — kept, not dropped, not upgraded.
+
+**D21 — Withdraw the tau2 magnitude table; keep only the AO structural result.** The five sealed `⚠ INTERNAL — HOLD` blocks and README Blocker 5 exist precisely for this outcome and their withdrawal wording is pre-drafted. This removes a benchmark that was front and centre in the General Response and the AC letter, which is a real loss — but publishing a comparison against a control we can now demonstrate was rate-limit-clipped would be indefensible, and the clipping is already conceded in our own source report. (Logged to `logs/orchestrator.jsonl` in the same command.)

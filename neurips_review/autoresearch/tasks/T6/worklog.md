@@ -606,3 +606,210 @@ than Baseline on all three** (gpt-5.4 -21.1 pp p=0.008; DSV4F -19.3 pp p=0.043;
 Kimi -21.1 pp p=0.012). Gated-Reset and Rewrite are directionally negative on all three
 but not significant. AO is -68 to -79 pp, p<0.0001, on all three — reproducing the
 paper exactly.
+
+---
+
+# 20:26 UTC — FINAL. Matrix complete: 3 models x 5 arms x 3 replicates = 15/15 cells, 899 rollouts.
+
+Benchmark `telecom_small`, n=19 per replicate (`[service_issue]break_apn_settings[PERSONA:None]`
+dropped, matching the paper's denominator). 7 errored rollouts total across 899
+(0.8%); all but one were recovered by re-running with resume. Zero rate-limit
+failures after the pooling patch.
+
+## Table 1 — per-replicate raw numbers, mean ± sd
+
+| Model | Arm | rep1 (seed 42) | rep2 (seed 43) | rep3 (seed 44) | mean +- sd | range | n/rep | seed-42 ref (N=1) |
+|---|---|---|---|---|---|---|---|---|
+| gpt-5.4 | Baseline (FC) | 52.6 | 78.9 | 73.7 | **68.4 ± 13.9** | 52.6–78.9 | 19/19/19 | 68.4 |
+| gpt-5.4 | AO (Assistant Omission) | 0.0 | 0.0 | 0.0 | **0.0 ± 0.0** | 0.0–0.0 | 19/19/19 | 0.0 |
+| gpt-5.4 | AC3-Augment | 42.1 | 52.6 | 47.4 | **47.4 ± 5.3** | 42.1–52.6 | 19/19/19 | 84.2 |
+| gpt-5.4 | AC3-Gated-Reset | 36.8 | 57.9 | 78.9 | **57.9 ± 21.1** | 36.8–78.9 | 19/19/19 | 52.6 |
+| gpt-5.4 | AC3-Rewrite (v11) | 52.6 | 47.4 | 42.1 | **47.4 ± 5.3** | 42.1–52.6 | 19/19/19 | 73.7 |
+| DeepSeek-V4-Flash | Baseline (FC) | 57.9 | 78.9 | 73.7 | **70.2 ± 11.0** | 57.9–78.9 | 19/19/19 | 31.6 |
+| DeepSeek-V4-Flash | AO (Assistant Omission) | 0.0 | 0.0 | 0.0 | **0.0 ± 0.0** | 0.0–0.0 | 19/18/19 | 0.0 |
+| DeepSeek-V4-Flash | AC3-Augment | 52.6 | 57.9 | 42.1 | **50.9 ± 8.0** | 42.1–57.9 | 19/19/19 | 57.9 |
+| DeepSeek-V4-Flash | AC3-Gated-Reset | 57.9 | 68.4 | 47.4 | **57.9 ± 10.5** | 47.4–68.4 | 19/19/19 | 47.4 |
+| DeepSeek-V4-Flash | AC3-Rewrite (v11) | 68.4 | 42.1 | 63.2 | **57.9 ± 13.9** | 42.1–68.4 | 19/19/19 | 57.9 |
+| Kimi-K2.6 | Baseline (FC) | 78.9 | 78.9 | 78.9 | **78.9 ± 0.0** | 78.9–78.9 | 19/19/19 | 26.3 |
+| Kimi-K2.6 | AO (Assistant Omission) | 0.0 | 0.0 | 0.0 | **0.0 ± 0.0** | 0.0–0.0 | 19/19/19 | 0.0 |
+| Kimi-K2.6 | AC3-Augment | 63.2 | 47.4 | 63.2 | **57.9 ± 9.1** | 47.4–63.2 | 19/19/19 | 57.9 |
+| Kimi-K2.6 | AC3-Gated-Reset | 68.4 | 84.2 | 63.2 | **71.9 ± 11.0** | 63.2–84.2 | 19/19/19 | 68.4 |
+| Kimi-K2.6 | AC3-Rewrite (v11) | 73.7 | 57.9 | 68.4 | **66.7 ± 8.0** | 57.9–73.7 | 19/19/19 | 73.7 |
+
+`n/rep` = tasks scored in each replicate. "seed-42 ref" = the published N=1 number
+from `docs/reports/post_may18_progress_update_v4_bandaid_tau2.html:435-470`.
+
+## Table 2 — paired vs Baseline (pairs on (task, seed); exact two-sided sign test)
+
+| Model | Arm | paired obs | arm wins | baseline wins | ties | delta (pp) | exact sign-test p |
+|---|---|---|---|---|---|---|---|
+| gpt-5.4 | AO | 57 | 0 | 39 | 18 | -68.4 | 0.0000 ** |
+| gpt-5.4 | AC3-Augment | 57 | 3 | 15 | 39 | -21.1 | 0.0075 ** |
+| gpt-5.4 | AC3-Gated-Reset | 57 | 6 | 12 | 39 | -10.5 | 0.2379 |
+| gpt-5.4 | AC3-Rewrite | 57 | 4 | 16 | 37 | -21.1 | 0.0118 ** |
+| DeepSeek-V4-Flash | AO | 56 | 0 | 39 | 17 | -69.6 | 0.0000 ** |
+| DeepSeek-V4-Flash | AC3-Augment | 57 | 7 | 18 | 32 | -19.3 | 0.0433 ** |
+| DeepSeek-V4-Flash | AC3-Gated-Reset | 57 | 5 | 12 | 40 | -12.3 | 0.1435 |
+| DeepSeek-V4-Flash | AC3-Rewrite | 57 | 4 | 11 | 42 | -12.3 | 0.1185 |
+| Kimi-K2.6 | AO | 57 | 0 | 45 | 12 | -78.9 | 0.0000 ** |
+| Kimi-K2.6 | AC3-Augment | 57 | 4 | 16 | 37 | -21.1 | 0.0118 ** |
+| Kimi-K2.6 | AC3-Gated-Reset | 57 | 5 | 9 | 43 | -7.0 | 0.4240 |
+| Kimi-K2.6 | AC3-Rewrite | 57 | 5 | 12 | 40 | -12.3 | 0.1435 |
+
+Pairing is what gives this any power: unpaired cell means on 19 tasks have a binomial
+sd of ~11 pp. 57 paired observations per arm (19 tasks x 3 replicates).
+
+## Answers to the five questions
+
+### 1. Do the published baselines replicate? Two of three do NOT.
+
+| model | published | remeasured (N=3) | per-replicate | verdict |
+|---|---|---|---|---|
+| gpt-5.4 | 68.4 | **68.4 ± 13.9** | 52.6 / 78.9 / 73.7 | replicates exactly (on the mean) |
+| DeepSeek-V4-Flash | 31.6 | **70.2 ± 11.0** | 57.9 / 78.9 / 73.7 | **+38.6 pp — does not replicate** |
+| Kimi-K2.6 | 26.3 | **78.9 ± 0.0** | 78.9 / 78.9 / 78.9 | **+52.6 pp — does not replicate** |
+
+Denominator n=19 in every replicate of all three cells. **Kimi's remeasured Baseline
+(78.9) is above every published Kimi AC3 number** — Augment 57.9, Gated-Reset 68.4,
+Rewrite 73.7. DSV4F's remeasured Baseline (70.2) is above every published DSV4F AC3
+number — 57.9 / 47.4 / 57.9.
+
+Why I believe these are degraded controls rather than a shifted environment:
+- The source report **already concedes it for Kimi**: the Baseline and AO cells had
+  14/20 and 19/20 short-exits from `litellm.RateLimitError` and are described as
+  "rate-limit-clipped floors rather than honest performance", with a guess of 40-50%
+  for the true baseline. My measurement says 78.9.
+- The **AC3 arms on those same two models replicate**, which is what the report claims
+  ("the AC3 variants ran clean"). DSV4F Augment 59.1 vs 57.9 published; DSV4F Rewrite
+  57.9 vs 57.9; Kimi Augment 57.9 vs 57.9; Kimi Gated-Reset 71.9 vs 68.4; Kimi Rewrite
+  66.7 vs 73.7. So the environment is not shifted — only the controls moved.
+- My own runs on those cells terminate cleanly: DSV4F Baseline 60/60 `user_stop`,
+  Kimi Baseline 59/60 `user_stop`. No short-exits.
+- Foundry deployment drift: no positive evidence. `DeepSeek-V4-Flash` and `Kimi-K2.6`
+  still resolve as their own deployment names; `DeepSeek-V4-Flash-2026-04-23` is a
+  separate deployment that 404s under the alias. Cannot exclude an in-place version
+  bump, but nothing indicates one.
+
+### 2. Did the positive control reproduce? YES — two independent anchors.
+
+This is the pivotal difference from the ERGO/database result reported elsewhere in the
+session. **`gpt-5-mini` was reachable for me** and is the same model identity the
+published sweep used for the user simulator and the analyzer — it is served by
+`dl-openai-1` and `dl-openai-3` under the current `az` identity (probe at 13:55; only
+`dl-openai-3` was saturated, and pooling across both fixed it). `gpt-5.4` likewise
+resolves on both. **No model substitution was made anywhere in this sweep.** The CLI
+invocation strings are byte-identical to the committed sweep scripts; only the
+transport underneath changed.
+
+Two controls anchor comparability:
+- **gpt-5.4 Baseline: 68.4 ± 13.9 vs published 68.4.** Exact on the mean.
+- **AO: 0.0 ± 0.0 in all 3 models x all 3 replicates, vs published 0.0/0.0/0.0.**
+  Nine cells, 171 rollouts, not one non-zero reward. Mechanism confirmed: AO rollouts
+  never reach `user_stop`, they exhaust `max_steps=50`. Paired vs Baseline, AO is
+  -68.4 / -69.6 / -78.9 pp at p<0.0001.
+
+Plus a harness-level control run before the sweep: 2 known-good rollouts scored 1.0,
+and all four other arms scored 1.0 on the same tasks in the same process.
+
+So: **these ARE comparable measurements** — same models, same prompts, same
+hyperparameters, same denominator, and two published anchors reproduced exactly. The
+finding is "the published DSV4F/Kimi baseline numbers are wrong", not "these are not
+comparable".
+
+### 3. Does the gpt-5.4 Gated-Reset regression reproduce? YES, in direction. Not significant.
+
+**Gated-Reset 57.9 ± 21.1 (36.8 / 57.9 / 78.9) vs Baseline 68.4 ± 13.9.** Still below
+baseline, so the regression is not dropped. But the ranges nest almost completely and
+the paired test gives **-10.5 pp, exact p = 0.238** over 57 pairs (6 arm wins, 12
+baseline wins, 39 ties). Directionally consistent across two independent runs; not
+resolvable by a 19-task benchmark. Do not upgrade this to "fixed" or downgrade it to
+"noise" — report it as a persistent, underpowered negative.
+
+### 4. Does `--seed` thread through? YES — genuinely, unlike the LiC harness.
+
+Verified by reading the call chain, not by assumption:
+`run_parallel.py:223` `seed = args.seed + trial` -> `:262` -> `run_one` ->
+`run_parallel.py:131` `Orchestrator(..., seed=seed)` ->
+`orchestrator.py:526-528` `self.agent.set_seed(...)`, `self.user.set_seed(...)` ->
+`agent/base/llm_config.py:41-48` `self.llm_args["seed"] = seed` -> forwarded verbatim
+to litellm -> the provider `seed` parameter.
+
+So this is **not** the inert-`cfg.seed` situation from the ctx_editor/LiC harness.
+Caveat that must travel with the claim: it is the OpenAI-style *best-effort* seed, not
+a deterministic RNG, and Foundry-hosted DeepSeek/Kimi may ignore it. Temperature is left
+at the provider default (`run_parallel` passes `llm_args={}` for `openai/` models, so
+`DEFAULT_LLM_ARGS_AGENT` temperature=0.0 is never applied). `LLM_CACHE_ENABLED=False`
+(`config.py:35`), so no cache contamination between replicates.
+
+**Safest phrasing: "N=3 replicate runs (seeds 42/43/44; `--seed` is threaded to the
+provider `seed` parameter, best-effort only)."** Both "3 replicates" and "3 seeds" are
+defensible here; "3 replicate runs" is the phrasing I'd ship.
+
+### 5. Coverage
+
+**Ran, complete:** the full published matrix. 3 models (gpt-5.4, DeepSeek-V4-Flash,
+Kimi-K2.6) x 5 arms (Baseline/s0, AO, AC3-Augment/s1, AC3-Gated-Reset/s2,
+AC3-Rewrite-v11/s3) x 3 replicates x 19 tasks = **855 scored rollouts** (899 including
+retries). Same hyperparameters as the committed sweep scripts: `--max-steps 50
+--min-turns 2 --max-resets 3 --rewrite-prompt-version v11`, user sim and analyzer
+`openai/gpt-5-mini`. Nothing in the published tau2 matrix was skipped.
+
+**Not covered:**
+- **N is 3, not more.** With a 19-task benchmark and 11-21 pp replicate sd, N=3 still
+  cannot resolve 10 pp effects. Gated-Reset and Rewrite are directionally negative on
+  all three models but none reach p<0.05.
+- **The paper-era gpt-5-mini tau2 cells** (Baseline 53.3 / Gated-Reset 48.3, the pair
+  iNYK quotes, `--num-trials 3` seeds 42-44) were not re-run — different model and
+  different config from the multi-model sweep this task targeted.
+- **No false-negative / user-sim-induced-failure adjustment** — tau2 has no analogue of
+  LiC's `adjusted_accuracy`. Raw reward only.
+- **Root cause of the gpt-5.4 AC3 collapse is unresolved** (below).
+
+## The finding the rebuttal has to deal with
+
+**On all three models, remeasured Baseline is at or above every AC3 arm.** Paired
+against Baseline, **AC3-Augment is significantly worse on all three** (-21.1 pp
+p=0.008; -19.3 pp p=0.043; -21.1 pp p=0.012). Gated-Reset and Rewrite are negative
+everywhere but not significant. This is the opposite of the published tau2 story.
+
+Two separable components:
+1. **DSV4F and Kimi**: the AC3 arms replicate; the *baselines* were degraded. Correcting
+   the controls alone flips those two models. Well supported.
+2. **gpt-5.4**: baseline reproduces exactly, but all three AC3 arms drop 10-37 pp
+   (Augment 84.2 -> 47.4; Rewrite 73.7 -> 47.4). **I could not explain this.**
+
+What I ruled out for (2):
+- Model substitution — none; gpt-5.4 and gpt-5-mini both native.
+- Arm not firing — median 2 analyses/rollout, gating matches `agents.py:589-597`.
+- Degenerate termination — gpt-5.4 s1 was 60/60 `user_stop`, zero `max_steps`, median
+  message count 24, identical to Baseline.
+- Rate-limit contamination — zero rate-limit errors after the pooling patch.
+- **The analyzer tag-parsing bug** (see below) — tested directly; worth ~2 pp.
+
+## Bug found in the fork (worth fixing regardless of this task)
+
+`ctx_edit/analyzer.py:89-95` `_extract_tag` regexes only for `<task_spec>...</task_spec>`;
+`analyze_conversation:519-521` falls back to the **raw completion** when that misses.
+gpt-5-mini frequently answers Q1 with a JSON object instead, so a JSON blob with
+literal `\n` escapes gets spliced into the agent's briefing. Measured across all 862
+analyzer calls in the sweep: **459 (53%) hit the fallback** — 66% on gpt-5.4 Augment,
+69% on Kimi Augment. It degrades every AC3 arm and cannot touch Baseline or AO.
+
+I patched it behind `T6_FIX_TAG_PARSE=1` (default off, so the sweep was unaffected) and
+re-ran gpt-5.4 Augment at seed 42. Fallback rate fell 66% -> 25%; accuracy moved
+**42.1 -> 44.4 (+2.3 pp)**, i.e. less than one task flip. **Real bug, not the
+explanation.** The fix belongs upstream; nobody knew half the briefings were corrupt.
+
+## Reproduction pointers
+
+- Clone: `/home/t-matthewho/ac3/tau2_ctxe` (HEAD `8e5fd3c` + local uncommitted patches;
+  **not pushed** — outside the ctx_editor tree per brief).
+- Results: `ctx_edit/outputs/T6_reps/<model>_<arm>/traces/*.json` (per-rollout, with
+  full message history and `analysis_log`).
+- Aggregators: `ctx_edit/t6_aggregate.py` (Table 1), `ctx_edit/t6_paired.py` (Table 2).
+  Both read traces, drop `error` records, and exclude `break_apn_settings`.
+- Driver: `ctx_edit/run_t6_reps.sh <model_label> <agent_llm> <workers> [arms...]`.
+- Local patches: `ctx_edit/_t6_llm_patch.py` (endpoint pooling + backoff),
+  `run_parallel.py` (resume, token refresh, `refresh_openai_env`),
+  `analyzer.py` (gated tag-parse fix).
+- Diagnostic: `ctx_edit/outputs/T6_diag/gpt5_4_s1_fixparse/`.
