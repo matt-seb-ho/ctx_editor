@@ -5,7 +5,12 @@ CollabLLM's earlier regression "was a user-simulator artifact," quoting **100%**
 math-hard) and **20%** (AC3-Reset, bigcodebench). Both came from a **single run**. This task
 re-measures them at N=3.
 
-**Date:** 2026-07-29. **Status:** in progress.
+**Date:** 2026-07-29. **Status:** COMPLETE — all 12 cells in hand (4 arms x 3 replicates).
+All 8 fresh runs finished 11:17 UTC; bigcodebench re-scored offline under a unified environment.
+
+> **STATUS LINE (11:4x UTC):** all runs complete, no processes outstanding, nothing wedged.
+> Remaining work was analysis/write-up only, now finished.
+
 
 ---
 
@@ -253,6 +258,91 @@ re-scoring needs no re-run of any conversation. Script: `/tmp/rescore_bcb.py`.
 
 Under the unified scorer, rep1's Reset cell is **5/20 (25%)**, not the 20% quoted in the rebuttal —
 i.e. the quoted figure is itself environment-dependent by ±1 problem (±5pp).
+
+#### bigcodebench results (all cells re-scored under the unified environment)
+
+| Arm | rep1 (recovered) | rep2 | rep3 | mean | sd |
+|---|---|---|---|---|---|
+| **AC3-Reset** | 5/20 = **25.0** | 5/20 = **25.0** | 3/20 = **15.0** | **21.67** | 5.77 |
+| **Baseline** | 2/20 = **10.0** | 2/20 = **10.0** | 0/20 = **0.0** | **6.67** | 5.77 |
+
+Per-replicate delta (Reset − Baseline): `[+15, +15, +15]` → **mean +15.00, sd 0.00**.
+Reset beats Baseline in **3/3 replicates**, by the same margin every time.
+
+In-run vs re-scored scores per cell (shows which cells the matplotlib bug touched):
+
+| Cell | in-run (unreliable) | re-scored (authoritative) |
+|---|---|---|
+| Reset rep1 (recovered, 2026-06 env) | 4/20 | 5/20 |
+| Reset rep2 | 0/20 (matplotlib bug) | 5/20 |
+| Reset rep3 | 3/20 | 3/20 |
+| Baseline rep1 (recovered, 2026-06 env) | 1/20 | 2/20 |
+| Baseline rep2 | 1/20 | 2/20 |
+| Baseline rep3 | 0/20 | 0/20 |
+
+#### Per-problem view — bigcodebench (fully paired; same 20 problems everywhere)
+
+Total across the 3 replicates: **Reset 13/60, Baseline 4/60.**
+
+**14 of the 20 problems are never solved by either arm in any replicate** — a hard floor. All signal
+lives in 6 problems. Reset solves `209, 285, 563` (2 reps each) and `447, 54, 61` (1 rep each) —
+**9 solves on problems Baseline never solves once**. The three problems Baseline does solve
+(`228, 451, 859`) are also solved by Reset. **There is no problem that Baseline solves and Reset
+does not.** Baseline rep3's 0/20 is a genuine floor reading, not an error.
+
+---
+
+## 7. Paste-ready table
+
+**CollabLLM, competent user simulator (DeepSeek-V4-Flash as user + assistant + analyzer;
+gpt-4o-mini as judge/extractor). N = 3 replicate runs at temperature 1.0 on a fixed 20-problem
+draw — these are replicates, NOT seeds (`seed=` is a no-op; see §0/§4).**
+
+| Arm | Dataset | rep1 | rep2 | rep3 | mean ± sd | n | Artifact path |
+|---|---|---|---|---|---|---|---|
+| Baseline | math-hard | 19/20 (95.0) | 19/20 (95.0) | 17/20 (85.0) | **91.7 ± 5.8** | 3 | `outputs/T8/collabllm_baseline_math-hard_rep{2,3}`; rep1 `~/ac3/recovered/ctx_editor/outputs/post_neurips_r2_collabllm_user_deepseek/collabllm_baseline_math-hard_rep1_1779092497` |
+| **AC3-Augment** | math-hard | 20/20 (100.0) | 17/20 (85.0) | 18/20 (90.0) | **91.7 ± 7.6** | 3 | `outputs/T8/collabllm_ac3_augment_v8_math-hard_rep{2,3}`; rep1 `.../collabllm_ac3_augment_v8_math-hard_rep1_1779095798` |
+| Baseline | bigcodebench | 2/20 (10.0) | 2/20 (10.0) | 0/20 (0.0) | **6.7 ± 5.8** | 3 | `outputs/T8/collabllm_baseline_bigcodebench_rep{2,3}`; rep1 `.../collabllm_baseline_bigcodebench_rep1_1779092497` |
+| **AC3-Reset** | bigcodebench | 5/20 (25.0) | 5/20 (25.0) | 3/20 (15.0) | **21.7 ± 5.8** | 3 | `outputs/T8/collabllm_ac3_reset_v8_bigcodebench_rep{2,3}`; rep1 `.../collabllm_ac3_reset_v8_bigcodebench_rep1_1779092497` |
+
+**Deltas vs. paired Baseline:** math-hard AC3-Augment **0.0 ± 8.7 pp** (per-rep `+5, −10, +5`);
+bigcodebench AC3-Reset **+15.0 ± 0.0 pp** (per-rep `+15, +15, +15`; wins 3/3).
+
+**Precision caveat — state this, don't let reviewers infer false precision.** Every cell is n = 20,
+so accuracy is **quantised to 5pp**; one problem flipping moves a cell by a full 5 points. All
+bigcodebench cells are re-scored under a single unified dependency environment, because the
+original 2026-06 environment differed by ±1 problem (`BigCodeBench/451`) — which is exactly why the
+quoted "20%" reads as 25% here. Treat both the quoted 20% and this 21.7% as "≈1 in 5, ±1 problem."
+
+**Ceiling / floor flags:**
+- math-hard is **near ceiling**: 15/20 problems are solved by both arms in all replicates. The
+  sd's (5.8–7.6) come from ~5 unstable problems only.
+- bigcodebench is **near floor**: 14/20 problems are never solved by anyone. Baseline rep3 = 0/20
+  is a true floor reading. `sd = 0.00` on the bigcodebench delta is **not** the degenerate
+  zero-variance artifact seen in the old Phase-3a 30.0/30.0/30.0 triple (which was the fixed-draw
+  seed bug) — here the two arms' per-replicate scores move together across replicates while
+  preserving a constant 3-problem gap.
+
+---
+
+## 8. Verdict on the rebuttal claims
+
+| Rebuttal claim (`replies/v4/03_reviewer_5YHP.md`) | N=1 quoted | N=3 measured | Survives? |
+|---|---|---|---|
+| AC3-Augment reaches **100%** on math-hard | 100.0 | **91.7 ± 7.6** (Baseline 91.7 ± 5.8) | **NO** |
+| AC3-Reset reaches **20%** on bigcodebench | 20.0 | **21.7 ± 5.8** (Baseline 6.7 ± 5.8) | **YES** |
+
+1. **The 100% math-hard figure does not replicate.** It is the top of the observed range, and at
+   n=3 AC3-Augment and Baseline are **exactly tied** (91.67 vs 91.67; 55/60 vs 55/60 problem-solves;
+   mean delta 0.0). The rebuttal currently reads as if Augment (100) beats Baseline (95) — that
+   +5pp gap is decoding noise on a near-ceiling benchmark. **This sentence needs correcting before
+   submission.** The honest statement is that on math-hard with a competent user simulator,
+   AC3-Augment **matches** Baseline — which still refutes the *regression* reviewer 5YHP was
+   pointing at (no arm degrades), but does **not** support a claimed improvement.
+2. **The 20% bigcodebench figure replicates and is the stronger result than we claimed.** Reset is
+   21.7 ± 5.8 vs Baseline 6.7 ± 5.8, **+15pp in every replicate, 3/3 wins**, and it solves 9
+   problem-instances Baseline never solves while losing none. This claim is safe to lead with.
+
 
 
 ---
