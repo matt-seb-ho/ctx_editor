@@ -589,3 +589,28 @@ The reconciliation ships in the reviewer-facing text (a compactor copies a short
 - **19:46** Heartbeat tick. T6 healthy (worklog 15m, `run_parallel.py` workers 2 → 1, converging). T26 healthy — editing `HANDOFF.md` directly per its brief, touched 4 min ago.
 
   Slot free and the queue empty, so dispatched **T27**: triage the five MEDIUM red-team items T25 flagged as needing runs (M11, M12, M6, M3, M15), then execute only the ones that pass triage, cheapest-first, under ~$15. The instruction that matters most is to **decline any item whose entire value is a sub-10 pp ordering at n≈20** — four such margins dissolved tonight once replicates were added, so buying another would be spending compute to manufacture a claim we would later have to retract. Declining with a cost estimate is an acceptable outcome for every item.
+
+### Decisions D15–D19 (backfilled 19:55 — I repeated the D11–D14 mistake)
+
+**D15 — Never strike a claim for unverifiability without a documented deep search.** Twice tonight (T16/U1, T20/U3+U5) "no artifact exists" meant "the audit did not look hard enough". Striking a true claim costs us a defensible number for nothing.
+
+**D16 — At n≈20 per cell this benchmark family cannot resolve sub-10 pp differences.** Four asserted margins dissolved once replicates were added: math-hard 100% → tied; memory +10/+12 pp → below a ~6 pp noise floor; the ERGO ordering → nothing significant either way; AC3-Reset-over-AO +6.7 → +3.3 pp. This belongs in the paper's limitations as a stated resolution limit, not as four separate retractions.
+
+**D17 — Run the adversarial read as well as the factual audit.** T23 found in one pass what three accuracy audits missed, because it asked "what does a hostile reviewer do with this?" rather than "is this true?" Both H7 and the 22-cell error were **inherited through** a verification step: a verified *number* can arrive inside a wrong *sentence*.
+
+**D18 — Route follow-up work to the agent already in the tree.** T24's fixes went to T25 by message rather than to a new agent, because two writers on `replies/v5/` is the double-write pattern that corrupted output dirs at 10:14–10:52.
+
+**D19 — Briefs must cite finding IDs so agents can re-derive rather than inherit.** My T25 brief said "+21 pp over AO on database", carried forward from an earlier summary without re-derivation; T25 recomputed 18.7 pp and printed the measured value. An agent checking its orchestrator's numbers is correct behaviour.
+
+**Repeat offence, recorded deliberately.** I backfilled D11–D14 at 17:30 after T19 flagged them, stated the rule "any decision in the JSONL must also be written into WORKLOG.md prose", and **then broke it again for D15–D19**, which T26 caught. The lesson is not "remember harder" — it is that a rule enforced only by the actor who keeps breaking it does not hold. The durable fix is to write the decision into this file **in the same command** that appends to the JSONL, which is what I am doing from here.
+
+- **19:55** `T26` returned **DONE**. `HANDOFF.md` refreshed and committed (`701f6b6`, that file only).
+
+**F73 — T26 verified against `WORKLOG.md` rather than trusting my brief, and corrected it in three places.** (i) The eight `⚠ INTERNAL` blocks are the *total*, of which **five** are tau2 HOLDs pending T6 — the rest are a preamble and two renumbering notes; I had implied all eight were tau2 holds. (ii) `README.md` carries **six** numbered blockers, three resolved and three open, **plus PAPER-7, which is the real blocker and is not in that list** — a gap worth knowing about, since someone working the numbered list would miss the one that actually gates posting. (iii) The session runs to D19, and D15–D19 existed only in the JSONL; the artifact map now flags that.
+
+**The operator's order of business, per T26:**
+1. **PAPER-7 (~1–2 h) — the only thing blocking the post.** v5 discloses the ERGO denominator defect in five reviewer-facing places; posting before the `tab:main` fix means announcing a correction we have not made.
+2. **PAPER-5 has flipped, and the knock-on needs human judgement.** T2B killed the Rewrite attribution (Rewrite keeps 0/66 natural spans, *worse* than Reset's 5/66). "Preserve what's correct" is deleted for both operators — and "unlike prior work that discards all assistant messages" was the ERGO differentiation. **That is a contribution-framing decision, not a number edit**, which is exactly why it should not be made by an agent.
+3. **T6 is the last unsettled result.** Five HOLDs plus Blocker 5 stay sealed until it lands. Its 19:32 self-report has hardened but is **not integrated or audited** — T26 deliberately did not resolve it.
+
+Cheapest high-value item after PAPER-7: **PAPER-9, ten minutes**, on the `tab:main` caption covering the 52-point baseline spread — the discrepancy a reviewer is most likely to catch unaided.
