@@ -796,3 +796,26 @@ The distinguishing signal existed and I did not use it: every previous nudge-and
 **F96 — The "appropriate intensity" ordering inverts.** On the re-measured tau2 matrix, Gated-Reset is best or tied-best on **all three** respondents, so the light-for-strong / heavy-for-weak pattern is **absent, not merely weakened**. It appears in three places. This is a claim change, not a number change.
 
 **F97 — Four PAPER items have no target in the paper as `HANDOFF.md` describes them** (PAPER-1, 4, 2, 10), and three smaller issues surfaced: PAPER-8 has a **second occurrence at L347**; `checklist.tex:98` carries a stale `tab:main` reference; and the LiC **`+Memory` rows are transductive and undisclosed** — the cheatsheet is built from the eval set itself, and T13 measured that protocol's effect at **0.0 pp**. The last is a disclosure gap, not just bookkeeping.
+
+- **22:25** `T36` returned **DONE**. `HANDOFF.md` corrected (commit `0c0d77b`, that file only), every claim verified against `PAPER_EDITS.md` and F94–F97 before writing.
+
+Corrected the endorsed PAPER-9 caption and the same two facts where they recurred in the population table; added Figure 1's image as a camera-ready blocker (no `.drawio` source in the tree) and `checklist.tex:98`'s stale reference; flagged "appropriate intensity" as a **claim** change alongside PAPER-5/PAPER-11; rewrote PAPER-1/4/2/10, none of which had a target as described; added PAPER-8's second occurrence and the `+Memory` transductive disclosure gap; routed the entry point to `PAPER_EDITS.md`; and added the inherited-wording lesson with all four instances.
+
+**F98 — Two further handoff errors found beyond the brief, and one was a live trap.** PAPER-7's row **bundled two body-number edits** (78 → 82%, 55–80 → 67–82%) that are consequences of the **optional** 7b, not the blocking 7a — **applying them alongside 7a alone would have put unsupported numbers into the paper.** That is precisely the kind of error that turns a careful correction into a new defect, and it was sitting inside the one item that gates posting. Separately, PAPER-6's "delete `adjusted_accuracy`" has no target either — the paper never names the metric — so it is **45 minutes, not 2–3 hours**.
+
+---
+
+## Session close — 2026-07-29
+
+**Every task is complete. Nothing is in flight.** 36 dispatched agents, 98 findings (F1–F98), 29 decisions (D1–D29), one agent failure (T31, API timeout, relaunched successfully as T31b).
+
+**What the operator picks up:**
+- `HANDOFF.md` — the briefing. Read first.
+- `PAPER_EDITS.md` — nine paste-ready paper edits, two judgement calls. **PAPER-7a (~20 min) is the only item gating the rebuttal post.**
+- `replies/v5/` + `CHANGES.md` + `README.md` — the rebuttal, coherent, tally reconciling, blockers listed.
+- `PROVENANCE.md` — lineage graph and the dead-ends table.
+- This log, and ~25 per-task worklogs under `tasks/`.
+
+**The honest balance:** this session found substantially more problems with our existing claims than it produced new wins — including withdrawing an entire benchmark (tau2) and correcting a defect that had deflated a competitor (ERGO). Every one of those was findable by a reviewer. **The core result survived everything: AC3-Reset and Gated-Reset beat baseline in all 8 LiC cells under raw, shipped-adjusted and arm-symmetric-corrected accuracy alike**, the Area Chair's baseline reservation is now empirically closed, and T1/T9/T2A/T2B/T11/T27 are genuinely new evidence.
+
+**The lesson most worth carrying forward:** *findings* were re-derived reliably all night; **proposed replacement wording was inherited rather than verified — four times**, by an adversarial reviewer, twice by me, and once through two consolidation passes. Verification effort was aimed at measurements; it needs aiming at the text that reports them.
