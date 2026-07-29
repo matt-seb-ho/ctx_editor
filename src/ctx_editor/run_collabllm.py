@@ -103,8 +103,18 @@ async def run_collabllm_experiment(cfg: DictConfig) -> dict[str, Any]:
     dataset_name = cfg.task.get("dataset_name", "math-hard")
     limit = cfg.task.get("limit")
     split = cfg.task.get("split", None)
-    samples = load_collabllm_dataset(dataset_name, limit=limit, split=split)
-    logger.info(f"Loaded {len(samples)} samples from {dataset_name} ({split} split)")
+    # cfg.seed drives the subsample draw. Before 2026-07-29 the loaders
+    # hardcoded random.Random(42), so `seed=` was a silent no-op here and every
+    # "seed" replicate drew the SAME problems -- variation came only from
+    # temperature. Default stays 42 so prior runs reproduce bit-for-bit.
+    data_seed = cfg.get("seed", 42)
+    samples = load_collabllm_dataset(
+        dataset_name, limit=limit, split=split, seed=data_seed
+    )
+    logger.info(
+        f"Loaded {len(samples)} samples from {dataset_name} "
+        f"({split} split, data_seed={data_seed})"
+    )
 
     # Get dataset metadata
     dataset_info = COLLABLLM_DATASETS[dataset_name]

@@ -206,6 +206,7 @@ def load_collabllm_dataset(
     dataset_name: str,
     limit: int | None = None,
     split: str | None = None,
+    seed: int = 42,
 ) -> list[dict[str, Any]]:
     """Load a CollabLLM dataset by name.
 
@@ -213,6 +214,9 @@ def load_collabllm_dataset(
         dataset_name: Name of the dataset (e.g., "math-hard", "bigcodebench").
         limit: Maximum number of samples.
         split: Dataset split. If None, uses the dataset's default split.
+        seed: Random seed for the subsample draw. Defaults to 42, which is the
+            value that was previously hardcoded in every loader — so omitting
+            this argument reproduces all pre-2026-07-29 runs exactly.
 
     Returns:
         List of sample dicts.
@@ -225,4 +229,4 @@ def load_collabllm_dataset(
     dataset_info = COLLABLLM_DATASETS[dataset_name]
     loader = dataset_info["loader"]
     effective_split = split or dataset_info.get("default_split", "test")
-    return loader(limit=limit, split=effective_split)
+    return loader(limit=limit, split=effective_split, seed=seed)
