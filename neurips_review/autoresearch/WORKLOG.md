@@ -769,3 +769,13 @@ This is the second time tonight a number of mine propagated into a task brief wi
   Nudged rather than restarted: the task is legitimately slow — reading the full `.tex` to pin exact current text for eleven items — and a restart would discard 51 minutes of reading for a bookkeeping problem. Asked for a skeleton on disk now and incremental appends after, plus a reminder that a partial spec covering eight items well beats a complete one that never lands. Re-stated the two constraints that shape the output: **PAPER-7 first** (the only posting-gating item, with T17's superseded 57.9 barred except as a do-not-use note), and **PAPER-11 as a scoped inventory, not a rewrite**.
 
   Ninth nudge of the session; the prior eight all produced a response and no task has needed a restart.
+
+- **21:50** `T31` **FAILED** — terminated early on an API timeout, having only begun reading. Nothing written; `PAPER_EDITS.md` does not exist.
+
+**F93 — My 21:46 diagnosis was wrong, and the error is worth naming.** I read 51 minutes of silence as "legitimately slow on a read-heavy task" and nudged rather than restarted. It was neither slow nor wedged — **it was dead**, killed by a transport error, and a nudge to a dead agent does nothing. Tonight's record ("nine nudges, nine responses, zero restarts") had trained me toward nudging, and that prior was right eight times and wrong here.
+
+The distinguishing signal existed and I did not use it: every previous nudge-and-recover case had **some** artifact on disk — a worklog, a commit, a live process. T31 had **nothing at all**. "Has written nothing since dispatch" is categorically different from "has stopped updating an existing file", and should have been treated as failure-until-proven-otherwise rather than slowness. Adding that as a rule:
+
+**D28 — Zero artifacts after 45 minutes means presume failure, not slowness.** Nudge when an agent has produced *something* and gone quiet; relaunch when it has produced *nothing*. The prior eight recoveries all had partial output; T31 had none, and that was the tell.
+
+**Mitigation for the relaunch:** the task is a long single-shot document, which is exactly the shape that loses everything to one transport error. Relaunching with **write-first, fill-in-after** structure — skeleton to disk in the first minutes, then append per item, highest-priority item specified first — so any future failure leaves usable partial value rather than nothing. (Logged to `logs/orchestrator.jsonl` in the same command.)
