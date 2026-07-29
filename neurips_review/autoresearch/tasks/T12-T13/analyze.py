@@ -104,6 +104,7 @@ def report(task):
     # ---- T13 inductive arms ----
     print("\n-- T13: offline (frozen, disjoint learn set) memory --")
     frozen = {}
+    clean = {}
     LEARN = set(x["task_id"] for x in json.load(open(f"{ROOT}/data/lic_mem_learn_set.json")))
     for o in ORDS:
         p = f"{out}/frozen_{o}/results.json"
@@ -111,18 +112,29 @@ def report(task):
             r = load_results(p)
             frozen[o] = acc(p)
             cl = [x for x in r if x["sample_id"] not in LEARN]
+            ov = [x for x in r if x["sample_id"] in LEARN]
             cc = sum(1 for x in cl if x.get("is_correct"))
+            oc = sum(1 for x in ov if x.get("is_correct"))
+            clean[o] = 100.0 * cc / max(1, len(cl))
             print(f"  {o:8s} all {frozen[o][0]:2d}/{frozen[o][1]} = {frozen[o][2]:5.1f}%"
-                  f" | clean {cc:2d}/{len(cl)} = {100.0*cc/max(1,len(cl)):5.1f}%")
+                  f" | clean {cc:2d}/{len(cl)} = {clean[o]:5.1f}%"
+                  f" | on-overlap {oc}/{len(ov)}")
     if frozen:
         v = [x[2] for x in frozen.values()]
-        print(f"  mean +/- std (n_orderings={len(v)}) : {st.mean(v):.1f} +/- "
-              f"{st.stdev(v) if len(v)>1 else 0:.1f} pp")
+        cv = list(clean.values())
+        print(f"  mean +/- std (n_orderings={len(v)}) : all {st.mean(v):.1f} +/- "
+              f"{st.stdev(v) if len(v)>1 else 0:.1f} pp | clean {st.mean(cv):.1f} +/- "
+              f"{st.stdev(cv) if len(cv)>1 else 0:.1f} pp")
         if ref:
             r = load_results(f"{out}/ref_nomem/results.json")
             cl = [x for x in r if x["sample_id"] not in LEARN]
+            ov = [x for x in r if x["sample_id"] in LEARN]
             cc = sum(1 for x in cl if x.get("is_correct"))
-            print(f"  no-memory on clean subset : {cc}/{len(cl)} = {100.0*cc/len(cl):5.1f}%")
+            oc = sum(1 for x in ov if x.get("is_correct"))
+            print(f"  no-memory : all {ref[0]}/{ref[1]} = {ref[2]:.1f}% | "
+                  f"clean {cc}/{len(cl)} = {100.0*cc/len(cl):.1f}% | on-overlap {oc}/{len(ov)}")
+            print(f"  CLEAN-SUBSET DELTA (offline memory - no memory) = "
+                  f"{st.mean(cv) - 100.0*cc/len(cl):+.1f}pp")
 
     # ---- cheatsheet divergence ----
     for label, pat in [("online", "{o}_cheatsheet.json"), ("offline", "offline_{o}_cheatsheet.json")]:

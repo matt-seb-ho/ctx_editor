@@ -169,12 +169,95 @@ tree clean removes all doubt).
 
 ---
 
-## 5. Per-replicate raw results
+## 5. Failure encountered and resolved: bigcodebench execution scoring
 
-_(filled in as cells complete — see §6 for the paste-ready table)_
+The first `collabllm_ac3_reset_v8_bigcodebench_rep2` run completed all 20 conversations but
+reported **`0/0 correct (20 errors excluded)`** — a *silent* metric failure:
+
+```
+File "src/ctx_editor/evaluation/collabllm_metrics.py", line 342, in judge_pass_rate
+    from bigcodebench.eval import untrusted_check
+ModuleNotFoundError: No module named 'bigcodebench'
+```
+
+BigCodeBench is scored by **actual test execution** (`eval_method: pass_rate` in
+`COLLABLLM_DATASETS` → `judge_pass_rate` → `bigcodebench.eval.untrusted_check`), not by the LLM
+judge. The package was absent from the current venv. (This also corrects RECON *Unknown #7*, which
+guessed BigCodeBench scoring was LLM-based — it is execution-based and already wired in.)
+
+**Resolution:** killed the code stream immediately (the queued Baseline bigcodebench cell would
+have failed identically), installed the package (`uv pip install bigcodebench`), verified
+`from bigcodebench.eval import untrusted_check` and that `ctx_editor` still imports, then re-smoked:
+`outputs/T8/smoke_bcb` returned `0.00% (0/2)` — i.e. **2 samples actually evaluated, 0 errors
+excluded** (vs the earlier `0/0`), consistent with Baseline's 5% in rep1. Deleted the poisoned
+cell dirs and relaunched. Failed logs retained as `logs/FAILED_*.log`.
+
+The math stream was unaffected (math-hard uses the LLM judge) and was left running; all four math
+cells report the full 20 samples with **no errors excluded** and no tracebacks.
 
 ---
 
-## 6. Paste-ready table
+## 6. Per-replicate raw results
 
-_(pending)_
+### math-hard (complete, n=3)
+
+| Arm | rep1 (recovered) | rep2 | rep3 | mean | sd |
+|---|---|---|---|---|---|
+| **AC3-Augment** | **100.0** (20/20) | 85.0 (17/20) | 90.0 (18/20) | **91.67** | 7.64 |
+| **Baseline** | 95.0 (19/20) | 95.0 (19/20) | 85.0 (17/20) | **91.67** | 5.77 |
+
+Per-replicate delta (Augment − Baseline): `[+5, −10, +5]` → **mean 0.00, sd 8.66**.
+
+**The quoted 100% does not replicate.** It is the *top* of the observed range, not its centre.
+At n=3 the two arms have **identical** means.
+
+#### Per-problem view (all replicates share the same 20 problems, so this is fully paired)
+
+Total correct across the 3 replicates: **AC3-Augment 55/60, Baseline 55/60 — exactly tied.**
+
+15 of the 20 problems are solved by **both** arms in **all** replicates (a ceiling block). All
+variance comes from just 5 unstable problems (`math-hard/1116, 1209, 191, 447, 476`). This is the
+context needed to read the sd: math-hard is a near-ceiling benchmark where a 20-problem draw
+resolves ~5 problems' worth of decoding noise, i.e. ±5pp granularity per replicate.
+
+### bigcodebench (in progress)
+
+**Second, larger failure — and the reason every bigcodebench number here is *re-scored*.**
+
+After installing `bigcodebench`, `collabllm_ac3_reset_v8_bigcodebench_rep2` ran all 20 samples with
+**0 execution errors** and scored **0/20**. That looked like a catastrophic non-replication of the
+20% claim. It was an artifact.
+
+`judge_pass_rate` swallows any exception and `return 0.0`. Inside BigCodeBench's sandbox,
+`reliability_guard()` does `import matplotlib.pyplot` — and matplotlib was not installed, so **every
+test subprocess died and silently scored 0**, while the parent logged only the benign
+`test failed for task_func: {}` (the empty `{}` detail is the tell).
+
+**Diagnostic that caught it:** re-score the *recovered rep1* extractions (known stored total 4/20)
+under the current environment. It returned **0/20** — proving the environment, not the model, was
+producing zeros.
+
+**Fix:** derived the actual dependency set from the 20 problems' own test code rather than guessing
+(`bs4, matplotlib, mechanize, numpy, openpyxl, pandas, regex, scipy, seaborn, sklearn, xlwt`) and
+installed it. Re-validation against rep1: **19/20 scores now match exactly**, total 5/20 vs stored
+4/20. The single difference (`BigCodeBench/451`) is **deterministic** (scored 1.0 on 5/5 repeats),
+so it is a *dependency-version* difference, not flakiness — the original 2026-06 environment had a
+library version on which 451 failed.
+
+**Consequence for methodology:** the historical bigcodebench numbers were produced under a
+materially different dependency environment. Comparing a fresh replicate against them directly
+would confound model behaviour with library versions. So **every bigcodebench cell — including the
+recovered rep1 — is re-scored offline under one unified current environment**, and it is those
+re-scored numbers that are reported. `results.json` stores `extracted_answer` per sample, so
+re-scoring needs no re-run of any conversation. Script: `/tmp/rescore_bcb.py`.
+
+Under the unified scorer, rep1's Reset cell is **5/20 (25%)**, not the 20% quoted in the rebuttal —
+i.e. the quoted figure is itself environment-dependent by ±1 problem (±5pp).
+
+
+---
+
+## 7. Paste-ready table
+
+_(pending bigcodebench)_
+

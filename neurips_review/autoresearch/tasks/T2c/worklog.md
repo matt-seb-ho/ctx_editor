@@ -143,18 +143,29 @@ already stated, or the assistant had already produced, is excluded by constructi
 only operationalisation that answers 5YHP's actual question ("is the analyzer solving the
 task?") rather than a proxy for "does the answer string appear anywhere".
 
-**Prompt v1 failed hand-validation** — see §5. Prompt **v2** (`prompt_v2.txt`, verbatim, and the
-one used for every reported number) forces a provenance-first decision procedure and carries
-three worked examples covering the failure mode found in v1. v1 labels are kept at
-`leak_labels_v1.jsonl` for comparison.
+**Prompt v1 and v2 both failed validation; v3 is the one used for every reported number.**
+Full text of each is kept (`prompt_v2.txt`, `prompt_v3.txt`), and the label files are kept
+side by side (`leak_labels_v1.jsonl`, `leak_labels_v2.jsonl` (partial, 386 rows, abandoned),
+`leak_labels_v3.jsonl`).
 
-*Contamination note:* two of v2's worked examples were written from records in the v1
-hand-validation sample (`sharded-BFCL/parallel_199` conv1, `sharded-GSM8K/856` conv1). Those two
-records are excluded from the round-2 hand-validation draw. 2/1079 is immaterial to aggregates.
+| prompt | what changed | how it failed / passed |
+|---|---|---|
+| v1 | first attempt; provenance asked for alongside the label | 14/23 binary hand-agreement. **Systematic over-call**: faithful restatement of user-supplied requirements scored as leakage (worst on `actions`, 2/6). |
+| v2 | provenance-first decision procedure + 3 worked examples | **Over-corrected**: 42/46 math outputs labelled `NO_LEAK`, versus 39.6% derived-gold from the model-free numeric probe. Cause traced to the phrase "not recoverable by restating the user messages", which the judge read as "not derivable from the user's numbers", filing arithmetic on user values under `QUOTED_FROM_USER`. Killed at 386/1079. |
+| **v3** | draws the quoting/deriving line explicitly at **computation** ("copying a number the user wrote is quoting; *combining* two numbers the user wrote is deriving"), plus 5 worked examples spanning all four tasks | adopted — see §5 |
+
+**Decision D5 — calibrate the math subset against the model-free probe, not against my own
+labels.** The numeric probe (§4a) is an objective, 144-item check that needs no trust in the
+judge. Any prompt whose math `LEAKS`+`PARTIAL` rate is far from the probe's ~40-50% is wrong.
+This is what caught v2; v1 and v3 both clear it.
+
+*Contamination note:* v3's worked examples were written from records I had already adjudicated
+(`sharded-GSM8K/856`, `/1124`, `sharded-BFCL/parallel_199`, `sharded-livecodebench/2977`,
+`sharded-spider-val-257-hard`). Those, and the whole round-1 sample, are excluded from the
+held-out round-2 hand-validation draw.
 
 *Non-injected analyses:* 16/1079 records have `needs_edit=false`, so nothing was inserted into
-the context and no leak was possible. They are labelled `NO_LEAK` by construction in the paired
-analysis.
+the context and no leak was possible. They are forced to `NO_LEAK` in the paired analysis.
 
 ---
 
