@@ -26,7 +26,7 @@ Numbers that could not be confirmed are flagged in-line and recorded in
 
 | ID | One-line | Blocks posting? | Status in this doc |
 |---|---|---|---|
-| **PAPER-7** | ERGO scored on unfiltered pools in `tab:main`; math 69.6 → **80.0**, code ≈44.0, database 12.0, actions uncorrectable | **YES — the only blocker** | ⏳ |
+| **PAPER-7** | ERGO scored on unfiltered pools in `tab:main`; math 69.6 → **80.0**, code ≈44.0, database 12.0, actions uncorrectable | **YES — the only blocker** | ✅ (7a paste-ready; 7b ⚖) |
 | **PAPER-9** | `tab:main` caption must disclose the top-25-by-failure-rate instance selection | No (camera-ready) | ⏳ |
 | **PAPER-1** | LiC/CollabLLM "seeds" → "replicate runs (temperature 1.0)"; WildChat + tau2 keep "seeds" | No | ⏳ |
 | **PAPER-8** | Table 3 / §gated "on the same prefixes" is false; 35 shared prefixes, McNemar p=0.125 | No | ⏳ |
@@ -218,4 +218,114 @@ does not contradict anything posted.
 | **7a** | ~20 min, mechanical, zero API calls. **BLOCKS POSTING.** |
 | **7b** | ~1 h, camera-ready, adopts interval endpoints as point estimates — needs a human sign-off |
 | **Contradiction risk with v5** | **None for 7a.** 7b goes beyond v5 but does not contradict it |
+
+
+---
+
+## PAPER-9 — disclose the difficulty selection behind `tab:main` ✅ (one correction inside)
+
+**Summary.** The paper never states that `tab:main`'s LiC pool is difficulty-selected. Its 4.0%
+database baseline therefore reads as a measurement of GPT-5-mini when it is largely **what the
+selection procedure guarantees**. Highest value per minute on the whole list: it is the
+discrepancy a reviewer is most likely to catch unaided (a 52-point spread across our own tables —
+red-team item H1).
+
+**Blocking:** no. Camera-ready. v5 already discloses the selection to the reviewers
+(`00` CW5, `01` W2, `02`, `04`, `05` — F68/F70/T25), so the paper is *behind* the replies but
+does not contradict them; the replies describe the pool correctly.
+
+### ⚠ Correction to the wording HANDOFF and `tasks/T24/worklog.md` §7.4 both propose
+
+The drafted caption reads *"the 25 per task with the highest full-context failure rate across five
+GPT-5-mini baseline runs."* **Two of those facts are wrong**, verified against the primary source
+`docs/lic_dev_set_provenance.md`:
+
+* **math is not a top-25 selection.** Math had only **23 eligible** instances, so *all* were kept
+  (`lic_dev_set_provenance.md:50,54`). `data/dev_math_subset.json` holds 23, matching `tab:main`'s
+  math n of 20 after 3 pruned items.
+* **code used four runs, not five.** One `gpt5_mini` run's artifacts were lost to a directory
+  collision (`lic_dev_set_provenance.md:32`).
+
+Do not paste the drafted sentence. Use the version below.
+
+### Location
+
+`writing/overleaf_repo/neurips/neurips_2026_conference.tex` **L254** — the `\caption{...}` of
+`tab:main` (the same caption PAPER-7 extends; a **merged** replacement is given at the end of this
+item so the two edits do not collide).
+
+### Current text (exact, the opening of L254)
+
+```latex
+\caption{\textbf{Per-task LiC results (GPT-5-mini, accuracy \%).} Cells shaded by score (darker $=$ higher). Indented \texttt{+ Memory} rows add the memory-based learner.
+```
+
+### Replacement — PAPER-9 alone (paste-ready)
+
+```latex
+\caption{\textbf{Per-task LiC results (GPT-5-mini, accuracy \%).} \textbf{Instances are difficulty-selected}: from each task's full LiC pool (math 103, code 100, database 107, actions 105) we keep instances the GPT-5-mini full-context baseline answered incorrectly in at least 60\% of five independent baseline runs (four for code), then take the 25 with the highest error rate --- math yielded only 23 eligible instances and all are kept. The Baseline row is therefore close to a fixed point of that procedure rather than an independent estimate of GPT-5-mini's multi-turn accuracy, and its absolute level is not comparable to accuracies we report on unselected pools. Because the design-oracle rows are computed on the \emph{same} instances, the gap-closure percentages quoted in the text are measured against a same-pool ceiling rather than against 100\%. Cells shaded by score (darker $=$ higher). Indented \texttt{+ Memory} rows add the memory-based learner.
+```
+
+### Evidence
+
+| Claim | Value | Source |
+|---|---|---|
+| Selection criterion | `valid_appearances ≥ 3`, `errors ≥ 3`, `errors/valid_appearances ≥ 0.6`; sort by error rate desc; top 25 | `docs/lic_dev_set_provenance.md:44-50` |
+| Runs used | 5 GPT-5-mini baseline runs; **code had only 4 usable** | `docs/lic_dev_set_provenance.md:26-32` |
+| Full pools | math 103, code 100, database 107, actions 105 | `docs/lic_dev_set_provenance.md:17-20` |
+| Eligible → selected | math 23→23, code 40→25, database 75→25, actions 55→25 | `docs/lic_dev_set_provenance.md:52-57` |
+| "4.0% is what the construction guarantees" | database had 75 items already at ≥60% error; only the top 25 kept, so the retained set is dominated by 5/5-wrong items | **F68** · `tasks/T24/worklog.md` §"pool selection" |
+| Gap-closure is roughly pool-independent | AC3-Reset closes 50% on this pool vs **51% / 60%** on the complete unselected pool (107/100) | **F68, F69** · `tasks/T24/worklog.md` §7.1 |
+| Denominators reconcile | 23−3=20 math, 25−6=19 code, 25−0=25 database, 25→23 actions (ad-hoc) | F43 · `tasks/T17/RESULTS.md` §1 |
+
+### Secondary exposure — two body sentences that currently imply the opposite
+
+Flagged in `tasks/T24/worklog.md` §"Secondary exposure" but **not** carried into HANDOFF's
+PAPER-9 line. Both contrast a "difficulty-selected subset" against "the default subset", which
+reads to any reviewer as *the default subset is not difficulty-selected*.
+
+**L328**, current:
+
+```latex
+with gains of +20--42pp on average on this difficulty-selected subset, across closed and open-weight architectures at different scales. Tables~\ref{tab:megatable} and~\ref{tab:wildchat} extend this picture beyond GPT-5-mini on the default subset:
+```
+
+replacement:
+
+```latex
+with gains of +20--42pp on average on that subset, across closed and open-weight architectures at different scales. Tables~\ref{tab:megatable} and~\ref{tab:wildchat} extend this picture beyond GPT-5-mini on the default subset (also difficulty-selected, but from GPT-5-mini rather than GPT-5.2 logs; Table~\ref{tab:main} caption):
+```
+
+**L139**, current:
+
+```latex
+Reset improves 15 of 16 model--task pairs on a difficulty-selected LiC subset (Table~\ref{tab:multi-model}), and the multi-respondent mega-table reproduces the ordering on the default subset.
+```
+
+replacement:
+
+```latex
+Reset improves 15 of 16 model--task pairs on a harder difficulty-selected LiC subset (Table~\ref{tab:multi-model}), and the multi-respondent mega-table reproduces the ordering on the default subset (itself difficulty-selected; see the Table~\ref{tab:main} caption).
+```
+
+One more, optional: **L513** (`app:multi-model-protocol`) says "we **re-ran** the subset selection
+protocol using GPT-5.2 LiC logs (instead of GPT-5-mini)", presupposing a protocol it never
+describes. With the caption above in place this now resolves, but a cross-reference is cheap:
+append `(the original protocol is described in the Table~\ref{tab:main} caption)` after
+"…instead of GPT-5-mini)".
+
+### Merged `tab:main` caption — PAPER-7 (7a) + PAPER-9 together (paste-ready)
+
+If you apply both in one pass, replace the whole of L254 with:
+
+```latex
+\caption{\textbf{Per-task LiC results (GPT-5-mini, accuracy \%).} \textbf{Instances are difficulty-selected}: from each task's full LiC pool (math 103, code 100, database 107, actions 105) we keep instances the GPT-5-mini full-context baseline answered incorrectly in at least 60\% of five independent baseline runs (four for code), then take the 25 with the highest error rate --- math yielded only 23 eligible instances and all are kept. The Baseline row is therefore close to a fixed point of that procedure rather than an independent estimate of GPT-5-mini's multi-turn accuracy, and its absolute level is not comparable to accuracies we report on unselected pools. Because the design-oracle rows are computed on the \emph{same} instances, the gap-closure percentages quoted in the text are measured against a same-pool ceiling rather than against 100\%. Cells shaded by score (darker $=$ higher). Indented \texttt{+ Memory} rows add the memory-based learner. $^{\diamond}$ marks \emph{design-oracle} baselines (collapsing multi-turn to single-turn by construction); \method \emph{exceeds} them in two cells marked $^{\dagger}$. $^{\ddagger}$ Gated-Reset row reports the mean over $N{=}3$ replay-mode reruns per cell (last-turn regen with fixed user-sim trajectory); other ours-rows are single-trial point estimates --- see Appendix~\ref{app:variance}. $^{\S}$ERGO was initially scored on the \emph{unfiltered} replay pools ($n{=}23/25/25/25$) while every other row used the pre-filtered pools ($n{=}20/19/25/23$); the row above places it on the same pools as every other row, which raises math from 69.6 to 80.0. Code is measured at 43.9 (essentially the published 44.0) and database is unaffected. The actions cell cannot be corrected --- no filter artifact has ever existed for that task --- so it is printed as the interval its unknown spans. Paired exact sign tests on the same items find \emph{no} ERGO-vs-\method{} difference in this table statistically distinguishable at $n{\approx}20$ in either direction (code $p{=}0.375$, math $p{=}1.00$); at this sample size the table does not settle these orderings. Multi-respondent results for LiC, CollabLLM, and tau2-bench are in Table~\ref{tab:megatable}; multi-respondent WildChat results are in Table~\ref{tab:wildchat}.}
+```
+
+### Effort / risk
+
+10–15 min. Mechanical once the corrected facts above are used. **Risk: none to the argument** —
+the mitigation is strong and is measured (gap-closure moves 50% → 51%/60% across a 52-point
+baseline spread, F68/F69). The only trap is pasting the drafted sentence with its two factual
+errors.
 
