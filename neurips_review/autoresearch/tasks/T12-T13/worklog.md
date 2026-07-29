@@ -221,34 +221,38 @@ Delta vs no memory: **−8.0 pp on average**; the best ordering only reaches par
 Instance-level instability: **8/25 (32%) of instances change correctness across orderings.**
 Paired, pooled over the four orderings: memory fixes 6 instance-runs, breaks 14; exact sign test p = 0.115.
 
-**This is an unflattering result and we should report it as one.** On the cell where the paper claims memory's largest LiC gain (+12.0 pp), under gpt-5.4-mini memory is (a) net harmful and (b) more sensitive to trajectory ordering than the effect size the paper attributes to it.
+**This is an unflattering result and we should report it as one.** On the cell where the paper claims memory's largest LiC gain (+12.0 pp), under gpt-5.4-mini memory is net harmful and its run-to-run spread is larger than the effect the paper attributes to it. *But see §6.6 before attributing the spread to ordering specifically — the variance controls say most of it is not ordering.*
 
 ### 6.2 T12 — order sensitivity, LiC-math (n=20)
 
 Reference: **Augment, no memory = 80.0% (16/20)** — an exact match to the paper's Table-1 Augment/math cell (16/20), so this venue replicates too.
 
-| Ordering | correct | raw | FN-adjusted |
-|---|---:|---:|---:|
-| ord0 | 16/20 | 80.0% | 84.2% (1 user-sim-induced excluded) |
-| ord1001 | 17/20 | 85.0% | 85.0% |
-| ord1002 | 16/20 | 80.0% | 84.2% (1 excluded) |
-| ord1003 | 16/20 | 80.0% | 80.0% |
+| Ordering | correct | accuracy |
+|---|---:|---:|
+| ord0 | 15/20 | 75.0% |
+| ord1001 | 16/20 | 80.0% |
+| ord1002 | 15/20 | 75.0% |
+| ord1003 | 14/20 | 70.0% |
 
-**Mean ± std = 81.2 ± 2.5 pp (raw); 83.4 ± 2.3 pp (FN-adjusted).** Delta vs no memory +1.2 pp.
-Instance-level instability: 2/20 (10%). Sign test on pooled pairs: 4 fixes / 3 breaks, p = 1.0.
+**Mean ± std = 75.0 ± 4.1 pp; range 70.0–80.0 (10 pp spread = 2 of 20 instances).** Delta vs no memory **−5.0 pp**.
+Instance-level instability: 4/20 (20%). Sign test on pooled pairs: 4 fixes / 8 breaks, p = 0.388.
 
-Math is near-ceiling for gpt-5.4-mini (baseline Augment already 80%), so both the memory effect and its order sensitivity are compressed. Consistent with the paper's own claim that memory helps only where headroom exists — but it also means math cannot discriminate, and the discriminating venue (database) is the one that came back negative.
+Math is near-ceiling for gpt-5.4-mini (Augment already 80%), so both the memory effect and its spread are compressed. Consistent with the paper's own claim that memory helps only where headroom exists — but note that the +10 pp gain the paper reports on this exact cell (80.0 → 90.0) does not reproduce; we measure −5.0 pp.
 
 ### 6.3 Cheatsheet divergence across orderings
 
-Same 25 (resp. 20) trajectories, different presentation order:
+Same trajectories, different presentation order:
 
 | Task / regime | words per cheatsheet | mean pairwise Jaccard (content words, len>3) |
 |---|---|---:|
 | database, online | 813 / 907 / 1060 / 1014 | **0.300** |
-| math, online | 1060 / 989 / 1075 / 932 | **0.320** |
+| database, offline | 920 / 804 / 921 / 806 | **0.302** |
+| math, online | 910 / 1056 / 1020 / 1082 | **0.319** |
+| math, offline | 821 / 947 / 777 / 765 | **0.309** |
 
-Qualitatively: the four cheatsheets **converge thematically and diverge operationally**. All four database cheatsheets open with the same headline principle — *rebuild the task spec from user turns only; treat the latest user turn as authoritative; do not let assistant framing enter the spec.* But the structure (flat bullet list vs. numbered sections vs. prose), the granularity, and the specific operative sub-rules differ substantially, which is what a 0.30 Jaccard means. So the learner reliably recovers the *gist* and unreliably recovers the *detail* — and it is the detail that is injected into the analyzer's Query 2 and drives the 16 pp accuracy spread.
+Qualitatively: the cheatsheets **converge thematically and diverge operationally**. All four database cheatsheets open with the same headline principle — *rebuild the task spec from user turns only; treat the latest user turn as authoritative; do not let assistant framing enter the spec.* But the structure (flat bullet list vs. numbered sections vs. prose), the granularity, and the specific operative sub-rules differ substantially, which is what a 0.30 Jaccard means. So the learner reliably recovers the *gist* and unreliably recovers the *detail* — and it is the detail that is injected into the analyzer's Query 2.
+
+Note that offline and online divergence are the same (0.30 both). Divergence is a property of the Reflect-then-Unify learner, not of the online protocol.
 
 ### 6.4 T13 — clean inductive split, LiC-database
 
@@ -271,19 +275,60 @@ Two things to note, both of which cut against a contamination explanation:
 
 Cheatsheet divergence in the offline regime matches the online regime (mean pairwise Jaccard **0.302**, 804–921 words), so ordering instability is a property of the **cheatsheet learner**, not of the transductive protocol.
 
-### 6.5 T13 — dose-response (free contamination probe from the online arms)
+### 6.5 T13 — clean inductive split, LiC-math
+
+Same protocol; cheatsheet learned offline from the 10 disjoint `lic_mem_learn_set` math trajectories (10/10 correct), frozen, applied to the 20-instance replay eval set. Clean subset = 17 (3 learn-set ids removed).
+
+| Ordering | all 20 | clean 17 | on the 3 overlapping ids |
+|---|---:|---:|---:|
+| ord0 | 16/20 = 80.0% | 14/17 = 82.4% | 2/3 |
+| ord1001 | 15/20 = 75.0% | 13/17 = 76.5% | 2/3 |
+| ord1002 | 14/20 = 70.0% | 12/17 = 70.6% | 2/3 |
+| ord1003 | 15/20 = 75.0% | 13/17 = 76.5% | 2/3 |
+| **mean ± std** | **75.0 ± 4.1** | **76.5 ± 4.8** | — |
+| no memory (reference) | 16/20 = 80.0% | 13/17 = 76.5% | **3/3** |
+
+**Clean-subset delta = +0.0 pp.** And again the anti-leakage signal is if anything inverted: the no-memory arm gets **3/3** on the three instances that *are* in the learn set, while every memory arm gets 2/3. Training on an instance made the system slightly *worse* on it.
+
+### 6.6 T13 — dose-response (contamination probe from the online arms)
 
 Accuracy by batch index, pooled over the four orderings (batch *b* is evaluated with a cheatsheet distilled from 5(*b*−1) **other** eval instances plus their gold answers):
 
 | batch | prior eval instances in memory | database | math |
 |---|---:|---:|---:|
-| 1 | 0 (empty cheatsheet) | 4/20 = 20.0% | 18/20 = 90.0% |
-| 2 | 5 | 7/20 = 35.0% | 17/20 = 85.0% |
-| 3 | 10 | 5/20 = 25.0% | 17/20 = 85.0% |
-| 4 | 15 | 7/20 = 35.0% | 13/20 = 65.0% |
+| 1 | 0 (empty cheatsheet) | 4/20 = 20.0% | 17/20 = 85.0% |
+| 2 | 5 | 7/20 = 35.0% | 16/20 = 80.0% |
+| 3 | 10 | 5/20 = 25.0% | 15/20 = 75.0% |
+| 4 | 15 | 7/20 = 35.0% | 12/20 = 60.0% |
 | 5 | 20 | 5/20 = 25.0% | — |
 
-No monotone increase in either task; math trends *down*. **There is no dose-response in exposure to other evaluation instances**, which is the strongest available evidence that the online LiC memory numbers are not driven by transductive leakage — the cheatsheet is not accumulating eval-set-specific knowledge, it is accumulating (increasingly stale, increasingly general) analyzer priors. That is exactly 5YHP's W6 hypothesis, and we can now say we measured it.
+The marginal math column looks like a monotone decline, but that is instance composition, not memory. **Controlling for instance identity kills it entirely.** Restricting to instances that appear both in batch 1 (empty cheatsheet) and in some later batch (loaded cheatsheet), and averaging within instance:
+
+| Task | instances observed in both positions | acc. with empty cheatsheet | acc. with loaded cheatsheet | paired |
+|---|---:|---:|---:|---|
+| database | 15 | 16.7% | 16.7% | 3 up, 2 down, 10 tied |
+| math | 14 | 78.6% | 78.6% | 1 up, 1 down, 12 tied |
+
+**Exactly zero within-instance effect on both tasks.** Exposing the cheatsheet to 5–20 other evaluation instances *together with their gold answers* changes accuracy on a held-fixed instance by 0.0 pp. This is the single most useful number for W6: it is a direct, well-controlled measurement that the transductive LiC memory protocol is not buying anything through eval-set exposure.
+
+### 6.7 Variance controls — how much of the spread is *ordering*?
+
+The across-ordering spread only means "order matters" if it exceeds what you get from re-running a *fixed* order. Two controls on LiC-database, both at n=25:
+
+| Control | what is held fixed | what is resampled | cells | mean ± std | range |
+|---|---|---|---:|---:|---|
+| **A** | frozen cheatsheet (`offline_ord0`) *and* ordering | assistant/analyzer sampling only | 4 | 29.0 ± 3.8 | 24.0–32.0 |
+| **B** | ordering (`ord0`) | cheatsheet relearned online + sampling | 3 | 25.3 ± 6.1 | 20.0–32.0 |
+| — | *(T12 online, for comparison)* | ordering **and** everything in B | 4 | 28.0 ± 6.5 | 20.0–36.0 |
+| — | *(T13 offline, for comparison)* | ordering **and** everything in B | 4 | 32.0 ± 8.6 | 24.0–44.0 |
+
+**Reading — and this is the correct interpretation of T12.** The across-ordering std (6.5) is essentially identical to the same-ordering-relearned std (6.1). Eval-sampling alone already accounts for 3.8. So:
+
+> Trajectory ordering does **not** add measurable variance on top of the cheatsheet learner's intrinsic run-to-run variance. The memory component *is* unstable — ~6 pp std at n=25 — but the instability is a property of the learner (Reflect-then-Unify at temperature 1.0 over ~10–25 trajectories), of which ordering is one interchangeable source of randomness among several, not a distinguished one.
+
+That is a *better* answer than either "order matters" or "order doesn't matter," and it is honest in the direction that costs us something: the memory effect the paper reports on LiC (+10 pp math, +12 pp database) is **smaller than this cell's noise floor**, and our N=4 re-measurement on a newer respondent returns −5.0 pp and −8.0 pp respectively. The Table-1 `+ Memory` rows are single trials and should not be read as establishing a memory gain.
+
+Controls were run only on database (the discriminating venue) to stay inside the compute budget; math's compressed spread (4.1 pp) is already at the level of database's eval-only noise, so a math control would not discriminate.
 
 ---
 
@@ -304,3 +349,59 @@ No monotone increase in either task; math trends *down*. **There is no dose-resp
 - `data/dev_math_train.json` and `data/dev_*_test.json` (referenced by `config/task/dev_*_{train,test}.yaml` and by `scripts/run_spec_curation_memory_experiment.sh`) **do not exist on disk**. The soft-attention spec-curation train/test split reported in appendix `app:soft-attention` is therefore not reproducible here; it is a separate, already-clean split and is not what W6 asks about, so it was not chased.
 - No memory snapshot (`*cheatsheet*.json`) exists anywhere on the machine (confirms RECON §B.4), so every cheatsheet in this task is freshly learned. The paper-era cheatsheets cannot be diffed against ours.
 - `cfg.seed` is inert on this harness; ordering had to be materialised as data files. Do not report these as "seeds" in the paper — report them as *recorded orderings*.
+- **Transient filesystem event at 11:30.** `run_controls.sh`'s last cell (`ctrlB_rep3`) died with `FileNotFoundError` on `data/dev_database_ord0.json` — a file that four earlier cells in the same minute had read successfully. Immediately afterwards the entire `T12-T13/data/` tree reappeared with mtime 11:30 on every entry including the directories. Cause not established (shared machine, several agents active; plausibly a mount/sync hiccup). The cell was simply re-run and succeeded. Flagged because it means *any* long chain on this box should be re-runnable and idempotent — both driver scripts here skip cells whose `run_summary.json` already exists, which is what made the recovery a one-liner.
+- Considered and rejected: evaluating on `data/lic_eval_subset.json` (0/120 overlap with the learn set, so no clean/contaminated split to compare) instead of the dev subsets. The dev subsets are what Table 1's memory rows are computed on, and they are the only sets with a non-trivial overlap to measure, so they are the right venue for the promised analysis.
+- Not run: code and actions venues. Database (largest reported memory delta, most headroom) and math (the headline `+ Memory` claim) were prioritised; code/actions would cost ~4× more per cell for the same qualitative answer.
+- Sample sizes are small (n=20–25 per cell, 4 orderings). §6.7 quantifies the resulting noise floor rather than papering over it. Any camera-ready claim about memory should either raise N substantially or be stated as a null.
+
+---
+
+## 9. Paste-ready tables
+
+### T12 — Memory order-sensitivity
+
+> **Memory order-sensitivity (LiC replay, gpt-5.4-mini, Augment + Memory).** Trajectory ordering varied over four recorded orderings (published order + `random.Random({1001,1002,1003}).shuffle`); everything else held fixed; cheatsheet rebuilt from scratch for each ordering; identical evaluation set throughout. *Control A* holds the cheatsheet and the ordering fixed and resamples only the assistant/analyzer; *Control B* holds the ordering fixed and relearns the cheatsheet. Across-ordering spread does not exceed Control B, so ordering is not a distinguished source of variance — the cheatsheet learner is simply high-variance at this scale.
+
+| Setting | Task | n | Orderings | Accuracy per ordering | **Mean ± std** |
+|---|---|---:|---:|---|---:|
+| Augment, no memory | database | 25 | — | 36.0 | 36.0 |
+| Augment + Memory, **online** (paper's LiC regime) | database | 25 | 4 | 20.0 / 28.0 / 28.0 / 36.0 | **28.0 ± 6.5** |
+| Augment + Memory, **offline** (frozen, disjoint learn set) | database | 25 | 4 | 24.0 / 28.0 / 44.0 / 32.0 | **32.0 ± 8.6** |
+| *Control A* — fixed cheatsheet + fixed order, resample eval | database | 25 | 1 | 24.0 / 28.0 / 32.0 / 32.0 | *29.0 ± 3.8* |
+| *Control B* — fixed order, relearn cheatsheet | database | 25 | 1 | 20.0 / 24.0 / 32.0 | *25.3 ± 6.1* |
+| Augment, no memory | math | 20 | — | 80.0 | 80.0 |
+| Augment + Memory, **online** | math | 20 | 4 | 75.0 / 80.0 / 75.0 / 70.0 | **75.0 ± 4.1** |
+| Augment + Memory, **offline** | math | 20 | 4 | 80.0 / 75.0 / 70.0 / 75.0 | **75.0 ± 4.1** |
+
+Cheatsheet spread across orderings (mean pairwise content-word Jaccard; 765–1082 words each): database online **0.300**, database offline **0.302**, math online **0.319**, math offline **0.309**. Instance-level instability (fraction of instances whose correctness changes across orderings): database **8/25 (32%)**, math **4/20 (20%)**.
+
+Artifacts: `outputs/T12_T13/{database,math}/{ref_nomem,mem_ord*,frozen_ord*,ctrlA_*,ctrlB_*}`; cheatsheets in `neurips_review/autoresearch/tasks/T12-T13/memories/{database,math}/`; orderings in `.../data/dev_{database,math}_ord*.json`; analysis `.../analyze.py`; log `.../worklog.md`.
+
+### T13 — Memory train/evaluation-split analysis
+
+> **Memory train/evaluation-split analysis.** Overlap between the designated memory learn set (`data/lic_mem_learn_set.json`, n=40) and each candidate evaluation set, by exact `task_id`, exact normalised `full_spec_q`, and token-set Jaccard near-duplicate detection. The clean-subset rows remove every evaluation instance that also appears in the learn set and re-report memory-on vs memory-off on the remainder.
+
+| Learn set vs. | n eval | Exact-dup | Near-dup (J ≥ 0.9) | Overlap rate |
+|---|---:|---:|---:|---:|
+| `lic_eval_subset.json` (canonical LiC eval set) | 120 | 0 | 0 | **0.0%** |
+| `lic_subset30.json` | 120 | 0 | 0 | **0.0%** |
+| dev subsets, pooled (the sets Table 1's `+ Memory` rows use) | 98 | 11 | 11 | **11.2%** |
+| — dev math / code / database / actions | 23 / 25 / 25 / 25 | 3 / 3 / 3 / 2 | same | 13.0 / 12.0 / 12.0 / 8.0% |
+
+| Clean-subset result (offline memory, frozen cheatsheet from the disjoint learn set) | Task | n clean | Memory off | Memory on (mean ± std over 4 orderings) | **Δ** |
+|---|---|---:|---:|---:|---:|
+| dev set minus learn-set ids | database | 22 | 36.4 | 31.8 ± 9.8 | **−4.5 pp** |
+| dev set minus learn-set ids | math | 17 | 76.5 | 76.5 ± 4.8 | **+0.0 pp** |
+| *the overlapping instances themselves* | database | 3 | 1/3 | 1/3 in all four arms | 0 |
+| *the overlapping instances themselves* | math | 3 | **3/3** | 2/3 in all four arms | −1 instance |
+
+Within-instance contamination probe (online regime, pooled over four orderings; compares the same instance evaluated with an empty cheatsheet vs. with a cheatsheet distilled from 5–20 *other* evaluation instances **and their gold answers**):
+
+| Task | instances observed in both positions | empty cheatsheet | loaded cheatsheet | **Δ** |
+|---|---:|---:|---:|---:|
+| database | 15 | 16.7 | 16.7 | **0.0 pp** |
+| math | 14 | 78.6 | 78.6 | **0.0 pp** |
+
+**Conclusion.** The split is clean where it matters (0% overlap with the canonical LiC eval set), the 11.2% overlap with the dev subsets confers no measurable advantage (identical or worse accuracy on exactly those instances), and the transductive online protocol used for Table 1 shows a 0.0 pp within-instance effect from eval-set exposure. **The memory benefit is not contaminated.** The reason it is not contaminated is unfortunately also the reason it is unimpressive on this respondent: on gpt-5.4-mini there is no memory benefit to contaminate (−8.0 pp online / −4.5 pp offline on database; −5.0 pp online / +0.0 pp offline on math), and the paper's reported +10/+12 pp are single-trial point estimates inside a ~6 pp noise floor.
+
+Artifacts: overlap computation reproducible from §3 (pure data, no API); clean-subset numbers from `outputs/T12_T13/{database,math}/{ref_nomem,frozen_ord*}` via `neurips_review/autoresearch/tasks/T12-T13/analyze.py`; training trajectories `outputs/T12_T13/{database,math}/train_traj`.
