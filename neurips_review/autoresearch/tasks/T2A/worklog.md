@@ -52,3 +52,181 @@ T2c showed math is where the analyzer leaks the gold answer, which would confoun
 **Decision D2 — replay source.** The phase-1 `valid_prefixes_htn50_52` pools, because (a) they are
 the paper's own prefixes, (b) they are already curated as *valid* (conversation reached the final
 turn), and (c) 150 database + 116 code prefixes is far more than `baseline_traces_v2`'s 25.
+
+---
+
+## 1. Design (t+20 .. t+100min)
+
+### 1.1 What "removed" and "kept" mean for AC3
+
+Read `src/ctx_editor/strategies/context_edit_v2.py` before designing the metric. AC3-Reset does
+**not** delete spans in place; when the analyzer fires it *replaces* the whole history with
+
+```
+system message (unchanged)
+[compacted conversation] = "# User Task Specification (So Far)" <- result.user_intent
+                           "# What Looks Right So Far"          <- result.aligned
+latest user message
+```
+
+`result.issues` is deliberately **not** re-injected (`_build_edited_context` docstring: "the point
+is to remove harmful content from context, not redescribe it").
+
+**Decision D3 — the unit of measurement is the context that actually reaches the assistant.**
+A span is **KEPT** iff its content appears in `user_intent ∪ aligned`; **REMOVED** otherwise.
+This is the causally relevant definition — it is exactly what the assistant does or does not see.
+(Note `context_edit_output.edited_context` logs `result.raw_output`, which *includes* `issues`;
+using that field would score every flagged pollutant as "kept". Anyone reproducing this must use
+`conversation_analysis.{user_intent,aligned}`, not `edited_context`.)
+
+### 1.2 Symmetric injection — the thing that makes the metric non-gameable
+
+Per the brief, removal rate alone is trivially gamed by an editor that deletes everything (and
+AC3-Reset *does* delete everything, then rebuilds). So every conversation receives **two** injected
+spans:
+
+* **one HARMFUL span** — false or phantom, ground truth by construction;
+* **one USEFUL span** — true and spec-consistent, ground truth by construction;
+
+both in the **identical surface frame**
+
+> `Quick note so we don't lose track of this: {claim} I'll carry that forward.`
+
+Frame therefore carries **zero label information**: a detector cannot score by noticing "an
+injected-looking sentence", because half the injected sentences are the ones it must keep.
+
+Each span carries a **rare anchor token** verified absent from the entire pre-injection
+conversation body (all user + assistant messages), so the probe is a deterministic substring test
+with no judge and no paraphrase sensitivity. The clean arm measures each anchor's spontaneous
+base rate.
+
+The two spans in one conversation always concern **different referents** (different columns /
+different test inputs), so they never contradict each other and give the game away. Positions are
+two distinct assistant messages, order counterbalanced, never the final assistant message (replay
+strips that one).
+
+### 1.3 Injection taxonomy — grounded in *observed* failure modes
+
+Sources: `docs/reports/post_neurips_r2_rewrite_analysis.md` (F1–F7, labelled taxonomy, n=48),
+`docs/reports/database_actions_analysis.md` (Spider error taxonomy, 21 database errors),
+`docs/reports/code_task_analysis.md`, `docs/lic_failure_mode_report.md` (LiC F.1–F.4).
+
+| Type | Label | Task | Mirrors | n |
+|---|---|---|---|---|
+| `H_PHANTOM_COL` | harmful | database | **F4 "Overfit requirements"** — 10/12 = 83% of observed database rewrite failures; and the #1 real Spider error ("SQL correct but returns extra columns", 12/21) | 67 |
+| `H_WRONG_EXEC_FACT` | harmful | database | **F2 "Anchored on partial wrong work"**; a *partially* true claim (true row count, false value) | 14 |
+| `H_PHANTOM_PARAM` | harmful | code | **F4+F5** — phantom parameters + wrong return type, 10/12 = 83% of observed code rewrite failures | 44 |
+| `H_WRONG_TEST` | harmful | code | **F2**; false expected output for a real input | 20 |
+| `U_EXEC_FACT` | useful | database | correct executed-query fact (row count + a真 value). Obtainable only by running the gold SQL against the restored Spider DB | 81 |
+| `U_TRUE_TEST` | useful | code | a real benchmark public test case | 42 |
+| `U_TRUE_SIG` | useful | code | the true graded interface — mirrors **F5 "Schema/detail lost"**, and LiC code's documented "Missing Function Signatures" mode. Unambiguously necessary state | 22 |
+
+**Pair designs**, alternated so both are ~half the corpus:
+* **MATCHED** (n=34) — harmful and useful make the *same kind of claim* about *different
+  referents*, one false one true. Claim type, frame, length and position are held fixed; only the
+  truth value differs. The tightest test.
+* **MIXED** (n=111) — phantom-requirement harmful (the dominant observed mode) + true useful.
+
+**Corpus: 145 conversations = 145 harmful spans + 145 useful spans** (database 81, code 64), built
+from the paper's own phase-1 replay prefixes, 2 conversation prefixes per task.
+
+### 1.4 Run matrix
+
+`data/t2a_injected/` and `data/t2a_clean/` (clean = byte-identical copies of the source prefixes,
+so both arms read through the same code path). Replay, `replay_turns=1`, so there is exactly one
+analyzer invocation per conversation and no compounding across turns.
+
+2 arms x {AC3-Reset (`context_edit_v2_no_gate`), Baseline} x {database_v2, code_v2} x {conv0, conv1}
+= **16 runs**, all under `outputs/T2A/` (trap 5: T2A-scoped output dir).
+Model `gpt5_4_mini_trapi` + `load_balancer=trapi`, `execution.max_concurrent=5`,
+`false_negative_analysis.model=gpt-5.4-mini_2026-03-17` (trap 1).
+
+Smoke test (3 database samples, injected, AC3) passed at 12:23: 1 `conversation_analysis` +
+1 `edit_decision(should_edit=True)` + 1 `context_edit_output` per sample, all populated.
+In all 3, the harmful anchor was absent from the carried-forward context and 2/3 were named
+explicitly in `issues`. Notably the **useful** anchors were also absent in all 3 — the preservation
+side is clearly not going to be a free pass, which is the point of measuring it.
+
+Matrix launched 12:31.
+
+---
+
+## 2. Scorer + positive controls (t+100 .. t+130min)
+
+### 2.1 Probe
+
+`measure.py::hit()` — identifier-shaped anchors get identifier boundaries
+(`(?<![A-Za-z0-9_])X(?![A-Za-z0-9_])`, case-insensitive), punctuated anchors (list/dict literals
+like `[1, 2, 6, 24, 15]`) use a whitespace-normalised substring test. No model, no judge.
+
+### 2.2 A bug I found in my own first probe, and the fix
+
+The first version used a plain substring test at measurement time but a `\b`-word-boundary test at
+injection time. The two disagree, and PC2 caught it immediately: **PC2 scored 0.938 instead of
+1.000** — 5 database conversations where deleting the injected span by hand still left the anchor
+"present". Causes: `Museum_ID` matching inside `Museum_IDs`; `area_code` inside `AREA_CODE_STATE`;
+`Advisor` inside `advisors`; and a Spider column literally named `note`, which collides with the
+word "note" in my own injection frame.
+
+**This is exactly the failure the brief warned about** — a scorer that silently returns a number
+instead of erroring. Without PC2 the removal rate would have been quietly overstated.
+
+Fix: one shared boundary-aware `hit()`, plus a mechanical **probe-admissibility** check
+(`anchor_clean`) applied identically to the harmful and the useful side, rejecting a conversation
+if either anchor (a) survives in the body once both injections are stripped, (b) collides with the
+shared frame or with the partner span, or (c) is a 1–2 character numeric literal (too common to be
+a reliable probe). **19 of 145 conversations excluded, 126 admissible.** The excluded set is
+reported and the full set is also reported as a robustness row.
+
+### 2.3 Positive controls — all four pass (n = 126, offline, zero API calls)
+
+| control editor | removal | preservation | expected | pass |
+|---|---|---|---|---|
+| PC1 identity — no edit at all | 0.000 | 1.000 | 0 / 1 | PASS |
+| PC2 oracle — harmful span deleted by hand | 1.000 | 1.000 | 1 / 1 | PASS |
+| PC3 nuke — empty context | 1.000 | 0.000 | 1 / 0 | PASS |
+| PC4 delete-both | 1.000 | 0.000 | 1 / 0 | PASS |
+
+PC1 proves the probe fires when the span is present, so 0% removal is reachable and a low number
+would be visible. PC2 proves a hand-removed span scores as removed *and* that removal is separable
+from preservation. PC3/PC4 show that a delete-everything editor scores **100% removal and 0%
+preservation** — i.e. removal rate alone is gameable and preservation is precisely what stops it.
+
+Also checked per run cell: `metrics.json` accuracy == `run_summary.json` accuracy (trap 5).
+
+12:55 — matrix at cell 2/16 (~2.5 min per AC3 database cell).
+
+*(correction: the timestamp on the line above was written from a stale clock — the matrix reached
+cell 2/16 at 12:29, not 12:55.)*
+
+---
+
+## 3. Interim readout (12:44, 8/16 matrix cells complete)
+
+Computed live off the finished AC3 and Baseline **injected** cells, admissible probes only:
+
+| task | n | gate opened | removal | preservation | harmful span named in `issues` | AC3 acc | Baseline acc |
+|---|---|---|---|---|---|---|---|
+| database | 80 | 78 | 77/80 (96.3%) | 2/80 (2.5%) | 66/80 (82.5%) | 57.5% | 13.8% |
+| code | 46 | 46 | 46/46 (100%) | 3/46 (6.5%) | 33/46 (71.7%) | 78.3% | 76.1% |
+
+Three things follow, and I am recording them before the remaining cells land so the interpretation
+is not fitted to the final numbers:
+
+1. **Removal is near-ceiling (96–100%)** — as expected for an editor that resets. On its own this
+   is close to uninformative, which is exactly why the brief demanded preservation.
+2. **The analyzer names the injected span explicitly in `issues` in 72–83% of conversations.** This
+   is the part that is *not* explainable by "it deletes everything": a reset editor would score 100%
+   removal while naming nothing. Flagging rate is the honest detection signal for a resetting editor.
+3. **Preservation is very low (2.5% / 6.5%).** AC3-Reset discards the injected *true* span almost
+   always. This is a real result and it partly contradicts the paper's "we preserve what's correct"
+   framing — but it is uninterpretable until we know whether the true span was worth anything. That
+   is what the factorial arms (`base_harm_only`, `base_use_only`, queued) are for: they measure the
+   causal value of each span on an unedited context, with no detector in the loop. If the useful
+   span's main effect is ~0 it is *true but inert*, and dropping it is not a defect.
+
+Queued behind the matrix: (a) the detector-free factorial (Baseline x {clean, harm_only, use_only,
+injected}), (b) an **AC3-Rewrite (S3)** arm, which compacts instead of resetting and is therefore
+the natural control for "is the removal rate just an artifact of deleting everything?".
+`experiment.strategy.analysis_cache_dir=null` is forced on the Rewrite runs — the shipped config
+points at `outputs/analysis_cache`, built with a different model/prompt (RECON unknown #9).
