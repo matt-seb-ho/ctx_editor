@@ -205,13 +205,160 @@ Because the bias is one-directional, v1's numbers are **conservative for the pap
 (over-calling leakage shrinks the `NO_LEAK` subset and dilutes the `LEAKS` subset with
 non-leaky samples) — but 61% agreement is not good enough to report, hence v2.
 
-### Round 2 — prompt v2
+### Round 2 — prompt v3, held-out draw: **10/24 exact, 11/24 binary**
 
-(filled in below)
+Fresh stratified draw (2 per task × label, seed 99), excluding every record used in round 1 or
+quoted in a prompt. I adjudicated before reading the judge's justification.
+
+| task | exact | binary |
+|---|---|---|
+| math | 3/6 | 3/6 |
+| database | 2/6 | 2/6 |
+| code | 3/6 | 4/6 |
+| actions | 2/6 | 2/6 |
+| **total** | **10/24 (42%)** | **11/24 (46%)** |
+
+**12 of the 13 disagreements are again over-calls.** The residual failure modes:
+- the analyzer states a *wrong* final value and the judge scores it as a leak
+  (`sharded-GSM8K/315`: analyzer says "the final answer should remain 16", gold is 14;
+  `sharded-spider-val-671` conv0: analyzer writes `SELECT Earnings FROM poker_player;`, gold is a
+  join returning `Name`; `sharded-HumanEval/88`: analyzer guesses ascending, gold is descending);
+- requirement transcription on `actions` (`BFCL/parallel_132`: the four `calculate_average`
+  argument lists are literally the four number sets the user typed);
+- the analyzer endorsing the assistant's own already-correct artifact.
+
+One under-call, again on math: `sharded-GSM8K/1166`, where `<aligned>` contains
+"50 + 150 + 350 + 800 + 0 + 1000 = 2350" and gold is 2350.
+
+**Conclusion: the raw 3-way judge label is not reliable enough to report.** But the error is
+one-directional, so the `NO_LEAK` *label* is a high-precision filter even though the judge's
+recall for `NO_LEAK` is poor. That is the quantity the analysis actually depends on, so I
+measured it directly.
+
+### Round 3 — precision of the `NO_LEAK` label (the load-bearing quantity)
+
+24 records **all labelled `NO_LEAK` by v3** (6 per task, seed 555, disjoint from rounds 1-2),
+hand-adjudicated for whether the injected text really withholds the answer:
+
+| task | correct `NO_LEAK` | errors |
+|---|---|---|
+| math | 4/6 | `GSM8K/117` ("the final calculation (6 pairs × $60 = $360)", gold 360); `GSM8K/420` (borderline — "simply added the three numbers ($5,000 + $4,000 + $8,000)", gold 17000, recipe not evaluated) |
+| database | 6/6 | — |
+| code | 6/6 | — |
+| actions | 6/6 | — |
+| **total** | **22/24 (92%)** | |
+
+Pooling with the 8 `NO_LEAK` records that fell in the round-2 draw: **29/32 = 91%**
+(Wilson 95% CI [76%, 97%]). Every error is on math.
+
+An objective, model-free cross-check agrees: of the 62 math records v3 called `NO_LEAK`, the
+numeric probe finds the analyzer-derived gold number in 15 (24%), bounding math `NO_LEAK`
+precision at ≤76%. On `database`/`code`/`actions` there were no hand-validation errors at all.
+
+### Decision D6 — do not report the raw judge label as the primary split
+
+Three detectors of the same underlying event, in increasing strictness:
+
+1. **judge 3-way** (`LEAKS`∪`PARTIAL`) — high recall, poor precision → an **upper bound** on
+   leakage, and a **conservative** definition of the `NO_LEAK` stratum.
+2. **answer-verification pass** (`answer_check.py`, `prompt` in that file) — re-examines only the
+   records the judge flagged, asking one narrow, checkable question: does the analyzer output
+   state a value/artifact that *matches the ground truth*? Verdicts
+   `CORRECT_ANSWER_STATED` / `WRONG_ANSWER_STATED` / `NOT_STATED`. This is what caught the
+   wrong-answer over-calls: of 170 math records judged `LEAKS`, only 92 state the correct answer,
+   52 state a wrong one, 26 state none; of 45 `code` `LEAKS`, **2**; of 26 `database` `LEAKS`, **0**.
+3. **model-free numeric probe** — math only, no model in the loop.
+
+**`leak_final` = LEAK iff (answer verified `CORRECT_ANSWER_STATED`) OR (math ∧ probe-derived).**
+A union of two independent detectors, so it is high-recall for leakage and the resulting
+`NO_LEAK` stratum is conservative. The two detectors converge on math (38% vs 40%), which is
+the only place both apply — a useful validation of each.
+
+Everything is reported under **both** `leak_final` (primary) and `leak_judge` (secondary), and
+they agree on the direction and significance of every headline row.
 
 ---
 
 ## 6. Results
 
-(filled in below)
+Full tables: [`RESULTS.md`](RESULTS.md), regenerable with
+`.venv/bin/python neurips_review/autoresearch/tasks/T2c/final_tables.py`.
+Artifact for every number: `~/ac3/recovered_t2c/ctx_editor/outputs/post_neurips_ac3_phase1/`
+(extracted from `~/ac3/blob_staging/snapshot.tar.gz`; the on-disk
+`outputs/post_neurips_ac3_phase1/` has only `winners.json`).
+
+### 6a. Leakage base rate
+
+| task | n analyzer outputs | judge `LEAKS`∪`PARTIAL` (upper bound) | **answer verified correct (strict)** | model-free probe |
+|---|---|---|---|---|
+| math | 144 | 110 (76%) | **54 (38%)** | 57 (40%) |
+| code | 106 | 33 (31%) | **0 (0%)** | n/a |
+| database | 147 | 25 (17%) | **1 (1%)** | n/a |
+| actions | 150 | 14 (9%) | **3 (2%)** | n/a |
+| **all** | **547** | **182 (33%)** | **58 (11%)** | — |
+
+### 6b. Paired AC3-vs-Baseline split by leakage — strict definition
+
+| subset | n | Baseline | AC3-Reset | Δ (pp) | 95% CI | W/L | McNemar p |
+|---|---|---|---|---|---|---|---|
+| math+code+database, all | 397 | 43.1% | 64.5% | +21.4 | [+16.4, +25.3] | 110/25 | <0.0001 |
+| &nbsp;&nbsp;**NO_LEAK** | **329** | 36.5% | 57.1% | **+20.7** | [+14.8, +25.3] | 93/25 | **<0.0001** |
+| &nbsp;&nbsp;LEAK | 68 | 75.0% | 100.0% | +25.0 | [+15.8, +25.0] | 17/0 | <0.0001 |
+| math, NO_LEAK | 77 | 68.8% | 66.2% | **−2.6** | [−11.9, +7.6] | 8/10 | 0.815 |
+| math, LEAK | 67 | 76.1% | 100.0% | +23.9 | [+14.6, +23.9] | 16/0 | <0.0001 |
+| code, NO_LEAK | 106 (all) | 32.1% | 62.3% | **+30.2** | [+20.3, +34.7] | 36/4 | <0.0001 |
+| database, NO_LEAK | 146 | 22.6% | 48.6% | **+26.0** | [+16.5, +32.4] | 49/11 | <0.0001 |
+| actions, NO_LEAK | 147 | 76.2% | 83.0% | +6.8 | [−0.5, +12.6] | 20/10 | 0.099 |
+
+Gated-Reset replicates: NO_LEAK n=311, 35.0% → 54.7%, **+19.6pp** [+13.8, +24.0], p<0.0001.
+
+Under the conservative judge label the same rows read: NO_LEAK n=229, **+24.5pp**
+[+17.3, +29.6] versus LEAK n=168, +17.3pp — i.e. the gain is *larger* on the non-leaking
+subset under that definition too.
+
+### 6c. What this means
+
+- **Code and database — the two tasks with AC3's largest headline gains — have essentially no
+  answer leakage at all (0/106 and 1/147).** Their +30.2pp and +26.5pp are therefore fully
+  attributable to context editing. This is the strongest single fact for 5YHP.
+- **Math is the exception and should be conceded.** 38-40% of math analyzer outputs contain the
+  analyzer's own derived gold answer, and math's entire +9.7pp gain sits on that subset
+  (+23.9pp on LEAK, −2.6pp on NO_LEAK). This is not surprising in hindsight: to say "your total
+  of 3,270 is wrong because year 9 is 0" on a GSM8K item you have to compute the right total.
+  Auditing and solving are not separable on short-answer arithmetic.
+- The **overall** picture holds: on 329 of 397 conversations nothing correct was leaked, and AC3
+  still gains **+20.7pp** there (p<0.0001).
+
+### 6d. Caveats to state honestly if these numbers are used
+
+1. **Post-treatment conditioning.** The leak label only exists in the AC3 arm, so the strata are
+   selected on an AC3-arm variable. They differ in difficulty: baseline accuracy is 36.5% on
+   NO_LEAK versus 75.0% on LEAK — the analyzer leaks on the *easy* items. The within-stratum
+   paired comparison is valid; the between-stratum comparison is not causal.
+2. **AC3 = 100% on the LEAK stratum is near-tautological** and should not be quoted as a result.
+3. **Single model, single benchmark family, one run per cell.** DeepSeek-V4-Flash on the LiC
+   replay matrix; the replay design makes the arms sample-matched, but there are no reps.
+   `outputs/rebuttal_random/` (gpt-5.4-mini, math only) was rejected as the primary source
+   because baseline sits at 87.5%.
+4. **`code` has no stored gold solution** (`ground_truth_a: null`; graded by hidden tests), so
+   its "leak" bar is "a complete correct implementation", judged from the problem statement.
+   A strict bar; the 0% should be read as "the analyzer never wrote the program", which is what
+   the hand-validation shows.
+5. **The 3-way judge label is noisy** (42% exact hand-agreement) and is reported only as an
+   upper bound / conservative alternative, never as the primary number.
+
+---
+
+## 7. Files
+
+| file | what |
+|---|---|
+| `extract_analyzer_outputs.py` | traces → `analyzer_outputs.jsonl` (1079 analyzer invocations, 4 arms) |
+| `numeric_probe.py` → `math_numeric_probe.json` | model-free gold-number probe for math |
+| `prompt_v2.txt`, `prompt_v3.txt` | leakage-classifier prompts (v3 is the one used) |
+| `classify_leakage.py` → `leak_labels_v{1,2,3}.jsonl` | 3-way LLM labels |
+| `answer_check.py` → `answer_check.jsonl` | answer-verification pass over judge-flagged records |
+| `paired_split.py` | sample-level paired McNemar / Wilson machinery |
+| `final_tables.py` → `leak_labels_final.jsonl`, `RESULTS.md` | final labels + rebuttal tables |
+| `make_tables.py` | earlier v3-only table builder (superseded by `final_tables.py`) |
 
