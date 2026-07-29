@@ -675,3 +675,202 @@ The $^{\diamond}$ label is a statement about the LiC \emph{construction} (each i
 **Effort:** 10 min. **Blocking:** no. **Risk:** none — this edit *strengthens* the paper's
 strongest LiC claim by giving it an unselected-pool replication.
 
+
+---
+
+## PAPER-6 — the false-negative appendix describes a procedure the code does not run ✅
+
+**Summary.** `app:false-neg` (L473–L480) says the FN classifier collates *"all user simulator
+messages"*. The code keeps only `role == "user"` entries from the stored trace, so on reset and
+rewrite arms — whose stored trace holds the *edited* context — it sees **1.00 user turns per
+sample** against **5.35** on baseline. Recomputing that metric per run therefore excludes 50–78%
+of an editing arm's failures against 9% for baseline. **The paper's `tab:main` is nonetheless
+safe**: its denominators come from a **pool-level pre-filter computed once on baseline traces and
+applied identically to every arm** — that is arm-symmetric and correct, and it must be
+**defended, not conceded**.
+
+**Blocking:** no; v5 is raw throughout. **Do before arXiv** — it moves published magnitudes
+elsewhere and the appendix as written invites exactly the wrong reading.
+
+### Verified on disk tonight (independent of T14)
+
+* `src/ctx_editor/identify_false_negatives.py`, `format_user_messages`:
+  `user_msgs = [m for m in messages if m.get("role") == "user"]` — **only** user-role messages,
+  from whatever trace it is handed.
+* `src/ctx_editor/execution/replay.py:21+`, `load_user_sim_induced_ids`: docstring states the IDs
+  are *"pre-computed by running `identify_false_negatives` on the baseline traces"* and loaded
+  from a sidecar.
+* `data/baseline_traces_v2/` contains `math_false_negatives.json`, `code_false_negatives.json`,
+  `database_false_negatives.json` — and **no actions sidecar**, confirming T17 §1a directly.
+
+### Location — `app:false-neg`, L478 and L480
+
+Current text (exact, L478 in full):
+
+```latex
+We account for this with a post-hoc false negative identification procedure applied to all tasks. For each instance where the assistant fails, we collate all user simulator messages and compare them against the original single-turn question. We query GPT-5 (prompt provided in supplemental materials) to determine whether the user simulator's messages, taken as a union, provide sufficient information to solve the original problem.
+```
+
+Replacement (paste-ready):
+
+```latex
+We account for this with a pool-level pre-filter, computed once and applied identically to every arm. For each instance where the \emph{full-context baseline} assistant fails, we collate the user-role messages of that baseline trace and compare them against the original single-turn question. We query GPT-5 (prompt provided in supplemental materials) to determine whether those messages, taken as a union, provide sufficient information to solve the original problem. The resulting per-task list of instance IDs is stored alongside the replay pool and every strategy is evaluated on the same reduced pool, which is why all rows of Table~\ref{tab:main} share the denominators $n{=}20/19/25/23$ (math $23{-}3$, code $25{-}6$, database $25{-}0$; the actions column is normalized to a common 23 samples, as noted in Appendix~\ref{app:variance}).
+
+We deliberately do \emph{not} recompute this classifier per run. A reset or rewrite arm stores the \emph{edited} context, in which the original user turns have been consolidated into a single specification message; the classifier would then see about one user turn per sample on those arms against about five on the full-context baseline, and would exclude their failures at a far higher rate. Computing the filter once on baseline traces removes that asymmetry by construction: it is a property of the \emph{instance}, not of the arm.
+```
+
+Then, current L480 first sentence:
+
+```latex
+Instances flagged as insufficient are excluded from accuracy calculations, as the assistant's failure is attributable to the evaluation setup rather than to context pollution or the intervention strategy.
+```
+
+Replacement:
+
+```latex
+Instances flagged as insufficient are excluded from the evaluation pool for \emph{all} arms, as the failure is attributable to the evaluation setup rather than to context pollution or the intervention strategy. All accuracies we report are raw accuracies on that common pool; we report no per-run adjustment of any kind.
+```
+
+### Evidence
+
+| Claim | Value | Finding | Artifact |
+|---|---|---|---|
+| Judge visibility asymmetry | **1.00** user turns/sample on AC3-Rewrite vs **5.35** on baseline | **F41** | `tasks/T14/RESULTS.md` |
+| Exclusion-rate asymmetry | 50–78% of failures excluded on reset arms vs **9%** on baseline | F28, F40 | `tasks/T14/{RESULTS.md,corrected_matrix.*}` |
+| Inflation magnitude | reset arms **+13.9 to +55.9 pp**; no-reset arms +0.2 to +6.5 | F41 | same |
+| Visibility isolated from judge-swap | second full re-judge: **+0.5%** on no-reset arms, **−48.9%** on reset arms | F41 | same |
+| `tab:main` denominators are sound | pool-level pre-filter reproduces 20/19/25/23 exactly; **defend, do not concede** | **F42, D13** | `tasks/T17/RESULTS.md` §1, PC1 (28/28 archived runs, 0 exceptions) |
+| Per-run adjustment's footprint in `tab:main` | at most 4 cells, ≤1 sample each; 2 of 4 favour prior work | F42 | same |
+
+**Cross-check with v5:** v5 concedes the per-run metric loudly in five places while **defending**
+the denominators. The replacement text above does both in the same paragraph, so the paper and the
+replies agree. T19 added an explicit rule (F50) forbidding the metric concession from bleeding
+into an admission that the denominators are wrong — the wording above respects it.
+
+**Effort:** 45 min, not the 2–3 h HANDOFF estimates: the paper never names `adjusted_accuracy`, so
+there is no metric to delete from any table — only the appendix description to correct.
+**Risk:** low. The only judgement is how loudly to state the asymmetry; the wording above states
+it as a design rationale rather than as a confession, which is both accurate and stronger.
+
+---
+
+## PAPER-5 — retract "preserve what's correct and remove what's harmful" ⚖ **JUDGEMENT CALL**
+
+**Summary.** T2B tested this causally on **natural** spans with no detector, judge or LLM anywhere
+in the label path, and it does not hold for **either** operator. Preservation of causally useful
+spans is **0% for both**; edit precision is **63.6% = the base rate for both**. The mechanism the
+evidence supports is *detect → discard the assistant side → rebuild the specification from the
+user side*. **Do not re-attribute the claim to AC3-Rewrite** — Rewrite is the *worse* of the two
+(keeps 0/66 probe-admissible spans against Reset's 5/66).
+
+**Blocking:** no — v5 already retracts it (`03_reviewer_5YHP.md:132`, `CHANGES.md` §11.1).
+**But the paper currently asserts it in six places, so after posting the paper contradicts the
+reply.** That makes PAPER-5 the highest-priority *non-blocking* item after PAPER-11.
+
+### The evidence, both directions
+
+| Question | Answer | Finding |
+|---|---|---|
+| Is natural pollution real? | **Yes, and concentrated.** Effect SD **0.155** vs a replicate-matched parametric null's 0.125 (2,000 sims, **p = 0.0085**); **16** large-effect spans (\|Δ\| ≥ 0.25) where the null predicts 9.3 (**p = 0.017**). Mean effect **+0.020** [−0.010, +0.048] — the typical span is inert; the phenomenon lives in a ~6% excess minority | **F65** |
+| Are the operators selective? | **No — neither.** Reset keeps **5/66** probe-admissible spans, Rewrite **0/66**. Removal on causally harmful spans **100% (7/7, both)**. Preservation on causally useful spans **0% (0/4, both)**. Edit precision **63.6% = the base rate for both**. Label-free aggregate agrees (Reset removed−kept **−0.014, p = 0.85**) | **F66** |
+| What survives and is still ours | Analyzer **names the injected pollutant in `issues` 78.6%** of the time (89.7% on the causally-harmful subset); the factorial gives Baseline clean 24.7% → **9.3%** with the pollutant → **AC3 59.8% with the pollutant still present**; **100% removal** of causally-harmful natural spans | F23, F26, **F66** |
+
+Artifacts: `tasks/T2B/{RESULTS.md,worklog.md,per_span.json,per_span_alignment.json}` (`289de75`),
+`outputs/T2B/`; earlier `tasks/T2A/{RESULTS.md,inject.py,measure.py}`, `outputs/T2A/`.
+**F25 is superseded by F66** — T2A's own first paragraph flagged synthetic salience as an
+upper-bound caveat, and the caveat turned out to be exactly right, so T2B *extends* T2A rather
+than contradicting it. That reconciliation is load-bearing and should ship with any rewrite.
+
+### Every location, with the current text
+
+| # | Line | Current text (exact substring) | Nature |
+|---|---|---|---|
+| 1 | **L110** (abstract) | `(3) edit the context to keep verified work and remove invalidated reasoning` | mechanical |
+| 2 | **L135** (intro) | `and then edits the conversation context (by augmenting it with the analysis, resetting it from the clean specification, or rewriting it) to keep verified work and remove invalidated reasoning` | mechanical |
+| 3 | **L151** (Fig. 2 caption) | `by rewriting the conversation to keep verified work and remove invalidated reasoning` | mechanical |
+| 4 | **L191** (Methods opening) | `compares the assistant's work against that clean specification, and rewrites the conversation to keep what is correct and remove what is harmful` | mechanical |
+| 5 | **L394** (Related Work) | `We instead treat context as \emph{heterogeneous}, distinguishing correct assistant work from polluting content.` | **the ERGO differentiation — authorial** |
+| 6 | **L405** (conclusion) | `mitigates multi-turn degradation by selectively curating rather than discarding context` | **authorial** |
+
+Two further sites depend on the decision but are *not* straightforwardly false:
+
+* **L174, the "Preservation" desideratum** (`$p_\theta(\text{correct} \mid C'_t) \geq
+  p_\theta(\text{correct} \mid U_t)$ whenever $A_{t-1}$ contains useful referential state`). This
+  is a **desideratum**, not a claim that AC3 achieves it. It can stand — but if it stands, the
+  paper should say somewhere that AC3 satisfies it *empirically on referential benchmarks* (the
+  tau2 AO-vs-AC3 contrast, WildChat) rather than *by selective span preservation*.
+* **L727** (`app:trajectories`): `The rewritten context preserves the correct diagnosis (Maven needs a JDK) while removing the flawed reasoning.` This is one qualitative trajectory and is accurate as an anecdote; it becomes misleading only if it is offered as the general mechanism.
+
+Also in the **outer repo**: `CLAUDE.md` §Project Overview carries the identical sentence
+(*"Unlike prior work that simply discards all assistant messages, we preserve what's correct and
+remove what's harmful"*), and `docs/project_motivation.md` develops it.
+
+### Mechanical replacements (safe to paste regardless of which framing option is chosen)
+
+**#1, L110:**
+
+```latex
+(3) edit the context to remove invalidated reasoning and rebuild the working specification from the user side
+```
+
+**#2, L135:**
+
+```latex
+and then edits the conversation context (by augmenting it with the analysis, resetting it from the clean specification, or rewriting it) so that the assistant continues from a specification rebuilt from the user's own messages rather than from its own invalidated reasoning
+```
+
+**#3, L151:**
+
+```latex
+by rebuilding the conversation around a user-grounded specification and dropping the invalidated reasoning
+```
+
+**#4, L191:**
+
+```latex
+compares the assistant's work against that clean specification, and then rebuilds the conversation around that specification rather than around the assistant's prior reasoning
+```
+
+### ⚖ The authorial decision — #5 and #6
+
+T2B does not just retract a sentence; it **dissolves the differentiation from ERGO**. "Unlike prior
+work that discards all assistant messages, we are selective" was the paper's stated distinction,
+and T2B says we largely *do* discard them. Three coherent options, each internally consistent with
+the measured evidence. **Matthew's call — I am deliberately not choosing.**
+
+**Option A — differentiate on *what is rebuilt from*, not on selectivity.** ERGO resets by an LLM
+rewrite of prior **user** messages; AC3 consolidates a specification from the user side **and
+audits the assistant's work against it**, so the reset context carries an explicit statement of
+what was verified and what was invalidated. This is measurable and true: the analyzer names the
+injected pollutant 78.6% of the time, and the factorial shows AC3 reaching 59.8% *with the
+pollutant still in context* against a clean baseline of 24.7%.
+*Cost:* the paper stops claiming span-level selectivity, which several passages currently lean on.
+*Benefit:* nothing in it is at risk from a future ablation.
+
+**Option B — differentiate on *what is preserved at the artifact level*.** AC3 keeps an explicit
+`aligned` record of verified work, which blanket omission cannot; the claim becomes "we preserve
+the *conclusions* of correct assistant work, not its *text*". This is closer to the current
+framing and is what the Reset template actually does.
+*Cost:* it is untested. T2B measured span-level preservation, not conclusion-level. Making this
+claim would put a new unverified assertion in place of a retracted one — the exact failure mode
+D20 was written about.
+*Benefit:* least rewriting.
+
+**Option C — lead with the referentiality result and drop the selectivity framing entirely.** The
+paper's strongest surviving distinction is that AO collapses structurally where state lives in
+assistant turns (tau2 AO = 0% on 9/9 cells, 171 rollouts) while AC3 remains viable, and that AC3
+beats full context across LiC and WildChat. Selectivity becomes an implementation detail rather
+than the contribution.
+*Cost:* this is the largest rewrite and it converges with PAPER-11, which removes the far end of
+the same "spectrum of referentiality" narrative. **Do PAPER-5 and PAPER-11 in one sitting if you
+choose C.**
+*Benefit:* every claim in it is measured, and it survives the tau2 withdrawal unchanged.
+
+**One thing to avoid under any option.** Do not write "we preserve what is correct" about
+AC3-Rewrite. Rewrite is the *less* preserving operator (0/66 vs Reset's 5/66). F25 briefly
+suggested re-attribution and **F66 overturned it**; re-attributing would ship a claim that the
+best evidence we have contradicts.
+
+**Effort:** 30 min for #1–#4; 1–3 h for #5–#6 depending on option. **Blocking:** no, but the paper
+will contradict `03_reviewer_5YHP.md:132` until it is done.
+
