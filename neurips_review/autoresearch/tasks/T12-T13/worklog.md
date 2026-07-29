@@ -2,7 +2,7 @@
 
 **Owner:** autoresearch agent, overnight session 2026-07-29.
 **Deliverable for:** reviewer 5YHP, W6 commitment in `neurips_review/replies/v4/03_reviewer_5YHP.md`.
-**Status:** in progress (see Results at the bottom).
+**Status:** complete. Headline numbers in §6, paste-ready tables in §9.
 
 ---
 
@@ -70,7 +70,7 @@ Note `include_full_spec_q=true include_ground_truth_a=true`: **the reflection st
 ## 2. Design decisions (and why)
 
 **Venue = LiC-database, dev set (n=25), replay on `data/baseline_traces_v2/database`.**
-Reasons: (a) it is the exact cell that produces the paper's largest memory delta (+12.0pp, 32.0 → 44.0), so an order-sensitivity result there is maximally load-bearing; (b) it is far from ceiling (baseline FC 4.0%), unlike LiC-math under gpt-5.4-mini which saturates; (c) replay is one-turn regeneration, so a 25-sample cell costs ~$0.25 and ~3 min, which is what makes 4 orderings × 2 regimes affordable. LiC-math (n=23) is run as a second venue for cross-task confirmation.
+Reasons: (a) it is the exact cell that produces the paper's largest memory delta (+12.0pp, 32.0 → 44.0), so an order-sensitivity result there is maximally load-bearing; (b) it is far from ceiling (baseline FC 4.0%), unlike LiC-math under gpt-5.4-mini which saturates; (c) replay is one-turn regeneration, so a 25-sample cell costs ~$0.25 and ~3 min, which is what makes 4 orderings × 2 regimes affordable. LiC-math is run as a second venue for cross-task confirmation (n=20: `dev_math_subset` has 23 rows but only 20 have baseline traces in `data/baseline_traces_v2/math`, and replay drops unmatched samples).
 
 **T12 measures the online regime, not an offline one.** The brief says "vary only the trajectory ordering ... rebuild the cheatsheet each time". In the online regime the trajectory ordering *is* the sample ordering, since each evaluated instance also becomes a training trajectory. Shuffling the data file therefore does exactly the required manipulation, and it perturbs the protocol that actually generated the published numbers. `BatchedRunner._batches` (`src/ctx_editor/execution/batched.py:72`) slices `problems` in list order and `load_samples` (`run_experiment.py:87-110`) preserves data-file order through filtering, so data-file order == batch order. Verified by reading, not assumed.
 
@@ -246,17 +246,17 @@ Same trajectories, different presentation order:
 | Task / regime | words per cheatsheet | mean pairwise Jaccard (content words, len>3) |
 |---|---|---:|
 | database, online | 813 / 907 / 1060 / 1014 | **0.300** |
-| database, offline | 920 / 804 / 921 / 806 | **0.302** |
+| database, offline | 782 / 750 / 773 / 718 | **0.290** |
 | math, online | 910 / 1056 / 1020 / 1082 | **0.319** |
 | math, offline | 821 / 947 / 777 / 765 | **0.309** |
 
 Qualitatively: the cheatsheets **converge thematically and diverge operationally**. All four database cheatsheets open with the same headline principle — *rebuild the task spec from user turns only; treat the latest user turn as authoritative; do not let assistant framing enter the spec.* But the structure (flat bullet list vs. numbered sections vs. prose), the granularity, and the specific operative sub-rules differ substantially, which is what a 0.30 Jaccard means. So the learner reliably recovers the *gist* and unreliably recovers the *detail* — and it is the detail that is injected into the analyzer's Query 2.
 
-Note that offline and online divergence are the same (0.30 both). Divergence is a property of the Reflect-then-Unify learner, not of the online protocol.
+Note that offline and online divergence are the same (0.29-0.32 in all four cells). Divergence is a property of the Reflect-then-Unify learner, not of the online protocol.
 
 ### 6.4 T13 — clean inductive split, LiC-database
 
-Cheatsheet learned **offline** from the 10 disjoint `lic_mem_learn_set` database trajectories (generated end-to-end with Augment; 5/10 correct, `outputs/T12_T13/database/train_traj`), then **frozen** and applied to the same 25-instance replay eval set. Four cheatsheets, one per training-trajectory ordering.
+Cheatsheet learned **offline** from the 10 disjoint `lic_mem_learn_set` database trajectories (generated end-to-end with Augment; 9/10 correct, `outputs/T12_T13/database/train_traj`), then **frozen** and applied to the same 25-instance replay eval set. Four cheatsheets, one per training-trajectory ordering.
 
 | Ordering of training trajectories | all 25 | clean 22 (learn-set ids removed) | on the 3 overlapping ids |
 |---|---:|---:|---:|
@@ -273,7 +273,7 @@ Two things to note, both of which cut against a contamination explanation:
 - The 3 instances that *are* shared between the learn set and the eval set score **1/3 in every single condition, including no-memory**. If the cheatsheet had memorised them we would expect them to be the easy wins; they are not.
 - Removing the 3 overlapping instances moves the number by ≤ 1.3 pp in every cell. There is no clean/contaminated gap to speak of.
 
-Cheatsheet divergence in the offline regime matches the online regime (mean pairwise Jaccard **0.302**, 804–921 words), so ordering instability is a property of the **cheatsheet learner**, not of the transductive protocol.
+Cheatsheet divergence in the offline regime matches the online regime (mean pairwise Jaccard **0.290**, 718–782 words), so ordering instability is a property of the **cheatsheet learner**, not of the transductive protocol.
 
 ### 6.5 T13 — clean inductive split, LiC-math
 
@@ -373,7 +373,7 @@ Controls were run only on database (the discriminating venue) to stay inside the
 | Augment + Memory, **online** | math | 20 | 4 | 75.0 / 80.0 / 75.0 / 70.0 | **75.0 ± 4.1** |
 | Augment + Memory, **offline** | math | 20 | 4 | 80.0 / 75.0 / 70.0 / 75.0 | **75.0 ± 4.1** |
 
-Cheatsheet spread across orderings (mean pairwise content-word Jaccard; 765–1082 words each): database online **0.300**, database offline **0.302**, math online **0.319**, math offline **0.309**. Instance-level instability (fraction of instances whose correctness changes across orderings): database **8/25 (32%)**, math **4/20 (20%)**.
+Cheatsheet spread across orderings (mean pairwise content-word Jaccard; 718–1082 words each): database online **0.300**, database offline **0.290**, math online **0.319**, math offline **0.309**. Instance-level instability (fraction of instances whose correctness changes across orderings): database **8/25 (32%)**, math **4/20 (20%)**.
 
 Artifacts: `outputs/T12_T13/{database,math}/{ref_nomem,mem_ord*,frozen_ord*,ctrlA_*,ctrlB_*}`; cheatsheets in `neurips_review/autoresearch/tasks/T12-T13/memories/{database,math}/`; orderings in `.../data/dev_{database,math}_ord*.json`; analysis `.../analyze.py`; log `.../worklog.md`.
 
