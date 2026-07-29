@@ -548,3 +548,23 @@ This **extends** T2A rather than contradicting it, and the explanation is the im
 
 Also unanswerable as specified: the TODO's "close the loop" correlation has a **zero-variance predictor** — both operators removed 100% of harmful spans in all 6 qualifying conversations. Worth noting the TODO's design assumed variation that the method does not produce.
 - **19:24** Heartbeat tick. All 3 under threshold, no intervention. T24 worklog 7m with an `omit_assistant` process, consistent with its baseline-reconciliation work. T25 dispatched 18 min ago, no worklog yet. **T6 at 42 min** — approaching the threshold but with two `run_parallel.py` workers live, so the D5/D6 process check clears it; a breach next tick gets a nudge, not a restart. T6 is now the last experiment outstanding in the session. No dispatch, no pivot.
+
+- **19:30** `T24` returned **DONE**. Log: `tasks/T24/worklog.md`, commit `78226bd`.
+
+**F68 — H1 is fully explained, and the explanation is measured rather than argued.** All three baselines are correct measurements of deliberately different populations; the dominant term is **pool difficulty selection**, not model era, evaluator, or metric.
+
+| source | value | population |
+|---|---|---|
+| paper | 4.0 / 15.8 | GPT-5-mini, last-turn replay, `dev_{task}_subset` — **top-25 items by GPT-5-mini baseline failure rate** (≥60% error over 5 runs; 75 eligible → 25 kept, per `docs/lic_dev_set_provenance.md`). **4.0% = 1/25 is what the construction guarantees**, not an independent measurement. |
+| iNYK reply | 19.0–22.4 | three newer models, last-turn replay, `htn50_52` (top-50 by GPT-5.2 true-negative rate), **with replay prefixes deliberately weighted toward baseline failures** (74–86% on database, per `curate_valid_prefixes.py`). A floor by construction. |
+| T1 | 56.1 / 83.0 | gpt-5.4-mini, **full end-to-end** sharded simulation, the **complete unselected pool** (107/100). |
+
+**Verified by direct restriction, not inference:** restricting T1's own baseline run to the paper's exact 25 items — same model, evaluator, protocol — gives 56.1 → **32.0** (database) and 83.0 → **48.0** (code). Independently, LiC's released logs put GPT-5-mini at 29.9% on the whole 107-item pool vs 4.0% on its top-25 subset. **Two routes to a ~25 pp selection effect, agreeing within 2 pp.** No case of the same setup producing two numbers.
+
+**F69 — T1 still answers the Area Chair; no re-scoping needed.** T24 ran the ceiling arms T1 lacked. On the unselected pool the fully-specified single-turn ceiling is **94.4% database / 98.0% code** (positive control: LiC's own `full` band for this pool is 89.7–98.1%). So T1's venue carries a **38.3 pp / 15.0 pp** multi-turn gap, and AC3 closes **51% / 60%** of it — **the same fraction as on the paper's much harder pool (50%)**.
+
+That is the sentence that kills the objection: **baselines move 52 points across venues; gap-closure moves 4.** And condensation got no easy ride — it scores *below* full context in every venue.
+
+**F70 — ⚠️⚠️ Worse than H1, and found on the way: we answer iNYK's own complaint with a false statement.** `01_reviewer_iNYK.md:31` says the 36-comparison matrix is on "the full, non-difficulty-selected pool". **It is not.** Difficulty selection is precisely what iNYK complained about, and we assert the opposite about our new headline evidence. If a reviewer checks one claim in the rebuttal, this is the one they check.
+
+The fix is a straight swap rather than a retraction: **T1 is the experiment that genuinely satisfies the claim** (complete unselected pool, end-to-end). Draft replacement wording is in T24's §7. Routed to T25, which is already editing that tree — dispatching a second editor onto the same files would risk the double-write class of corruption we hit earlier tonight.

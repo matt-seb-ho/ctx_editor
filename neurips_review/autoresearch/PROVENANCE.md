@@ -50,7 +50,7 @@ graph TD
     T21["T21 apply wordings + AO N=3<br/>UNVERIFIED 4->1; AO margin<br/>+6.7pp -> +3.3pp (claim dropped)<br/>[done]"]
     T22["T22 operator handoff<br/>v5 drafted but NOT postable<br/>[done]"]
     T23["T23 red-team v5<br/>10 HIGH / 15 MED / 5 LOW<br/>found 52pp baseline spread<br/>[done]"]
-    T24["⚠⚠ T24 reconcile baselines<br/>[run] — does T1 still answer the AC?"]
+    T24["T24 reconcile baselines<br/>spread = pool selection, verified<br/>T1 STILL answers the AC<br/>found false iNYK claim<br/>[done]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
   S1 --> S2
@@ -79,6 +79,7 @@ graph TD
   T23 --> T24
   T2B -->|"supersedes Rewrite attribution"| T25
   T23 --> T25
+  T24 -->|"F70 false claim + reconciliation"| T25
   T1 -.->|"56.1% vs paper 4.0%"| T24
   T8 --> T21
   T11 --> T20
@@ -127,7 +128,7 @@ graph TD
 | T21 | Apply wordings + AO N=3 | 2026-07-29 | `tasks/T21/worklog.md` (`99e28ba`, `89dfecf`) | UNVERIFIED 4→1; AO N=3 narrows Reset-over-AO to +3.3 pp → claim dropped |
 | T22 | Operator handoff | 2026-07-29 | `autoresearch/HANDOFF.md` (`11d8e40`) | 14 must-change claims; PAPER-1..8 with effort estimates |
 | T23 | Red-team `replies/v5/` | 2026-07-29 | `tasks/T23/RED_TEAM.md` | 30 items; **found the 52 pp baseline spread the accuracy audits missed** |
-| T24 | Reconcile the three baselines | 2026-07-29 | `tasks/T24/worklog.md` | H1 — whether T1 still answers the AC |
+| T24 | Reconcile the three baselines | 2026-07-29 | `tasks/T24/worklog.md` (`78226bd`) | **H1 explained by pool selection (~25 pp, two routes); T1 still answers the AC; found F70** |
 | T2B | Counterfactual span ablation | 2026-07-29 | `tasks/T2B/{RESULTS.md,per_span.json}` (`289de75`) | **Causal gold standard: pollution concentrated (~6%); both operators non-selective** |
 | T25 | Retract Rewrite claim + assemble case | 2026-07-29 | `tasks/T25/worklog.md` | Supersedes PAPER-5; executes RED_TEAM's four-move plan |
 
@@ -141,6 +142,7 @@ graph TD
 | "AC3 beats ERGO across LiC" (as an unqualified claim) | `[dead]` | Corrected denominators: ERGO/math 80.0 beats AC3-Reset (75.0) and ties Gated-Reset. **Superseded in part by T18** — see next row. |
 | T17's corrected ERGO/code = 57.9 | `[dead]` | T18 measured the free parameter k directly (2.67/6, not 0/6): corrected ERGO/code is ~43.9 ≈ the published 44.0. Shipping 57.9 would have overstated a competitor by 14 pp. Measured scorecard 3/12, not 7/12. |
 | "AC3-Reset beats assistant omission on BigCodeBench" | `[dead]` | T21: AO at N=3 is 18.3 ± 5.8, narrowing the margin from +6.7 pp to +3.3 pp (13/60 vs 11/60) — inside noise, and the arms succeed on partly different problems. v5 rests on AC3-Reset over *full context* (+15 pp, 3/3) instead. |
+| "The three baselines are inconsistent" (red-team H1) | `[dead]` | T24: all three are correct measurements of different populations, dominated by pool difficulty selection. Restricting T1's own run to the paper's 25 items reproduces 32.0/48.0; LiC's logs give the same ~25 pp effect independently. Gap-closure is stable at 50–60% across venues. |
 | Striking the "72–92%" WildChat range as unverifiable | `[dead]` | T20 re-derived all 22 `tab:wildchat` cells from per-turn judge verdicts — 22/22 reproduce to the digit; the range is their exact rounded envelope. T11's corrections touch no Table 3 cell. v5 was giving away a defensible number. |
 | U2 struck "because not order-balanced" | `[dead]` | Wrong reason — it invites "so re-judge it". Real reason is non-significance: matched-35-turn gap rests on 7 discordant turns, 6 vs 1, exact McNemar p = 0.125. |
 | Framing the ERGO comparison as an ordering at all | `[dead]` | T18: paired exact sign tests show **no** ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction (code p=0.375, math p=1.00). Report "n≈20 cannot resolve this" rather than any ordering. |

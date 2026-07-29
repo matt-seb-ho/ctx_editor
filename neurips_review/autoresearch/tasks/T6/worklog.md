@@ -588,3 +588,21 @@ termination mechanism confirmed in the smoke test, the paper's "AO -> 0% everywh
 claim is the single most solidly reproduced result in the whole tau2 row. It is also
 the strongest evidence the harness is scoring honestly: the same code path that
 returns a hard 0 for AO returns 68-79% for Baseline on the same tasks in the same run.
+
+## 19:32 UTC — 14/15 cells at full 60/60. Backfill complete.
+
+Re-invoked the four cells that had errored rollouts; resume filled every gap except one
+(`s3 unseat_sim_card`, the Azure content-filter rejection, which is deterministic —
+and it succeeded on the retry after all, so the matrix is clean). Backfill ran at
+workers=2 into the same output dirs; resume skipped 58-59 existing traces each time.
+
+Only `dsv4f_foundry_ao` still running (33/60). Everything else is 60/60, n=19/rep.
+
+### Near-final numbers — see final report for the full table.
+
+The headline that will not change: **on all three models, remeasured Baseline is at or
+above every AC3 arm, and the paired sign test finds AC3-Augment significantly *worse*
+than Baseline on all three** (gpt-5.4 -21.1 pp p=0.008; DSV4F -19.3 pp p=0.043;
+Kimi -21.1 pp p=0.012). Gated-Reset and Rewrite are directionally negative on all three
+but not significant. AO is -68 to -79 pp, p<0.0001, on all three — reproducing the
+paper exactly.
