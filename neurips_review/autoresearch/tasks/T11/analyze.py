@@ -120,6 +120,16 @@ def position_bias(rows, dim="quality", label=""):
                         if idx[(p, "ao_first")] == "var" and idx[(p, "var_first")] == "ao")
     inc_tie = len(inc) - inc_firstpos - inc_secondpos
 
+    # exact two-sided binomial (McNemar) test on the discordant pairs:
+    # H0 = judge is equally likely to flip toward first-position vs second-position
+    from math import comb
+    nn = inc_firstpos + inc_secondpos
+    kk = min(inc_firstpos, inc_secondpos)
+    if nn > 0:
+        p_exact = min(1.0, 2 * sum(comb(nn, i) for i in range(kk + 1)) / (2 ** nn))
+    else:
+        p_exact = float("nan")
+
     # per-seed / per-variant
     per = defaultdict(lambda: defaultdict(list))
     for p in both:
@@ -143,7 +153,7 @@ def position_bias(rows, dim="quality", label=""):
         "pA": picksA / tot * 100 if tot else 0, "pB": picksB / tot * 100 if tot else 0,
         "pTie": ties / tot * 100 if tot else 0,
         "n_inconsistent": len(inc), "inc_first_pos": inc_firstpos,
-        "inc_second_pos": inc_secondpos, "inc_tie_flip": inc_tie,
+        "inc_second_pos": inc_secondpos, "inc_tie_flip": inc_tie, "p_exact": p_exact,
         "cells": cells, "failures": fail_count(rows),
     }
 
@@ -206,7 +216,7 @@ def main():
         print(f"     P(pick A)={pb['pA']:.1f}%  P(pick B)={pb['pB']:.1f}%  tie={pb['pTie']:.1f}%")
         print(f"     inconsistent pairs n={pb['n_inconsistent']}: "
               f"always-first={pb['inc_first_pos']} always-second={pb['inc_second_pos']} "
-              f"tie-flip={pb['inc_tie_flip']}")
+              f"tie-flip={pb['inc_tie_flip']}  exact-binom p={pb['p_exact']:.2g}")
         for (var, seed), c in pb["cells"].items():
             print(f"       {var:8s} seed{seed}: n={c['n']:3d}  "
                   f"var2nd={c['ao_first']:5.1f}  var1st={c['var_first']:5.1f}  "

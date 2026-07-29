@@ -81,3 +81,33 @@ paper's claim actually rests on.
 ### 01:35 — DeepSeek order run complete (320/320, 0 failures)
 gpt-5-mini at 769/904, Kimi at 181/320. Launched the DeepSeek n=20 positive control.
 Added PABAK + Gwet's AC1 to `analyze.py` alongside raw agreement and Cohen's kappa.
+
+### 02:00 — Judge A (gpt-5-mini) position-bias run COMPLETE: 452 pairs x 2 orders = 904 judgements, 0 failures
+
+**Position bias IS present in the headline judge, and it is a SECOND-position (recency) preference.**
+
+| | variant presented 2nd | variant presented 1st | order-balanced | swap-consistency |
+|---|---|---|---|---|
+| all 452 pairs | 92.3% | 86.7% | **89.5%** | 90.3% |
+| AC3-Reset (s15), 3 seeds | 91.1 +/- 2.2 | 84.4 +/- 2.1 | **87.8 +/- 2.1** | |
+| AC3-Augment, 3 seeds | 93.4 +/- 2.6 | 89.0 +/- 2.0 | **91.2 +/- 2.1** | |
+
+Order effect = 5.5pp. Of 44 order-inconsistent pairs, 32 flip toward the second-presented
+response vs 8 toward the first (exact binomial **p = 1.8e-4**), so the bias is real, not noise.
+The other two judges lean the *other* way (first-position): DeepSeek +6.2pp toward first
+(13 vs 5, p = 0.096), Kimi +1.8pp (6 vs 4, p = 0.75). So it is a per-model idiosyncrasy,
+not a property of the prompt.
+
+**Crucially, this does not bias the headline.** `judge_pairwise` randomises A/B 50/50 per call,
+so the published number is an unbiased estimate of the order-balanced quantity in expectation.
+The corrected (explicitly order-balanced) numbers are Reset **87.8 +/- 2.1** vs published
+89.8 +/- 1.4, and Augment **91.2 +/- 2.1** vs published 92.1 +/- 1.3 — shifts of -2.0pp and
+-0.9pp, both within the judge's own run-to-run noise (agreement of this re-judge with the
+May-2026 stored verdicts: raw 88.5%, kappa 0.487, AC1 0.871). Headline conclusion unchanged.
+
+Cross-family (shared 160-pair subset, DeepSeek-V4-Flash): pooled raw agreement 87.5%,
+kappa 0.449, AC1 0.859; each judge's own order-balanced win-rate on that subset:
+gpt-5-mini 88.8% vs DeepSeek 85.6% — a 3.2pp difference, same conclusion.
+
+Positive control (DeepSeek, n=20 pairs x 2 orders): 36/40 good, 2 degraded, 2 tie, in both orders. ✅
+Still running: Kimi order run (230/320), gpt-5-mini self-consistency repeat, gpt-5-mini control.
