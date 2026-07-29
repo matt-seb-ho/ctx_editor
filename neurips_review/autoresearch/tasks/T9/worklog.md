@@ -206,3 +206,92 @@ as "user-sim-induced" on the AC3 arms but only 0-5 on Baseline, so adjusted accu
 a strategy-correlated way. **Headline metric for T9 is therefore raw accuracy on the full,
 identical sample set**, which keeps the pairing exact. Adjusted numbers are recorded per run in
 `run_summary.json` but are not used for the sensitivity claim.
+
+## 8. rep1 complete (2026-07-29 12:13 UTC) — audit + analysis
+
+### 8.1 Audit: did the swap actually take effect?
+
+Counted `conversation_analysis` log records per run dir and grouped by the `analyzer_model` field
+the strategy writes into every trace:
+
+```
+code_baseline                traces= 40 analyzer_calls={}
+code_ds_v4_flash             traces= 40 analyzer_calls={'DeepSeek-V4-Flash': 37}
+code_gpt4o_mini              traces= 40 analyzer_calls={'gpt-4o-mini': 37}
+code_gpt54mini               traces= 40 analyzer_calls={'gpt-5.4-mini_2026-03-17': 37}
+code_kimi_k26                traces= 40 analyzer_calls={'Kimi-K2.6': 37}
+code_llama70b                traces= 40 analyzer_calls={'Llama-3.3-70B-Instruct': 37}
+database_baseline            traces= 49 analyzer_calls={}
+database_ds_v4_flash         traces= 49 analyzer_calls={'DeepSeek-V4-Flash': 49}
+database_gpt4o_mini          traces= 49 analyzer_calls={'gpt-4o-mini': 49}
+database_gpt54mini           traces= 49 analyzer_calls={'gpt-5.4-mini_2026-03-17': 49}
+database_kimi_k26            traces= 49 analyzer_calls={'Kimi-K2.6': 49}
+database_llama70b            traces= 49 analyzer_calls={'Llama-3.3-70B-Instruct': 49}
+```
+Every arm used exactly one analyzer, and exactly the intended one. No cross-contamination, no
+silent fallback to a default, no cache reuse. `code` shows 37 rather than 40 analyzer calls in
+**every** arm identically (3 prefixes are too short to be analyzable), so the arms remain matched.
+This is the empirical complement to the §0 cache-key argument: even if the key had been wrong,
+this audit would have caught it.
+
+### 8.2 Analysis
+
+`.venv/bin/python neurips_review/autoresearch/tasks/T9/analyze_t9.py rep1`
+(full output cached at `/tmp/t9_rep1_tables.md`; statistical core = exact two-sided McNemar on
+discordant pairs + Wilson CI, lifted from `T2c/paired_split.py`). Pair key `(task, sample_id)`;
+conv is fixed at 0 so the T2c triple degenerates to a pair.
+
+**Paired vs Baseline, pooled over code+database (n=89, Baseline 23.6%):**
+
+| analyzer | family | AC3-Reset | Δ (pp) | 95% CI | W/L | McNemar p |
+|---|---|---|---|---|---|---|
+| `Kimi-K2.6` | Moonshot | 62.9% | **+39.3** | [+29.0, +42.6] | 37/2 | <0.0001 |
+| `DeepSeek-V4-Flash` (ref) | DeepSeek | 48.3% | **+24.7** | [+12.6, +31.8] | 28/6 | 0.0002 |
+| `gpt-5.4-mini_2026-03-17` | OpenAI | 47.2% | **+23.6** | [+11.6, +30.7] | 27/6 | 0.0003 |
+| `Llama-3.3-70B-Instruct` | Meta | 39.3% | **+15.7** | [+5.7, +21.1] | 18/4 | 0.0043 |
+| `gpt-4o-mini` | OpenAI | 34.8% | **+11.2** | [+0.9, +18.2] | 16/6 | 0.0525 |
+
+**Per task:**
+
+| analyzer | code (base 30.0%) | Δ | database (base 18.4%) | Δ |
+|---|---|---|---|---|
+| `Kimi-K2.6` | 72.5% | +42.5 (p=0.0001) | 55.1% | +36.7 (p<0.0001) |
+| `DeepSeek-V4-Flash` | 55.0% | +25.0 (p=0.021) | 42.9% | +24.5 (p=0.0075) |
+| `gpt-5.4-mini` | 45.0% | +15.0 (p=0.18) | 49.0% | +30.6 (p=0.0007) |
+| `Llama-3.3-70B` | 45.0% | +15.0 (p=0.15) | 34.7% | +16.3 (p=0.022) |
+| `gpt-4o-mini` | 45.0% | +15.0 (p=0.15) | 26.5% | +8.2 (p=0.34) |
+
+**Head-to-head vs the reference analyzer (DeepSeek-V4-Flash), pooled n=89:** Kimi +14.6
+(p=0.024), gpt-5.4-mini -1.1 (p=1.00), Llama-70B -9.0 (p=0.20), gpt-4o-mini -13.5 (p=0.058).
+So the two strong analyzers are statistically indistinguishable from each other, and the two weak
+ones lose roughly half the gain without ever going negative.
+
+### 8.3 Mechanism: *why* the weak analyzers lose gain
+
+Per-arm analyzer behaviour, medians over `conversation_analysis` / `context_edit_output` logs:
+
+| arm | n | `needs_edit` rate | median `issues` chars | median `edited_context` chars |
+|---|---|---|---|---|
+| code / DeepSeek-V4-Flash | 37 | 97.3% | 594 | 2072 |
+| code / gpt-5.4-mini | 37 | 94.6% | 985 | 2390 |
+| code / Kimi-K2.6 | 37 | 94.6% | 1081 | 2456 |
+| code / Llama-3.3-70B | 37 | 83.8% | 575 | 1895 |
+| code / gpt-4o-mini | 37 | 91.9% | 385 | 1888 |
+| database / DeepSeek-V4-Flash | 49 | 100.0% | 636 | 1658 |
+| database / gpt-5.4-mini | 49 | 98.0% | 639 | 1730 |
+| database / Kimi-K2.6 | 49 | 98.0% | 793 | 1726 |
+| database / Llama-3.3-70B | 49 | 85.7% | 576 | 1642 |
+| database / gpt-4o-mini | 49 | 65.3% | 239 | 1368 |
+
+The failure mode of a weak analyzer is **under-detection, not mis-detection**: on database,
+gpt-4o-mini declares `needs_edit` on only 65% of turns (vs 98-100% for the strong analyzers) and
+writes 2.7× shorter issue lists. It does not hallucinate spurious issues and drag accuracy below
+baseline — it simply notices less and therefore edits less, which is exactly the profile that
+produces a graceful, monotone degradation rather than a cliff. This is a useful rebuttal
+sentence: the analyzer's contribution is *recall of divergences*, and recall degrades smoothly
+with analyzer strength.
+
+### 8.4 rep2 launched
+
+Sampling replicate (temperature 1.0; **not** a seed — `seed=` is inert on LiC), same 12 cells,
+launched 12:13 UTC into `outputs/T9/rep2/`.
