@@ -346,6 +346,11 @@ subset under that definition too.
    the hand-validation shows.
 5. **The 3-way judge label is noisy** (42% exact hand-agreement) and is reported only as an
    upper bound / conservative alternative, never as the primary number.
+6. **7 of 113 `code` samples are excluded** from the split because the AC3 run never invoked the
+   analyzer on them (conversation ended before `min_turns`). Every other cell is complete:
+   math 144/144, database 147/147, actions 150/150. The excluded 7 are in the "all" row of the
+   published `code` accuracy (62.3% over 106 here vs the run-level figures over 113) — a
+   negligible difference, but stated for exactness.
 
 ---
 
