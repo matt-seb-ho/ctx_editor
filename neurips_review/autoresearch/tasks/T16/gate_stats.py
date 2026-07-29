@@ -361,6 +361,11 @@ def main() -> None:
             f" = **{pct(t['rate_sample_corrected'])}**"
         )
         print(
+            f"- gate-open, **conversation level** (gate opened on >=1 turn): "
+            f"{t['n_samples_open_any']}/{t['n_samples_analyzer_ran']}"
+            f" = **{pct(t['n_samples_open_any'] / t['n_samples_analyzer_ran'])}**"
+        )
+        print(
             f"- gate-open, LEGACY per-sample verdict / all-traces denominator: "
             f"{t['n_samples_open_last']}/{t['n_samples']}"
             f" = {pct(t['rate_legacy_sample'])}"
@@ -371,6 +376,7 @@ def main() -> None:
         print(table(legacy, ("task", "cell"), f"{bench} — {LEGACY_ARMS[bench]} by task x cell"))
         print(table(rows, ("strategy",), f"{bench} — all analyzer-bearing strategies"))
         print(table(rows, ("strategy", "task"), f"{bench} — strategy x task"))
+        print(issues_diagnostic(legacy, f"{bench} / {LEGACY_ARMS[bench]}"))
         report[bench] = {
             "headline_arm": LEGACY_ARMS[bench],
             "headline": t,
