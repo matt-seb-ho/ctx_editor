@@ -345,3 +345,173 @@ independent checks, both on rep1:
    edit on a third of turns where every strong analyzer edits. Note the empty-`issues` count
    equals the `needs_edit=False` count in every arm, i.e. "no issues found" is a *deliberate,
    well-formed* verdict, not a parse failure. That is under-detection, measured.
+
+### 8.6 rep2 progress 13:27 UTC — 5/6 arms done per task
+
+Raw counts, both replicates side by side (`llama70b` still running on both tasks):
+
+| task | arm | rep1 | rep2 |
+|---|---|---|---|
+| code | baseline | 12/40 (30.0%) | 10/40 (25.0%) |
+| code | kimi_k26 | 29/40 (72.5%) | 27/40 (67.5%) |
+| code | ds_v4_flash | 22/40 (55.0%) | 23/40 (57.5%) |
+| code | gpt54mini | 18/40 (45.0%) | 20/40 (50.0%) |
+| code | gpt4o_mini | 18/40 (45.0%) | 18/40 (45.0%) |
+| database | baseline | 9/49 (18.4%) | 7/49 (14.3%) |
+| database | kimi_k26 | 27/49 (55.1%) | 26/49 (53.1%) |
+| database | ds_v4_flash | 21/49 (42.9%) | 23/49 (46.9%) |
+| database | gpt54mini | 24/49 (49.0%) | 24/49 (49.0%) |
+| database | gpt4o_mini | 13/49 (26.5%) | 12/49 (24.5%) |
+
+Replicate-to-replicate spread is ≤5pp on every cell, and **the rank order of the analyzer ladder
+is identical in both replicates** on both tasks. The sensitivity curve is not a one-draw artifact.
+
+---
+
+## 9. FINAL RESULTS (both replicates complete, 2026-07-29 13:37 UTC)
+
+24 cells: 6 arms × 2 tasks × 2 replicate runs. Assistant fixed at `DeepSeek-V4-Flash` throughout;
+`model.ctx_editor.model` is the **only** thing that varies between arms. Last-turn replay on the
+phase-1 `conv0` prefix pools, strategy `context_edit_v2_no_gate` (AC3-Reset, always-on),
+`analysis_cache_dir=null`. Metric: raw accuracy over the full identical sample set (see §7 for
+why `adjusted_accuracy` is not comparable across arms here).
+
+Reproduce with:
+```bash
+.venv/bin/python neurips_review/autoresearch/tasks/T9/analyze_t9.py rep1     # per-replicate paired tables
+.venv/bin/python neurips_review/autoresearch/tasks/T9/analyze_t9.py rep2
+.venv/bin/python neurips_review/autoresearch/tasks/T9/summarize_reps.py rep1 rep2
+```
+Cached outputs: `/tmp/t9_rep1_tables.md`, `/tmp/t9_rep2_tables.md`, `/tmp/t9_reps.md`.
+
+### 9.1 DELIVERABLE — analyzer model × task
+
+Assistant = DeepSeek-V4-Flash (fixed). AC3-Reset, LiC last-turn replay, conv0 prefixes.
+Accuracy is mean ± std over **2 replicate runs at `temperature: 1.0`** (not seeds — `seed=` is
+inert on the LiC harness and no `seed=` override was used anywhere in T9).
+Artifact root: `outputs/T9/{rep1,rep2}/<task>_<arm>/`.
+
+| Analyzer model | Family | Task | AC3-Reset acc | Baseline acc | Δ (pp) | n (per rep) | Artifact |
+|---|---|---|---|---|---|---|---|
+| `Kimi-K2.6` | Moonshot | LiC-code | **70.0 ± 3.5** | 27.5 ± 3.5 | **+42.5** | 40 | `outputs/T9/rep{1,2}/code_kimi_k26` |
+| `DeepSeek-V4-Flash` (ref) | DeepSeek | LiC-code | **56.2 ± 1.8** | 27.5 ± 3.5 | **+28.8** | 40 | `outputs/T9/rep{1,2}/code_ds_v4_flash` |
+| `gpt-5.4-mini_2026-03-17` | OpenAI | LiC-code | **47.5 ± 3.5** | 27.5 ± 3.5 | **+20.0** | 40 | `outputs/T9/rep{1,2}/code_gpt54mini` |
+| `gpt-4o-mini` | OpenAI | LiC-code | **45.0 ± 0.0** | 27.5 ± 3.5 | **+17.5** | 40 | `outputs/T9/rep{1,2}/code_gpt4o_mini` |
+| `Llama-3.3-70B-Instruct` | Meta | LiC-code | **42.5 ± 3.5** | 27.5 ± 3.5 | **+15.0** | 40 | `outputs/T9/rep{1,2}/code_llama70b` |
+| `Kimi-K2.6` | Moonshot | LiC-database | **54.1 ± 1.4** | 16.3 ± 2.9 | **+37.8** | 49 | `outputs/T9/rep{1,2}/database_kimi_k26` |
+| `gpt-5.4-mini_2026-03-17` | OpenAI | LiC-database | **49.0 ± 0.0** | 16.3 ± 2.9 | **+32.7** | 49 | `outputs/T9/rep{1,2}/database_gpt54mini` |
+| `DeepSeek-V4-Flash` (ref) | DeepSeek | LiC-database | **44.9 ± 2.9** | 16.3 ± 2.9 | **+28.6** | 49 | `outputs/T9/rep{1,2}/database_ds_v4_flash` |
+| `Llama-3.3-70B-Instruct` | Meta | LiC-database | **36.7 ± 2.9** | 16.3 ± 2.9 | **+20.4** | 49 | `outputs/T9/rep{1,2}/database_llama70b` |
+| `gpt-4o-mini` | OpenAI | LiC-database | **25.5 ± 1.4** | 16.3 ± 2.9 | **+9.2** | 49 | `outputs/T9/rep{1,2}/database_gpt4o_mini` |
+
+**Pooled over code+database, paired per sample over both replicates (n = 178 matched pairs each,
+Baseline 21.3%), exact two-sided McNemar:**
+
+| Analyzer model | Family | AC3-Reset | Δ (pp) | W/L | McNemar p |
+|---|---|---|---|---|---|
+| `Kimi-K2.6` | Moonshot | 61.2 ± 2.4 | **+39.9** | 76/5 | 2.3e-17 |
+| `DeepSeek-V4-Flash` (ref) | DeepSeek | 50.0 ± 2.4 | **+28.7** | 64/13 | 3.0e-09 |
+| `gpt-5.4-mini_2026-03-17` | OpenAI | 48.3 ± 1.6 | **+27.0** | 61/13 | 1.4e-08 |
+| `Llama-3.3-70B-Instruct` | Meta | 39.3 ± 0.0 | **+18.0** | 41/9 | 5.6e-06 |
+| `gpt-4o-mini` | OpenAI | 34.3 ± 0.8 | **+12.9** | 34/11 | 8.2e-04 |
+
+### 9.2 Per-replicate raw counts (no means hiding anything)
+
+| task | arm | rep1 | rep2 |
+|---|---|---|---|
+| code | baseline | 12/40 | 10/40 |
+| code | kimi_k26 | 29/40 | 27/40 |
+| code | ds_v4_flash | 22/40 | 23/40 |
+| code | gpt54mini | 18/40 | 20/40 |
+| code | gpt4o_mini | 18/40 | 18/40 |
+| code | llama70b | 18/40 | 16/40 |
+| database | baseline | 9/49 | 7/49 |
+| database | kimi_k26 | 27/49 | 26/49 |
+| database | ds_v4_flash | 21/49 | 23/49 |
+| database | gpt54mini | 24/49 | 24/49 |
+| database | gpt4o_mini | 13/49 | 12/49 |
+| database | llama70b | 17/49 | 19/49 |
+
+Max replicate-to-replicate spread on any cell: 5pp. Ladder rank order identical across both
+replicates on both tasks.
+
+### 9.3 Mechanism, pooled over both replicates and both tasks (172 analyzer calls per arm)
+
+| Analyzer | analyzer calls | `needs_edit` rate | median `issues` chars | median `edited_context` chars |
+|---|---|---|---|---|
+| `Kimi-K2.6` | 172 | 95.9% | 891 | 2006 |
+| `DeepSeek-V4-Flash` | 172 | 99.4% | 613 | 1899 |
+| `gpt-5.4-mini` | 172 | 97.1% | 811 | 2001 |
+| `Llama-3.3-70B` | 172 | 87.8% | 578 | 1774 |
+| `gpt-4o-mini` | 172 | 74.4% | 326 | 1545 |
+
+`needs_edit` rate is monotone in the accuracy ladder except for the DeepSeek/Kimi swap at the top
+(where both are ≥96% and the difference is in *quality*, i.e. `issues` length, not *rate*).
+`user_intent` parsed on 100% of calls in every arm and `edited_context` was non-empty on 100% of
+applied edits (§8.5), so none of this is a parse artifact.
+
+### 9.4 Shape of the sensitivity curve
+
+**Graceful degradation, not collapse.** Across a ladder spanning four model families and a wide
+strength range, every analyzer produces a positive, individually significant gain over the
+full-context baseline: +39.9pp (Kimi-K2.6), +28.7pp (DeepSeek-V4-Flash), +27.0pp (gpt-5.4-mini),
++18.0pp (Llama-3.3-70B), +12.9pp (gpt-4o-mini), all p ≤ 8.2e-04 on n=178 matched pairs. The
+weakest analyzer in the ladder retains **32% of the reference analyzer's gain** and still beats
+Baseline by 12.9pp; no arm ever falls below Baseline, on either task, in either replicate. The
+two strong analyzers (DeepSeek-V4-Flash and gpt-5.4-mini) are statistically indistinguishable
+from one another (pooled head-to-head Δ = -1.1pp, p = 1.00 in rep1), so the top of the curve is
+flat and the degradation is concentrated at the weak end — the classic saturating-then-declining
+shape one wants from a robustness argument. The mechanism (§9.3) explains why it degrades
+smoothly rather than falling off a cliff: **weak analyzers under-detect rather than mis-detect.**
+gpt-4o-mini declines to edit on 25.6% of turns where the strong analyzers edit on ~97%, and when
+it does report issues it writes 2.7× less; it does not invent spurious issues that would corrupt
+the context and push accuracy below Baseline. AC3's requirement on its analyzer is therefore
+*recall of divergences*, which degrades continuously with model strength, not a threshold
+capability that is present or absent.
+
+**Not gpt-specific — and the non-gpt analyzers follow the same curve.** Three of the five
+analyzers are non-OpenAI (Moonshot, DeepSeek, Meta) and they occupy the top, middle, and lower
+rungs respectively, interleaving with the two OpenAI models rather than clustering. The single
+best analyzer in the whole sweep is `Kimi-K2.6` (Moonshot), which beats the paper's default
+gpt-5.4-mini analyzer by +12.9pp pooled; and the *weakest* arm is an OpenAI model, gpt-4o-mini.
+So the ordering is explained by analyzer capability, not by analyzer provenance: the same
+under-detection mechanism ranks Llama-3.3-70B (87.8% `needs_edit`) between gpt-5.4-mini (97.1%)
+and gpt-4o-mini (74.4%). AC3 is not a gpt-specific artifact, and — since the assistant here is
+also non-OpenAI (DeepSeek-V4-Flash) — this sweep contains no OpenAI model in any load-bearing
+role in its best-performing cell.
+
+### 9.5 Confidence and limitations
+
+- **Cache question: fully resolved, twice.** The key is analyzer-model-aware
+  (`analysis_cache.py:92`, `analyzer.py:587`), *and* I disabled the cache on every run, *and* the
+  per-trace `analyzer_model` audit (§8.1) shows each arm made 100% of its analyzer calls with the
+  intended model and no other. The curve is not a cache artifact. Confidence: high.
+- **n is modest** (40 + 49 per replicate, 178 matched pairs pooled). The pooled deltas vs Baseline
+  are strongly significant, but the *pairwise gaps between adjacent analyzers* are not all
+  individually significant (e.g. gpt-4o-mini vs Llama-70B). The claim I would defend in the
+  rebuttal is the **shape** (monotone, everywhere positive, no collapse) plus the two endpoints,
+  not the exact ordering of adjacent rungs.
+- **Two replicates, not three.** Std is computed over N=2, so it is an indication of spread, not a
+  proper variance estimate. Stated as such everywhere above.
+- **One assistant model.** The sweep varies the analyzer with the assistant pinned to
+  DeepSeek-V4-Flash, which is what the reviewer asked for; it does not test analyzer × assistant
+  interaction.
+- **One strategy.** AC3-Reset (always-on). Gated-Reset was not run; a weak analyzer under gating
+  would additionally be able to decline to fire, which on this evidence (gpt-4o-mini's 74%
+  `needs_edit`) would likely make it degrade *more* gently still, by editing less.
+- **Adjusted accuracy unusable here** (§7); raw accuracy on identical sample sets is the metric.
+
+### 9.6 Dead ends / notes for whoever picks this up
+
+- The chained rep2 launcher (`/tmp/t9_rep2_chain.sh`) appeared to exit immediately in the tool
+  log; it had in fact detached correctly and rep2 did start on schedule. Check `pgrep -af
+  run_t9_sweep` before concluding a background sweep died.
+- Throughput on `mgalley-foundry2` dropped ~6× (4 s/sample → 23 s/sample) between 11:00 and 12:40
+  UTC due to contention with the other overnight agents. Budget 20 min/arm, not 10, if others are
+  running.
+- `Phi-4` is listed on `mgalley-foundry2` at a 1 RPM cap — unusable as an analyzer for a
+  40-sample sweep. `Llama-3.3-70B-Instruct` (cap 10) was the practical "genuinely weak" rung and
+  worked fine.
+- `run_t9_sweep.sh` is idempotent (skips any arm with an existing `run_summary.json`), so a rep3
+  can be added with `bash run_t9_sweep.sh <task> rep3` and the analysis scripts take replicate
+  names as argv.
