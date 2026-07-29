@@ -200,3 +200,25 @@ All bigcodebench cells are consequently re-scored offline under one unified envi
 - **13:24** Heartbeat tick. All 3 healthy, no intervention. **T9's nudge worked** — worklog went from 46 min stale to 17 min. T2A at 17 min. T1 at 35 min but with live arms: `ac3_rewrite_v8_lic` and `context_edit_v2_gated`, i.e. the AC3-Rewrite and Gated-Reset comparison arms its brief asked for, so it has moved past the summariser arms into the AC3 side of the comparison.
 
   Scoreboard on the guardian mechanism: **five nudges tonight (T12-T13, T8 ×2, T1, T9), five responses, zero restarts.** Every case that tripped a staleness signal turned out to be a live agent mid-work, which is why the nudge-before-restart ordering (D5/D6) mattered — a restart-on-threshold policy would have destroyed T8's bigcodebench re-scoring and T9's in-flight rep2.
+
+- **13:50** `T9` returned **DONE**. Log: `tasks/T9/worklog.md` (commit `1f4f32d`). Clean, strongly positive, and it closes a question we were asked directly and had never answered.
+
+**F20 — The `analysis_cache` confound is resolved; it was never a threat.** `AnalysisCache.make_key()` includes the analyzer model identity (`src/ctx_editor/strategies/analysis_cache.py:92`), and the sole call site passes the live model (`src/ctx_editor/strategies/analyzer.py:587`, `analyzer_model=self.model`, Hydra-bound to `${model.ctx_editor.model}`). RECON's open Unknown #9 is closed. The agent nonetheless disabled the cache on every run *and* audited every trace to confirm each arm made 100% of its analyzer calls with the intended model — three independent guards on the one check that could have invalidated the whole task. This is the right level of paranoia for a load-bearing validity question.
+
+**F21 — Analyzer-model sensitivity: graceful degradation, not collapse.** Assistant pinned to DeepSeek-V4-Flash; only `model.ctx_editor.model` varies. Venue LiC code+database last-turn replay (Baseline 21.3% pooled — the headroom T2c identified; math deliberately avoided). AC3-Reset always-on so the analyzer fires every sample. 2 replicate runs at temperature 1.0 (**not** seeds). n=178 matched pairs, exact McNemar.
+
+| Analyzer | Family | AC3-Reset | Δ | p |
+|---|---|---|---|---|
+| Kimi-K2.6 | Moonshot | 61.2 ± 2.4 | **+39.9** | 2e-17 |
+| DeepSeek-V4-Flash (ref) | DeepSeek | 50.0 ± 2.4 | **+28.7** | 3e-09 |
+| gpt-5.4-mini | OpenAI | 48.3 ± 1.6 | **+27.0** | 1e-08 |
+| Llama-3.3-70B | Meta | 39.3 ± 0.0 | **+18.0** | 6e-06 |
+| gpt-4o-mini | OpenAI | 34.3 ± 0.8 | **+12.9** | 8e-04 |
+
+Every analyzer is positive and individually significant. The weakest retains 32% of the reference gain and still beats Baseline by 12.9 pp; **no arm falls below Baseline on either task in either replicate**. The top is flat — the two strongest are indistinguishable (Δ = −1.1 pp, p = 1.00).
+
+**The mechanism behind the curve is measured, not assumed:** weak analyzers **under-detect rather than mis-detect**. gpt-4o-mini declares `needs_edit` on 74.4% of turns vs ~97% for strong analyzers and writes 2.7× shorter issue lists, yet `user_intent` parsed on 100% of calls and `edited_context` was non-empty on 100% of applied edits. It notices less; it does not hallucinate issues that corrupt the context. That is exactly why the degradation is graceful, and it is a far better answer to Vg97 than a bare table.
+
+**F22 — The method is not gpt-specific, and the evidence is stronger than "it also works elsewhere."** Three of five analyzers are non-OpenAI and they occupy the top, middle and lower rungs, interleaving with the OpenAI models. The best analyzer overall is **Kimi-K2.6, +12.9 pp above the paper's own default**, and the *weakest* is an OpenAI model. Since the assistant is also non-OpenAI, the best-performing cell contains no OpenAI model anywhere.
+
+**Limits to state ourselves:** n = 40+49 per replicate; adjacent rungs are not individually separated — defend the *shape* and the *endpoints*, not the exact ordering. The ± is spread over N=2, not a variance estimate. One assistant, one strategy (no Gated arm). Baselines reproduced phase-1 to within 4 pp, so the harness is sound.

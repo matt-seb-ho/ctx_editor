@@ -31,13 +31,13 @@ graph TD
     BLK["BLOCK-spider<br/>Spider SQLite DBs recovered<br/>17/17 db_ids, test-suite semantics<br/>[done]"]
     RC["RECON<br/>harness map + operator naming<br/>[done] — found inert-seed bug"]
     T8["T8 CollabLLM N=3 replicates<br/>math-hard 100% DOES NOT replicate<br/>bigcodebench +15pp 3/3 survives<br/>[done]"]
-    T9["T9 analyzer-model sensitivity<br/>[run] — cache-key check first"]
+    T9["T9 analyzer-model sensitivity<br/>graceful degradation, all 5 positive<br/>non-gpt takes top rung<br/>[done]"]
     T2A["T2A Tier-A constructed pollution<br/>[run]"]
     T2C["T2c auditing vs re-solving<br/>+20.7pp on NO_LEAK subset<br/>math conceded<br/>[done]"]
     T1["T1 condensation baseline<br/>[run] — database+code, not math"]
     T11["T11 WildChat judge checks<br/>[todo]"]
     T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
-    T6["T6 multi-seed tau2<br/>[todo] — harness is an off-machine fork"]
+    T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
     T2B["T2B counterfactual span ablation<br/>[todo, gold standard]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
@@ -77,6 +77,8 @@ graph TD
 | T1 | Condensation baseline | 2026-07-29 | `tasks/T1/worklog.md` | Vg97 W1/Q1 + **AC "limited baselines"** |
 | T8 | CollabLLM 3 replicates | 2026-07-29 | `tasks/T8/worklog.md` | 5YHP — **math-hard 100% struck**; bigcodebench +15pp 3/3 + disjoint draw |
 | T2A | Tier-A constructed pollution | 2026-07-29 | `tasks/T2A/worklog.md` | 5YHP W5 detector story |
+| T9 | Analyzer-model sensitivity | 2026-07-29 | `tasks/T9/worklog.md` (`1f4f32d`) | Vg97 Q3 — **graceful degradation, +12.9 to +39.9 pp across 5 analyzers** |
+| T6 | Multi-replicate tau2 | 2026-07-29 | `tasks/T6/worklog.md`; fork at `~/ac3/tau2_ctxe` | iNYK — largest remaining statistical hole |
 
 ---
 
@@ -88,5 +90,6 @@ graph TD
 | Full human eval on WildChat | `[dead]` | Out of window. Defend with N=3 seeds + tight intervals; T11 supplies judge-side checks. |
 | T5 on math | `[dead]` as a discriminating control | Near-ceiling accuracy compressed all arms to ~97.5%. Needs a high-pollution venue → folded into T1. |
 | Quoting single-trial memory gains (+10/+12 pp) | `[dead]` | T12: below the learner's own ~6 pp noise floor; N=4 remeasure gives −5.0/−8.0 pp. Lead with T13's zero-contamination result instead (D7). |
+| `analysis_cache` as a T9 confound | `[dead]` | Resolved, not worked around: `make_key()` includes analyzer model identity (`analysis_cache.py:92`); call site passes live model (`analyzer.py:587`). Cache disabled anyway + per-trace audit. |
 | CollabLLM math-hard "100%" claim | `[dead]` | T8 N=3: 91.7 ± 7.6 vs Baseline 91.7 ± 5.8, identical 55/60 totals. Near-ceiling decoding noise. Say "matches Baseline" — still refutes the regression. |
 | "Memory is order-robust" framing | `[dead]` | T12 variance controls: across-ordering std (6.5) does not exceed same-ordering std (6.1). Ordering is not a distinguished factor; the learner is just noisy. |

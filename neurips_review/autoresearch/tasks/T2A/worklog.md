@@ -286,3 +286,55 @@ configured; I forced `analysis_cache_dir=null` on the AC3-Rewrite arm anyway bec
 default cache predates this model.
 
 This is precisely why the single-span factorial arms were queued. Running now.
+
+---
+
+## 5. The factorial resolves the surprise (13:24)
+
+Baseline (no editing at all) across all four arms, same 126 conversations, paired:
+
+| arm | useful span | harmful span | Baseline accuracy |
+|---|---|---|---|
+| clean | absent | absent | 27.8% (35/126) |
+| use_only | **present** | absent | **42.9%** (54/126) |
+| harm_only | absent | **present** | **16.7%** (21/126) |
+| injected | present | present | 36.5% (46/126) |
+
+- **Harmful span main effect: −11.1pp.** The injected pollution really does damage an unedited
+  context. No detector, no judge — this is a causal measurement, and it validates the Tier-A labels
+  the way Tier B was supposed to.
+- **Useful span main effect: +15.1pp.** The injected true span really is worth something. So the
+  4.0% preservation rate is *not* "AC3 correctly discarding inert filler": it is AC3 discarding
+  content that demonstrably helps a full-context assistant.
+
+### Per-type effects, and a correction I have to make to my own labels
+
+| type | n | Baseline clean → span present |
+|---|---|---|
+| `H_PHANTOM_COL` | 66 | 13.6% → 4.5% (**−9.1pp**) |
+| `H_PHANTOM_PARAM` | 31 | 48.4% → 19.4% (**−29.0pp**) |
+| `H_WRONG_EXEC_FACT` | 14 | 28.6% → 28.6% (**0.0pp**) |
+| `H_WRONG_TEST` | 15 | 46.7% → 53.3% (**+6.7pp**) |
+| `U_EXEC_FACT` | 80 | 16.2% → 20.0% (+3.8pp) |
+| `U_TRUE_TEST` | 24 | 50.0% → 75.0% (+25.0pp) |
+| `U_TRUE_SIG` | 22 | 45.5% → 90.9% (+45.5pp) |
+
+The two `*_WRONG_*` types are **false by construction but causally inert**. Calling them "harmful"
+is right as a factual matter and wrong as a causal one, and I am not going to quietly average them
+in. Section 5 of `RESULTS.md` therefore repeats the 2x2 on the **causally-validated** subset
+(`H_PHANTOM_*`, n=97), which is pollution defined the way Tier B defines it:
+
+- removal **96.9%**, preservation 5.2%, harmful span named in `issues` **89.7%**
+- Baseline clean 24.7% → Baseline with the pollutant **9.3%** (−15.5pp) → AC3 with the pollutant
+  present **59.8%**
+
+That is the mechanistic claim in one line: a span that costs the full-context assistant 15.5pp is
+detected by name 9 times in 10, removed 97 times in 100, and the assistant ends up at 59.8%.
+
+### Contrast arm: AC3-Rewrite (S3), which compacts instead of resetting
+
+Partial (n=22 so far): **removal 22.7%, preservation 27.3%**, harmful span named in `issues` 77.3%.
+A completely different operating point on the same 2x2 with the same probes — which is the
+strongest evidence that the metric is measuring something and is not saturated by construction.
+Note the analyzer *names* the pollutant at a similar rate (77.3% vs 78.6%) while the rewriter keeps
+it anyway: **detection and removal are separable, and the second stage is where Rewrite loses it.**

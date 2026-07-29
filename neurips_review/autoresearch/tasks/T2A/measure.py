@@ -258,6 +258,19 @@ def main():
     L = []
     P = L.append
     P("# T2A — Tier-A pollution detection (constructed pollution, no judge)\n")
+    P("""> **Read this first — these numbers are an upper bound, not a headline.**
+> The pollution measured here was *injected*, so its position, phrasing and self-containedness are
+> known to us and plausibly make it **more salient than naturally occurring pollution**. A detection
+> rate on constructed pollution is therefore a **sanity check and a ceiling**, not an estimate of
+> AC3's field performance. It answers exactly one question — *when a known-false span is definitely
+> present, does AC3 find and remove it, while leaving correct content alone?* — and nothing more.
+> The counterfactual span-ablation study (Tier B) is what would license a headline number.
+>
+> Two further limits, stated up front. (1) The injected spans use one shared surface frame, so they
+> are stylistically homogeneous in a way real pollution is not; the frame is used for the harmful
+> and the useful spans alike, which controls for "detector spots an injected-looking sentence" but
+> not for "injected sentences are easier to reason about". (2) Single model (gpt-5.4-mini), single
+> analyzer, one replay turn per conversation, no repeats.\n""")
     P(f"Conversations in manifest: **{len(per)}**; complete across all four run cells: "
       f"**{len(comp_all)}**; of those, **{len(comp)}** pass the mechanical probe-admissibility "
       f"check and form the primary analysis set.")
@@ -315,7 +328,9 @@ def main():
         P("")
         P(f"- **Pollution removal rate** = {pct(h_rm, n)}  [95% CI {100*lo:.1f}–{100*hi:.1f}%]")
         P(f"- **Preservation rate** = {pct(u_kp, n)}  [95% CI {100*lo2:.1f}–{100*hi2:.1f}%]")
-        P(f"- **Edit precision** = {pct(h_rm, h_rm + u_rm)}")
+        P(f"- **Edit precision** = {pct(h_rm, h_rm + u_rm)}  "
+          f"(chance = 50.0% by construction: exactly one harmful and one useful span per "
+          f"conversation, so an indiscriminate editor scores 50%)")
         P(f"- clean-arm spontaneous base rate: harmful anchor {100*h_base:.1f}%, useful anchor {100*u_base:.1f}%")
         P(f"- base-rate-attributable preservation = {100*att:.1f}%" if not math.isnan(att) else "")
         fl = sum(1 for r in rows if r.get(f"{tag}_h_flagged_in_issues"))
@@ -346,6 +361,19 @@ def main():
         P("\n### Contrast: AC3-Rewrite (S3), which *compacts* instead of resetting\n")
         block(rw, "AC3-Rewrite, all tasks", tag="rw")
 
+    if rw:
+        P("\n**Two editors, one 2x2, same probes** — the metric is not saturated by construction:\n")
+        P("| editor | removal | preservation | edit precision (chance 50%) | pollutant named in `issues` |")
+        P("|---|---|---|---|---|")
+        for tg, nm in (("ac3", "AC3-Reset (rebuilds context)"), ("rw", "AC3-Rewrite (compacts context)")):
+            rows = [r for r in comp if f"{tg}_injected_h_kept" in r]
+            n = len(rows)
+            hr = sum(1 for r in rows if not r[f"{tg}_injected_h_kept"])
+            uk = sum(1 for r in rows if r[f"{tg}_injected_u_kept"])
+            ur = n - uk
+            P(f"| {nm} | {pct(hr,n)} | {pct(uk,n)} | {pct(hr,hr+ur)} | "
+              f"{pct(sum(1 for r in rows if r.get(f'{tg}_h_flagged_in_issues')), n)} |")
+
     # ---- gate
     P("\n## 2. Gate accuracy (turn level)\n")
     P("| arm | n | gate opened (analyzer chose to edit) |")
@@ -370,8 +398,10 @@ def main():
     # ---- closing the loop
     P("\n## 3. Does removal predict accuracy?\n")
     if not comp:
+        P("(no complete conversations yet)")
         open(os.path.join(HERE, "RESULTS.md"), "w").write("\n".join(L) + "\n")
-        print("\n".join(L)); return 0
+        print("\n".join(L))
+        return 0
     P("| arm | Baseline (full context) | AC3-Reset | delta |")
     P("|---|---|---|---|")
     for arm in ("clean", "injected"):
@@ -379,6 +409,10 @@ def main():
         a = sum(1 for r in comp if r.get(f"ac3_{arm}_correct"))
         n = len(comp)
         P(f"| {arm} | {100*b/n:.1f}% ({b}/{n}) | {100*a/n:.1f}% ({a}/{n}) | {100*(a-b)/n:+.1f}pp |")
+    rwa = [r for r in comp if "rw_injected_correct" in r]
+    if rwa:
+        k = sum(1 for r in rwa if r["rw_injected_correct"])
+        P(f"\nAC3-Rewrite on the injected arm: {100*k/len(rwa):.1f}% ({k}/{len(rwa)}).")
     bc = sum(1 for r in comp if r.get("base_clean_correct"))
     bi = sum(1 for r in comp if r.get("base_injected_correct"))
     ac = sum(1 for r in comp if r.get("ac3_clean_correct"))
@@ -436,6 +470,67 @@ def main():
             cc = sum(1 for r in rows if r.get("base_clean_correct"))
             hh = sum(1 for r in rows if r.get("base_harm_only_correct"))
             P(f"  - `{k}` (n={m}): {100*cc/m:.1f}% -> {100*hh/m:.1f}% ({100*(hh-cc)/m:+.1f}pp)")
+
+    # ---- causally validated subset
+    if fac:
+        harm_eff = {}
+        for k in sorted({r["h_kind"] for r in fac}):
+            rows = [r for r in fac if r["h_kind"] == k]
+            m = len(rows)
+            cc = sum(1 for r in rows if r.get("base_clean_correct"))
+            hh = sum(1 for r in rows if r.get("base_harm_only_correct"))
+            harm_eff[k] = (hh - cc) / m
+        causal = [r for r in fac if harm_eff.get(r["h_kind"], 0) < -0.02]
+        P("\n## 5. Restricting to injections that are *causally* harmful\n")
+        P("Section 4 shows the two `*_WRONG_*` types are false by construction but **causally "
+          "inert** on an unedited context (0.0pp and +6.7pp). Labelling them 'harmful' is defensible "
+          "as a factual matter and indefensible as a causal one, so here is the 2x2 restricted to "
+          "the injection types whose measured main effect on the Baseline is negative — i.e. "
+          "pollution validated by causal effect, not by my say-so:\n")
+        P(f"Types retained: {sorted({r['h_kind'] for r in causal})}.")
+        block(causal, "causally-validated harmful injections")
+        if causal:
+            m = len(causal)
+            for lab, key in (("Baseline, clean", "base_clean_correct"),
+                             ("Baseline, harmful span only", "base_harm_only_correct"),
+                             ("AC3-Reset, harmful span present", "ac3_injected_correct")):
+                k = sum(1 for r in causal if r.get(key))
+                P(f"- {lab}: {100*k/m:.1f}% ({k}/{m})")
+
+    # ---- appendix: verbatim templates
+    P("\n---\n\n## Appendix A — verbatim injection templates\n")
+    P("Every injected span, harmful and useful, is wrapped in the **same** frame:\n")
+    P("```\n" + FRAME + "\n```\n")
+    P("`{claim}` per type, with a real instantiation drawn from the corpus:\n")
+    tmpl = {
+        "H_PHANTOM_COL": "you also need `{table}.{col}` included as an extra output column in the final result, and rows where `{table}.{col}` is NULL filtered out.",
+        "H_PHANTOM_PARAM": "the function also has to take a required `{param}` parameter and return a tuple `(result, {param})` rather than the bare result.",
+        "H_WRONG_EXEC_FACT": "I checked this against the data — the correct result has {n_true} row(s), and `{wrong_value}` is one of the values that must appear in the `{col}` column.",
+        "H_WRONG_TEST": "I checked the expected behaviour — for the input `{input}` the function must return `{wrong_output}`.",
+        "U_EXEC_FACT": "I checked this against the data — the correct result has {n_true} row(s), and `{true_value}` is one of the values that must appear in the `{col}` column.",
+        "U_TRUE_TEST": "I checked the expected behaviour — for the input `{input}` the function must return `{true_output}`.",
+        "U_TRUE_SIG": "the graded interface is `{starter_code}` — the function must be named `{func}` and take exactly those arguments.",
+    }
+    seen = {}
+    for r in man.values():
+        for side in ("harmful", "useful"):
+            seen.setdefault(r[side]["kind"], (r["sample_id"], r[side]["text"], r[side]["why"]))
+    for k in ("H_PHANTOM_COL", "H_PHANTOM_PARAM", "H_WRONG_EXEC_FACT", "H_WRONG_TEST",
+              "U_EXEC_FACT", "U_TRUE_TEST", "U_TRUE_SIG"):
+        if k not in seen:
+            continue
+        sid, txt, why = seen[k]
+        lab = "HARMFUL" if k.startswith("H_") else "USEFUL"
+        P(f"\n**`{k}` — {lab}.** {why}\n")
+        P(f"- template: `{tmpl[k]}`")
+        P(f"- instance (`{sid}`): {txt}")
+    P("\nSlot values are filled deterministically: schema columns and foreign keys from the Spider "
+      "DDL, executed-result values by running `reference_sql` against the restored Spider SQLite "
+      "database, test cases from the benchmark's `public_test_cases`, signatures from "
+      "`starter_code`. Wrong variants are produced by a fixed `corrupt()` function (integer +7, "
+      "last list element +7, final character substituted for proper nouns). Nothing is authored by "
+      "a model, so a reviewer can regenerate every span from "
+      "`neurips_review/autoresearch/tasks/T2A/inject.py`.")
 
     open(os.path.join(HERE, "RESULTS.md"), "w").write("\n".join(L) + "\n")
     print("\n".join(L))
