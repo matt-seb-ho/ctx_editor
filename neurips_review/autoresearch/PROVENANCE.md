@@ -42,7 +42,11 @@ graph TD
     T25["T25 retract Rewrite claim<br/>+ assemble AO counter-case<br/>H2-H8,H10 applied<br/>[done]"]
     T26["T26 refresh HANDOFF<br/>[done]"]
     T27["T27 triage MEDIUM items<br/>M3/M11/M12/M15 run, M6/U-Fold declined<br/>caught 2 FALSE red-team fixes<br/>[done] $19.60"]
-    T28["T28 apply T27 wordings<br/>+ inoculate RED_TEAM<br/>[run]"]
+    T28["T28 apply T27 wordings + inoculate<br/>RED_TEAM + tau2 withdrawal<br/>[done]"]
+    T29["T29 final HANDOFF<br/>found PAPER-11<br/>[done]"]
+    T30["T30 coherence pass<br/>8 fixes; v5 coherent<br/>[done]"]
+    T31["T31 paper edit spec<br/>[run]"]
+    T32["T32 resolve J1/J2<br/>[run]"]
     T15["T15 claims audit -> replies/v5<br/>64 claims: 24 unchanged, 14 corrected,<br/>6 struck, 11 added, 5 unverified<br/>[done]"]
     T16["T16 verify gate stats<br/>claim exact; wording wrong<br/>firing rate != detection rate<br/>[done]"]
     T14["⚠ T14 FN-adjustment audit<br/>2 flips on Rewrite (unpublished cells)<br/>Reset/Gated survive all 8<br/>found ERGO denominator defect<br/>[done]"]
@@ -143,6 +147,10 @@ graph TD
 | T27 | Triage MEDIUM red-team items | 2026-07-29 | `tasks/T27/worklog.md` (`6396b31`) | **M11 closes the AC's reservation; caught 2 false red-team fixes**; M15 CI [+11.5, +19.4] |
 | T28 | Apply T27 wordings + inoculate RED_TEAM + **unseal HOLDs / withdraw tau2** | 2026-07-29 | `tasks/T28/worklog.md` | Prevents the two false fixes; lands D21 |
 | T6 | Multi-replicate tau2 (N=3) | 2026-07-29 | `tasks/T6/worklog.md`; `~/ac3/tau2_ctxe` | **855 rollouts; DSV4F 31.6→70.2, Kimi 26.3→78.9; tau2 comparison withdrawn** |
+| T29 | Final `HANDOFF.md` | 2026-07-29 | `autoresearch/HANDOFF.md` (`60b9e3f`) | Identified **PAPER-11** — the paper is not yet rewritten around the tau2 withdrawal |
+| T30 | Coherence pass over `replies/v5/` | 2026-07-29 | `tasks/T30/worklog.md` (`e1e901e`) | 8 cross-reference fixes; verdict **coherent**; left J1/J2 |
+| T31 | Paper edit specification | 2026-07-29 | `autoresearch/PAPER_EDITS.md` | Turns PAPER-1..11 into ready-to-paste edits |
+| T32 | Resolve J1/J2 | 2026-07-29 | `tasks/T32/worklog.md` | MT-OSC engagement rate; T2c leak-label consistency |
 
 ---
 
