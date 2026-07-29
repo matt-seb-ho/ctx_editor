@@ -586,3 +586,6 @@ The reconciliation ships in the reviewer-facing text (a compactor copies a short
 **Still open:** **H9** — the tau2-dependent "improves across the entire spectrum" sentence — recorded as **README Blocker 5** with pre-drafted fallback wording and deliberately **not** applied, since T6 may falsify it. M11, M12, M6, M3, M15 need runs; the rest deferred as survivable or tone calls.
 
 **HOLD integrity:** all eight `⚠ INTERNAL` blocks verified byte-identical by **per-block SHA-256** against `d24a2db` — a stronger check than the grep used in earlier passes.
+- **19:46** Heartbeat tick. T6 healthy (worklog 15m, `run_parallel.py` workers 2 → 1, converging). T26 healthy — editing `HANDOFF.md` directly per its brief, touched 4 min ago.
+
+  Slot free and the queue empty, so dispatched **T27**: triage the five MEDIUM red-team items T25 flagged as needing runs (M11, M12, M6, M3, M15), then execute only the ones that pass triage, cheapest-first, under ~$15. The instruction that matters most is to **decline any item whose entire value is a sub-10 pp ordering at n≈20** — four such margins dissolved tonight once replicates were added, so buying another would be spending compute to manufacture a claim we would later have to retract. Declining with a cost estimate is an acceptable outcome for every item.
