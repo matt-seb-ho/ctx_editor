@@ -2,23 +2,70 @@
 
 Every assertion in `replies/v4/` audited against the 2026-07-29 autoresearch session (findings **F1–F81**, decisions **D1–D21**: `../../autoresearch/WORKLOG.md`; retired claims: `../../autoresearch/PROVENANCE.md`). Task T15 worklog: `../../autoresearch/tasks/T15/worklog.md`.
 
-**Revision history.** T15 wrote this audit at F1–F38, with four claims on HOLD pending two in-flight audits. **T19** (`../../autoresearch/tasks/T19/worklog.md`) revised it once T14, T16, T17 and T18 landed: the T14 hold is resolved, U1 is retired, and the ERGO denominator disclosure is added as §9 and as claim rows 1.23 / 2.10 / 3.12 / 5.9 / 6.x. **The T6 (tau2) holds were untouched and still live at that point — they were discharged later, by T28; see §12.3.** **T30** audited the whole set for internal coherence and left four items open; **T32** (`../../autoresearch/tasks/T32/worklog.md`) settled the two factual ones from artifacts, with no re-runs — see §13. **T33** (`../../autoresearch/tasks/T33/worklog.md`) closed the remaining cleanup: J3, the T2c caption at its generator, and one tone leak; **J4 is escalated, not fixed** — see §14.
+**Revision history.** T15 wrote this audit at F1–F38, with four claims on HOLD pending two in-flight audits. **T19** (`../../autoresearch/tasks/T19/worklog.md`) revised it once T14, T16, T17 and T18 landed: the T14 hold is resolved, U1 is retired, and the ERGO denominator disclosure is added as §9 and as claim rows 1.23 / 2.10 / 3.12 / 5.9 / 6.x. **The T6 (tau2) holds were untouched and still live at that point — they were discharged later, by T28; see §12.3.** **T30** audited the whole set for internal coherence and left four items open; **T32** (`../../autoresearch/tasks/T32/worklog.md`) settled the two factual ones from artifacts, with no re-runs — see §13. **T33** (`../../autoresearch/tasks/T33/worklog.md`) closed the remaining cleanup: J3, the T2c caption at its generator, and one tone leak; J4 was escalated there rather than fixed. **T34** (`../../autoresearch/tasks/T34/worklog.md`) then resolved J4: the Tally is re-derived from the rows, the bucket scheme is written out, and a derivation rule is stated so the drift cannot recur — see §14.4. T34 changed no claim, no row and nothing reviewer-facing.
 
 ## Tally
 
-| Status | Count |
+> **Derivation rule (T34).** *This table is derived from the numbered rows of §§1–6 and from nothing else. Whenever a row is added, removed, or its Status cell changes, re-derive every bucket from the rows — do not increment the table in prose.* Every drift this table has suffered was an increment recorded in a "Changes made by T*n*" paragraph and never applied here; naming the mechanism is the fix.
+
+| Status bucket | Count |
 |---|---|
-| **Unchanged** (re-verified, wording untouched) | 24 |
-| **Corrected** (number or wording changed) | 17 |
-| **Struck** (removed from v5) | 6 |
-| **Newly added** (result that did not exist in v4) | 21 |
-| **On HOLD** (blocked on an in-flight task) | **0** |
-| **UNVERIFIED** (no artifact found — see §7) | 1 |
-| **Total claims audited** | 69 |
+| **Unchanged** (re-verified; wording untouched, or only a label/frame added around it) | 20 |
+| **Corrected** (a v4 number or wording changed; the claim survives) | 21 |
+| **Struck** (a v4 claim, or an identified half of one, removed from v5) | 9 |
+| **Replaced by results** (a v4 *promise* — "we are adding X" — discharged by a measurement) | 5 |
+| **HOLD → resolved** (a claim sealed pending an in-flight task, since unsealed by its result) | 3 |
+| **Newly added** (result that did not exist in v4) | 22 |
+| **Bookkeeping / not used** (records no reviewer-facing claim at all) | 2 |
+| **Total numbered rows, §§1–6** | **82** |
 
-*Bookkeeping note (T28): this table had drifted — T25's increment from 15 to 16 corrections was recorded in prose but never applied to the table, and the printed total of 67 did not equal the sum of its own rows. The counts above are the sum of the rows and are correct as of T28. The three T6 holds are discharged (§12.3), which is why On HOLD is now zero.*
+Two counts that are **not** row buckets, and are therefore stated outside the total rather than added into it:
 
-Of the 17 corrections, **8 move against us** (CollabLLM MATH-Hard, the CollabLLM assistant-omission column, FN-adjusted accuracy / end-to-end table, the selectivity claim — first re-attributed to Rewrite, then retracted for both operators — the WildChat headline, memory gains, auditing-on-math, and the tau2 withdrawal), **3 move in our favour** (BigCodeBench, database leak-free replication, budget accounting), and the remainder are wording-only. Of the 5 claims T19 newly added, **all 5 are the ERGO denominator disclosure**, which moves against us by raising a competitor. *(T30: this paragraph still read "of the 15 corrections … 7 move against us" after T25 and T28 had taken the count to 17. The two later additions are the T2B-driven selectivity retraction and the tau2 withdrawal, both against us.)*
+| | |
+|---|---|
+| **On HOLD** (blocked on an in-flight task) | **0** — no row carries a live hold; the three former holds are in *HOLD → resolved* |
+| **UNVERIFIED** (no artifact found) | **1** — U6 alone, and it is a **§7** liability, not a numbered row of §§1–6 |
+
+### The bucket scheme, written down so nobody has to re-derive it
+
+**How a row is assigned.** Read the row's **Status** cell only, and take the *tokens* it contains. Where a cell carries more than one token, assign the single highest-precedence one, so that every row lands in exactly one bucket and the buckets sum to the row count:
+
+**Struck > Corrected > HOLD → resolved > Replaced by results > Newly added > Unchanged > Bookkeeping.**
+
+Precedence runs from least to most flattering to us, which is also the tie-break rule for genuine judgement calls: where a row could honestly be read two ways, take the reading that concedes more.
+
+**The statuses that previously mapped to no bucket, and where they now go.**
+
+| Status token as written in the rows | Bucket | Why |
+|---|---|---|
+| "replaced by results", "promise fulfilled" | **Replaced by results** | A v4 promise kept is not a v4 error corrected. Nothing was wrong with the v4 text; it said we would measure something and we did. Folding these into *Corrected* would inflate our own error count; folding them into *Unchanged* would hide that the text was rewritten. They get their own bucket. |
+| "HOLD → resolved", "resolved (T19)" | **HOLD → resolved** | A claim deliberately sealed pending an in-flight audit, then unsealed by that audit's result. The seal is a process state, not a defect: the claim was never asserted in a state we could not stand behind. Distinct from *Corrected* (we printed something wrong) and from *Struck* (we removed it). |
+| "qualified by T25" | **Corrected** | Judgement call, taken against us. The v4 numbers stand but v5 materially qualifies what they support, which is a wording change. |
+| "unchanged in substance, wording fixed" | **Corrected** | Judgement call, taken against us: wording changed, so it is a correction, notwithstanding the lead word. |
+| "struck / corrected", "half struck", "CORRECTED — claim struck" | **Struck** | Precedence. If part of a claim is gone, the row records a removal. |
+| "not used", "bookkeeping" | **Bookkeeping / not used** | Rows 4.24 and 5.10 audit no reviewer-facing assertion — 4.24 records a framing retired *before* it was ever written into a reply, 5.10 records the placement of an internal note. Counting them as claims would overstate the audit's scope; deleting them would lose the record, which is what they exist for. |
+
+**The one status where the Claim column overrides the Status cell: none.** The 21 rows whose Claim column reads *(new)* all carry a *newly added* status, and the reverse holds with one exception — **3.9**, whose Claim column names a v4 question ("Q3 analyzer-model sensitivity") and then states that **v4 never answered this half of it**. By the printed definition — *result that did not exist in v4* — 3.9 is newly added, so *Newly added* is 22 and not 21. Rows **2.4** and **3.2** also carry a trailing "+ newly added concession" token, but lead with *HOLD → resolved* and are counted there, once each.
+
+**Per-bucket row lists, so the arithmetic is checkable without re-reading the tables.**
+
+* **Unchanged (20)** — 1.1, 1.2, 1.3, 1.5, 1.8, 1.14, 1.19, 2.1, 2.7, 2.8, 3.6, 3.8, 3.10, 4.1, 4.7, 4.20, 4.21, 4.25, 5.1, 5.8
+* **Corrected (21)** — 1.4, 1.6, 1.7, 1.9, 1.10, 1.11, 1.16, 2.3, 2.5, 2.6, 2.9, 3.3, 3.4, 4.5, 4.6, 4.9, 4.10, 4.18, 5.2, 5.3, 5.5
+* **Struck (9)** — 1.13, 1.15, 1.17, 4.4, 4.8, 4.11, 4.12, 4.19, 5.4
+* **Replaced by results (5)** — 1.18, 3.1, 3.7, 4.13, 4.15
+* **HOLD → resolved (3)** — 1.24, 2.4, 3.2
+* **Newly added (22)** — 1.12, 1.20, 1.21, 1.22, 1.23, 2.2, 2.10, 3.5, 3.9, 3.11, 3.12, 4.2, 4.3, 4.14, 4.16, 4.17, 4.18a, 4.22, 4.23, 5.6, 5.7, 5.9
+* **Bookkeeping / not used (2)** — 4.24, 5.10
+
+20 + 21 + 9 + 5 + 3 + 22 + 2 = **82**. §6 contributes no numbered rows — it is prose mirroring §§1–5 — so all 82 sit in §§1–5.
+
+*Bookkeeping note (T28): this table had drifted — T25's increment from 15 to 16 corrections was recorded in prose but never applied to the table, and the printed total of 67 did not equal the sum of its own rows. The counts were made the sum of the rows as of T28, and the three T6 holds are discharged (§12.3), which is why On HOLD is zero.*
+
+*Bookkeeping note (T34): T28's fix decayed, because later passes introduced statuses ("replaced by results", "HOLD → resolved", "promise fulfilled", "not used", "bookkeeping") that no bucket covered, so eleven rows counted toward nothing and the printed total of 69 stood against 82 actual rows. T34 re-derived every bucket from the rows under the scheme above, added the three missing buckets, and moved On HOLD and UNVERIFIED out of the total because neither describes a §§1–6 row. **Two counts moved for reasons that are not re-bucketing and are worth stating plainly: the row count is 82, not the 81 recorded in §14.4 — the difference is row 4.18a, a real row with its own status and its own evidence that the T33 enumeration missed; and Newly added is 22, not 21, for the 3.9 reason given above.** No row's status, claim, number or evidence was touched, and nothing reviewer-facing was touched. See `../../autoresearch/tasks/T34/worklog.md` for the row-by-row enumeration.*
+
+Of the 17 corrections, **8 move against us** (CollabLLM MATH-Hard, the CollabLLM assistant-omission column, FN-adjusted accuracy / end-to-end table, the selectivity claim — first re-attributed to Rewrite, then retracted for both operators — the WildChat headline, memory gains, auditing-on-math, and the tau2 withdrawal), **3 move in our favour** (BigCodeBench, database leak-free replication, budget accounting), and the remainder are wording-only. Of the 5 claims T19 newly added, **all 5 are the ERGO denominator disclosure**, which moves against us by raising a competitor. *(T30: this paragraph still read "of the 15 corrections … 7 move against us" after T25 and T28 had taken the count to 17. The two later additions are the T2B-driven selectivity retraction and the tau2 withdrawal, both against us.)* *(T34: the "17" here is the pre-T34 tally figure, **left exactly as written**. It was never derived from the rows, so it cannot be reconciled against them; the row-derived **Corrected** bucket is **21** (see the Tally above). The eight-against / three-in-favour split names specific corrections and is a characterisation, not an arithmetic total, so T34 did not touch it — re-deriving it would be a claim decision, not bookkeeping. Nothing reviewer-facing quotes either number; the reviewer-facing self-correction count is the separate "eight in total", re-verified at §14.2.)*
+
+**The four paragraphs that follow are a historical record of how the tally moved, pass by pass. They are not the tally.** They are kept because the audit trail is worth having, but per the derivation rule above the table is authoritative and is re-derived from the rows; the counts quoted below are those that were current when each paragraph was written.
 
 **Changes made by T19 to T15's tally.** Newly-added 11 → 16 (five ERGO disclosure rows). On-HOLD 4 → 3 (1.13, 2.4, 3.2, 4.4 were the four; the T14-gated provisional flag on all LiC figures is lifted, and 4.4's hold is now T6-only — the three remaining holds are all tau2). UNVERIFIED 5 → 4 (**U1 retired**: the gate-statistic artifacts do exist, at `scripts/analysis_rewrite_v_reset/data/gated_reset_reconstructed_{lic,collabllm}.md`, and T16 re-derived both independently from raw traces). Total 64 → 67.
 
@@ -693,6 +740,11 @@ engagement rate; row 4.2, the auditing-vs-re-solving table). They are not v4 cla
 Corrected count stays at **17** and the total stays at **69**. Recorded explicitly because T30's F8
 found this exact tally drifting twice.
 
+*(T34: the two figures quoted in the previous sentence are superseded — the tally is now derived
+from the rows, where Corrected is **21** and the total **82**. §13.3's substantive point is
+unaffected and still holds: both T32 corrections land on rows already booked **Newly added**, so
+neither row changed bucket and T32's tally impact remains none.)*
+
 ## 14. T33 cleanup record — T30's J3, the T2c caption, and one tone leak
 
 `../../autoresearch/tasks/T33/worklog.md`. Zero API calls, no re-runs, no `git checkout`,
@@ -743,11 +795,12 @@ side effect of the run) is byte-identical to its backup. Table 1's "strict leak 
 is left alone: it is computed at `:64` from `answer_verdict` alone and the label is accurate there.
 **No reviewer-facing number is affected** — `03` W1 already reports the union label after T32.
 
-### 14.4 Escalated, not fixed: T30's J4 (the tally split)
+### 14.4 Escalated by T33, RESOLVED by T34: T30's J4 (the tally split)
 
-**J4 is larger than the "count wording" it was scoped as, so it was left alone.** T30 rewrote the
-tally prose to "17 corrections, 8 against us, 3 in our favour, remainder wording-only" and noted
-the split was partly inherited. Checking it against the rows themselves does not reconcile:
+**T33 left J4 alone** on the grounds that it was larger than the "count wording" it had been
+scoped as. T30 had rewritten the tally prose to "17 corrections, 8 against us, 3 in our favour,
+remainder wording-only" and noted the split was partly inherited; checking it against the rows did
+not reconcile. What T33 recorded:
 
 | bucket | printed in the Tally table | rows carrying that status in §§1–6 |
 |---|---|---|
@@ -757,11 +810,34 @@ the split was partly inherited. Checking it against the rows themselves does not
 | Struck | 6 | 5 (+2 "half struck") |
 | — | total 69 (68 rows + 1 UNVERIFIED) | **81 numbered rows**, 1.1–5.10, no gaps or duplicates |
 
-Eleven further rows carry statuses that map to no bucket at all ("replaced by results" ×4,
+Eleven further rows carried statuses that mapped to no bucket at all ("replaced by results" ×4,
 "HOLD → resolved" ×2, "resolved", "qualified by T25", "promise fulfilled", "not used",
-"bookkeeping"). So T28's note that "the counts above are the sum of the rows" is not true of the
-current rows, and fixing J4 would mean deciding which statuses count as corrections and
-re-deriving every bucket — a bookkeeping decision about how we characterise our own audit, not a
-wording fix. **The 17 is internal-only**: no reviewer-facing file quotes it. The reviewer-facing
-count is the separate "seven of our own numbers moved … eight in total", which was re-verified in
-§14.2 and is right.
+"bookkeeping"). So T28's note that "the counts above are the sum of the rows" was not true of the
+rows as they then stood, and fixing J4 meant deciding which statuses count as corrections and
+re-deriving every bucket — a bookkeeping decision about how we characterise our own audit.
+
+**Resolution (T34).** The buckets were re-derived from the rows and the tally now reconciles
+exactly; the bucket scheme, the assignment rule and the per-bucket row lists are written into the
+**Tally** section at the top of this file so the derivation does not have to be repeated. Three
+buckets were added for the statuses that mapped nowhere — *Replaced by results*, *HOLD → resolved*
+and *Bookkeeping / not used* — because those are genuinely different events from a correction, and
+On HOLD and UNVERIFIED were moved out of the total, UNVERIFIED because U6 is a §7 liability rather
+than a §§1–6 row. The reconciled counts are **Unchanged 20, Corrected 21, Struck 9, Replaced by
+results 5, HOLD → resolved 3, Newly added 22, Bookkeeping / not used 2 = 82**. A derivation rule is
+now stated at the head of the table naming the decay mechanism: the tally is derived from the rows
+and must be re-derived whenever a row changes, never incremented in prose.
+
+**Two corrections to the T33 table above, which are counting errors rather than bucket
+disagreements.** The row count is **82**, not 81: the T33 enumeration missed **4.18a**, which is a
+full row with its own status, evidence and new wording, not a sub-note of 4.18. And *Newly added*
+is **22**, not 21 — the one bucket believed to reconcile did not: row **3.9** carries a *newly
+added* status while its Claim column names a v4 question that v4 never answered, so it lacks the
+*(new)* marker the other 21 carry. Both are recorded here rather than quietly absorbed, because
+"the bucket that reconciled" was the reason to trust the rest.
+
+**Unchanged by T34**: every row's status, claim, number, evidence and new-wording cell; the
+"17 corrections, 8 against us, 3 in our favour" paragraph, which counts named corrections rather
+than rows and whose re-derivation would be a claim decision, not arithmetic (it is annotated in
+place, not rewritten); and every reviewer-facing file. **The 17 remains internal-only**: no
+reviewer-facing file quotes it. The reviewer-facing count is the separate "seven of our own numbers
+moved … eight in total", which was re-verified in §14.2 and is right.
