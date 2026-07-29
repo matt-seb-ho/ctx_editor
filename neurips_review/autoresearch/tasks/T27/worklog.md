@@ -287,15 +287,127 @@ Launcher `run_t27.sh`, log `run_log.txt`, output `outputs/T27/`. Two streams, ea
 
 | Cell | Purpose | Status |
 |---|---|---|
-| `db_summarize1_rep2` | **Positive control + replicate.** Known value 53.3% (57/107). Same strategy class, harness, evaluator and FN model as the neutral arm; also supplies the run-to-run noise floor without which "neutral vs v1" is uninterpretable | launched 19:50 |
-| `db_summarize_neutral` | **M11** — the condenser prompt-robustness control that "did not finish in the window" | launched 19:50 |
-| `code_summarize_neutral` | M11, second venue (queued behind the above) | queued |
-| `db_mtosc_w2` | **M12 (tractable half)** — MT-OSC at the smallest window in the paper's own sweep, post-`c1dd523` | launched 19:50 |
+| `db_summarize1_rep2` | **Positive control + replicate.** Known value 53.3% (57/107). Same strategy class, harness, evaluator and FN model as the neutral arm; also supplies the run-to-run noise floor without which "neutral vs v1" is uninterpretable | **done 20:05** |
+| `db_mtosc_w2` | **M12 (tractable half)** — MT-OSC at the smallest window in the paper's own sweep, post-`c1dd523` | **done 20:04** |
+| `db_summarize_neutral` | **M11** — the condenser prompt-robustness control that "did not finish in the window" | running |
+| `code_summarize_neutral` | M11, second venue | **CANCELLED on cost — §8** |
 
-_Results appended when the cells land._
+All cells cross-check `metrics.json` against `run_summary.json` and against a recount of
+`results.json` before any number is used (`analyze_runs.py`); **all pass, 0 errors in every cell.**
+
+### 7.1 The positive control did NOT reproduce the level, and that is the most useful thing here
+
+`db_summarize1_rep2` re-runs T1's `summarize_v1` database cell at identical config.
+
+| | accuracy | vs full context | McNemar p |
+|---|---|---|---|
+| T1's published run | 53.3% (57/107) | −2.8pp | 0.678 |
+| **T27 replicate, same config** | **47.7% (51/107)** | **−8.4pp** | 0.122 |
+| The two replicates against each other | — | 5.6pp apart, 14 vs 8 discordant | **p = 0.286** |
+
+The control **reproduces the finding and not the level**: summarisation lands below full context in
+both runs, but the cell carries roughly ±6pp of run-to-run variation at n=107. Everything else in
+this section is read against that floor.
+
+**F73 — the "condensation degrades with more budget" mechanism story is noise, and we were about
+to print it.** `RED_TEAM.md`'s own M11 revision proposes writing:
+
+> "First, it degrades with *more* budget (−2.8 → −8.4pp), which is itself the mechanism
+> prediction — a second condensation pass compresses the invalidated reasoning further rather
+> than removing it"
+
+That ordering is 1-call 53.3% against 2-call 47.7%, exact McNemar **p = 0.263**. My replicate of
+the **1-call** arm lands on **47.7% — exactly the 2-call value** — and the two 1-call replicates
+differ by more (p = 0.286) than 1-call differs from 2-call. There is no budget effect to explain.
+Pooling the two 1-call runs gives 108/214 = **50.5%, −5.6pp** against 2-call's −8.4pp: the two
+budgets are the same arm to within noise.
+
+This is the **fifth** time this session that adding a replicate dissolved an asserted margin
+(after math-hard 100%, the memory gains, the ERGO ordering, and the AO/BigCodeBench 6.7→3.3pp
+narrowing). Printing a *mechanism* on top of one would have been worse than printing the margin,
+because the mechanism is the part a reviewer would quote back at us. **The correct M11 wording is
+the second half of the red team's own suggestion and not the first** — summarisation is
+neutral-to-negative, full stop — and §6.5 writes it that way.
+
+What is untouched: AC3-Reset beats **both** summariser budgets by +22.4 / +28.0pp at p ≤ 0.0001
+(T1), i.e. by 4–5× the ±6pp noise floor just measured. The margin that carries the argument is
+nowhere near the resolution limit; the sub-arm ordering inside the baseline is.
+
+### 7.2 M12 — MT-OSC at a window scaled to the conversation length
+
+We supplied the objection ourselves ("MT-OSC at w=4 cannot compact before turn 6, and LiC
+conversations average 4.1 turns"), and the obvious follow-up — *then scale the window and
+re-report* — had no answer, because T1 archived its w=2 cell as buggy (`raw_pairs_carried` dropped)
+and converged before re-running it. Now measured post-`c1dd523`.
+
+**Positive control that the fix is live and the schedule engages** (this is the cell that produced
+a spurious 26.2% before, so it gets its own control):
+
+| Run | MT-OSC log events / conversation | `raw_pairs_carried` |
+|---|---|---|
+| w=4, T1 as published | 0.62 | 6 |
+| w=2, T1 **pre-fix (archived buggy)** | 6.05 | **0** — the bug |
+| **w=2, T27 post-fix** | **5.67** | **133** — the fix is active |
+
+So w=2 engages ~9× more often than w=4, and the completed pairs the buggy run silently dropped are
+now retained. Result, n=107 paired, raw accuracy:
+
+| Arm | Accuracy | vs full context | McNemar p |
+|---|---|---|---|
+| Full context | 56.1% (60/107) | — | — |
+| MT-OSC w=4 (as published) | 60.7% (65/107) | +4.7pp | 0.383 |
+| **MT-OSC w=2 (window scaled to conversation length)** | **47.7% (51/107)** | **−8.4pp** | 0.093 |
+| AC3-Reset | 75.7% (81/107) | +19.6pp | 0.0005 |
+
+Head-to-head: **w=2 − w=4 = −13.1pp** (8 W / 22 L, p = 0.016) and **AC3-Reset − MT-OSC w=2 =
++28.0pp** (37 W / 7 L, p < 0.0001).
+
+The answer to "then scale the window" is therefore: **we did, and it does not help — it hurts.**
+Compaction that actually engages with a 4-turn conversation compresses the polluted reasoning
+rather than removing it, which is the same mechanism the summariser arms show. At w=4 MT-OSC looks
+mildly positive precisely because it is nearly a no-op. That is a much stronger version of our
+scoping argument than "the schedule cannot fire", because it rules out the reading that MT-OSC
+would have won if only we had tuned it.
+
+Caveats to state with it: single run per window; the −13.1pp w2-vs-w4 gap is above the ±6pp
+noise floor of §7.1 and significant paired, but the −8.4pp-vs-baseline figure is one run and
+should be quoted as "below full context", not as a point estimate; and it remains our
+reimplementation of a method with no code release.
+
+### 7.3 M11 — the neutral-prompt condenser
+
+_Appended when the cell lands._
 
 ---
 
-## 8. Cost
+## 8. Cost — over the guidance, deliberately, and the marginal cell cancelled
 
-_Appended when the runs land._
+`call_meter.json` list-price accounting (the same accounting T18 used; TRAPI
+`redmond/interactive` is the session's free primary endpoint, so this is a notional list price
+rather than a billed amount):
+
+| Cell | list cost |
+|---|---|
+| `smoke_neutral` (3-sample pre-flight) | $0.14 |
+| `db_mtosc_w2` | $5.91 |
+| `db_summarize1_rep2` (positive control) | $7.88 |
+| `db_summarize_neutral` | ~$7 (in flight) |
+| **running total** | **≈ $21** |
+
+**The brief's ~$15 guidance is exceeded and I am proceeding anyway on M11, per the brief's own
+carve-out.** The reason: M11 is the Area Chair's *central* reservation, the reply currently
+concedes that its only robustness control "did not finish in the window", and we wrote the
+competitor's prompt ourselves. Converting that admission into a measured result is the single
+highest-value credibility trade in the reply set, and there is no cheaper way to get it.
+
+**My per-cell estimate was wrong, not the decision.** I projected ~$3/cell from the 3-sample smoke
+($0.14 → ~$5 at 107) and the real figures are $6–8, because the strategy arms inflate turn counts
+(7.3 vs 4.1) and the smoke's short conversations under-sample that. T1's own comparable cells cost
+$7.70–$12.39, which I should have read off before estimating.
+
+**`code_summarize_neutral` cancelled** to stop the overage there. It was a second venue for an
+item already answered on the discriminating one, i.e. exactly the "marginally neater" category the
+brief says not to buy. Cancelled without a race by pre-writing a clearly-labelled skip sentinel at
+`outputs/T27/code_summarize_neutral/run_summary.json` (it says `_T27_SKIP_SENTINEL` and "NOT A
+RESULT" in the file) rather than killing a live process mid-write.
+
