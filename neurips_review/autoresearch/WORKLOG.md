@@ -95,3 +95,5 @@ Consequences, in order of severity:
 
 - **R1:** TRAPI `max_concurrent: 20` is shared. If several experiment agents run at once, aggregate concurrency must stay under it or runs will throttle/fail. Mitigation: cap each dispatched run at `execution.max_concurrent=5` and never run more than 3 experiment agents concurrently.
 - **R2:** The 2026-07-27 session's numbers in `replies/v4/` include several N=1 claims (CollabLLM 100%/20%, tau2 seed-42). Until T8/T6 land, those remain the paper's exposed surface.
+
+- **09:50** Heartbeat tick. 3 agents in flight (T8, T2c, T12-T13) = concurrency cap; all <5 min old, no worklogs written yet, none stalled. No dispatch, no pivot. Queue behind them: T9, T2A, T1, T11, T6, T2B.
