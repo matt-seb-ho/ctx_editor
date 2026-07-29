@@ -60,6 +60,37 @@ Verification: 5 gold queries across 5 db_ids all executed, returned non-empty ro
 
 **F3 — `task.limit` is the sample-count config key.**
 
+- **10:04** `RECON` returned. Log: `tasks/RECON/worklog.md`. Six findings, two of which change what we are allowed to claim.
+
+**F4 — ⚠️ `seed=` is a no-op on LiC and CollabLLM. Our "N=3 seeds" language is wrong.** `cfg.seed` is read *only* by `huang_eval/`. Every `seed=$((42+rep))` in the LiC and CollabLLM launchers — **including T4's, from session 1** — was inert. Replicates varied through `temperature: 1.0` sampling alone. Worse, the CollabLLM loaders hardcode `random.Random(42)`, so all replicates draw the *same 20 problems*; Phase-3a Baseline scored 30.0/30.0/30.0 across "seeds", which is the signature of this bug rather than of a stable method.
+
+Consequences, in order of severity:
+1. **Wording.** For LiC and CollabLLM we must say "3 replicate runs at temperature 1.0", never "3 seeds". A reviewer who reads the launcher scripts will find this, and "seeds" would look like an overclaim. WildChat's N=3 *is* real seeding and can keep the word.
+2. **Interpretation.** Temperature-only replication estimates decoder variance, not sampling variance over problems. Our error bars are therefore narrower than a true seed sweep's would be. This is a genuine limitation and belongs in the limitations appendix.
+3. **Paper edit required.** Any "seeds" claim in `writing/overleaf_repo/` sourced from LiC/CollabLLM needs rewording. Queued as `PAPER-1` below; not actioned without the operator, since the paper repo is shared with collaborators.
+
+**F5 — T8 would have failed at the judge step.** `fxdata-shared` returns 401 for this identity, and `multi_endpoint_foundry.yaml` routes `gpt-4o-mini` — the CollabLLM judge role — *only* there. Fix: add `gpt-4o-mini: 150` to the `dl-openai-3` block. `mgalley-foundry2` and `dl-openai-3` are both live (verified by single-token probe).
+
+**F6 — The "missing" prior outputs are recoverable.** `~/ac3/blob_staging/snapshot.tar.gz` contains the whole `outputs/` tree, including the CollabLLM competent-user-sim dir and all WildChat runs. Selective-extract command is in the RECON worklog. (Spider was *not* in there — unrelated recovery path, see F1.)
+
+**F7 — Analyzer override syntax for T9:** `model.ctx_editor.model=X`, verified. Two traps: the load balancer hard-fails on models not listed in `supported_models`, and gpt-4o inherits `reasoning_effort: medium` unless you also pass `model.ctx_editor.reasoning_effort=null`.
+
+**F8 — Two documentation artifacts referenced by the paper do not exist.** `docs/paper_experiments_provenance.md` names configs `assistant_omit` and `concat_baseline` that are absent, and `docs/multi_run_variance_2026-05-07.md` — cited *twice* as the source of the paper's appendix variance table — does not exist. The variance table's provenance is currently unverifiable. Queued as `PAPER-2`.
+
+**F9 — `analysis_cache` reuse is unsafe under an analyzer swap** (T9). The cache-key logic is unread; a stale hit would silently return the old analyzer's output and void the experiment. T9 must run with the cache disabled or key-verified.
+
+### Action items for the operator (not actioned autonomously)
+
+| ID | Item | Why it needs a human |
+|----|------|----------------------|
+| PAPER-1 | Reword LiC/CollabLLM "seeds" → "replicate runs (temperature 1.0)"; add the decoder-vs-sampling-variance caveat to limitations | Edits `writing/overleaf_repo/`, a shared repo synced to Overleaf |
+| PAPER-2 | Appendix variance table cites a non-existent doc; re-derive or re-source | Same |
+
+### Decisions (cont.)
+
+**D4 — Report the seed bug rather than quietly relabelling.** Discovering that replicates were temperature-only is exactly the kind of thing that, if papered over, turns a borderline-reject into a desk-reject on integrity grounds. We reword the claims, state the limitation, and keep the numbers — they are still valid measurements of decoder variance, which is what the error bars will now say they are.
+
+
 ### Open questions / risks
 
 - **R1:** TRAPI `max_concurrent: 20` is shared. If several experiment agents run at once, aggregate concurrency must stay under it or runs will throttle/fail. Mitigation: cap each dispatched run at `execution.max_concurrent=5` and never run more than 3 experiment agents concurrently.
