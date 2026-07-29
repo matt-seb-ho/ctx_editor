@@ -38,9 +38,9 @@ graph TD
     T11["T11 WildChat judge checks<br/>position bias real but pre-randomised<br/>headline survives, -2.0/-0.9pp<br/>[done]"]
     T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
     T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
-    T2B["T2B counterfactual span ablation<br/>[deferred] — superseded in priority"]
+    T2B["T2B counterfactual span ablation<br/>[run] — natural spans, causal labels"]
     T15["T15 claims audit -> replies/v5<br/>64 claims: 24 unchanged, 14 corrected,<br/>6 struck, 11 added, 5 unverified<br/>[done]"]
-    T16["T16 verify gate stats<br/>[run] — zero API"]
+    T16["T16 verify gate stats<br/>claim exact; wording wrong<br/>firing rate != detection rate<br/>[done]"]
     T14["⚠ T14 FN-adjustment audit<br/>adjusted_accuracy inflates our own<br/>numbers 89.0 -> 77.1<br/>[run]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
@@ -93,7 +93,8 @@ graph TD
 | T14 | FN-adjustment audit | 2026-07-29 | `tasks/T14/worklog.md` | **Corrects the paper's headline LiC magnitudes** |
 | T11 | WildChat judge checks | 2026-07-29 | `tasks/T11/{worklog.md,out/}` | 5YHP W4 — bias real but pre-randomised; corrected 87.8 / 91.2 |
 | T15 | Claims audit → `replies/v5/` | 2026-07-29 | `replies/v5/{CHANGES.md,README.md}` (`5775f71`); `tasks/T15/worklog.md` | Lands F1–F33 in the submitted text; **found F34/F36/F37** |
-| T16 | Verify gate statistics | 2026-07-29 | `tasks/T16/{worklog.md,gate_stats.py}` | F38 — the one unverifiable number in the detector reply |
+| T16 | Verify gate statistics | 2026-07-29 | `tasks/T16/{worklog.md,gate_stats.py,report.md}` (`8d545ff`) | F38/F39 — claim exact, wording corrected in v5 (`e889c17`) |
+| T2B | Counterfactual span ablation | 2026-07-29 | `tasks/T2B/worklog.md` | Upgrades T2A's synthetic injections to **natural** spans |
 
 ---
 
