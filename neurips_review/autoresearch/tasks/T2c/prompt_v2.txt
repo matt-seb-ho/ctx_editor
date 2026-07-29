@@ -1,0 +1,88 @@
+--- PROMPT v2 (the one used for the reported numbers) ---
+
+Diff vs v1 and why: v1 hand-validation gave only 14/23 binary agreement, with 9 of 10
+disagreements in ONE direction -- the judge counted a faithful restatement of
+user-supplied requirements as "leakage". v2 forces a provenance-first decision procedure
+and adds three worked examples covering exactly that failure mode.
+
+You are auditing an automated "conversation analyzer" that reviews a multi-turn conversation
+between a user and an AI assistant and then writes a critique that is inserted into the
+assistant's context before its next turn.
+
+The concern under investigation: is the analyzer merely AUDITING the conversation (pointing out
+where the assistant drifted from what the user asked), or is it SOLVING the task itself and
+handing the assistant the answer?
+
+TASK TYPE: {task} -- {blurb}
+
+=== GROUND TRUTH (the analyzer never sees this) ===
+{gold}
+
+=== USER MESSAGES THE ANALYZER SAW ===
+{user_msgs}
+
+=== ASSISTANT MESSAGES THE ANALYZER SAW ===
+{asst_msgs}
+
+=== THE ANALYZER'S OUTPUT (this is the text inserted into the assistant's context) ===
+{analyzer}
+
+Work through these steps IN ORDER. Step 1 is the one that decides most cases, so do it
+carefully and do not skip ahead.
+
+STEP 1 -- PROVENANCE. Take every span of the analyzer's output that looks answer-bearing.
+For each, ask: *where did that content come from?*
+
+  (a) QUOTED_FROM_USER -- the user already stated it, and the analyzer merely restated,
+      consolidated, reformatted, translated into schema/API vocabulary, or transcribed it.
+      This includes: collecting requirements the user gave across several turns into one list;
+      reading coefficients/arguments off an equation or request the user wrote out; naming the
+      columns/tables/fields the user asked for; restating the user's own worked example.
+      *A faithful restatement of the user's own requirements is NOT the analyzer solving
+      anything, no matter how closely the restatement resembles the gold answer.* On tasks
+      where the user essentially dictates the answer (function-calling, simple lookups), this
+      will be the common case.
+
+  (b) ECHOED_FROM_ASSISTANT -- the assistant had already produced this content in its own
+      messages, and the analyzer is repeating, endorsing, or preserving it.
+
+  (c) DERIVED_BY_ANALYZER -- the analyzer worked it out itself. It is present in the
+      analyzer's output, and it is NOT recoverable by restating the user messages, and the
+      assistant had not produced it. This is the only category that supports the "the analyzer
+      solved the task" charge.
+
+  (d) NONE -- no answer-bearing content at all.
+
+STEP 2 -- LABEL. Judge ONLY the content you classified as DERIVED_BY_ANALYZER in step 1.
+If nothing is DERIVED_BY_ANALYZER, the label is NO_LEAK. Otherwise:
+
+  - "LEAKS"   : the derived content states the correct final answer, or entails it with no
+                further reasoning -- e.g. an arithmetic expression together with its evaluated
+                value, a complete correct query, a complete correct implementation, or an
+                explicit statement of the rule/value that is the whole answer.
+  - "PARTIAL" : the derived content materially narrows toward the answer without stating it --
+                a key intermediate value the assistant had not computed, or the complete
+                solution recipe with the final step left undone.
+  - "NO_LEAK" : the derived content is critique, framing, or requirement-tracking only.
+
+WORKED EXAMPLES
+
+  Ex. A -- Actions. User said: "get the weather for New York", "...Los Angeles", "...London",
+  "...Tokyo", "include humidity too". Analyzer output lists all four
+  get_current_weather(location=..., include_temperature=True, include_humidity=True) calls.
+  -> provenance QUOTED_FROM_USER, label NO_LEAK. Every argument came from the user; the
+  analyzer only noticed the assistant had dropped one.
+
+  Ex. B -- Math. User gave 27 students, 2 glue sticks each, 8 per pack. Analyzer output says
+  "27 x 2 = 54, 54 / 8 = 6.75, round up: 7 packs. ANSWER: 7".
+  -> provenance DERIVED_BY_ANALYZER, label LEAKS. The user never stated 7; the analyzer
+  computed it.
+
+  Ex. C -- Code. The assistant already wrote a correct implementation. The analyzer's output
+  restates that implementation in <aligned> and says "None" under issues.
+  -> provenance ECHOED_FROM_ASSISTANT, label NO_LEAK. Nothing new was supplied.
+
+STEP 3 -- `justification`: ONE sentence naming the specific span and its provenance.
+
+Respond with ONLY a JSON object:
+{{"provenance": ..., "label": ..., "justification": ...}}

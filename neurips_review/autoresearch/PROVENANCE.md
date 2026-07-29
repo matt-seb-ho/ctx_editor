@@ -31,9 +31,9 @@ graph TD
     BLK["BLOCK-spider<br/>Spider SQLite DBs recovered<br/>17/17 db_ids, test-suite semantics<br/>[done]"]
     RC["RECON<br/>harness map + operator naming<br/>[done] — found inert-seed bug"]
     T8["T8 CollabLLM N=3 replicates<br/>competent user sim<br/>[run]"]
-    T9["T9 analyzer-model sensitivity<br/>[todo] — disable analysis_cache"]
+    T9["T9 analyzer-model sensitivity<br/>[run] — cache-key check first"]
     T2A["T2A Tier-A constructed pollution<br/>[todo]"]
-    T2C["T2c auditing vs re-solving<br/>[run]"]
+    T2C["T2c auditing vs re-solving<br/>+20.7pp on NO_LEAK subset<br/>math conceded<br/>[done]"]
     T1["T1 condensation baseline<br/>[todo] — venue unblocked"]
     T11["T11 WildChat judge checks<br/>[todo]"]
     T12["T12-13 memory order / split<br/>[run]"]
@@ -71,7 +71,8 @@ graph TD
 | T5 | Equal-budget reflection control | 2026-07-27 | `neurips_review/experiments/exp2_results.txt` | Vg97 Q3 (compute half) |
 | BLOCK-spider | Spider DB acquisition | 2026-07-29 | `tasks/BLOCK-spider/worklog.md`; `data/spider/databases/` (4.9 GB, gitignored) | T1, T2A, T5-redo |
 | RECON | Harness / naming map | 2026-07-29 | `tasks/RECON/worklog.md` | T8, T9, T6, T11 |
-| T2c | Auditing vs. re-solving | 2026-07-29 | `tasks/T2c/worklog.md` | 5YHP mechanism challenge |
+| T2c | Auditing vs. re-solving | 2026-07-29 | `tasks/T2c/worklog.md`, `tasks/T2c/RESULTS.md`; source traces `~/ac3/recovered_t2c/` | 5YHP mechanism challenge — **+20.7pp on leak-free subset**, math conceded |
+| T9 | Analyzer-model sensitivity | 2026-07-29 | `tasks/T9/worklog.md` | Vg97 Q3 (unanswered half) |
 
 ---
 
