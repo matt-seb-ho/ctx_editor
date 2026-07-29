@@ -41,7 +41,8 @@ graph TD
     T2B["T2B counterfactual span ablation<br/>[run] — natural spans, causal labels"]
     T15["T15 claims audit -> replies/v5<br/>64 claims: 24 unchanged, 14 corrected,<br/>6 struck, 11 added, 5 unverified<br/>[done]"]
     T16["T16 verify gate stats<br/>claim exact; wording wrong<br/>firing rate != detection rate<br/>[done]"]
-    T14["⚠ T14 FN-adjustment audit<br/>adjusted_accuracy inflates our own<br/>numbers 89.0 -> 77.1<br/>[run]"]
+    T14["⚠ T14 FN-adjustment audit<br/>2 flips on Rewrite (unpublished cells)<br/>Reset/Gated survive all 8<br/>found ERGO denominator defect<br/>[done]"]
+    T17["⚠⚠ T17 ERGO denominator fix<br/>[run] — deflates prior work"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
   S1 --> S2
@@ -60,6 +61,7 @@ graph TD
   T2C --> T2B
   T1 --> T14
   T14 -.->|"LiC figures provisional"| T15
+  T14 --> T17
   T6 -.->|"⚠ baselines may not replicate"| T15
   T15 --> T16
   T14 -.->|"corrects magnitudes in"| P0
@@ -95,6 +97,8 @@ graph TD
 | T15 | Claims audit → `replies/v5/` | 2026-07-29 | `replies/v5/{CHANGES.md,README.md}` (`5775f71`); `tasks/T15/worklog.md` | Lands F1–F33 in the submitted text; **found F34/F36/F37** |
 | T16 | Verify gate statistics | 2026-07-29 | `tasks/T16/{worklog.md,gate_stats.py,report.md}` (`8d545ff`) | F38/F39 — claim exact, wording corrected in v5 (`e889c17`) |
 | T2B | Counterfactual span ablation | 2026-07-29 | `tasks/T2B/worklog.md` | Upgrades T2A's synthetic injections to **natural** spans |
+| T14 | FN-adjustment audit | 2026-07-29 | `tasks/T14/{RESULTS.md,corrected_matrix.*}` (`30089f3`) | **`tab:main` pool filter is sound; per-run `adjusted_accuracy` must go; ERGO denominators wrong** |
+| T17 | ERGO denominator fix | 2026-07-29 | `tasks/T17/worklog.md` | **PAPER-7 — corrects a defect that deflates prior work** |
 
 ---
 
@@ -103,6 +107,7 @@ graph TD
 | Direction | Verdict | Reason |
 |---|---|---|
 | "BigCodeBench cannot be evaluated with executable tests" | `[dead]` | Factually wrong — T8 §5 shows that path runs real `untrusted_check` execution. We conceded a limitation that does not exist; struck along with the dependent judge-discrimination figures. |
+| Per-run `adjusted_accuracy` as a reported metric | `[dead]` | T14: inflates reset arms +13.9 to +55.9 pp vs +0.2 to +6.5 for no-reset arms, because the FN judge sees 1.00 user turns/sample on Rewrite vs 5.35 on baseline. Report **raw**; keep only the arm-symmetric pool filter. |
 | Rebuttal end-to-end "AC3-Reset 100.0 ± 0.0" | `[dead]` | FN-adjusted with asymmetric exclusions (Reset 1/2/5 items, baseline 0). Raw: 87.5 ± 2.0 / 93.3 ± 4.2 / 95.0 ± 0.0. Claim survives; the perfect score does not. |
 | MT-OSC as a fair pollution baseline | `[dead]` | T1: at published w=4 it fired 0.3×/conversation — it cannot touch context before turn 6 and LiC conversations average 4.1 turns. Report as *structurally inapplicable*, which supports our scoping argument, rather than as a beaten baseline. |
 | End-to-end tau2 replay | `[dead]` | ~2 dev-days; out of window. Defend replay as causal-attribution design instead; T4 supplies fresh end-to-end evidence on LiC. |

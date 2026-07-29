@@ -358,3 +358,23 @@ No bimodality — every task/cell lands in 93–100%. Two defects worth fixing r
 
 **Note on the gate paragraph:** it is worth keeping the sentence that follows — "we would not over-read firing rates into a precision/recall claim" — because F39 shows exactly why that hedge was correct, and T2A's 50.4% edit precision is the measurement that belongs there instead.
 - **15:58** Dispatched `T2B` (counterfactual span ablation) into T16's freed slot — the last unrun item in `experiment_todos.md`. Framed deliberately as *upgrading T2A's synthetic injections to naturally-occurring spans*, which is T2A's own stated limitation, rather than as filling a gap: T2A already answered the circularity objection non-circularly. Its brief requires the alignment check against **Rewrite as well as Reset**, since T2A showed Reset's non-selectivity (edit precision at chance) makes its answer largely predetermined by design — Rewrite is where "do AC3's edits match the causal labels?" is actually an open question.
+
+- **16:15** `T14` returned **DONE**. Artifacts: `tasks/T14/{RESULTS.md,worklog.md,survey.py,rejudge.py,analyze.py,corrected_matrix.*}`, commit `30089f3`.
+
+**F40 — Two conclusions flip under the arm-symmetric correction, both on AC3-Rewrite.** Under the shipped metric AC3-Rewrite beats baseline in 4/4 LiC tasks; corrected, it **loses in 2/4** — code **+46.0 pp → −5.3 pp**, actions **+22.4 → −1.5**. A 46-point win is manufactured out of a 6-point loss, on our own arm.
+
+**Scope, stated precisely so this is neither over- nor under-sold: neither flip is a published error.** `tab:main` has no AC3-Rewrite LiC row, and `tab:megatable` — where Rewrite does appear — is computed from **raw** (`build_mega_table.py:87-96`). So this is not a correction to the paper; it is proof that the metric *can* invert an ordering, which is the argument for deleting it.
+
+**What survives, and it is the load-bearing part:** AC3-Reset and AC3-Gated-Reset beat baseline in **all 8 cells** under raw, shipped-adjusted and corrected alike, and the Gated-vs-Reset ordering holds cell-for-cell.
+
+**F41 — Magnitude and mechanism.** Reset arms inflate **+13.9 to +55.9 pp** (worse than the single +12 pp cell T1 found); no-reset arms only **+0.2 to +6.5**. After correction, adjusted−raw is a uniform +0.0 to +3.9 across every arm. The mechanism is measured, not inferred: the judge sees **1.00 user turns/sample** on AC3-Rewrite vs **5.35** on baseline (`trace.py:102-105` hides user messages; `context_edit_v2.py:117-124` re-adds the spec under role `"compacted conversation"`; `identify_false_negatives.py:173` keeps only `role=="user"`). A second full re-judge cleanly separates judge-swap from visibility: the visibility effect is **+0.5% on no-reset arms and −48.9% on reset arms.**
+
+**F42 — ⚠️ The paper is *less* exposed than feared on FN adjustment, but has a worse defect: ERGO is scored on the wrong denominators.** `tab:main` uses a **pool-level pre-filter** (`data/baseline_traces_v2/*_false_negatives.json`, computed on baseline traces and applied identically to all arms) that exactly reproduces its 20/19/25/23 denominators. That is arm-symmetric and correct — **defend it.** Per-run `adjusted_accuracy` touches at most 4 cells at ≤1 sample each, and 2 of the 4 favour prior work.
+
+**But ERGO's denominators are 23/25/25/25 — the *unfiltered* pools — while every other row uses 20/19/25/23.** Bound: ERGO math could reach **80.0 vs published 69.6**, tying or beating AC3-Reset's 75.0. That is worth ~14 pp **against prior work**, and it is visible from the printed percentages alone.
+
+This is the most dangerous single item found tonight. An error that inflates our own numbers is embarrassing; an error that *deflates a baseline we compare against* is the kind reviewers read as thumb-on-the-scale, and it is arithmetically checkable from the table as printed. **Queued as PAPER-7 and dispatched for immediate quantification as T17.**
+
+**T14's recommendation (endorsed):** report **raw** as primary; keep the pool filter as the only FN adjustment; **delete per-run `adjusted_accuracy`**; rewrite `tex:478-480` (it claims "all user simulator messages"; the code collates only the visible ones); and **fix the ERGO/Gated-Reset denominators first.**
+
+**Controls:** shipped metric reproduced to 1e-6 across 499 runs; 0 cross-file mismatches; no archived run hit the TRAPI FN no-op condition.
