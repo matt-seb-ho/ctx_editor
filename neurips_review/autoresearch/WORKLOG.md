@@ -250,3 +250,6 @@ This matters beyond the rebuttal — the "unlike prior work that discards all as
 ### Decisions (cont.)
 
 **D9 — Report T2A as "detection is strong, selectivity is operator-dependent," never as a bare 97.6%.** Quoting 97.6% removal alone would be the most attackable sentence in the rebuttal: a reviewer computes edit precision from our own confusion table, finds chance, and concludes we hid it. Leading with the honest decomposition — high detection, chance-level selectivity for Reset, real selectivity for Rewrite — is both more defensible and more interesting.
+- **14:01** Heartbeat tick. All 3 healthy, no intervention. **T1's nudge #2 worked** — worklog went from 57 min stale to 10 min, `summarize_v1` running again. T6 is moving fast: it cloned `tau2_ctxe` to `~/ac3/` — correctly *outside* the shared ctx_editor tree, as its brief required — and had two `run_parallel.py` processes live within 11 minutes of dispatch. T11 is extracting `huang_eval/{phase1,phase2,rejudge}` and `post_neurips_ac3_phase3_huang` from `snapshot.tar.gz`, i.e. recovering the existing judgements rather than re-running generations, which is the cheap path RECON identified.
+
+  Guardian scoreboard: **six nudges, six responses, zero restarts.** Only T2B (counterfactual span ablation) remains unqueued.
