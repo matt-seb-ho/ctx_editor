@@ -779,3 +779,6 @@ The distinguishing signal existed and I did not use it: every previous nudge-and
 **D28 — Zero artifacts after 45 minutes means presume failure, not slowness.** Nudge when an agent has produced *something* and gone quiet; relaunch when it has produced *nothing*. The prior eight recoveries all had partial output; T31 had none, and that was the tell.
 
 **Mitigation for the relaunch:** the task is a long single-shot document, which is exactly the shape that loses everything to one transport error. Relaunching with **write-first, fill-in-after** structure — skeleton to disk in the first minutes, then append per item, highest-priority item specified first — so any future failure leaves usable partial value rather than nothing. (Logged to `logs/orchestrator.jsonl` in the same command.)
+- **22:01** Heartbeat tick. **The D29 mitigation is working**: T31b wrote `PAPER_EDITS.md` to disk within ~8 minutes of dispatch and committed it (`2772f8b`) as a skeleton covering all eleven items, before specifying any of them. Contrast with T31, which held the whole document in memory for 51 minutes and lost every bit of it to one transport error. The instruction converts a total-loss failure mode into a bounded one, and cost the agent perhaps a minute to comply with.
+
+  Nothing else outstanding; every experiment and edit pass is complete. No dispatch, no pivot.
