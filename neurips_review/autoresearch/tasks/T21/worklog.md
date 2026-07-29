@@ -133,3 +133,32 @@ paragraph in `00` sits immediately *after* the CW4 HOLD block and is not part of
 edit changed only the unquoted paragraph.
 
 Total v5 diff: 5 files, **+17 / −12 lines**.
+
+---
+
+## Part 2 — running log
+
+**17:42 UTC** — both streams launched.
+**17:49** — `math-hard rep2` done: **17/20 = 85.0**, 20 attempted, **0 errors**, cost $0.0384, avg 1.5 turns.
+**17:54** — `bigcodebench rep2` done: in-run **3/20**, 20 attempted, **0 errors**, cost $0.0450, avg 2.85 turns.
+**17:59** — `math-hard rep3` done: **18/20 = 90.0**. **math stream COMPLETE.**
+**~18:05** — `bigcodebench rep3` at 12/20 and running clean (real per-test tracebacks in the
+log, e.g. `TypeError: task_func() missing 1 required positional argument`, which is the
+signature of a *live* sandbox — the matplotlib failure mode produces an empty `{}` detail).
+
+### Cross-checks on completed cells (`metrics.json` vs `run_summary.json` vs `results.json`)
+
+| cell | `metrics.correct` | `results.json` score sum | `total_attempted` / `errors` | `run_summary` strategy |
+|---|---|---|---|---|
+| `math-hard_rep2` | 17 | 17.0 | 20 / **0** | `collabllm_assistant_omit` |
+| `bigcodebench_rep2` | 3 | 3.0 | 20 / **0** | `collabllm_assistant_omit` |
+
+All three sources agree per cell. `errors: 0` everywhere — no silent `0/0` metric failure of
+the kind that produced T8's first `0/0 correct (20 errors excluded)`.
+
+### Offline re-score, `bigcodebench rep2`
+
+`T8/rescore_bcb.py`, zero API calls, unified environment: **3.0/20, stored 3.0/20 — no item
+moved**, including `BigCodeBench/451` (which is the item that moved on Reset rep1 and
+Baseline rep1). So the AO cells are insensitive to the dependency-version difference that
+shifted the other two arms — consistent with T20's finding on AO rep1.

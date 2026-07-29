@@ -345,3 +345,9 @@ because the filler arm has only ~3 replicates so far; it will tighten as the mat
 Main matrix **85/172** runs (≈ 49%), steady at 1.06 runs/min; projected finish ≈ 19:05.
 **2062 samples run, 0 errors** across every T2B run directory. AC3 alignment arms complete at
 5 replicates × 2 arms × 2 tasks (20 runs).
+
+### 5.2 Status 18:19
+
+Main matrix **120/172** (70%). Still 0 errors. Projected finish ≈ 19:08. Added `analyze.py` §6,
+the explicit "what this does and does not cover" list, so the final RESULTS.md carries its own
+limitations rather than leaving them to the summary message.
