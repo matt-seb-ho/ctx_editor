@@ -568,3 +568,21 @@ That is the sentence that kills the objection: **baselines move 52 points across
 **F70 — ⚠️⚠️ Worse than H1, and found on the way: we answer iNYK's own complaint with a false statement.** `01_reviewer_iNYK.md:31` says the 36-comparison matrix is on "the full, non-difficulty-selected pool". **It is not.** Difficulty selection is precisely what iNYK complained about, and we assert the opposite about our new headline evidence. If a reviewer checks one claim in the rebuttal, this is the one they check.
 
 The fix is a straight swap rather than a retraction: **T1 is the experiment that genuinely satisfies the claim** (complete unselected pool, end-to-end). Draft replacement wording is in T24's §7. Routed to T25, which is already editing that tree — dispatching a second editor onto the same files would risk the double-write class of corruption we hit earlier tonight.
+
+- **19:45** `T25` returned **DONE**. Commit `edbda19`. Log: `tasks/T25/worklog.md`.
+
+**Part 1 — retraction shipped.** The "we preserve what's correct" re-attribution to Rewrite is retracted **for both operators** across `02` Q4, `03` W5, `04` correction 3, `05` correction 3, `README.md`, and `CHANGES.md`. **PAPER-5 rewritten** from "attribute to Rewrite" to "delete the framing", with a note that **the ERGO differentiation argument changes too** — that consequence had not occurred to me, and it matters: "unlike prior work that discards all assistant messages" was how we distinguished ourselves from ERGO, and T2B says we largely *do* discard them.
+
+The reconciliation ships in the reviewer-facing text (a compactor copies a short *injected* sentence verbatim but paraphrases the model's own prose), so T2B reads as an **extension** of T2A rather than a reversal, and T2B is presented as *answering* 5YHP's W5 — pollution is real and concentrated (0.155 vs 0.125, p=0.0085), AC3 removes 100% of causally harmful spans.
+
+**F71 — Part 2: the case is assembled, and it leads with the concession.** New CW2 subsection, "Where AC3 separates from assistant omission, and where it does not", plus a summary in the AC letter. It opens with the wash — matrix-wide head-to-head **+2.6 pp, 15 W / 17 L / 4 T** — then the concentration: **database +18.7 pp, 8 of 9**; tau2 AO 0% structural; WildChat every populated cell; framed as a decision procedure over operators indexed by referentiality.
+
+**Note against myself:** my brief told T25 "+21 pp over AO on database". **T25 recomputed it as 18.7 pp and printed the measured value.** I had carried +21 forward from an earlier summary without re-deriving it. The agent verifying its orchestrator's numbers rather than trusting them is exactly the behaviour that should be rewarded, and it is the eleventh number tonight that moved when someone actually checked.
+
+**F72 — H10 answered with a number recovered at zero API cost.** Vg97 asked for AC3's latency and we had been reporting only the summariser's. T25 recovered AC3's own wall-clock from `outputs/T1/main/*/experiment.log`: Reset is **+82% end-to-end but +9% per turn** once turn inflation is separated, against the summariser's +19%. Separating the two is the honest presentation — the end-to-end figure is dominated by AC3 producing more turns, not by slower turns.
+
+**HIGH items applied:** H2, H3, H4, H5, H6, H7, H8, H10. **T24's routed work also landed**: the false *"full, non-difficulty-selected pool"* claim in `01` W2 is fixed, and the three-way baseline reconciliation is now in `00`, `01`, `02`, `04`, `05`. T24's two paper-side items queued as **PAPER-9/PAPER-10**.
+
+**Still open:** **H9** — the tau2-dependent "improves across the entire spectrum" sentence — recorded as **README Blocker 5** with pre-drafted fallback wording and deliberately **not** applied, since T6 may falsify it. M11, M12, M6, M3, M15 need runs; the rest deferred as survivable or tone calls.
+
+**HOLD integrity:** all eight `⚠ INTERNAL` blocks verified byte-identical by **per-block SHA-256** against `d24a2db` — a stronger check than the grep used in earlier passes.

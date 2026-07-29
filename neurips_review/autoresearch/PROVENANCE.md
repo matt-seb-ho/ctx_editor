@@ -39,7 +39,8 @@ graph TD
     T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
     T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
     T2B["T2B counterfactual span ablation<br/>pollution real + concentrated (~6%)<br/>BOTH operators non-selective<br/>[done] $62.80"]
-    T25["T25 retract Rewrite claim<br/>+ assemble the case<br/>[run]"]
+    T25["T25 retract Rewrite claim<br/>+ assemble AO counter-case<br/>H2-H8,H10 applied<br/>[done]"]
+    T26["T26 refresh HANDOFF<br/>[run] — stale at 58 of 72 findings"]
     T15["T15 claims audit -> replies/v5<br/>64 claims: 24 unchanged, 14 corrected,<br/>6 struck, 11 added, 5 unverified<br/>[done]"]
     T16["T16 verify gate stats<br/>claim exact; wording wrong<br/>firing rate != detection rate<br/>[done]"]
     T14["⚠ T14 FN-adjustment audit<br/>2 flips on Rewrite (unpublished cells)<br/>Reset/Gated survive all 8<br/>found ERGO denominator defect<br/>[done]"]
@@ -80,6 +81,8 @@ graph TD
   T2B -->|"supersedes Rewrite attribution"| T25
   T23 --> T25
   T24 -->|"F70 false claim + reconciliation"| T25
+  T25 --> T26
+  T22 -.->|"superseded"| T26
   T1 -.->|"56.1% vs paper 4.0%"| T24
   T8 --> T21
   T11 --> T20
@@ -130,7 +133,8 @@ graph TD
 | T23 | Red-team `replies/v5/` | 2026-07-29 | `tasks/T23/RED_TEAM.md` | 30 items; **found the 52 pp baseline spread the accuracy audits missed** |
 | T24 | Reconcile the three baselines | 2026-07-29 | `tasks/T24/worklog.md` (`78226bd`) | **H1 explained by pool selection (~25 pp, two routes); T1 still answers the AC; found F70** |
 | T2B | Counterfactual span ablation | 2026-07-29 | `tasks/T2B/{RESULTS.md,per_span.json}` (`289de75`) | **Causal gold standard: pollution concentrated (~6%); both operators non-selective** |
-| T25 | Retract Rewrite claim + assemble case | 2026-07-29 | `tasks/T25/worklog.md` | Supersedes PAPER-5; executes RED_TEAM's four-move plan |
+| T25 | Retract Rewrite claim + assemble case | 2026-07-29 | `tasks/T25/worklog.md` (`edbda19`) | PAPER-5 rewritten; AO case assembled (+2.6 pp wash, database +18.7 pp); H2–H8, H10 applied |
+| T26 | Refresh `HANDOFF.md` | 2026-07-29 | `autoresearch/HANDOFF.md` | Supersedes the T22 version (written at 58 of 72 findings) |
 
 ---
 
