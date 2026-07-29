@@ -37,7 +37,7 @@ graph TD
     T1["T1 condensation baseline<br/>summarisation does NOT close gap<br/>over-budget and still loses<br/>[done]"]
     T11["T11 WildChat judge checks<br/>position bias real but pre-randomised<br/>headline survives, -2.0/-0.9pp<br/>[done]"]
     T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
-    T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
+    T6["⚠⚠⚠ T6 multi-replicate tau2<br/>855 rollouts, 15/15 cells<br/>2 of 3 baselines DO NOT replicate<br/>Baseline >= every AC3 arm<br/>[done]"]
     T2B["T2B counterfactual span ablation<br/>pollution real + concentrated (~6%)<br/>BOTH operators non-selective<br/>[done] $62.80"]
     T25["T25 retract Rewrite claim<br/>+ assemble AO counter-case<br/>H2-H8,H10 applied<br/>[done]"]
     T26["T26 refresh HANDOFF<br/>[done]"]
@@ -93,7 +93,7 @@ graph TD
   T11 --> T20
   T14 --> T19
   T16 --> T19
-  T6 -.->|"⚠ baselines may not replicate"| T15
+  T6 -->|"WITHDRAW tau2 table"| T28
   T15 --> T16
   T14 -.->|"corrects magnitudes in"| P0
 
@@ -141,7 +141,8 @@ graph TD
 | T25 | Retract Rewrite claim + assemble case | 2026-07-29 | `tasks/T25/worklog.md` (`edbda19`) | PAPER-5 rewritten; AO case assembled (+2.6 pp wash, database +18.7 pp); H2–H8, H10 applied |
 | T26 | Refresh `HANDOFF.md` | 2026-07-29 | `autoresearch/HANDOFF.md` (`701f6b6`) | Supersedes the T22 version; corrected my brief in 3 places |
 | T27 | Triage MEDIUM red-team items | 2026-07-29 | `tasks/T27/worklog.md` (`6396b31`) | **M11 closes the AC's reservation; caught 2 false red-team fixes**; M15 CI [+11.5, +19.4] |
-| T28 | Apply T27 wordings + inoculate RED_TEAM | 2026-07-29 | `tasks/T28/worklog.md` | Prevents the two false fixes being posted |
+| T28 | Apply T27 wordings + inoculate RED_TEAM + **unseal HOLDs / withdraw tau2** | 2026-07-29 | `tasks/T28/worklog.md` | Prevents the two false fixes; lands D21 |
+| T6 | Multi-replicate tau2 (N=3) | 2026-07-29 | `tasks/T6/worklog.md`; `~/ac3/tau2_ctxe` | **855 rollouts; DSV4F 31.6→70.2, Kimi 26.3→78.9; tau2 comparison withdrawn** |
 
 ---
 
@@ -161,6 +162,7 @@ graph TD
 | Rebuttal end-to-end "AC3-Reset 100.0 ± 0.0" | `[dead]` | FN-adjusted with asymmetric exclusions (Reset 1/2/5 items, baseline 0). Raw: 87.5 ± 2.0 / 93.3 ± 4.2 / 95.0 ± 0.0. Claim survives; the perfect score does not. |
 | "MT-OSC barely fires, so it cannot address pollution" (as our defence) | `[dead]` | Superseded by T27/M12: at w=2 it engages **9× more** and scores **47.7%, −13.1 pp vs w=4** (p=0.016). We no longer need the low-engagement argument — making it fire more makes it worse. |
 | "Summarisation degrades with more budget, which is the mechanism prediction" | `[dead]` | T27: the 1-call arm replicates at **47.7%**, exactly the 2-call value; the two 1-call runs differ by more than 1-call differs from 2-call. Fifth margin to dissolve under replication. Print "neutral-to-negative". |
+| **The tau2 magnitude comparison (all 3 models)** | `[dead]` | T6 at N=3: remeasured Baseline is at or above every AC3 arm on every model. Positive control reproduced (gpt-5.4 68.4 vs 68.4; AO 0.0 across 9 cells), so the published DSV4F/Kimi baselines were degraded controls — our own source report concedes Kimi's was rate-limit-clipped. **Only the AO → 0.0 structural result survives.** |
 | End-to-end tau2 replay | `[dead]` | ~2 dev-days; out of window. Defend replay as causal-attribution design instead; T4 supplies fresh end-to-end evidence on LiC. |
 | Full human eval on WildChat | `[dead]` | Out of window. Defend with N=3 seeds + tight intervals; T11 supplies judge-side checks. |
 | T5 on math | `[dead]` as a discriminating control | Near-ceiling accuracy compressed all arms to ~97.5%. Needs a high-pollution venue → folded into T1. |
