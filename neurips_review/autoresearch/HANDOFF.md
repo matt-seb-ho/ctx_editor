@@ -4,64 +4,87 @@ Read this instead of `WORKLOG.md`. Everything here traces to a finding ID (F*) i
 [`WORKLOG.md`](WORKLOG.md) and an artifact on disk. Paths are relative to the repo root
 `/home/t-matthewho/ac3/ctx_editor/` unless they start with `~`.
 
-**Refreshed by T26 at F1–F72 / D1–D19.** The first version (T22, commit `11d8e40`) was
-written at F58, before T2B, T23, T24 and T25 landed. Several entries below are **reversals**
-of what that version said, not additions — most importantly **PAPER-5**, which now says the
-opposite of what it did. If you have read the earlier version, re-read §2 row 5, §4 PAPER-5,
-and §5.
+**Refreshed by T29 at F1–F83 / D1–D21. The session is over: every experiment and every edit
+pass is complete, nothing is in flight.** Two earlier versions exist (T22 at F58, commit
+`11d8e40`; T26 at F72, commit `701f6b6`) and **both are now wrong about the headline**.
 
-**One agent, T6, is still running.** See §5. Nothing should be posted until it lands.
+**If you read only one thing: the tau2-bench comparison is withdrawn.** T6, the last and
+longest experiment of the session, re-ran the full published tau2 matrix at N=3 and found that
+**two of three published baselines do not replicate**. On all three models the remeasured
+baseline is at or above every AC3 arm. This is not a caveat; it removes a benchmark that was
+front and centre in the abstract, Figure 1, the General Response and the AC letter. See §2 row
+**0**, §3 first subsection, and **PAPER-11**.
+
+The counterweight, which is real: **the Area Chair's baseline reservation is now empirically
+closed** (§3, T27/M11), and the core LiC result survived everything thrown at it.
 
 ---
 
 ## 1. Bottom line
 
-The session **net-strengthened the submission, but mostly by subtraction**: it found more
-problems with claims we had already written than it produced new wins. Roughly a dozen of
-our own numbers moved; most of those moved against us, and one correction *raises a
-competitor's* number. Every one of them was findable by a reviewer with our own printed
-tables and a calculator, so finding them first is the good outcome — but do not read the
-finding count as a win column.
+The session **net-strengthened the submission, but overwhelmingly by subtraction**. It found
+substantially more problems with claims we had already written than it produced new wins.
+Roughly a dozen of our own numbers moved; most moved against us, one correction *raises a
+competitor's* number, and one **withdraws an entire benchmark**. Nearly all of it was findable
+by a reviewer with our own printed tables and a calculator, so finding it first is the good
+outcome — but do not read the finding count as a win column.
 
-**The core result survives everything thrown at it**: AC3-Reset and AC3-Gated-Reset beat
-baseline in **all 8 LiC cells under raw, shipped-adjusted and arm-symmetric-corrected
-accuracy alike** (F40), and the Gated-vs-Reset ordering holds cell-for-cell. Four promises
-from v4 are now completed experiments (condensation baseline, detector evaluation, WildChat
-judge checks, memory split analysis), plus the analyzer sweep Vg97 asked for and we had
-never answered. **T1, T9, T2A/T2B and T11 are genuinely new evidence**, not repairs.
+**Two things are simultaneously true and both belong in the same sentence when you brief
+anyone:**
+
+1. **The tau2 story inverts and the improvement claim is gone** (F78–F81, D21). The one tau2
+   result that survives — **AO → 0.0% on every model, structurally, 9/9 cells, 171 rollouts,
+   reproducing the published 0/0/0 exactly** — is also the one the paper most needs tau2 for,
+   because it is the evidence that blanket omission fails when state lives in assistant turns.
+2. **The core LiC result survives every attack**: AC3-Reset and AC3-Gated-Reset beat baseline in
+   **all 8 LiC cells under raw, shipped-adjusted and arm-symmetric-corrected accuracy alike**
+   (F40), the Gated-vs-Reset ordering holds cell-for-cell, and the headline paired result now
+   carries an item-level test and a problem-clustered interval: **+15.4 pp, 95% CI [+11.5,
+   +19.4]**, 350 W / 93 L over 1,668 paired items (F77).
+
+Four promises from v4 are now completed experiments (condensation baseline, detector
+evaluation, WildChat judge checks, memory split analysis), plus the analyzer sweep Vg97 asked
+for and we had never answered. **T1, T9, T2A/T2B, T11 and T27 are genuinely new evidence**, not
+repairs.
 
 Three things to act on, in order:
 
-1. **PAPER-7 is the only hard blocker.** We scored ERGO on the wrong denominators,
-   understating a competitor by up to ~10 pp on math. `replies/v5/` now commits to that fix
-   **in front of the reviewers** (five places). Posting the rebuttal without making the paper
-   edit means announcing a correction we have not made (F58).
-2. **Do not post anything yet.** Five of the eight `⚠ INTERNAL` blocks in `replies/v5/` are
-   tau2 HOLDs sealed pending T6, plus a sixth tau2-dependent sentence (Blocker 5) left
-   deliberately unapplied.
-3. **The mechanism story changed, and with it the ERGO differentiation.** T2B (the causal
-   gold standard) shows **neither** operator is selective. "We preserve what's correct and
-   remove what's harmful" must be **deleted, not re-attributed** — and "unlike prior work
-   that discards all assistant messages" is no longer how we differ from ERGO (F66, §2 row 5).
+1. **Absorb the tau2 withdrawal before you talk to anyone about this paper.** `replies/v5/` is
+   already fully rewritten around it (T28, zero API calls) — the withdrawal is applied in `00`
+   CW1+CW4, `01` W3, `02` W2/Q2, `04` correction 6, `05` correction 8, `README`, `CHANGES` §12.3.
+   The **paper** still asserts the old story in the abstract, Figure 1, the intro,
+   `tab:megatable`, §`sec:tau2-results`, the discussion and the conclusion. That is **PAPER-11**.
+2. **PAPER-7 is still the only hard blocker on posting.** We scored ERGO on the wrong
+   denominators, understating a competitor by up to ~10 pp on math. `replies/v5/` commits to
+   that fix **in front of the reviewers** in five places. Posting without making the paper edit
+   means announcing a correction we have not made (F58).
+3. **Two contribution-framing decisions need a human, not an agent: PAPER-5 and PAPER-11.**
+   T2B killed "we preserve what's correct and remove what's harmful" for *both* operators, which
+   also dissolves the ERGO differentiation; the tau2 withdrawal removes the far end of the
+   "spectrum of referentiality" narrative. Together they change what the paper claims to
+   contribute, not just what it reports.
 
 ---
 
 ## 2. Claims that must change before anything is submitted
 
-Ordered by severity. "Fixed in v5" means the reply set already carries the corrected
-wording; it does **not** mean the paper does. Rows 1–14 keep their original numbers so
-cross-references still resolve; rows 15–20 are new since the T22 version.
+Ordered by severity. "Fixed in v5" means the reply set already carries the corrected wording; it
+does **not** mean the paper does. Rows 1–20 keep their original numbers so cross-references from
+earlier handoff versions still resolve; **row 0** and rows 21–22 are new since the T26 version.
 
 | # | We claimed | What is true | Finding | Artifact | Status |
 |---|---|---|---|---|---|
-| 1 | ERGO scored comparably to every other row in `tab:main` | **ERGO alone used the unfiltered pools** (23/25/25/25 vs everyone else's 20/19/25/23). Corrected: math **69.6 → 80.0**, code **≈44.0** (unchanged), database 12.0, actions unclosable **[43.5, 52.2]**. Corrected ERGO/math **beats AC3-Reset (75.0) and ties Gated-Reset (80.0)**. Measured scorecard: ERGO wins-or-ties **3/12**, not the published 1/12 | F42, F43, F44, F48 | `tasks/T17/RESULTS.md`, `tasks/T17/corrected_tabmain.json`, `tasks/T18/worklog.md` | Disclosed in v5 (5 places). **Paper: PAPER-7, not applied** |
+| **0** | *(new — the largest single change to the submission)* **tau2-bench: "the best AC3 operator beats full context by double-digit margins on every respondent"** (abstract, Fig. 1, intro, §tau2-results, discussion, conclusion) | **Withdrawn.** T6 re-ran the full published matrix at N=3 — 3 models × 5 arms × 3 replicates × 19 tasks = **855 scored rollouts** (899 run), 15/15 cells, same hyperparameters and model identities as the committed sweep scripts. **Two of three published baselines do not replicate: DSV4F 31.6 → 70.2 ± 11.0, Kimi 26.3 → 78.9 ± 0.0.** On **all three models the remeasured Baseline is at or above every AC3 arm**; AC3-Augment is significantly *worse* than baseline on all three (−21.1 p=.008 / −19.3 p=.043 / −21.1 p=.012). **What survives: AO → 0.0 across all 9 cells / 171 rollouts, structural and exact.** Also surviving: the gpt-5.4 Gated-Reset regression (57.9 ± 21.1 vs 68.4, paired −10.5 pp, p=0.24) — reproduces in direction, kept, not upgraded | **F78–F81, D21** | `tasks/T6/worklog.md` (Tables 1–2, §"the finding the rebuttal has to deal with"); traces at `~/ac3/tau2_ctxe/ctx_edit/outputs/T6_reps/` | **Withdrawn throughout v5 by T28.** **Paper: PAPER-11 — not applied, and it is the highest-stakes item on that list** |
+| 0a | *(scope of #0)* "these are not comparable measurements across model eras" | **No — this was tested, and the answer is "the published baselines were wrong".** The positive control **reproduced**: gpt-5.4 Baseline 68.4 vs published 68.4, AO 0.0 across 9 cells vs published 0/0/0. `gpt-5-mini` *was* reachable (dl-openai-1 + dl-openai-3), invocation strings byte-identical, **no model substitution anywhere**. Supporting: the AC3 arms on DSV4F/Kimi replicate well, T6's baseline runs terminate 60/60 and 59/60 `user_stop` with zero short-exits, and **our own source report already concedes Kimi's baseline was rate-limit-clipped** — 14/20 short exits, described there as "floors, not honest performance". The paper's `tab:megatable` caption already says this too. **Do not soften the withdrawal into "mixed results" or "not comparable"** | **F79** | `tasks/T6/worklog.md` §"Did the positive control reproduce?"; paper `tab:megatable` caption | Codified as a rule in `replies/v5/README.md` Blocker 2 |
+| 0b | *(open problem inside #0, disclosed not explained)* — | **gpt-5.4's AC3 collapse is unexplained.** Augment 84.2 → 47.4, Rewrite 73.7 → 47.4, while that model's *baseline* reproduced exactly. T6 ruled out model substitution, gating, degenerate termination and rate limits. It found a **real fork bug** — `ctx_edit/analyzer.py:89-95` `_extract_tag` regexes only for `<task_spec>`, and **459 of 862 analyzer Q1 calls (53%) hit the raw-completion fallback**, splicing escaped JSON into the agent briefing — but the gated fix moved accuracy **42.1 → 44.4 (+2.3 pp)**, not the ~37 pp needed. **Disclose it as an open problem; do not paper over it.** The parser should be fixed upstream regardless | **F80** | `tasks/T6/worklog.md` §"Bug found in the fork"; diagnostic at `~/ac3/tau2_ctxe/ctx_edit/outputs/T6_diag/gpt5_4_s1_fixparse/` | Disclosed in v5. Fork fix is behind `T6_FIX_TAG_PARSE=1`, **not merged** |
+| 1 | ERGO scored comparably to every other row in `tab:main` | **ERGO alone used the unfiltered pools** (23/25/25/25 vs everyone else's 20/19/25/23). Corrected: math **69.6 → 80.0**, code **≈44.0** (unchanged), database 12.0, actions unclosable **[43.5, 52.2]**. Corrected ERGO/math **beats AC3-Reset (75.0) and ties Gated-Reset (80.0)**. Measured scorecard: ERGO wins-or-ties **3/12**, not the published 1/12 | F42, F43, F44, F48 | `tasks/T17/RESULTS.md`, `tasks/T17/corrected_tabmain.json`, `tasks/T18/worklog.md` | Disclosed in v5 (5 places). **Paper: PAPER-7, not applied — the posting blocker** |
 | 2 | Per-run `adjusted_accuracy` is a valid metric | The FN judge reads **visible** messages only, so reset arms get 50–78% of failures excluded vs 9% for baseline. Inflates reset arms **+13.9 to +55.9 pp**, no-reset arms +0.2 to +6.5. Shipped example: AC3-Reset database **89.0% published vs 77.1% corrected**. Judge sees 1.00 user turns/sample on Rewrite vs 5.35 on baseline | F28, F40, F41 | `tasks/T14/{RESULTS.md,corrected_matrix.*}` | v5 is raw throughout. **Paper: PAPER-6** |
 | 2b | (scope of #2) `tab:main`'s 20/19/25/23 denominators are suspect | **They are not.** They come from an arm-symmetric **pool-level pre-filter** (`data/baseline_traces_v2/*_false_negatives.json`) that reproduces them exactly. **Defend this, do not concede it.** Only the *per-run* metric is invalid | F42, D13 | same | v5 defends it explicitly |
-| 3 | Rebuttal end-to-end: **AC3-Reset 100.0 ± 0.0** | That table was itself FN-adjusted with **asymmetric exclusions** (Reset 1/2/5 items excluded, Baseline 0). Raw: Baseline **87.5 ± 2.0**, Reset **93.3 ± 4.2**, Gated-Reset **95.0 ± 0.0**. Claim survives — both operators win in all three runs — the perfect score does not. It appeared in **five files** | F34 | `neurips_review/experiments/exp1_reps_results.txt` | Fixed in v5 |
+| 3 | Rebuttal end-to-end: **AC3-Reset 100.0 ± 0.0** | That table was itself FN-adjusted with **asymmetric exclusions** (Reset 1/2/5 items excluded, Baseline 0). Raw: Baseline **87.5 ± 2.0**, Reset **93.3 ± 4.2**, Gated-Reset **95.0 ± 0.0**. Claim survives — both operators win in all three runs — the perfect score does not. It appeared in **five files**. **Now also carries clustered CIs** (F77/M3): Reset +5.8 pp [+0.0, +12.5], p=0.119; Gated-Reset +7.5 pp [+1.7, +15.0], **p=0.023** — reads honestly in both directions | F34, F77 | `neurips_review/experiments/exp1_reps_results.txt`, `tasks/T27/m3_bootstrap.py` | Fixed in v5 |
 | 4 | CollabLLM MATH-Hard **100%** | Does not replicate. N=3: AC3-Augment **91.7 ± 7.6** vs Baseline **91.7 ± 5.8** — identical means *and* identical 55/60 per-problem totals; per-replicate delta [+5, −10, +5] = **0.0 ± 8.7**. Say **"matches Baseline"**, which still refutes 5YHP's regression claim | F16 | `tasks/T8/worklog.md` | Fixed in v5. **Paper: PAPER-4** |
-| 5 | "We preserve what's correct and remove what's harmful" | **Not supported for *either* operator — retract, do not re-attribute.** T2A (constructed spans) put Reset's edit precision at **50.4%** against 50% chance with **4.0%** preservation, and Rewrite looked like the selective exception (27.0 / 38.9), which is why F25 said "attribute, don't retract". **T2B overturns that on *natural* spans, causally, with no detector or judge in the label path:** Reset keeps **5/66** probe-admissible spans, **Rewrite keeps 0/66**, preservation on causally useful spans is **0% for both**, edit precision is **63.6% = the base rate for both**, and the label-free aggregate test agrees (Reset removed−kept −0.014, p=0.85). Rewrite only looked selective because a short self-contained *injected* sentence survives compaction verbatim; the model's own prose and code get paraphrased. **The mechanism for both operators is *detect → discard the assistant side → rebuild the specification from the user side*.** **Consequence nobody had named: this breaks the ERGO differentiation** — "unlike prior work that discards all assistant messages" was how the paper distinguished itself, and T2B says we largely *do* discard them | F25, **superseded by F66** | `tasks/T2B/RESULTS.md` §4, `tasks/T2B/per_span_alignment.json`; earlier `tasks/T2A/RESULTS.md`, `outputs/T2A/` | **Retracted in v5 by T25** (`replies/v5/CHANGES.md` §11.1). **Paper: PAPER-5** (framing is also in `CLAUDE.md`/project overview) |
+| 5 | "We preserve what's correct and remove what's harmful" | **Not supported for *either* operator — retract, do not re-attribute.** T2A (constructed spans) put Reset's edit precision at **50.4%** against 50% chance with **4.0%** preservation, and Rewrite looked like the selective exception (27.0 / 38.9), which is why F25 said "attribute, don't retract". **T2B overturns that on *natural* spans, causally, with no detector or judge in the label path:** Reset keeps **5/66** probe-admissible spans, **Rewrite keeps 0/66**, preservation on causally useful spans is **0% for both**, edit precision is **63.6% = the base rate for both**, and the label-free aggregate test agrees (Reset removed−kept −0.014, p=0.85). **The mechanism for both operators is *detect → discard the assistant side → rebuild the specification from the user side*.** **Consequence nobody had named: this breaks the ERGO differentiation** — "unlike prior work that discards all assistant messages" was how the paper distinguished itself, and T2B says we largely *do* discard them | F25, **superseded by F66** | `tasks/T2B/RESULTS.md` §4, `tasks/T2B/per_span_alignment.json`; earlier `tasks/T2A/RESULTS.md`, `outputs/T2A/` | **Retracted in v5** (`replies/v5/CHANGES.md` §11.1). **Paper: PAPER-5** (framing is also in `CLAUDE.md`/project overview) |
 | 6 | Bare **97.6%** pollution-removal rate | True but unquotable alone — a delete-everything editor scores 1.000 on it, as our own PC3/PC4 controls show. Always report the quartet: detection (**78.6%** pollutant naming, 89.7% on the causally-harmful subset), removal 97.6%, preservation 4.0%, edit precision 50.4% vs chance 50 | F23, F26, D9 | `tasks/T2A/{RESULTS.md,measure.py}` | Fixed in v5 |
-| 7 | "N=3 **seeds**" on LiC and CollabLLM | `cfg.seed` was read only by `huang_eval/`; every `seed=$((42+rep))` was **inert**, and the CollabLLM loaders hardcode `random.Random(42)` so all replicates drew the *same 20 problems*. Replicates varied through **temperature-1.0 sampling only** — decoder variance, not sampling variance. Say "3 replicate runs at temperature 1.0". **WildChat's N=3 are real seeds and keep the word.** Fixed going forward in 2 lines (F19); prior runs reproduce bit-for-bit | F4, F19 | `tasks/RECON/worklog.md`, `tasks/T8/worklog.md` | Fixed in v5. **Paper: PAPER-1** |
+| 7 | "N=3 **seeds**" on LiC and CollabLLM | `cfg.seed` was read only by `huang_eval/`; every `seed=$((42+rep))` was **inert**, and the CollabLLM loaders hardcode `random.Random(42)` so all replicates drew the *same 20 problems*. Replicates varied through **temperature-1.0 sampling only**. Say "3 replicate runs at temperature 1.0". **WildChat's N=3 are real seeds and keep the word. So does tau2** — `--seed` genuinely threads on that fork (`run_parallel:131` → `orchestrator:526-528` → `llm_config.py:41-48` → litellm), best-effort at the provider, so ship "N=3 replicate runs (seeds 42/43/44)" (F81) | F4, F19, **F81** | `tasks/RECON/worklog.md`, `tasks/T8/worklog.md`, `tasks/T6/worklog.md` §13:56 | Fixed in v5. **Paper: PAPER-1** |
 | 8 | Memory gains **+10 pp math / +12 pp database** | Single trials against a **~6 pp learner noise floor** — under 2σ. Variance controls: across-ordering sd **6.5** does not exceed same-ordering sd **6.1**, so ordering is not a distinguished factor; the learner is just noisy. An N=4 remeasure on gpt-5.4-mini gives **−5.0 / −8.0 pp** (different model, so not a direct refutation — but the variance argument is model-independent) | F12, D7 | `tasks/T12-T13/worklog.md` §9, `outputs/T12_T13/` | Dropped from v5. **Paper: PAPER-3** |
 | 9 | WildChat headline **89.8 / 92.1** | Order-balanced re-judge: **87.8 ± 2.1** (Reset) / **91.2 ± 2.1** (Augment). The headline judge prefers the second-presented response (32 vs 8 of 44 discordant pairs, binomial **p = 1.8e-4**), but `pairwise_judge.py` already randomises A/B 50/50, so the published number is unbiased *in expectation* — report the corrected values anyway, it is a cheap concession | F30, F31 | `tasks/T11/{worklog.md,out/}` | Fixed in v5 |
 | 10 | AC3-Reset beats assistant omission on BigCodeBench (+6.7 pp) | AO column at N=3 is **18.3 ± 5.8**, narrowing the margin to **+3.3 pp** — two problem-instances in sixty, inside the noise, and the two arms succeed on partly different problems. **Do not claim this ordering.** Lead instead with AC3-Reset over **full context**: +15 pp in 3 of 3 replicates | F57 | `tasks/T21/worklog.md`, `outputs/T21/` | Fixed in v5 |
@@ -69,37 +92,83 @@ cross-references still resolve; rows 15–20 are new since the T22 version.
 | 12 | Gate-open rates 97.3% / 98.3% are *turn*-level detection rates | Numbers reproduce **exactly**, but they are per-**conversation**, and turn-level CollabLLM is **95.3%** (628/659). Also a **firing** rate, not a detection rate: 29% (LiC) / 73% (CollabLLM) of gate-open records carry `issues: "None"` while setting `needs_edit=true` | F39 | `tasks/T16/{gate_stats.py,report.md}` | Fixed in v5 |
 | 13 | Two things we conceded that were false | (a) "BigCodeBench cannot be evaluated with executable tests" — it can; that path runs real `untrusted_check` execution. (b) Two documentation artifacts the paper cites do not exist: `docs/paper_experiments_provenance.md` names absent configs, and `docs/multi_run_variance_2026-05-07.md` — cited **twice** as the source of the appendix variance table — has never existed | F36, F8 | `tasks/T8/worklog.md` §5; `tasks/RECON/worklog.md` | (a) struck from v5. (b) **Paper: PAPER-2** |
 | 14 | Judging was deterministic (temperature 0) | The client logs `gpt-5 models require temperature=1.0, overriding 0.0 -> 1.0`. Substitute the honest figure: **96.9% self-consistency, κ 0.810** | F33 | `tasks/T11/worklog.md` | Fixed in v5 |
-| **15** | *(new)* Three full-context baselines for the same benchmark, **52 points apart**, with nothing in the rebuttal explaining it: paper 4.0 / 15.8, `01` W1 19.0–22.4, `00` CW5 (T1) 56.1 / 83.0 | **All three are correct measurements of deliberately different populations; the dominant term is pool difficulty selection**, not model era, evaluator or metric. Verified two independent ways agreeing within 2 pp: restricting T1's *own* run to the paper's exact 25 items gives 56.1 → **32.0** (database), 83.0 → **48.0** (code); LiC's released logs put GPT-5-mini at **29.9%** on the full 107-item pool vs 4.0% on its top-25. The paper's 4.0% = 1/25 **is what the construction guarantees**, not an independent measurement | F59 (red team H1), **F68** | `tasks/T24/worklog.md` §7 | Fixed in v5 (`00` CW5, `01`, `02`, `04`, `05`). **Paper: PAPER-9** |
-| **16** | *(new)* `01_reviewer_iNYK.md:31` — the 36-comparison matrix is on "the full, non-difficulty-selected pool" | **False.** It runs on difficulty-selected pools, which is **iNYK's exact complaint**, asserted about our own new headline evidence. If a reviewer checks one claim in the rebuttal, this is the one they check. The fix is a swap, not a retraction: **T1** is the experiment that genuinely satisfies the claim (complete unselected pool, end-to-end) | **F70** | `tasks/T24/worklog.md` §7 | Fixed in v5 by T25 (`01` W2 + `00` CW2) |
-| **17** | *(new)* CW1: "the same four operators", above a table printing **three** | `paired_analysis_results.txt` holds a fifth row we did not print: **AC3-Rewrite −0.3 pp, 6 W / 6 L**. Rewrite is precisely the operator 5YHP's W4 was about. Printing three of four while claiming four colours a reviewer's reading of everything else | **F60** (H2) | `neurips_review/experiments/paired_analysis_results.txt` | Fixed in v5 by T25 |
-| **18** | *(new)* "AC3 beats assistant omission in every WildChat cell (22 populated cells)" | Two arithmetic errors in one sentence: **9 of the 22 are against full context**, and 4×4 ≠ 22. Inherited from T20's suggested wording — a *verified number* arrived inside a *wrong sentence* | **F63** (H7) | `tasks/T23/RED_TEAM.md` H7 | Fixed in v5 by T25 |
-| **19** | *(new)* AC3-Reset separates from assistant omission generally | **Matrix-wide head-to-head is a wash: +2.6 pp, 15 W / 17 L / 4 T.** The separation is **concentrated**: database **+18.7 pp, 8 of 9**; tau2 AO 0% structural; WildChat every populated cell. Lead with the wash, then the concentration — this is the answer to the red team's strongest objection (F64), that our own concessions reduce AC3-Reset to "assistant omission plus a spec-extraction call" | **F64, F71** | `tasks/T23/RED_TEAM.md` (final section), `tasks/T25/worklog.md` §2 | Fixed in v5 by T25 — new CW2 subsection + AC-letter summary |
-| **20** | *(new)* Vg97 asked for AC3's latency; we reported the **summariser's** | AC3's own wall-clock, recovered at **zero API cost** from `outputs/T1/main/*/experiment.log`: full context 578 s, Gated-Reset 781 s (**+35%**), Reset 1,051 s (**+82%**), summariser-2 1,214 s (+110%). Decomposed, most of the gap is **turn inflation** (6.9 vs 4.1 turns): **per turn** Reset is **+9%**, Gated-Reset +5%, summariser-2 +19%. Report both halves | **F72** (H10) | `tasks/T25/worklog.md` §H10, `outputs/T1/main/*/experiment.log` | Fixed in v5 by T25 |
+| 15 | Three full-context baselines for the same benchmark, **52 points apart**, with nothing in the rebuttal explaining it: paper 4.0 / 15.8, `01` W1 19.0–22.4, `00` CW5 (T1) 56.1 / 83.0 | **All three are correct measurements of deliberately different populations; the dominant term is pool difficulty selection**, not model era, evaluator or metric. Verified two independent ways agreeing within 2 pp: restricting T1's *own* run to the paper's exact 25 items gives 56.1 → **32.0** (database), 83.0 → **48.0** (code); LiC's released logs put GPT-5-mini at **29.9%** on the full 107-item pool vs 4.0% on its top-25. The paper's 4.0% = 1/25 **is what the construction guarantees**, not an independent measurement | F59 (red team H1), **F68** | `tasks/T24/worklog.md` §7 | Fixed in v5 (`00` CW5, `01`, `02`, `04`, `05`). **Paper: PAPER-9** |
+| 16 | `01_reviewer_iNYK.md:31` — the 36-comparison matrix is on "the full, non-difficulty-selected pool" | **False.** It runs on difficulty-selected pools, which is **iNYK's exact complaint**, asserted about our own new headline evidence. If a reviewer checks one claim in the rebuttal, this is the one they check. The fix is a swap, not a retraction: **T1** is the experiment that genuinely satisfies the claim (complete unselected pool, end-to-end) | **F70** | `tasks/T24/worklog.md` §7 | Fixed in v5 (`01` W2 + `00` CW2) |
+| 17 | CW1: "the same four operators", above a table printing **three** | `paired_analysis_results.txt` holds a fifth row we did not print: **AC3-Rewrite −0.3 pp, 6 W / 6 L**. Rewrite is precisely the operator 5YHP's W4 was about. Printing three of four while claiming four colours a reviewer's reading of everything else. **M15 makes that row better, not worse**: at item level it is **+0.0 pp, 42 W / 42 L, CI [−3.8, +3.8]** — "neutral on LiC, bounded within ±4 pp" | **F60** (H2), F77 | `neurips_review/experiments/paired_analysis_results.txt`, `tasks/T27/m15_results.txt` | Fixed in v5 |
+| 18 | "AC3 beats assistant omission in every WildChat cell (22 populated cells)" | Two arithmetic errors in one sentence: **9 of the 22 are against full context**, and 4×4 ≠ 22. Inherited from T20's suggested wording — a *verified number* arrived inside a *wrong sentence* | **F63** (H7) | `tasks/T23/RED_TEAM.md` H7 | Fixed in v5 |
+| 19 | AC3-Reset separates from assistant omission generally | **Matrix-wide head-to-head is a wash.** Cell level: **+2.6 pp, 15 W / 17 L / 4 T**. Item level, independently derived: **+2.8 pp, clustered 95% CI [−0.3, +5.9]** — includes zero. The separation is **concentrated**: database **+18.7 pp cell-level / +18.6 pp item-level, CI [+10.7, +26.6]**; tau2 AO 0% structural; WildChat every populated cell. **Guardrail: never quote the matrix-wide item-level McNemar p = 0.010 as a win** — it treats 1,668 items as independent when they are 191 problems × up to 9 correlated replicates. Had it been quoted, two sections of `00` would have contradicted each other (F82) | **F64, F71, F77, F82** | `tasks/T23/RED_TEAM.md` (final section), `tasks/T25/worklog.md` §2, `tasks/T27/m15_results.txt` | Fixed in v5; guardrail codified in `CHANGES.md` §8 rule 6b and `README.md` |
+| 20 | Vg97 asked for AC3's latency; we reported the **summariser's** | AC3's own wall-clock, recovered at **zero API cost** from `outputs/T1/main/*/experiment.log`: full context 578 s, Gated-Reset 781 s (**+35%**), Reset 1,051 s (**+82%**), summariser-2 1,214 s (+110%). Decomposed, most of the gap is **turn inflation** (6.9 vs 4.1 turns): **per turn** Reset is **+9%**, Gated-Reset +5%, summariser-2 +19%. Report both halves | **F72** (H10) | `tasks/T25/worklog.md` §H10, `outputs/T1/main/*/experiment.log` | Fixed in v5 |
+| **21** | *(new)* Our own defence that "MT-OSC barely fires, so the comparison is unfair to us, not to them" | **Retire it — we no longer need it, and it is now the weaker argument.** Scaling the window down so MT-OSC *does* engage makes it **worse**: w=2 scores **47.7%, −13.1 pp vs w=4's 60.7%** (p=0.016), with the engagement fix verified live (`raw_pairs_carried` 133 vs the buggy run's 0). It engages **9× more** and loses by more. AC3-Reset is **+28.0 pp** over it. Lead with the measured result, keep "structurally cannot engage" as the mechanism behind it | **F76** | `tasks/T27/worklog.md` §7.2, `outputs/T27/` | Fixed in v5 (`00` CW5 table + paragraph, `02` Q1, `04`, `05`) |
+| **22** | *(new)* Two fixes **the red team itself proposed** are false and must never be posted | (a) M3's *"the analyzer cache was disabled for these runs"* — **false**; `context_edit_v2_gated.yaml:18` sets `analysis_cache_dir` and `run_exp1_reps.sh` never overrides it. The **true** answer is stronger and measured: **39/39 conversations have differing analyzer outputs across the three replicates**, the two failing problems are a different pair each run (**intersection 0**), turn counts differ on 7/40 and answers on 5/40. (b) M11's *"it degrades with more budget (−2.8 → −8.4 pp), which is itself the mechanism prediction"* — the 1-call arm **replicates at 47.7%, exactly the 2-call value**, and the two 1-call runs differ by *more* than 1-call differs from 2-call. Print "neutral-to-negative", never a mechanism | **F74, D20** | `tasks/T27/worklog.md` §3.1, §7.1; annotated in place as `⚠ SUPERSEDED — DO NOT APPLY` at `tasks/T23/RED_TEAM.md:451` and `:556` | Neither is written anywhere in v5 |
 
 **One live pattern, not a single claim (F61, H4):** 5YHP asked about Rewrite and was answered
 with Augment; iNYK asked about Gated-Reset's 38.7% and was answered with Reset. Individually
 each substitution is defensible; named as a *pattern* it reads as a per-cell oracle and
-discounts every headline in the paper. T25 applied H4, but keep it in mind when drafting
+discounts every headline in the paper. Applied in v5, but keep it in mind when drafting
 anything new.
 
 ---
 
 ## 3. New results that strengthen the rebuttal
 
+### T27 / M11 — the Area Chair's baseline reservation, closed (F75, F76, F77, F74)
+
+**This is the best news of the second half of the session.** The AC's central reservation was
+that AC3's advantage over condensation might be an artifact of a condenser prompt *we* wrote,
+and v5 previously had to concede that the one control for it "did not finish in the window."
+It has now finished:
+
+| Arm (LiC-database, complete 107-item pool) | Accuracy |
+|---|---|
+| Full context | 56.1% |
+| Our condenser prompt, replicate 1 / replicate 2 | 53.3 / 47.7 |
+| **Neutral condenser prompt (the control)** | **51.4%** |
+| AC3-Gated-Reset | 73.8 (**+22.4** vs neutral) |
+| AC3-Reset | 75.7 (**+24.3** vs neutral) |
+| MT-OSC, w=2 (engagement-fixed) | 47.7 (**−13.1** vs w=4's 60.7, p=0.016) |
+
+The neutral prompt lands **between our own prompt's two replicates** — so the condensation
+result does not depend on our wording. **The load-bearing detail is not the 51.4%:** with the
+"find errors" clause removed, the condenser **flags an assistant error 0 times in 340
+summaries**, identical to with it (probe validated: 26.4% on AC3 analyzer output, 0% on baseline
+turns). *A summariser does not audit, whatever you instruct it to do.* That sentence is what
+carries the item.
+
+**M15 upgrades the headline statistic**, on 1,668 paired items across 191 problem clusters,
+recovered from the snapshot at **$0**: AC3-Reset **+15.4 pp, 95% CI [+11.5, +19.4]**, 350 W /
+93 L; Augment +14.6 [+10.8, +18.6]; Gated-Reset +16.8 [+11.6, +22.0]; AO +12.6 [+9.2, +16.1];
+Rewrite **+0.0 [−3.8, +3.8]**. Both positive controls reproduce exactly (168/168 cells, and all
+five printed rows to the digit). Cost of the whole task **$19.60**, $4.60 over guidance, spent
+on the decisive item; two of the five triaged items were **declined with reasons** (human
+validation, U-Fold on tau2) and those declines are as defensible as the runs.
+Artifacts: `tasks/T27/{worklog.md,m15_results.txt,m15_itemlevel.py,m3_bootstrap.py,run_results.txt}`,
+`outputs/T27/`.
+
+### T6 — tau2 at N=3 (see §2 row 0 for the withdrawal)
+
+Listed here too because **one tau2 result is new evidence and should still be posted**:
+**AO = 0.0% on every model, every replicate, 9 cells / 171 rollouts**, reproducing the published
+0/0/0 exactly, via the confirmed `max_steps` termination path — rollouts exhaust the step budget
+in infinite re-lookup loops because stripping assistant messages erases every diagnostic result
+the agent fetched. This is structural, does not depend on the baseline's level, and survives the
+withdrawal intact. It is also the only quantitative evidence in the paper that blanket omission
+fails when state lives in assistant turns, so the tau2 *section* stands even though the
+comparison does not. Artifact: `tasks/T6/worklog.md`; fork at `~/ac3/tau2_ctxe`.
+
 ### T2B — causal span ablation, the gold standard (F65, F66, F67)
 
 **111 naturally occurring spans** across 30 LiC database+code conversations, each re-run
 **14× present / 12× removed** at temperature 1.0 — 3,357 assistant turns, 0 errors, **no
 detector, judge or LLM anywhere in the label-generation path**, which is what makes it immune
-to the circularity objection. Cost $62.80, the most expensive task of the session and the
-only one where that was warranted. Two results, one for us and one against:
+to the circularity objection. Cost $62.80, the most expensive task of the session and the only
+one where that was warranted. Two results, one for us and one against:
 
 | Question | Answer |
 |---|---|
 | Is natural pollution real? | **Yes, and concentrated.** Effect SD **0.155** vs a replicate-matched parametric null's **0.125** (2,000 sims, **p = 0.0085**); **16** large-effect spans (\|Δ\| ≥ 0.25) where the null predicts **9.3** (**p = 0.017**). Mean effect **+0.020** [−0.010, +0.048] — **the typical span is inert**; the phenomenon lives in a ~6% excess minority |
 | Are the operators selective? | **No — neither of them.** Reset keeps **5/66** probe-admissible spans, Rewrite keeps **0/66**. Removal on causally harmful spans **100% (7/7, both)**; preservation on causally useful spans **0% (0/4, both)**; edit precision **63.6% = the base rate for both**. Label-free aggregate agrees (Reset removed−kept −0.014, p=0.85) |
 
-**Controls pass in both directions**, which ties T2A and T2B onto one scale: contentless span
+**Controls pass in both directions**, tying T2A and T2B onto one scale: contentless span
 **+0.033** (n.s.), T2A's causally-validated pollutant **+0.368** (p=1e-4), full-spec + gold-SQL
 span **−0.447** (p<1e-4). Probe controls identity 1.000 / nuke 0.000 / other 0.000. MDE 0.333.
 Same-corpus raw accuracy: Baseline 39.3%, Reset 51.9%, Rewrite 53.1%.
@@ -108,11 +177,8 @@ Same-corpus raw accuracy: Baseline 39.3%, Reset 51.9%, Rewrite 53.1%.
 salience as an upper-bound caveat in its own first paragraph, and the caveat turned out to be
 exactly right. So T2B **extends** T2A rather than contradicting it — which is what stops a
 reviewer reading two studies as two inconsistent results. T2B also states **eight** limits
-itself (most spans inconclusive, and inconclusive ≠ inert; useful spans structurally
-under-detectable at LiC base rates; a headroom-selected subsample; ~40% of spans lack a unique
-token so the probe measures *lexical* survival; one model, one analyzer, single-span ablation).
-Artifacts: `tasks/T2B/{RESULTS.md,worklog.md,per_span.json,per_span_alignment.json}` (`289de75`),
-`outputs/T2B/`.
+itself. Artifacts: `tasks/T2B/{RESULTS.md,worklog.md,per_span.json,per_span_alignment.json}`
+(`289de75`), `outputs/T2B/`.
 
 ### T24 — the 52-point baseline spread, fully explained (F68, F69, F70)
 
@@ -125,12 +191,12 @@ populations:
 | `01` iNYK reply | 19.0–22.4 | three newer models, last-turn replay, `htn50_52`, with replay prefixes deliberately weighted toward baseline failures (74–86% on database). A floor by construction |
 | T1 (`00` CW5) | 56.1 / 83.0 | gpt-5.4-mini, **full end-to-end** sharded simulation, the **complete unselected pool** (107 / 100) |
 
-**T1 still answers the Area Chair with no re-scoping (F69).** T24 ran the ceiling arms T1
-lacked: on the unselected pool the fully-specified single-turn ceiling is **94.4% database /
-98.0% code** (positive control: LiC's own `full` band for this pool is 89.7–98.1%). So T1's
-venue carries a **38.3 / 15.0 pp** multi-turn gap and AC3 closes **51% / 60%** of it — the same
-fraction as on the paper's much harder pool (**50%**). And condensation got no easy ride: it
-scores *below* full context in every venue.
+**T1 still answers the Area Chair with no re-scoping (F69).** On the unselected pool the
+fully-specified single-turn ceiling is **94.4% database / 98.0% code** (positive control: LiC's
+own `full` band for this pool is 89.7–98.1%). So T1's venue carries a **38.3 / 15.0 pp**
+multi-turn gap and AC3 closes **51% / 60%** of it — the same fraction as on the paper's much
+harder pool (**50%**). And condensation got no easy ride: it scores *below* full context in
+every venue.
 
 **The line to keep: *baselines move 52 points across venues; gap-closure moves 4.***
 Artifact: `tasks/T24/worklog.md` (`78226bd`).
@@ -150,13 +216,12 @@ Artifact: `tasks/T24/worklog.md` (`78226bd`).
 | code | **AC3-Reset** | **92.0%** | 92/100 | **+9.0** | **0.023** |
 
 Head-to-head paired: AC3-Reset − summarisation = **+22.4 / +28.0 pp** (database),
-**+13.0 / +12.0 pp** (code), all p < 0.01. The budget result is better than parity: the
-budget-matched summariser **over-consumed** AC3-Reset (**1.02–1.19× strategy calls,
-1.62–2.14× strategy tokens**) and still lost by 12–28 pp. Gated-Reset gets +17.8 pp on
-**0.41×** Reset's calls. MT-OSC at published w=4 fired **30 times across 107 conversations
-(0.3/conv)** because it cannot touch context before turn 6 while LiC conversations average
-4.1 turns — length-triggered compaction schedules *structurally cannot engage* with early
-pollution. That is our scoping argument with a number behind it.
+**+13.0 / +12.0 pp** (code), all p < 0.01. Better than parity: the budget-matched summariser
+**over-consumed** AC3-Reset (**1.02–1.19× strategy calls, 1.62–2.14× strategy tokens**) and
+still lost by 12–28 pp. Gated-Reset gets +17.8 pp on **0.41×** Reset's calls. **Do not read the
+−2.8 → −8.4 ordering as a budget mechanism** — T27's replicate of the 1-call arm scores 47.7%
+(§2 row 22b). MT-OSC at published w=4 fired **30 times across 107 conversations (0.3/conv)**;
+T27 now supplies the measured w=2 counterpart (§2 row 21).
 Artifacts: `tasks/T1/{RESULTS.md,worklog.md,analyze.py}`, `outputs/T1/`.
 
 ### T9 — analyzer-model sensitivity, the unanswered half of Vg97 Q3 (F21, F22)
@@ -174,41 +239,29 @@ pairs, exact McNemar, LiC code+database replay (Baseline 21.3% pooled).
 
 Graceful degradation, not collapse: every analyzer is individually significant, the weakest
 still beats Baseline by 12.9 pp, and **no arm falls below Baseline on either task in either
-replicate**. The mechanism is measured, not assumed — weak analyzers **under-detect rather
-than mis-detect** (gpt-4o-mini fires on 74.4% of turns vs ~97% for strong analyzers, 2.7×
-shorter issue lists, but `user_intent` parsed on 100% of calls). Three of five analyzers are
-non-OpenAI, the **best is Kimi-K2.6 (+12.9 pp above our own default)** and the *weakest* is an
-OpenAI model — so the best cell contains no OpenAI model anywhere, which kills the
-"gpt-specific" reading. Defend the shape and the endpoints, not the exact ordering. The
-`analysis_cache` confound was resolved, not worked around (F20).
-Artifacts: `tasks/T9/worklog.md` (`1f4f32d`), `outputs/T9/`.
+replicate**. Weak analyzers **under-detect rather than mis-detect** (gpt-4o-mini fires on 74.4%
+of turns vs ~97%, 2.7× shorter issue lists, `user_intent` parsed on 100% of calls). Three of
+five analyzers are non-OpenAI, the **best is Kimi-K2.6** and the *weakest* is an OpenAI model,
+which kills the "gpt-specific" reading. Defend the shape and the endpoints, not the exact
+ordering. Artifacts: `tasks/T9/worklog.md` (`1f4f32d`), `outputs/T9/`.
 
 ### T2A + T2c — the detector story (F10, F23, F24, F25)
 
-**T2A (constructed pollution, no judge anywhere).** Two spans injected per conversation — one
-known-false, one known-true, identical surface frame — so labels are ground truth by
-construction and preservation is measurable at all. n=126 admissible. Removal **97.6%**
+**T2A (constructed pollution, no judge anywhere).** n=126 admissible. Removal **97.6%**
 [93.2, 99.2] · preservation **4.0%** · edit precision **50.4%** (chance = 50) · gate
-sensitivity **98.4%** · **analyzer names the injected pollutant in `issues` 78.6%** of the
-time (89.7% on the causally-harmful subset). That naming rate is the part not explainable by
-"it deletes everything."
-
-Causality is built out of **Baseline** arms, not detector output, so it is non-circular: a
+sensitivity **98.4%** · **analyzer names the injected pollutant in `issues` 78.6%** of the time
+(89.7% on the causally-harmful subset). That naming rate is the part not explainable by "it
+deletes everything." Causality is built out of **Baseline** arms, not detector output: a
 factorial over clean / harm-only / useful-only / both gives the harmful span **−11.1 pp** and
 the true span **+15.1 pp**; on the causally-validated subset Baseline clean 24.7% → 9.3% with
 the pollutant → **AC3 59.8% with the pollutant still present**. Four positive controls pass
-exactly (identity 0.000/1.000, oracle 1.000/1.000, nuke and delete-both 1.000/0.000).
-**T2A's own stated caveat — injected pollution is more salient than natural — turned out to be
-load-bearing; see T2B above.**
+exactly. **T2A's own stated caveat turned out to be load-bearing — see T2B.**
 
-**T2c (auditing vs re-solving — 5YHP's mechanism challenge).** Analyzer text was already
-persisted, so zero re-runs. Strict leakage base rate: math 38%, code **0%**, database 1%,
-actions 2%; overall 11% (n=547), with a model-free numeric probe on math returning 40% against
-the LLM's 38%. **Paired gain on the NO_LEAK subset (exact McNemar), n=329: 36.5% → 57.1% =
-+20.7 pp [+14.8, +25.3], p < 0.0001.** Code alone **+30.2 pp with zero leaks**; database
-+26.0 pp with one; Gated-Reset replicates at +19.6 pp. **Concede math outright**: NO_LEAK n=77
-gives **−2.6 pp [−11.9, +7.6]** — on GSM8K you cannot say "your total of 3,270 is wrong"
-without computing the right total, so auditing and solving are not separable there.
+**T2c (auditing vs re-solving — 5YHP's mechanism challenge).** Zero re-runs. Strict leakage
+base rate: math 38%, code **0%**, database 1%, actions 2%; overall 11% (n=547). **Paired gain on
+the NO_LEAK subset (exact McNemar), n=329: 36.5% → 57.1% = +20.7 pp [+14.8, +25.3],
+p < 0.0001.** Code alone **+30.2 pp with zero leaks**; database +26.0 pp with one. **Concede
+math outright**: NO_LEAK n=77 gives **−2.6 pp [−11.9, +7.6]**.
 Artifacts: `tasks/T2A/{RESULTS.md,inject.py,measure.py}`, `tasks/T2c/{RESULTS.md,worklog.md}`.
 
 ### T11 — WildChat judge checks (F30–F33)
@@ -216,23 +269,19 @@ Artifacts: `tasks/T2A/{RESULTS.md,inject.py,measure.py}`, `tasks/T2c/{RESULTS.md
 1,824 judgements, 0 hard failures. Position bias is real (**p = 1.8e-4**) but the harness
 already randomises A/B per call, so the published number is unbiased in expectation; corrected
 headline **87.8 / 91.2** (§2 #9). Cross-family agreement: raw 85.9–88.8%, κ 0.445–0.507, and
-because κ is depressed by the ~90% marginal (the kappa paradox) the right statistics are
-**PABAK 0.79–0.83 and Gwet's AC1 0.84–0.87**. Self-consistency **96.9% / κ 0.810** —
-materially above swap-consistency, cleanly attributing judge instability to **order rather
-than sampling**. Per-judge order-balanced win rates 88.8 / 85.6 / 85.3 (max spread 3.5 pp);
-under a punitive "2-of-3 judges in both orders" rule, still **82.5%**. Positive controls
-(intact vs degraded copy) 39/40, 36/40, 40/40.
-Artifacts: `tasks/T11/{worklog.md,out/}`.
+because κ is depressed by the ~90% marginal the right statistics are **PABAK 0.79–0.83 and
+Gwet's AC1 0.84–0.87**. Self-consistency **96.9% / κ 0.810**, cleanly attributing judge
+instability to **order rather than sampling**. Per-judge order-balanced win rates 88.8 / 85.6 /
+85.3; under a punitive "2-of-3 judges in both orders" rule, still **82.5%**. Positive controls
+(intact vs degraded copy) 39/40, 36/40, 40/40. Artifacts: `tasks/T11/{worklog.md,out/}`.
 
 ### T13 — zero contamination (F13)
 
-5YHP's contamination concern is **measurably unfounded**, with numbers. Learn set vs the
-canonical `lic_eval_subset`: **0/120 exact duplicates, 0 near-duplicates** (max Jaccard 0.416,
-boilerplate only). A within-instance probe of the transductive protocol — same instance with
-an empty cheatsheet vs one distilled from 5–20 *other* eval instances **plus their gold
-answers** — gives **0.0 pp on both tasks**. On the 11/98 overlapping instances memory is equal
-or worse than no-memory. This is the half of the memory story to lead with (D7).
-Artifact: `tasks/T12-T13/worklog.md` §9.
+5YHP's contamination concern is **measurably unfounded**. Learn set vs the canonical
+`lic_eval_subset`: **0/120 exact duplicates, 0 near-duplicates** (max Jaccard 0.416, boilerplate
+only). A within-instance probe of the transductive protocol gives **0.0 pp on both tasks**. On
+the 11/98 overlapping instances memory is equal or worse than no-memory. This is the half of the
+memory story to lead with (D7). Artifact: `tasks/T12-T13/worklog.md` §9.
 
 ### T8 — BigCodeBench survives and is stronger than we claimed (F17)
 
@@ -242,106 +291,91 @@ Artifact: `tasks/T12-T13/worklog.md` §9.
 | Baseline | 2/20 | 2/20 | 0/20 | **6.7 ± 5.8** |
 
 **+15 pp in every replicate — 3/3 wins, sd of the delta 0.0.** Reset solves 9
-problem-instances Baseline never solves once and loses none. It **reproduces on a fully
-disjoint 20-problem draw** (0/20 overlap): Reset 3/20 vs Baseline 1/20. Quote as "≈1 in 5,
-±1 problem" with the scoring environment named, never a bare percentage: at n=20 every cell
-moves in 5 pp steps and one problem flips deterministically on a library version. All cells
-re-scored offline under one unified environment. **The AO column of this row is now N=3 and
-narrows the Reset-over-AO margin to +3.3 pp — see §2 #10 and #19.**
+problem-instances Baseline never solves once and loses none. It **reproduces on a fully disjoint
+20-problem draw** (0/20 overlap): Reset 3/20 vs Baseline 1/20. Quote as "≈1 in 5, ±1 problem"
+with the scoring environment named, never a bare percentage. **The AO column is N=3 and narrows
+the Reset-over-AO margin to +3.3 pp — see §2 #10 and #19.**
 Artifacts: `tasks/T8/worklog.md`, `outputs/T8/`, `tasks/T21/worklog.md`.
 
 ---
 
-## 4. PAPER-1..10 — the operator action list
+## 4. The operator action list — PAPER-1..11
 
-These all touch `writing/overleaf_repo/`, which is shared with Lianhui and Michel and synced
-to Overleaf. They were deliberately **not** actioned autonomously. Pull before editing
+These all touch `writing/overleaf_repo/`, which is shared with Lianhui and Michel and synced to
+Overleaf. They were deliberately **not** actioned autonomously. Pull before editing
 (`git -C writing/overleaf_repo pull origin main`).
 
-**Only PAPER-7 blocks the rebuttal.** Everything else is camera-ready work; PAPER-6 and
-PAPER-9 are the two high-value non-blocking items.
+**Only PAPER-7 gates posting.** PAPER-11 is the largest and highest-stakes edit, but it is a
+*withdrawal* — a reviewer reading "we withdraw this claim" needs no paper edit to verify it,
+whereas PAPER-7 asserts corrected numbers a reviewer can check against a table that still prints
+the old ones.
 
 | ID | Do this | From | Effort | Blocking for the rebuttal? |
 |---|---|---|---|---|
-| **PAPER-7** | Fix ERGO's denominators in `tab:main`. Ship math **80.0**, code **≈44.0**, database 12.0; actions is **unclosable** — print as interval **[43.5, 52.2]** or drop, never as a point estimate. **Never ship T17's 57.9 for code** (it overstates a competitor by ~14 pp; T18 measured k = 2.67/6, not 0/6). Lead the passage with F49: **no ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction** (code p=0.375, math p=1.00). Two body numbers move *in our favour*: code gap-closure 78% → 82%, "closes 55–80%" → "67–82%" | F42–F44, F48, D14 | 1–2 h | **YES — the only blocking item.** `replies/v5/` commits to this fix in front of the reviewers in five places (F58) |
-| **PAPER-9** | `tab:main` caption: state that instances are the 25 per task with the **highest full-context failure rate** across five GPT-5-mini baseline runs, and that the design-oracle rows use the same instances so the gap-closure percentages are pool-independent. Without this, the paper's 4.0% database baseline reads as a measurement when it is largely what the selection guarantees | F68 | 10 min | Camera-ready — but **high value**: it is the paper-side half of the reconciliation the rebuttal now commits to (§2 #15). 10 minutes for the item a reviewer is most likely to catch |
+| **PAPER-7** | Fix ERGO's denominators in `tab:main`. Ship math **80.0**, code **≈44.0**, database 12.0; actions is **unclosable** — print as interval **[43.5, 52.2]** or drop, never as a point estimate. **Never ship T17's 57.9 for code** (it overstates a competitor by ~14 pp; T18 measured k = 2.67/6, not 0/6). Lead the passage with F49: **no ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction** (code p=0.375, math p=1.00). Two body numbers move *in our favour*: code gap-closure 78% → 82%, "closes 55–80%" → "67–82%" | F42–F44, F48, D14 | 1–2 h | **YES — the only blocking item** (F58) |
+| **PAPER-11** | *(new)* **Remove the tau2 improvement claim from the paper.** Places, in `neurips/neurips_2026_conference.tex`: abstract L110 ("only approach that improves over full context across the entire spectrum" + "substantially outperforms full context in agentic tool use — by double-digit margins per respondent"); Fig. 1 caption L122; intro L139; `tab:megatable` tau2 block + caption L280 (the caption's own rate-limit-clipped concession becomes the finding); L328; §`sec:tau2-results` L356–L360; discussion L369, L372; conclusion L405; limitations L808. **Keep**: AO = 0% on every respondent (structural, reproduces exactly), and the honest replacement claim already drafted for the rebuttal — AC3 is *"the only method that remains **viable** in the stateful agentic setting, where blanket omission fails structurally."* Also fold in the unexplained gpt-5.4 collapse and the fork parser bug as stated limitations | **F78–F81, D21** | 3–5 h; touches abstract, figure, two sections and the conclusion | **No** — v5 posts the withdrawal in its own words. **But it is the highest-stakes item on this list and must land before any revision or arXiv push** |
+| **PAPER-9** | `tab:main` caption: state that instances are the 25 per task with the **highest full-context failure rate** across five GPT-5-mini baseline runs, and that the design-oracle rows use the same instances so the gap-closure percentages are pool-independent. Without this, the paper's 4.0% database baseline reads as a measurement when it is largely what the selection guarantees | F68 | 10 min | Camera-ready — but **highest value per minute on the list**; it is the discrepancy a reviewer is most likely to catch unaided |
 | **PAPER-6** | Delete per-run `adjusted_accuracy` as a reported metric; report **raw** as primary; keep the arm-symmetric pool-level pre-filter as the only FN adjustment and **defend** it; rewrite `tex:478-480`, which says "all user simulator messages" when the code collates only the visible ones | F28, F40–F42, D13 | 2–3 h | Camera-ready (v5 is already raw). **Do before arXiv** — it moves published magnitudes |
-| **PAPER-5** | ⚠️ **This entry now says the opposite of what the T22 handoff said.** **Delete** "we preserve what's correct and remove what's harmful" from the abstract, intro and method — do **not** re-attribute it to AC3-Rewrite. F66 shows neither operator is selective on naturally occurring spans (Reset keeps 5/66, Rewrite 0/66, edit precision at the base rate for both). Replace with the mechanism supported for **both** operators: *detect → discard the assistant side → rebuild the specification from the user side*, Reset by dropping that side and Rewrite by recompacting it. **Also rewrite the ERGO differentiation**: the difference is not "we are selective and they are not" — it is that AC3 rebuilds the specification from the user side while ERGO rewrites user turns. Defensible empirical claims: the 78.6% pollutant-naming rate, the factorial (9.3% → 59.8% with the pollutant still present), and T2B's 100% removal of causally-harmful natural spans. Same edit needed in the project overview / `CLAUDE.md` | F25, **F66** | 1–2 h (framing appears in intro + method + related work) | Camera-ready — but it is a **contribution-framing** change, not a number change, so budget review time |
-| **PAPER-1** | Reword LiC/CollabLLM "seeds" → "replicate runs (temperature 1.0)"; add the decoder-vs-sampling-variance caveat to limitations. **WildChat keeps "seeds."** Note F19 fixed true seeding going forward and all prior runs reproduce bit-for-bit | F4, F19 | 30–45 min | Camera-ready, but cheap and an integrity item — do it early |
-| **PAPER-8** | `writing/overleaf_repo/neurips/neurips_2026_conference.tex:299` — replace "on the same prefixes" with the queued wording: "($-$14.5pp vs.\ always-on Reset; $-$14.3pp on the 35 prefixes both arms were evaluated on, exact McNemar $p=0.125$)" | F55 | 5 min | Camera-ready only — the claim is struck from v5, so nothing we post depends on it |
+| **PAPER-5** | **Delete** "we preserve what's correct and remove what's harmful" from the abstract, intro and method — do **not** re-attribute it to AC3-Rewrite. Replace with the mechanism supported for **both** operators: *detect → discard the assistant side → rebuild the specification from the user side*. **Also rewrite the ERGO differentiation**: the difference is not "we are selective and they are not" — it is that AC3 rebuilds the specification from the user side while ERGO rewrites user turns. Defensible empirical claims that remain: the 78.6% pollutant-naming rate, the factorial (9.3% → 59.8% with the pollutant still present), and T2B's 100% removal of causally-harmful natural spans. Same edit in `CLAUDE.md` / project overview | F25, **F66** | 1–2 h | Camera-ready — a **contribution-framing** change, not a number change, so budget review time |
+| **PAPER-1** | Reword LiC/CollabLLM "seeds" → "replicate runs (temperature 1.0)"; add the decoder-vs-sampling-variance caveat to limitations. **WildChat and tau2 keep "seeds"** — tau2's `--seed` genuinely threads (F81), best-effort at the provider. F19 fixed true seeding going forward; all prior runs reproduce bit-for-bit | F4, F19, F81 | 30–45 min | Camera-ready, but cheap and an integrity item — do it early |
+| **PAPER-8** | `neurips/neurips_2026_conference.tex:299` — replace "on the same prefixes" with: "($-$14.5pp vs.\ always-on Reset; $-$14.3pp on the 35 prefixes both arms were evaluated on, exact McNemar $p=0.125$)" | F55 | 5 min | Camera-ready only — the claim is struck from v5 |
 | **PAPER-4** | Any CollabLLM MATH-Hard "100" → "matches Baseline" (91.7 vs 91.7) | F16 | 15 min | Camera-ready (already fixed in v5) |
 | **PAPER-3** | Table 1's `+ Memory` rows are single-trial below a ~6 pp noise floor. Either re-run at **N ≥ 4** or soften the claim | F12 | 15 min to soften; hours of compute to re-run | Camera-ready |
-| **PAPER-10** | If any table reports assistant omission or Concatenate-User in **end-to-end** (non-replay) mode, label them baselines rather than upper bounds: they concatenate the *simulator's* paraphrases of the shards, not the original question, so they inherit the simulator's loss. On T24's unselected pool AO reaches 69.2% and Concat-User 63.6% against a measured single-turn ceiling of 94.4%. Report the single-turn ceiling separately | F69 | 30 min | Camera-ready; conditional on which tables survive |
+| **PAPER-10** | If any table reports assistant omission or Concatenate-User in **end-to-end** (non-replay) mode, label them baselines rather than upper bounds: they concatenate the *simulator's* paraphrases of the shards, not the original question. On T24's unselected pool AO reaches 69.2% and Concat-User 63.6% against a measured single-turn ceiling of 94.4%. Report the ceiling separately | F69 | 30 min | Camera-ready; conditional on which tables survive |
 | **PAPER-2** | The appendix variance table cites `docs/multi_run_variance_2026-05-07.md`, which does not exist; `docs/paper_experiments_provenance.md` names absent configs (`assistant_omit`, `concat_baseline`). Re-derive or re-source | F8 | Unknown — depends whether the runs are recoverable from `~/ac3/blob_staging/snapshot.tar.gz` | Camera-ready |
 
-**Order if time is short: PAPER-7 (blocking) → PAPER-9 → PAPER-1 → PAPER-8 → PAPER-6 →
-PAPER-5 → PAPER-4 → PAPER-3 → PAPER-10 → PAPER-2.** The first four are ~2.5 hours combined
-and cover the blocking item plus the three cheapest integrity items.
+**Order if time is short: PAPER-7 (blocking) → PAPER-9 (10 min) → PAPER-11 → PAPER-1 →
+PAPER-8 → PAPER-6 → PAPER-5 → PAPER-4 → PAPER-3 → PAPER-10 → PAPER-2.** The first two are
+~1.5 hours combined and cover the blocking item plus the cheapest high-value one; PAPER-11 is
+the one that cannot be skipped before any public revision.
+
+**Not a paper item, but do it anyway:** patch `ctx_edit/analyzer.py:89-95` upstream in
+`matt-seb-ho/tau2_ctxe`. Half the analyzer briefings in that fork are corrupt and nobody knew
+(F80). Currently fixed only behind `T6_FIX_TAG_PARSE=1` in the local clone, unpushed.
 
 ---
 
 ## 5. Still open
 
-### Posting blockers, as `replies/v5/README.md` now records them
+### Posting blockers
 
-`README.md` carries six numbered entries; three are marked RESOLVED and closed. **Three are
-genuinely open, plus PAPER-7 from F58, which is the hard external blocker and is not in that
-list.**
+`replies/v5/README.md` carries six numbered entries. **Five are now RESOLVED; one is
+bookkeeping. The real blocker is PAPER-7, which is not in that list.**
 
 | # | Blocker | State |
 |---|---|---|
 | — | **PAPER-7** — the paper edit v5 commits to in front of the reviewers | **OPEN. The hard blocker** (F58) |
-| 1 | Resolve and delete every `⚠ INTERNAL` block. There are **eight**: three in `00`, one in `01`, two in `04`, two in `05` (`grep -rn "⚠ INTERNAL" .`) | **OPEN** — five of the eight are tau2 HOLDs pending T6; the other three are one orientation preamble and two T19 renumbering notes, i.e. bookkeeping |
-| 2 | tau2 is on HOLD pending T6. Post no per-model tau2 magnitude | **OPEN — the only substantive unsettled result** |
+| 1 | Resolve and delete every `⚠ INTERNAL` block | **Effectively closed.** `grep -rn "⚠ INTERNAL" replies/v5/*.md` now returns only **one block** — the orientation preamble at the top of `00_general_response.md` (it self-references, so the grep shows two lines from the same block). Delete it before posting. The five tau2 HOLDs and both T19 renumbering notes were resolved and removed by T28 |
+| 2 | tau2 on HOLD pending T6 | **RESOLVED — and it goes against us.** Improvement claim withdrawn (§2 row 0, D21). Rule: no tau2 improvement claim on any model; do not soften into "mixed results"; keep AO = 0%; keep the gpt-5.4 Gated-Reset regression unupgraded; disclose the gpt-5.4 collapse as unexplained |
 | 3 | T14 (FN-adjustment audit) | RESOLVED, largely in our favour. `tab:main`'s denominators are **defended, not conceded** |
 | 4 | T17 + T18 (ERGO denominator defect) | RESOLVED and folded into v5 in five places — but see PAPER-7 |
-| **5** | **The "only method that improves over full context across the entire spectrum" sentence is tau2-dependent and sits *outside* every HOLD block** (red-team H9). It appears in `00` CW4, `01` W3 and `05`. Pre-drafted fallback swaps "improves" for "**remains viable**", which survives any T6 outcome. **Deliberately NOT applied** so nothing pre-empts T6 | **OPEN — re-check the moment T6 lands** |
-| 6 | H1 (the 52-point baseline spread) and F70 (the false "non-difficulty-selected pool" claim) | RESOLVED — T24 measured, T25 applied (§2 #15, #16) |
+| **5** | The "only method that improves over full context across the entire spectrum" sentence | **RESOLVED and REPLACED.** T6 made it false on the very benchmark it was sharpened to survive. The pre-drafted fallback is applied in `00` CW4, `01` W3, `04` correction 6 and `05`: "…the only method that remains **viable** in the stateful agentic setting, where blanket omission fails structurally (0% on every respondent)." **Do not reinstate the stronger wording anywhere** |
+| 6 | H1 (52-point baseline spread) and F70 (false "non-difficulty-selected pool") | RESOLVED — T24 measured, T25 applied (§2 #15, #16) |
 
-HOLD integrity has been verified three times, most recently by **per-block SHA-256** against
-`d24a2db` (stronger than the greps used in earlier passes): all eight blocks byte-identical.
+**HOLD integrity was verified four times**, most strongly by per-block SHA-256 from `d989c50`:
+all **nine** regions byte-identical through the entire T27 pass (`tasks/T28/hold_baseline.txt`).
+The deliberate phase-2 unsealing is recorded separately from phase 1, so the record distinguishes
+"sealed and untouched" from "opened on instruction".
 
-### T6 — multi-replicate tau2 (RUNNING — the last experiment outstanding)
+### Genuinely unresolved, in descending order of consequence
 
-**This is the session's largest remaining exposure and it may force a fifth self-correction.
-Do not guess the outcome; nothing below is integrated or orchestrator-verified.**
-
-Preliminary signal, from T6's own worklog: the published DSV4F (**31.6 → 70.2 ± 11.0**) and
-Kimi (**26.3 → 80.4 ± 2.5**) tau2 Baselines **may have been degraded floors** rather than real
-controls. The source report for the Kimi run itself admits infrastructure degradation
-("14/20 short exits", "true Baseline is probably 40–50%"). gpt-5.4 Baseline replicates exactly
-on the mean (68.4 → 68.4 ± 13.9). If the remeasures hold, two of three tau2 cells were
-measured against broken controls and the gains built on them must be withdrawn.
-
-**Status as of T6's 19:32 worklog entry** (its own self-report, not final, not integrated):
-14 of 15 cells at full 60/60; only `dsv4f_foundry_ao` still running. T6 states its own
-near-final direction there. **Treat it as unresolved until T6 returns DONE and its final
-report is read** — the direction has hardened but the matrix is not closed and nobody has
-audited it.
-
-Two things that are safe regardless of the outcome:
-
-- **The AO-collapses-to-0% result is mechanism-corroborated and reproduces exactly** (both
-  completed AO cells are 0.0 in every replicate, matching the published 0.0, via the confirmed
-  `max_steps` termination path). v5's tau2 section has already been rebuilt around it, so the
-  section stands even if every magnitude is withdrawn. **Draft withdrawal wording is
-  pre-written inside the HOLD blocks.**
-- **Per-replicate spread is huge** (gpt-5.4 Baseline spans 52.6–78.9, sd 13.9). Several
-  published tau2 cell-to-cell differences are smaller than that, which is the same
-  n-too-small story as §7.
-
-T6 separately found a **tag-parse defect in the fork** (53% of analyzer briefings fall back to
-an unparsed path; it degrades AC3 arms only and cannot touch Baseline or AO). It chased that
-confound to ground with a gated diagnostic: fixing it moved accuracy **+2.3 pp**, not the
-~37 pp needed to explain the AC3 collapse — so AC3's underperformance in this environment is
-a genuine measurement, not an artefact. **The parser should still be fixed in the fork.**
-
-**U4** ("1 of 11 baseline failures") must be re-checked in the same pass — it is unverified
-*and* characterises a baseline T6 may move. T20 established it is technically decoupled from
-T6's matrix, and its traces are gone, so the standing recommendation is **soften now, defer
-re-derivation to camera-ready** (F56).
-
-Log: `tasks/T6/worklog.md`. Fork at `~/ac3/tau2_ctxe` (deliberately outside the shared tree).
+1. **The gpt-5.4 tau2 AC3 collapse (84.2 → 47.4) has no explanation** (F80, §2 row 0b). The
+   baseline reproduced exactly; the one real bug found is worth +2.3 pp. This belongs in the
+   camera-ready as an open problem, and it is the kind of thing a hostile reviewer will ask
+   about once we disclose the tau2 withdrawal.
+2. **U4** ("1 of 11 baseline failures attributable to context pollution", the paper's
+   `tab:tau2-failure-modes`) is **unverified and characterises a tau2 baseline that has now
+   moved**. Its traces are gone. Standing recommendation unchanged: **soften now, defer
+   re-derivation to camera-ready** (F56). Note it was never re-run — T6 targeted the multi-model
+   sweep, not the paper-era gpt-5-mini tau2 cells.
+3. **Red-team M1 — the self-correction count reads 3 / 5 / 7 / 10 (now 6 / 8 in places) across
+   four files.** Each count is defensible in its own scope; making them agree is a tone judgement
+   about how prominently the general response should carry the total. Left to you deliberately
+   (`tasks/T28/worklog.md` §8).
+4. **Declined and worth knowing about:** a human-validation study for the WildChat judge (5YHP's
+   third named check — v5 now names the gap explicitly rather than faking a stand-in), and
+   U-Fold on tau2 (the red team's own suggested remedy was to *offer* it to the reviewer, not to
+   run an unvalidated overnight adaptation of someone else's method).
 
 ---
 
@@ -350,28 +384,29 @@ Log: `tasks/T6/worklog.md`. Fork at `~/ac3/tau2_ctxe` (deliberately outside the 
 | What | Where |
 |---|---|
 | **The rebuttal to post** | `neurips_review/replies/v5/` — `00_general_response.md` first, then `01`/`02`/`03`, then `04_response_to_AC.md`, then `05_final_remarks.md` at the end of the discussion period |
-| **Claim-by-claim audit** | `neurips_review/replies/v5/CHANGES.md` — every v4 assertion, status, finding ID, artifact path, new wording |
+| **Claim-by-claim audit** | `neurips_review/replies/v5/CHANGES.md` — every v4 assertion, status, finding ID, artifact path, new wording. **§12 is T28's integration record** (T27 items, tau2 withdrawal, HOLD verification) |
 | **Pre-posting checklist, blockers, guardrails, rhetoric plan** | `neurips_review/replies/v5/README.md` — read "Accuracy guardrails" before you touch any number |
-| **The adversarial read** | `neurips_review/autoresearch/tasks/T23/RED_TEAM.md` — 30 items (10 HIGH, 15 MEDIUM, 5 LOW), each with quoted text, the attack, and drop-in revision wording. Its closing section is the strongest single objection against us, written out in full |
+| **The adversarial read** | `neurips_review/autoresearch/tasks/T23/RED_TEAM.md` — 30 items (10 HIGH, 15 MEDIUM, 5 LOW), each with quoted text, the attack, and drop-in revision wording. **Now annotated in place**: a D20 banner at the top, `⚠ SUPERSEDED — DO NOT APPLY` at M3 (`:451`) and M11 (`:556`), and `✅ RESOLVED` notes on M12/M15/M6. Its closing section is still the strongest single objection against us |
 | **v4 (diff baseline, untouched)** | `neurips_review/replies/v4/` |
-| **Full narrative record, F1–F72** | `neurips_review/autoresearch/WORKLOG.md`. **Note: only D1–D14 are written up there; D15–D19 exist solely in `logs/orchestrator.jsonl`** (`grep '"level":"decision"'`) |
+| **Full narrative record, F1–F83 / D1–D21** | `neurips_review/autoresearch/WORKLOG.md`. **All 21 decisions are now written up in prose**, not only in the JSONL — D15–D19 were backfilled at 19:55, D20 and D21 written in the same command that logged them |
 | **What was run, in what order, and dead ends** | `neurips_review/autoresearch/PROVENANCE.md` — the "Dead ends and why" table at the bottom is the fastest way to see what we retired and why |
-| **Per-task detail, scripts, verbatim prompts** | `neurips_review/autoresearch/tasks/<ID>/{worklog.md,RESULTS.md,*.py}` — 22 task dirs |
-| **Machine logs** | `neurips_review/autoresearch/{logs/orchestrator.jsonl,logs/heartbeat.jsonl,state/}` — the JSONL is the machine log and carries the authoritative timestamps; `WORKLOG.md` is the human one |
-| **Run outputs from tonight** | `outputs/{T1,T2A,T2B,T8,T9,T12_T13,T18,T21}/` |
-| **Recovered prior outputs** | `~/ac3/blob_staging/snapshot.tar.gz` (whole `outputs/` tree incl. CollabLLM competent-user-sim and all WildChat runs); `~/ac3/recovered/`, `~/ac3/recovered_t2c/`, `~/ac3/recovered_t20/`, `~/ac3/t14_snapshot/` |
-| **Spider DBs (newly recovered)** | `data/spider/databases/` — 4.9 GB, gitignored, 17/17 db_ids, **test-suite** execution semantics from the `taoyds/test-suite-sql-eval` bundle. Provenance belongs in the camera-ready if we report database numbers (F1) |
-| **tau2 fork** | `~/ac3/tau2_ctxe` |
+| **Per-task detail, scripts, verbatim prompts** | `neurips_review/autoresearch/tasks/<ID>/{worklog.md,RESULTS.md,*.py}` — 24 task dirs |
+| **Machine logs** | `neurips_review/autoresearch/{logs/orchestrator.jsonl,logs/heartbeat.jsonl,state/}` — the JSONL carries the authoritative timestamps; `WORKLOG.md` is the human record |
+| **Run outputs from tonight** | `outputs/{T1,T2A,T2B,T8,T9,T12_T13,T18,T21,T24,T27}/` |
+| **tau2 results from T6** | `~/ac3/tau2_ctxe/ctx_edit/outputs/T6_reps/<model>_<arm>/traces/*.json` (per-rollout, with full message history and `analysis_log`); aggregators `t6_aggregate.py` / `t6_paired.py`; diagnostic at `outputs/T6_diag/`. **Local patches are uncommitted and unpushed** |
+| **Recovered prior outputs** | `~/ac3/blob_staging/snapshot.tar.gz` (whole `outputs/` tree incl. CollabLLM competent-user-sim and all WildChat runs; the 168 per-sample `results.json` M15 needed live here); `~/ac3/recovered/`, `~/ac3/recovered_t2c/`, `~/ac3/recovered_t20/`, `~/ac3/t14_snapshot/` |
+| **Spider DBs (newly recovered)** | `data/spider/databases/` — 4.9 GB, gitignored, 17/17 db_ids, **test-suite** execution semantics. Provenance belongs in the camera-ready if we report database numbers (F1) |
+| **tau2 fork** | `~/ac3/tau2_ctxe` (deliberately outside the shared tree) |
 
 ---
 
 ## 7. Methodological lessons worth keeping
 
-### Positive controls caught **eleven** harness or analysis faults tonight
+### Positive controls caught **twelve** harness or analysis faults tonight
 
-Several would otherwise have become published numbers. **Two of the eleven were faults in
-*analysis* code rather than in the harness** (items 5 and 10 — F67 records itself as the
-second of that kind), which is the harder class to catch because nothing crashes.
+Several would otherwise have become published numbers. **Two of the twelve were faults in
+*analysis* code rather than in the harness** (items 5 and 10), which is the harder class to
+catch because nothing crashes.
 
 | # | Fault | Caught by | Finding |
 |---|---|---|---|
@@ -384,19 +419,30 @@ second of that kind), which is the harder class to catch because nothing crashes
 | 7 | A duplicated background chain double-writing output dirs | Contradiction between `metrics.json` and `run_summary.json` | F14 |
 | 8 | T18's positive control **failing** to reproduce ERGO/database (44.0 vs published 12.0) because the published-era model is unreachable — which is exactly what stopped a plausible-looking set of numbers being written into `tab:main` | The control itself | F46 |
 | 9 | The AO BigCodeBench cell never re-scored under the unified dependency environment while every other cell in its row was | Auditing the auditor | F54 |
-| 10 | *(analysis)* T2B's first empirical null came from the filler control at **mismatched replicate counts** and produced a **false negative**; replaced with a matched parametric null | The agent re-deriving its own null | F67 |
-| 11 | T6's tag-parse defect, silently corrupting **53%** of analyzer briefings in the tau2 fork — degrades AC3 arms only | Gated diagnostic (§5); **still unfixed in the fork** | §5 |
+| 10 | *(analysis)* T2B's first empirical null came from the filler control at **mismatched replicate counts**, producing a **false negative**; replaced with a matched parametric null | The agent re-deriving its own null | F67 |
+| 11 | The tau2 fork's tag-parse defect — **459 of 862 (53%)** analyzer Q1 calls splice escaped JSON into the briefing; degrades AC3 arms only, cannot touch Baseline or AO | Gated diagnostic; worth +2.3 pp, so **not** the explanation for the gpt-5.4 collapse | F80 |
+| 12 | Harness error rows recorded as `num_turns == 0` with `is_correct: false` and **no `error` field** — a failed conversation is indistinguishable from a wrong answer. Scoring them as failures would have silently penalised whichever arm errored more (Kimi/math/conv0 prints 34/39 against 48 rows on disk) | M15's PC-1: only 165/168 cells reproduced their printed value; dropping `num_turns == 0` takes it to **168/168 exact** | F77 |
 
-### Adding replicates dissolved an asserted margin **four** separate times
+**A thirteenth catch of a different kind, worth its own line (F82):** T28 checked the new
+item-level AO statistics against the CW2 subsection T25 had already written. Both agree
+(+2.8 vs +2.6 pp cell-level; +18.6 vs +18.7 pp on database) — **but had it quoted the
+anti-conservative McNemar p = 0.010, the two sections of the same document would have
+contradicted each other**, one saying "wash" and the other "significant". Cross-file consistency
+is a control too, and it is the one nothing else in the pipeline performs.
 
-CollabLLM math-hard 100% (F16), the memory gains (F12), the ERGO ordering (F49), and
-AC3-Reset-over-AO on BigCodeBench (F57). The pattern is consistent enough to state in the
-paper as a positive claim about what the evaluation can and cannot support (D16):
+### Adding replicates dissolved an asserted margin **five** separate times
+
+CollabLLM math-hard 100% (F16), the memory gains (F12), the ERGO ordering (F49),
+AC3-Reset-over-AO on BigCodeBench (F57), and the summarisation "degrades with more budget"
+ordering (F74). The pattern is consistent enough to state in the paper as a positive claim about
+what the evaluation can and cannot support (D16):
 
 > At n≈20 per cell, this benchmark family cannot resolve differences below roughly 10 pp.
 
 Several of our narrower claims were reading noise. This is also the most defensible frame for
-the ERGO comparison: not "who wins", but "n≈20 cannot resolve this."
+the ERGO comparison: not "who wins", but "n≈20 cannot resolve this." **The tau2 withdrawal is
+the same lesson at benchmark scale** — a whole comparison rested on N=1 cells whose controls
+were degraded, and nobody had re-measured them.
 
 ### Factual audit and adversarial read are complementary — run both (D17, D18)
 
@@ -408,22 +454,32 @@ misdescribes. Note the mechanism: **both** the H7 arithmetic error and the 22-ce
 *inherited from a prior verification step*. **A verified number can arrive inside a wrong
 sentence.**
 
-### Two smaller rules earned tonight
+### Adversarial output is itself a hypothesis list, not a patch set (D20)
 
-- **Never strike a claim for unverifiability without a documented deep search** across the
-  repo, `scripts/`, `docs/`, `outputs/`, `runs.yaml`, both tarballs and the recovered trees.
-  Twice tonight "no artifact exists" meant "the audit did not look hard enough" — T20
-  recovered three of four, and striking a true claim gave away a defensible number for nothing
-  (D15, F39, F53).
+**Two of `RED_TEAM.md`'s own suggested fixes were measured and found false** (§2 row 22), and
+both would have handed a reviewer a checkable false statement in the exact paragraph meant to
+rebut a suspicion. The red team wrote its wording under time pressure without running anything:
+its *attacks* were excellent, its *proposed replacements* need the same verification as any
+other claim. Both are now annotated in place so a future reader cannot apply them by accident.
+
+### Three smaller rules earned tonight
+
+- **Never strike a claim for unverifiability without a documented deep search** across the repo,
+  `scripts/`, `docs/`, `outputs/`, `runs.yaml`, both tarballs and the recovered trees. Twice
+  tonight "no artifact exists" meant "the audit did not look hard enough" (D15, F39, F53).
 - **Report a validated sub-metric rather than an unvalidated headline.** T2c's 3-way leak
   classifier scored only 10/24 on a held-out draw, so it reported the quantity it could
   validate — **precision of the NO_LEAK label, 29/32** — and built the primary numbers on a
   stricter model-free detector instead (F10).
+- **Declining an experiment with a stated cost and reason is a result.** T27 declined two of five
+  triaged items and spent the money on the one that closed the AC's reservation; T6 refused to
+  substitute a reachable model for an unreachable one and thereby kept "the published baselines
+  were wrong" separable from "these are not comparable".
 
 ### And one aimed at whoever writes the next brief (D19)
 
 The orchestrator's brief to T25 said "+21 pp over AO on database", carried forward from an
-earlier summary without re-derivation. **T25 recomputed it as +18.7 pp and printed the
-measured value** rather than the instructed one — the eleventh number tonight that moved when
-someone actually checked. Briefs must cite finding IDs so the agent can re-derive rather than
-trust. An agent that verifies its orchestrator is behaving correctly.
+earlier summary without re-derivation. **T25 recomputed it as +18.7 pp and printed the measured
+value** rather than the instructed one — and T27's independent item-level pass later returned
++18.6 pp, confirming the agent and not the brief. Briefs must cite finding IDs so the agent can
+re-derive rather than trust. An agent that verifies its orchestrator is behaving correctly.
