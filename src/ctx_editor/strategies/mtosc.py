@@ -300,20 +300,32 @@ class MTOSCStrategy(BaseStrategy):
         # (1) Apply a condensation computed on the previous turn. This is the
         #     paper's one-turn lag: the condenser runs in the background, so
         #     C_j is only usable from turn T_j + 1.
+        #
+        #     Crucially, the pairs completed *after* the condensation window
+        #     survive: the paper's Combined Operation is
+        #         H_{w+2} = {(C_ju, C_ja)} u {(u_k, a_k)}_{k=t}^{w+1}
+        #     and its own w=4 walkthrough gives H_6 = {C_1, (u_5, a_5)} — pair 5
+        #     is NOT part of C_1 (which covers pairs 1-4) and is kept raw.
         pending = self._pending(trace)
         if pending is not None and t >= pending["available_turn"]:
+            carry = self._window_pairs(trace)[pending["n_pairs_condensed"]:]
             new_messages: list[Message] = []
             system_msg = trace.system_message
             if system_msg:
                 new_messages.append(Message(role="system", content=system_msg.content))
             new_messages.append(Message(role="user", content=pending["human_input"]))
             new_messages.append(Message(role="assistant", content=pending["assistant"]))
+            for u, a in carry:
+                new_messages.append(Message(role="user", content=u))
+                new_messages.append(Message(role="assistant", content=a))
             last_user = trace.last_user_message
             if last_user:
                 new_messages.append(Message(role="user", content=last_user.content))
             trace.reset_conversation(new_messages, label="mtosc_condensation")
             pending["applied"] = True
-            trace.add_log("mtosc_applied", {"j": pending["j"], "turn": t})
+            trace.add_log(
+                "mtosc_applied", {"j": pending["j"], "turn": t, "raw_pairs_carried": len(carry)}
+            )
 
         # (2) Trigger the next condensation, if this is a scheduled trigger turn.
         if self._trigger_turn(t):
