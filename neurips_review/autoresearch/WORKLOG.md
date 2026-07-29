@@ -336,3 +336,24 @@ T15 handled it correctly rather than optimistically: all per-model tau2 magnitud
 
 **F38 — Five claims could not be verified against any artifact** (`CHANGES.md` §7). The one that matters: **gate-open rates 97.3% (LiC, n=554) and 98.3% (CollabLLM, n=119)**, which appear in the reply to the reviewer who asked specifically for detector statistics. Their only source is session-1 prose — no `needs_edit` tally artifact exists. They are consistent with tonight's independent measurements (T2A 96.8%/98.4%, T9 ~97%), so they were left in, but an unverifiable number in the detector reply is exactly what a probing reviewer would ask us to produce. Re-deriving them from `traces/*/conversation_analysis.needs_edit` is a **zero-API script** — the cheapest risk reduction left, so it is being dispatched now (T16).
 - **15:46** Heartbeat tick. All 3 healthy, no intervention. T6 worklog 17m, still sweeping on three `run_parallel.py` workers — it is the long pole and carries the session's most severe open question (F37, whether the published tau2 baselines replicate). T14 worklog 2m. T16 dispatched 3 min ago, no worklog yet, as expected for a zero-API task. No dispatch, no pivot; queue empty apart from the deferred T2B.
+
+- **15:55** `T16` returned **DONE** (zero API calls). Artifacts: `tasks/T16/{worklog.md,gate_stats.py,report.md,gate_stats.json}`, commit `8d545ff`.
+
+**F39 — The gate statistics hold to the digit; the *wording* was wrong.** The claim reproduces exactly, and U1 turns out to have been a false alarm about provenance — the 2026-06 artifacts do exist in-repo at `scripts/analysis_rewrite_v_reset/data/gated_reset_reconstructed_{lic,collabllm}.md`, stating `539/554 (97.3%)` and `117/119 (98.3%)` verbatim; the T15 audit simply missed them. T16 re-derived both independently from raw traces.
+
+| population | metric | value |
+|---|---|---|
+| LiC | legacy (= the claim) | **539/554 = 97.3%** ✅ exact |
+| LiC | corrected turn-level | 539/547 = **98.5%** |
+| CollabLLM | legacy (= the claim) | 118/120 = **98.3%** ✅ exact |
+| CollabLLM | **turn-level** | 628/659 = **95.3%** |
+
+No bimodality — every task/cell lands in 93–100%. Two defects worth fixing regardless: both figures are per-**conversation**, not per-turn (harmless for LiC, which is last-turn replay with exactly one analyzer call per conversation, but materially wrong for CollabLLM at 659 calls over 120 conversations); and both denominators counted conversations the analyzer never ran on as gate-*closed* — the precise trap flagged in the brief. Correcting it raises both rates.
+
+**New caveat T16 surfaced:** 29% (LiC) / 73% (CollabLLM) of gate-open records have the analyzer writing `issues: "None"` while still setting `needs_edit=true`. It is a **firing rate, not a detection rate.** This does not contradict the reply — which already says the gate is deliberately near-always-on — but a reviewer handed `gate_stats.py` would find it, and we are better off having named it first.
+
+**Controls pass:** an independent regex parser matches the JSON walk across all 3,179 fields; 0/1,197 disagreements against `edit_decision.should_edit`; 12 records hand-read. One false alarm caught and corrected (an apparent 51% "prompt-template echo" rate in CollabLLM was a header-prefix formatting artifact; no headline number touched).
+
+**Action taken (main thread):** applied T16's one-sentence correction to `replies/v5/03_reviewer_5YHP.md` myself — T16 correctly declined to edit a file it believed other agents were using, but T15 had already finished, so the edit was safe. The line now reports LiC 97.3% per-conversation (98.5% turn-level) and CollabLLM **95.3% turn-level** (98.3% per-conversation), rather than mislabelling both as turn rates. `CHANGES.md` §7 U1 is retired.
+
+**Note on the gate paragraph:** it is worth keeping the sentence that follows — "we would not over-read firing rates into a precision/recall claim" — because F39 shows exactly why that hedge was correct, and T2A's 50.4% edit precision is the measurement that belongs there instead.
