@@ -359,3 +359,40 @@ reviewer would find if they ran our pipeline.
 preserved cell-for-cell across all three metrics (Gated ahead on math/database/actions, Reset
 ahead on code) — the one exception is that the shipped metric ties them on actions (99.2 vs
 99.2) purely because both are pinned near the 100% ceiling by exclusion.
+
+### ~T+185min — `--mode visible` control complete; clean 2-step decomposition
+
+Both re-judge modes done (72/72 each, 0 errors, 0 missing traces). Holding the judge fixed at
+`gpt-5.4-mini` and toggling only visibility separates the two effects:
+
+| arm | resets? | judged | shipped (5-mini, visible) | visible (5.4-mini, visible) | symmetric (5.4-mini, all) | Δ judge | Δ visibility | turns seen vis→sym |
+|---|---|---|---|---|---|---|---|---|
+| AC3-Augment | no | 180 | 18 | 10 | 10 | −4.4% | **+0.0%** | 5.09 → 5.06 |
+| AO | no | 166 | 20 | 12 | 12 | −4.8% | **+0.0%** | 4.90 → 4.88 |
+| Baseline | no | 264 | 18 | 7 | 10 | −4.2% | **+1.1%** | 5.38 → 5.35 |
+| AC3-Gated-Reset | yes | 171 | 136 | 88 | 9 | −28.1% | **−46.2%** | 1.18 → 5.15 |
+| AC3-Reset | yes | 172 | 135 | 94 | 13 | −23.8% | **−47.1%** | 1.18 → 5.05 |
+| AC3-Rewrite | yes | 264 | 212 | 150 | 13 | −23.5% | **−51.9%** | 1.00 → 5.20 |
+
+Pooled: judge swap −4.4% / −24.9% (no-reset / reset); **visibility +0.5% / −48.9%**.
+The null control passes exactly: where the two inputs are the same text, "changing visibility"
+moves +0.0 to +1.1%. Where the arm resets, it moves ~half of all judged samples.
+
+Honest caveat recorded: gpt-5.4-mini is more lenient than gpt-5-mini *given a single shard*
+(−25% on reset arms), so the shipped number is also judge-sensitive. That is a second defect of
+the same root cause — the metric is unstable because its input is degenerate — not a reason to
+discount the first.
+
+### Deliverables written
+`RESULTS.md` in this directory: mechanism (file:line), exclusion-rate table over 558 archived
+runs, `tab:main` provenance + the two-FN-mechanism distinction, the corrected 6-arm × 4-task
+matrix with all three metrics, the flip analysis, controls, and the recommendation.
+
+**Headline for the operator:** two flips, both on **AC3-Rewrite** (code +46.0 → −5.3;
+actions +22.4 → −1.5 vs baseline). Neither is in a currently-published table — `tab:main` has no
+AC3-Rewrite LiC row and `tab:megatable` is computed from raw. **AC3-Reset and AC3-Gated-Reset
+beat baseline in all 8 cells under every metric**, and the Gated-vs-Reset ordering holds.
+Separately: `tab:main`'s ERGO row is scored on the *unfiltered* replay pools (23/25/25/25) while
+every other row uses the filtered pools (20/19/25/23) — a comparability defect worth up to
+~14 pp *against* prior work, larger than the FN-adjustment effect and visible from the printed
+percentages alone.

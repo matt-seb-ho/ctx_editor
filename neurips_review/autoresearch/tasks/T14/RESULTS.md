@@ -262,16 +262,31 @@ control with a known answer.
   endpoints in use at the time. **No archived adjusted number needs excluding on this ground.**
   (The trap applies to *new* runs under `load_balancer=trapi`; `rejudge.py` accordingly pins
   `gpt-5.4-mini_2026-03-17`.)
-- **C4 — judge-model drift is not the effect.** On the three arms that never reset, the
-  arm-symmetric input *is* the shipped input, so shipped-vs-symmetric disagreement there is pure
-  gpt-5-mini→gpt-5.4-mini drift (plus the forced `temperature=1.0` for gpt-5-class judges).
-  Measured: **34 decision changes / 610 judged = 5.6%**. On the three reset arms the same
-  comparison gives **448 / 607 = 73.8%**. 13× separation; the 5.6% floor bounds how much of the
-  reset-arm effect could be noise.
-- **C5 — positive control on the mechanism itself.** `rejudge.py --mode visible` reruns the
-  *shipped* visibility with the *new* judge. On AC3-Rewrite it reproduces the shipped exclusions
-  essentially exactly (8/8→8/8, 10/10→10/10, 20/20→20/20) with `mean_user_turns_seen = 1.00`.
-  Changing the judge changes nothing; changing the visibility changes everything.
+- **C4 — judge-model drift is separated from the visibility effect, not assumed away.**
+  `rejudge.py --mode visible` reruns the *shipped* visibility with the *new* judge, giving a
+  clean two-step decomposition over the same 1217 samples:
+
+  | arm | resets? | judged | shipped excl (gpt-5-mini, visible) | visible excl (gpt-5.4-mini, visible) | symmetric excl (gpt-5.4-mini, all) | Δ from judge swap | Δ from visibility | user turns seen (visible → symmetric) |
+  |---|---|---|---|---|---|---|---|---|
+  | AC3-Augment | no | 180 | 18 | 10 | 10 | −4.4% | **+0.0%** | 5.09 → 5.06 |
+  | AO | no | 166 | 20 | 12 | 12 | −4.8% | **+0.0%** | 4.90 → 4.88 |
+  | Baseline | no | 264 | 18 | 7 | 10 | −4.2% | **+1.1%** | 5.38 → 5.35 |
+  | AC3-Gated-Reset | **yes** | 171 | 136 | 88 | 9 | −28.1% | **−46.2%** | 1.18 → 5.15 |
+  | AC3-Reset | **yes** | 172 | 135 | 94 | 13 | −23.8% | **−47.1%** | 1.18 → 5.05 |
+  | AC3-Rewrite | **yes** | 264 | 212 | 150 | 13 | −23.5% | **−51.9%** | 1.00 → 5.20 |
+
+  Pooled: judge swap −4.4% (no-reset) / −24.9% (reset); **visibility +0.5% (no-reset) / −48.9%
+  (reset)**. The visibility column is the falsifiable prediction and it passes: on arms where
+  the two inputs are literally the same text, changing "visibility" moves nothing (+0.5%); on
+  arms that reset it moves half of all judged samples. Reported honestly: gpt-5.4-mini is
+  somewhat more lenient than gpt-5-mini when handed a single shard, so ~24 of the reset arms'
+  ~80% shipped exclusion rate is judge-specific — but that is a *second* problem with the
+  metric (it is judge-sensitive precisely because the input is degenerate), not an escape from
+  the first.
+- **C5 — positive control on the mechanism.** `mean_user_turns_seen` under the shipped path is
+  **1.00** for AC3-Rewrite and **1.18** for the Reset arms, against 4.9–5.4 for every no-reset
+  arm and 4.9–5.2 for every arm under the symmetric path. The judge really is being shown one
+  shard, exactly as `format_user_messages` + `reset_conversation` predict.
 
 ---
 
