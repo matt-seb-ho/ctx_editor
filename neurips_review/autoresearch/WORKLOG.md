@@ -222,3 +222,31 @@ Every analyzer is positive and individually significant. The weakest retains 32%
 **F22 — The method is not gpt-specific, and the evidence is stronger than "it also works elsewhere."** Three of five analyzers are non-OpenAI and they occupy the top, middle and lower rungs, interleaving with the OpenAI models. The best analyzer overall is **Kimi-K2.6, +12.9 pp above the paper's own default**, and the *weakest* is an OpenAI model. Since the assistant is also non-OpenAI, the best-performing cell contains no OpenAI model anywhere.
 
 **Limits to state ourselves:** n = 40+49 per replicate; adjacent rungs are not individually separated — defend the *shape* and the *endpoints*, not the exact ordering. The ± is spread over N=2, not a variance estimate. One assistant, one strategy (no Gated arm). Baselines reproduced phase-1 to within 4 pp, so the harness is sound.
+
+- **14:00** `T2A` returned **DONE**. Artifacts: `tasks/T2A/{RESULTS.md,worklog.md,inject.py,measure.py,manifest.jsonl}`, 32 run cells under `outputs/T2A/`, commit `88cacb3`.
+
+**Design (why the labels are trustworthy):** into 145 LiC database+code replay prefixes the agent injected **two** spans per conversation — one known-false, one known-true — in an identical surface frame, each anchored on a rare token verified absent from the conversation. Labels are ground truth by construction; **no judge anywhere**. 126 conversations pass a mechanical admissibility check. The two-span design is what makes preservation measurable at all: with only false spans injected, an editor that deletes everything would score perfectly.
+
+**F23 — Detection works, and the four metrics (AC3-Reset, n=126):**
+- **Pollution removal 97.6%** (123/126), CI [93.2, 99.2]; 96.9% on the causally-validated subset
+- **Preservation 4.0%** (5/126), CI [1.7, 9.0]
+- **Edit precision 50.4%** (123/244) — **chance is exactly 50% here**
+- **Gate sensitivity 98.4%** (124/126); clean-arm gate-open base rate 96.8%
+
+The signal that is *not* explainable by "it deletes everything": the analyzer **names the injected pollutant in `issues` 78.6%** of the time (89.7% on the causally-harmful subset). That is genuine detection, independent of what the editor then does.
+
+**F24 — Removal predicts accuracy, causally.** The direct split is underpowered (only 3 conversations where AC3 kept the span), so the load-bearing evidence is a detector-free factorial over Baseline (clean / harm-only / useful-only / both): the harmful span costs an unedited assistant **−11.1 pp**; the true span is worth **+15.1 pp**. On the causally-validated subset: Baseline clean 24.7% → with pollutant 9.3% → **AC3 with pollutant present 59.8%**. Building the causal ladder out of Baseline arms rather than out of detector output is what keeps this non-circular.
+
+**F25 — ⚠️ The paper's "we preserve what's correct and remove what's harmful" is NOT supported for AC3-Reset.** Edit precision sits at chance and preservation is 4%: Reset removes *correct* injected content at essentially the same rate as false content. What the data supports for Reset is a different and still-defensible mechanism — **"detect, discard the assistant side, and re-derive the spec from the user side."** The detection is real (78.6% naming rate); the *surgical* part is not.
+
+Crucially, **AC3-Rewrite sits at the opposite corner** (removal 27.0%, preservation 38.9%), which both proves the metric is not saturated and shows the selectivity claim belongs to Rewrite, not Reset. The fix is attribution, not retraction: state the operator-specific mechanism rather than a blanket claim.
+
+This matters beyond the rebuttal — the "unlike prior work that discards all assistant messages, we preserve what's correct" framing is in the project's own overview and is part of how the paper differentiates from ERGO. **Queued as PAPER-5.**
+
+**F26 — Positive controls all pass, and one caught a real bug.** Offline, n=126: identity editor 0.000/1.000, oracle 1.000/1.000, nuke 1.000/0.000, delete-both 1.000/0.000. **PC2 caught a word-boundary vs substring mismatch in the agent's first probe** (`Museum_ID` ⊂ `Museum_IDs`) that would have silently overstated removal. Third time tonight a control caught something that looked fine.
+
+**Caveats (stated in RESULTS.md's first paragraph, correctly):** injected pollution is plausibly more salient than natural pollution, so these are an **upper bound / sanity check**, not a headline. Two of four injected types are causally inert; N=1 per cell; single model.
+
+### Decisions (cont.)
+
+**D9 — Report T2A as "detection is strong, selectivity is operator-dependent," never as a bare 97.6%.** Quoting 97.6% removal alone would be the most attackable sentence in the rebuttal: a reviewer computes edit precision from our own confusion table, finds chance, and concludes we hid it. Leading with the honest decomposition — high detection, chance-level selectivity for Reset, real selectivity for Rewrite — is both more defensible and more interesting.
