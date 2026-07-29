@@ -275,6 +275,17 @@ def main() -> int:
         P(f"* **{name}**: harmful {c['harmful']}, useful {c['useful']}, "
           f"inconclusive {c['inconclusive']} "
           f"({pct(c['harmful'], len(rows))} harmful, {pct(c['useful'], len(rows))} useful)")
+    n_lab = sum(1 for r in rows if r["label_null"] != "inconclusive")
+    if tau_null is not None and rows:
+        exp = 0.05 * len(rows)
+        # exact binomial tail: P(X >= n_lab) with X ~ Bin(len(rows), 0.05)
+        from math import comb
+        pb = sum(comb(len(rows), i) * 0.05 ** i * 0.95 ** (len(rows) - i)
+                 for i in range(n_lab, len(rows) + 1))
+        P(f"* **How many of those are real?** The null-calibrated threshold is the 95th percentile of "
+          f"a genuine null, so **{exp:.1f}** of {len(rows)} spans would be labelled by chance. "
+          f"**{n_lab}** were labelled (binomial p = {pb:.2e}), i.e. an excess of ≈ "
+          f"**{n_lab - exp:.0f} genuinely causal spans** over the noise floor.")
     nbh = sum(1 for r in rows if r["bh_sig"])
     P(f"* surviving Benjamini–Hochberg at q = 0.10: **{nbh}** spans "
       f"({sum(1 for r in rows if r['bh_sig'] and r['delta'] > 0)} harmful, "

@@ -21,18 +21,18 @@
 
 * conversations: **30** (Counter({'database_v2': 17, 'code_v2': 13}))
 * spans: **111** (Counter({'prose': 68, 'code': 43}))
-* replicate runs at temperature 1.0 — present: {'code_v2': 6, 'database_v2': 7}, ablation (min over conditions): {1: {'code_v2': 6, 'database_v2': 7}, 2: {'code_v2': 6, 'database_v2': 7}, 3: {'code_v2': 6, 'database_v2': 7}, 4: {'code_v2': 6, 'database_v2': 7}}
-* controls: {'ctl_filler': {'code_v2': 6, 'database_v2': 6}, 'ctl_harm': {'code_v2': 6, 'database_v2': 6}, 'ctl_answer': {'code_v2': 6, 'database_v2': 6}}
+* replicate runs at temperature 1.0 — present: {'code_v2': 9, 'database_v2': 9}, ablation (min over conditions): {1: {'code_v2': 9, 'database_v2': 9}, 2: {'code_v2': 9, 'database_v2': 9}, 3: {'code_v2': 9, 'database_v2': 9}, 4: {'code_v2': 8, 'database_v2': 9}}
+* controls: {'ctl_filler': {'code_v2': 8, 'database_v2': 8}, 'ctl_harm': {'code_v2': 8, 'database_v2': 8}, 'ctl_answer': {'code_v2': 8, 'database_v2': 8}}
 
 ## 1. Minimum detectable effect at the realised N
 
-n_present = 6, n_ablated = 6, mean present accuracy p0 = 0.388.
+n_present = 9, n_ablated = 8, mean present accuracy p0 = 0.396.
 
 | quantity | value |
 |---|---|
-| smallest **observed** difference that can reach two-sided Fisher p < 0.05 | **0.833** |
-| smallest **true** upward effect detectable with 80% power at p0=0.39 | **not reachable** |
-| smallest **true** downward effect detectable with 80% power at p0=0.39 | **not reachable — bounded by p0 = 0.39** |
+| smallest **observed** difference that can reach two-sided Fisher p < 0.05 | **0.500** |
+| smallest **true** upward effect detectable with 80% power at p0=0.40 | **not reachable** |
+| smallest **true** downward effect detectable with 80% power at p0=0.40 | **not reachable — bounded by p0 = 0.40** |
 
 Read this honestly: **per-span labels resolve only large effects.** A span that shifts the
 assistant's success probability by 10-20 pp is invisible at this N and will be scored
@@ -47,9 +47,9 @@ Every control is a **paired, per-conversation** comparison against the same `pre
 
 | control | expected sign | n conv | present acc | injected acc | ablation effect (removed − present) | 95% CI | perm p |
 |---|---|---|---|---|---|---|---|
-| `ctl_filler` | ≈ 0 | 32 | 0.388 | 0.370 | **+0.019** | [-0.044, +0.081] | 0.8516 |
-| `ctl_harm` | > 0 | 24 | 0.372 | 0.014 | **+0.358** | [+0.213, +0.507] | 0.0001 |
-| `ctl_answer` | ≪ 0 | 32 | 0.388 | 0.839 | **-0.450** | [-0.579, -0.317] | 0.0001 |
+| `ctl_filler` | ≈ 0 | 32 | 0.396 | 0.359 | **+0.036** | [-0.017, +0.090] | 0.7043 |
+| `ctl_harm` | > 0 | 24 | 0.384 | 0.010 | **+0.374** | [+0.230, +0.522] | 0.0001 |
+| `ctl_answer` | ≪ 0 | 32 | 0.396 | 0.840 | **-0.444** | [-0.572, -0.309] | 0.0001 |
 
 **Controls pass: True** ({'ctl_filler': True, 'ctl_harm': True, 'ctl_answer': True}).
 
@@ -62,34 +62,35 @@ causally-validated injected pollution on the same scale.
 
 `ctl_filler` gives 32 genuine null ablations (a contentless span removed from a real conversation), scored by exactly the ablation code path. Their |effect| distribution is the empirical noise floor:
 
-* mean +0.0186, mean |effect| 0.1079, max |effect| 0.5000
-* **95th percentile of |effect| under the null = 0.405** — used below as the data-driven threshold `TAU_null`. The filler control runs at fewer replicates than the ablation arms, so its noise floor is if anything *wider* than the ablation arms', which makes this threshold conservative.
+* mean +0.0365, mean |effect| 0.0998, max |effect| 0.4028
+* **95th percentile of |effect| under the null = 0.319** — used below as the data-driven threshold `TAU_null`. The filler control runs at fewer replicates than the ablation arms, so its noise floor is if anything *wider* than the ablation arms', which makes this threshold conservative.
 
 ## 3. Per-span causal labels
 
 Spans with a usable comparison: **111** of 111.
 
 * **strict (two-sided Fisher p < 0.05)**: harmful 0, useful 0, inconclusive 111 (0.0% (0/111) harmful, 0.0% (0/111) useful)
-* **null-calibrated (|delta| > 95th pct of the filler null)**: harmful 7, useful 4, inconclusive 100 (6.3% (7/111) harmful, 3.6% (4/111) useful)
-* **lenient (|delta| >= 0.25, point estimate)**: harmful 17, useful 8, inconclusive 86 (15.3% (17/111) harmful, 7.2% (8/111) useful)
+* **null-calibrated (|delta| > 95th pct of the filler null)**: harmful 15, useful 6, inconclusive 90 (13.5% (15/111) harmful, 5.4% (6/111) useful)
+* **lenient (|delta| >= 0.25, point estimate)**: harmful 16, useful 6, inconclusive 89 (14.4% (16/111) harmful, 5.4% (6/111) useful)
+* **How many of those are real?** The null-calibrated threshold is the 95th percentile of a genuine null, so **5.6** of 111 spans would be labelled by chance. **21** were labelled (binomial p = 1.39e-07), i.e. an excess of ≈ **15 genuinely causal spans** over the noise floor.
 * surviving Benjamini–Hochberg at q = 0.10: **0** spans (0 harmful, 0 useful)
 
-Mean ablation effect over **all** spans: **+0.0388** [95% CI +0.0024, +0.0757] — i.e. the average natural span is close to causally inert, which is itself the finding: pollution is concentrated, not diffuse.
+Mean ablation effect over **all** spans: **+0.0280** [95% CI -0.0091, +0.0668] — i.e. the average natural span is close to causally inert, which is itself the finding: pollution is concentrated, not diffuse.
 
 | bucket | n |
 |---|---|
-| delta <= -0.50 | 2 |
-| -0.50 < delta <= -0.25 | 6 |
-| -0.25 < delta < -0.05 | 12 |
-| |delta| <= 0.05 | 57 |
-| 0.05 < delta < 0.25 | 17 |
-| 0.25 <= delta < 0.50 | 13 |
-| delta >= 0.50 | 4 |
+| delta <= -0.50 | 3 |
+| -0.50 < delta <= -0.25 | 3 |
+| -0.25 < delta < -0.05 | 17 |
+| |delta| <= 0.05 | 58 |
+| 0.05 < delta < 0.25 | 14 |
+| 0.25 <= delta < 0.50 | 16 |
+| delta >= 0.50 | 0 |
 
-* **database_v2** (63 spans): mean delta +0.0023; strict labels harmful 0 / useful 0 / inconclusive 63
-* **code_v2** (48 spans): mean delta +0.0868; strict labels harmful 0 / useful 0 / inconclusive 48
-* **code spans** (43): mean delta +0.0570; harmful 0 / useful 0
-* **prose spans** (68): mean delta +0.0273; harmful 0 / useful 0
+* **database_v2** (63 spans): mean delta -0.0088; strict labels harmful 0 / useful 0 / inconclusive 63
+* **code_v2** (48 spans): mean delta +0.0764; strict labels harmful 0 / useful 0 / inconclusive 48
+* **code spans** (43): mean delta +0.0526; harmful 0 / useful 0
+* **prose spans** (68): mean delta +0.0125; harmful 0 / useful 0
 
 ### 3.1 The spans at the extremes (qualitative, for the reader)
 
@@ -97,27 +98,27 @@ Most **harmful** natural spans (removing them helped most)
 
 | task | kind | delta | 95% CI | p | excerpt |
 |---|---|---|---|---|---|
-| code | prose | **+0.500** | [+0.00, +0.81] | 0.182 | `I don't have enough context to help you with a specific number of carrots, but I can write a Python function t` |
-| code | prose | **+0.500** | [+0.00, +0.81] | 0.182 | `Let me clarify: If you've eaten 5, need 6 more (so target total is 11), and have 10 carrots available, you'd e` |
-| code | code | **+0.500** | [-0.04, +0.77] | 0.242 | ````python def unique_encode(message: str) -> str: """Encode a message by swapping case and shifting vowels for` |
-| code | prose | **+0.500** | [+0.00, +0.81] | 0.182 | `Your requirement is to implement a function that works in two steps: first rounds the purchase to the nearest ` |
-| database | prose | **+0.429** | [-0.06, +0.72] | 0.266 | `- Airports that have no flights arriving or departing? - Airports that are isolated (not connected to any othe` |
-| database | prose | **+0.429** | [-0.06, +0.72] | 0.266 | `Also, would you like to see the airport codes, city names, or other details?` |
-| database | prose | **+0.429** | [-0.06, +0.72] | 0.266 | `This query returns the contestant number, name, and total vote count for only those contestants who have recei` |
-| code | prose | **+0.333** | [-0.12, +0.70] | 0.455 | `Wait, this means the sequence would be all zeros if the first three terms start as 0, 0, 0. But you mentioned ` |
+| code | code | **+0.444** | [-0.01, +0.71] | 0.153 | ````python def sort_list_copy(lst): return sorted(lst) ```` |
+| code | prose | **+0.444** | [-0.01, +0.71] | 0.153 | `Here's a Python function that returns a sorted copy of a list of non-negative numbers:` |
+| database | prose | **+0.444** | [+0.01, +0.72] | 0.131 | `Also, would you like to see the airport codes, city names, or other details?` |
+| database | code | **+0.444** | [+0.05, +0.73] | 0.082 | ````sql SELECT e.City FROM employee e JOIN hiring h ON e.Employee_ID = h.Employee_ID GROUP BY e.City HAVING AVG` |
+| database | code | **+0.444** | [+0.05, +0.73] | 0.082 | ````sql SELECT e.City FROM employee e JOIN hiring h ON e.Employee_ID = h.Employee_ID WHERE e.Age < 30 GROUP BY ` |
+| code | prose | **+0.444** | [+0.05, +0.73] | 0.082 | `I don't have enough context to help you with a specific number of carrots, but I can write a Python function t` |
+| code | prose | **+0.444** | [+0.05, +0.73] | 0.082 | `Wait, this means the sequence would be all zeros if the first three terms start as 0, 0, 0. But you mentioned ` |
+| code | code | **+0.417** | [-0.05, +0.69] | 0.153 | ````python def sort_non_negative(lst): return sorted(lst) ```` |
 
 Most **useful** natural spans (removing them hurt most)
 
 | task | kind | delta | 95% CI | p | excerpt |
 |---|---|---|---|---|---|
-| code | code | **-0.500** | [-0.77, +0.04] | 0.242 | ````python def smallest_diff_at_least(arr, min_value): if len(arr) < 2: return None arr_sorted = sorted(arr) sm` |
-| code | prose | **-0.500** | [-0.77, +0.04] | 0.242 | `You could modify the function to take an additional parameter representing the required minimum value. Then fi` |
-| database | code | **-0.429** | [-0.72, +0.07] | 0.286 | ````sql SELECT t.Name AS Teacher_Name, c.Course AS Course_Name FROM teacher t JOIN course_arrange ca ON t.Teach` |
-| database | prose | **-0.429** | [-0.72, +0.07] | 0.286 | `Based on your request "cities with young employees", I need to clarify what you mean by "young employees". Cou` |
-| database | prose | **-0.286** | [-0.62, +0.19] | 0.592 | `This query joins the `teacher`, `course_arrange`, and `course` tables, then selects the teacher's name and cou` |
-| database | prose | **-0.286** | [-0.62, +0.19] | 0.592 | `Here's the query to find cities with more than one employee under 30:` |
-| database | prose | **-0.286** | [-0.64, +0.12] | 0.462 | `Sure! To analyze only students who have pets, I need to know what specific metrics or breakdown you're interes` |
-| database | prose | **-0.286** | [-0.64, +0.12] | 0.462 | `Certainly! To help you analyze students, could you clarify what specific analysis you need? For example:` |
+| code | code | **-0.556** | [-0.78, -0.10] | 0.057 | ````python def smallest_diff_at_least(arr, min_value): if len(arr) < 2: return None arr_sorted = sorted(arr) sm` |
+| code | prose | **-0.556** | [-0.78, -0.10] | 0.057 | `You could modify the function to take an additional parameter representing the required minimum value. Then fi` |
+| database | code | **-0.556** | [-0.78, -0.10] | 0.057 | ````sql SELECT t.Name AS Teacher_Name, c.Course AS Course_Name FROM teacher t JOIN course_arrange ca ON t.Teach` |
+| database | prose | **-0.444** | [-0.71, +0.01] | 0.153 | `This query joins the `teacher`, `course_arrange`, and `course` tables, then selects the teacher's name and cou` |
+| database | prose | **-0.333** | [-0.65, +0.03] | 0.206 | `Sure! To analyze only students who have pets, I need to know what specific metrics or breakdown you're interes` |
+| database | prose | **-0.333** | [-0.65, +0.03] | 0.206 | `Certainly! To help you analyze students, could you clarify what specific analysis you need? For example:` |
+| database | code | **-0.222** | [-0.55, +0.20] | 0.637 | ````sql SELECT contestant_number, contestant_name FROM CONTESTANTS; ```` |
+| database | prose | **-0.222** | [-0.55, +0.20] | 0.637 | `Based on your request "cities with young employees", I need to clarify what you mean by "young employees". Cou` |
 
 ## 4. Does AC3 remove the spans the ablation proves harmful?
 
@@ -147,30 +148,30 @@ PC-other is the specificity control that matters: it shows the probe is testing 
 - preservation rate = n/a (0)
 - edit precision = n/a (0)  (base rate: harmful spans are n/a (0) of the labelled set)
 
-**null-calibrated labels** — causally harmful n=6, causally useful n=2
+**null-calibrated labels** — causally harmful n=7, causally useful n=4
 
 | | causally harmful | causally useful |
 |---|---|---|
-| **AC3 removed** | 5 | 2 |
+| **AC3 removed** | 6 | 4 |
 | **AC3 kept** | 1 | 0 |
 
-- pollution removal rate = 83.3% (5/6)  [95% CI 43.6–97.0%]
-- preservation rate = 0.0% (0/2)  [95% CI 0.0–65.8%]
-- edit precision = 71.4% (5/7)  (base rate: harmful spans are 75.0% (6/8) of the labelled set)
+- pollution removal rate = 85.7% (6/7)  [95% CI 48.7–97.4%]
+- preservation rate = 0.0% (0/4)  [95% CI 0.0–49.0%]
+- edit precision = 60.0% (6/10)  (base rate: harmful spans are 63.6% (7/11) of the labelled set)
 
-**lenient (|delta|>=0.25) labels** — causally harmful n=10, causally useful n=5
+**lenient (|delta|>=0.25) labels** — causally harmful n=8, causally useful n=4
 
 | | causally harmful | causally useful |
 |---|---|---|
-| **AC3 removed** | 9 | 5 |
+| **AC3 removed** | 7 | 4 |
 | **AC3 kept** | 1 | 0 |
 
-- pollution removal rate = 90.0% (9/10)  [95% CI 59.6–98.2%]
-- preservation rate = 0.0% (0/5)  [95% CI 0.0–43.4%]
-- edit precision = 64.3% (9/14)  (base rate: harmful spans are 66.7% (10/15) of the labelled set)
+- pollution removal rate = 87.5% (7/8)  [95% CI 52.9–97.8%]
+- preservation rate = 0.0% (0/4)  [95% CI 0.0–49.0%]
+- edit precision = 63.6% (7/11)  (base rate: harmful spans are 66.7% (8/12) of the labelled set)
 
-**Label-free aggregate test.** Mean causal effect of the spans AC3-Reset *removed* (61) minus that of the spans it *kept* (5): **-0.0471** (permutation p = 0.6064). A selective editor should score **positive**: it should be dropping the spans whose removal helps and keeping the spans whose removal hurts. This test uses no per-span label at all, so it is not limited by the per-span MDE.
-  - mean delta | removed = +0.0386 (n=61); kept = +0.0857 (n=5)
+**Label-free aggregate test.** Mean causal effect of the spans AC3-Reset *removed* (61) minus that of the spans it *kept* (5): **-0.0605** (permutation p = 0.4954). A selective editor should score **positive**: it should be dropping the spans whose removal helps and keeping the spans whose removal hurts. This test uses no per-span label at all, so it is not limited by the per-span MDE.
+  - mean delta | removed = +0.0061 (n=61); kept = +0.0667 (n=5)
   - analyzer gate opened on 0.970 of replicates
 
 ### AC3-Rewrite  (replicates {'code_v2': 5, 'database_v2': 5}; 66 probe-admissible spans)
@@ -186,27 +187,27 @@ PC-other is the specificity control that matters: it shows the probe is testing 
 - preservation rate = n/a (0)
 - edit precision = n/a (0)  (base rate: harmful spans are n/a (0) of the labelled set)
 
-**null-calibrated labels** — causally harmful n=6, causally useful n=2
+**null-calibrated labels** — causally harmful n=7, causally useful n=4
 
 | | causally harmful | causally useful |
 |---|---|---|
-| **AC3 removed** | 6 | 2 |
+| **AC3 removed** | 7 | 4 |
 | **AC3 kept** | 0 | 0 |
 
-- pollution removal rate = 100.0% (6/6)  [95% CI 61.0–100.0%]
-- preservation rate = 0.0% (0/2)  [95% CI 0.0–65.8%]
-- edit precision = 75.0% (6/8)  (base rate: harmful spans are 75.0% (6/8) of the labelled set)
+- pollution removal rate = 100.0% (7/7)  [95% CI 64.6–100.0%]
+- preservation rate = 0.0% (0/4)  [95% CI 0.0–49.0%]
+- edit precision = 63.6% (7/11)  (base rate: harmful spans are 63.6% (7/11) of the labelled set)
 
-**lenient (|delta|>=0.25) labels** — causally harmful n=10, causally useful n=5
+**lenient (|delta|>=0.25) labels** — causally harmful n=8, causally useful n=4
 
 | | causally harmful | causally useful |
 |---|---|---|
-| **AC3 removed** | 10 | 5 |
+| **AC3 removed** | 8 | 4 |
 | **AC3 kept** | 0 | 0 |
 
-- pollution removal rate = 100.0% (10/10)  [95% CI 72.2–100.0%]
-- preservation rate = 0.0% (0/5)  [95% CI 0.0–43.4%]
-- edit precision = 66.7% (10/15)  (base rate: harmful spans are 66.7% (10/15) of the labelled set)
+- pollution removal rate = 100.0% (8/8)  [95% CI 67.6–100.0%]
+- preservation rate = 0.0% (0/4)  [95% CI 0.0–49.0%]
+- edit precision = 66.7% (8/12)  (base rate: harmful spans are 66.7% (8/12) of the labelled set)
 
 **Label-free aggregate test.** Mean causal effect of the spans AC3-Rewrite *removed* (66) minus that of the spans it *kept* (0): **+nan** (permutation p = nan). A selective editor should score **positive**: it should be dropping the spans whose removal helps and keeping the spans whose removal hurts. This test uses no per-span label at all, so it is not limited by the per-span MDE.
 
@@ -216,7 +217,7 @@ PC-other is the specificity control that matters: it shows the probe is testing 
 
 | arm | n conv | raw accuracy | 95% CI |
 |---|---|---|---|
-| Baseline (present, unedited) | 32 | 0.388 | [0.258, 0.524] |
+| Baseline (present, unedited) | 32 | 0.396 | [0.267, 0.535] |
 | AC3-Reset | 32 | 0.519 | [0.369, 0.681] |
 | AC3-Rewrite | 32 | 0.531 | [0.388, 0.675] |
 
@@ -224,8 +225,8 @@ These are the same conversations the ablation ran on, so the editing arms' gain 
 
 ### 5.1 Does removal of causally-harmful spans predict AC3's gain? (exploratory)
 
-* **AC3-Reset**: n = 5 conversations with at least one causally-harmful span; Pearson r between (fraction of harmful spans removed) and (accuracy gain) = **-0.555**. Underpowered by design — reported, not leaned on.
-* **AC3-Rewrite**: n = 5 conversations with at least one causally-harmful span; Pearson r between (fraction of harmful spans removed) and (accuracy gain) = **+nan**. Underpowered by design — reported, not leaned on.
+* **AC3-Reset**: n = 6 conversations with at least one causally-harmful span; Pearson r between (fraction of harmful spans removed) and (accuracy gain) = **-0.376**. Underpowered by design — reported, not leaned on.
+* **AC3-Rewrite**: n = 6 conversations with at least one causally-harmful span; Pearson r between (fraction of harmful spans removed) and (accuracy gain) = **+nan**. Underpowered by design — reported, not leaned on.
 
 ## 6. What this does and does not cover
 

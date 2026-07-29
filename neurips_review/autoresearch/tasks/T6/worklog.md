@@ -575,3 +575,16 @@ object keyed by the tag. Not chased further.
 
 Status 17:55: gpt-5.4 block **COMPLETE** (all 5 arms x 3 reps). Kimi has s0/s1/s2/s3,
 ao running (9/60). DSV4F has s0/s1/s2, s3 running (14/60), then ao.
+
+## 18:43 UTC — status
+
+13 of 15 cells complete. DSV4F Rewrite 57/60; Kimi AO 44/60; DSV4F AO not yet started
+(it is the last cell in the matrix). Newly landed:
+- DSV4F Rewrite **59.8 ± 15.3** (68.4 / 42.1 / 68.8) vs published 57.9 — replicates.
+- Kimi AO **0.0 ± 0.0** — replicates the published 0.0 exactly, as did gpt-5.4 AO.
+
+**Both completed AO cells are 0.0 in every replicate.** Taken with the `max_steps`
+termination mechanism confirmed in the smoke test, the paper's "AO -> 0% everywhere"
+claim is the single most solidly reproduced result in the whole tau2 row. It is also
+the strongest evidence the harness is scoring honestly: the same code path that
+returns a hard 0 for AO returns 68-79% for Baseline on the same tasks in the same run.
