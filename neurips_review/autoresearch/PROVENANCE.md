@@ -29,18 +29,23 @@ graph TD
 
   subgraph S2["Session 2 - 2026-07-29 (this session)"]
     BLK["BLOCK-spider<br/>Spider SQLite DBs recovered<br/>17/17 db_ids, test-suite semantics<br/>[done]"]
-    RC["RECON<br/>harness map + operator naming<br/>[run]"]
-    T8["T8 CollabLLM N=3<br/>competent user sim<br/>[todo]"]
-    T9["T9 analyzer-model sensitivity<br/>[todo]"]
+    RC["RECON<br/>harness map + operator naming<br/>[done] — found inert-seed bug"]
+    T8["T8 CollabLLM N=3 replicates<br/>competent user sim<br/>[run]"]
+    T9["T9 analyzer-model sensitivity<br/>[todo] — disable analysis_cache"]
     T2A["T2A Tier-A constructed pollution<br/>[todo]"]
     T2C["T2c auditing vs re-solving<br/>[run]"]
     T1["T1 condensation baseline<br/>[todo] — venue unblocked"]
-    T11["T11-13 WildChat judge checks,<br/>memory order/split<br/>[todo]"]
-    T6["T6 multi-seed tau2<br/>[todo, expensive]"]
+    T11["T11 WildChat judge checks<br/>[todo]"]
+    T12["T12-13 memory order / split<br/>[run]"]
+    T6["T6 multi-seed tau2<br/>[todo] — harness is an off-machine fork"]
     T2B["T2B counterfactual span ablation<br/>[todo, gold standard]"]
+    SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
   S1 --> S2
 
+  RC --> SEED
+  SEED -.->|"invalidates 'seeds' wording"| T4
+  SEED --> T8
   RC --> T8
   RC --> T9
   RC --> T6
