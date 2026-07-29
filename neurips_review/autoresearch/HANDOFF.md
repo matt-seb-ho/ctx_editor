@@ -8,6 +8,21 @@ Read this instead of `WORKLOG.md`. Everything here traces to a finding ID (F*) i
 pass is complete, nothing is in flight.** Two earlier versions exist (T22 at F58, commit
 `11d8e40`; T26 at F72, commit `701f6b6`) and **both are now wrong about the headline**.
 
+**Amended by T36 at F94–F97 (zero API calls).** T31b turned §4's item list into a ready-to-apply
+edit specification, [`PAPER_EDITS.md`](PAPER_EDITS.md), and in doing so found that **this document
+endorsed a drafted PAPER-9 caption that is wrong twice** (F94), that **Figure 1's image — not only
+its caption — is now false and has no recoverable source** (F95), that the "appropriate intensity"
+ordering **inverts rather than weakens** (F96), and that **four PAPER items have no target in the
+paper as §4 describes them** (F97). Those corrections are folded in below.
+
+**For anything under §4, work from [`PAPER_EDITS.md`](PAPER_EDITS.md), not from §4's one-line
+descriptions.** It gives, per item, the exact current text quoted from the live `.tex`, the
+paste-ready replacement, the finding ID behind every number, and effort/risk. **Nine of the eleven
+items are paste-ready; two (PAPER-5, PAPER-11) are judgement calls with options laid out and
+deliberately not chosen.** PAPER-7 remains the **only** posting blocker and is now a **~20-minute
+paste** (item 7a); T31b's items 1–7 total roughly **1 h 30 m**. §4 below stays as the rationale and
+the priority argument; `PAPER_EDITS.md` is where the work happens.
+
 **If you read only one thing: the tau2-bench comparison is withdrawn.** T6, the last and
 longest experiment of the session, re-ran the full published tau2 matrix at N=3 and found that
 **two of three published baselines do not replicate**. On all three models the remeasured
@@ -57,12 +72,20 @@ Three things to act on, in order:
 2. **PAPER-7 is still the only hard blocker on posting.** We scored ERGO on the wrong
    denominators, understating a competitor by up to ~10 pp on math. `replies/v5/` commits to
    that fix **in front of the reviewers** in five places. Posting without making the paper edit
-   means announcing a correction we have not made (F58).
+   means announcing a correction we have not made (F58). **T31b has since specified it
+   paste-ready — `PAPER_EDITS.md` §PAPER-7a: one table row, one caption, ~20 minutes, zero
+   judgement.** Do that first and nothing else is gating.
 3. **Two contribution-framing decisions need a human, not an agent: PAPER-5 and PAPER-11.**
    T2B killed "we preserve what's correct and remove what's harmful" for *both* operators, which
    also dissolves the ERGO differentiation; the tau2 withdrawal removes the far end of the
    "spectrum of referentiality" narrative. Together they change what the paper claims to
-   contribute, not just what it reports.
+   contribute, not just what it reports. **A third belongs with them (F96): the "appropriate
+   intensity" thesis — lighter operators for stronger respondents, heavier for weaker — is
+   *absent* from the re-measured tau2 matrix, not merely weakened.** Gated-Reset is best or
+   tied-best on all three respondents, which points the other way. It appears in three places
+   (L358, L372, L405) and is a **claim change, not a number change**; `PAPER_EDITS.md` PAPER-11
+   J2 lays out the options and recommends against replacing it with the new tau2 ordering, which
+   would swap a withdrawn pattern for an underpowered one.
 
 ---
 
@@ -187,7 +210,7 @@ populations:
 
 | Source | Value | Population |
 |---|---|---|
-| paper | 4.0 / 15.8 | GPT-5-mini, last-turn replay, `dev_{task}_subset` — **top-25 items by GPT-5-mini baseline failure rate** (≥60% error over 5 runs; 75 eligible → 25 kept). **4.0% = 1/25 is what the construction guarantees** |
+| paper | 4.0 / 15.8 | GPT-5-mini, last-turn replay, `dev_{task}_subset` — **top-25 items by GPT-5-mini baseline failure rate** (≥60% error over 5 runs; database 75 eligible → 25 kept). **4.0% = 1/25 is what the construction guarantees.** *(Per-task correction, F94: the top-25 cut binds on database, code and actions but **not on math**, which had only 23 eligible instances and kept all of them; and **code had only four usable baseline runs**, not five. Do not restate this row as a uniform "top 25 across five runs" — see PAPER-9.)* |
 | `01` iNYK reply | 19.0–22.4 | three newer models, last-turn replay, `htn50_52`, with replay prefixes deliberately weighted toward baseline failures (74–86% on database). A floor by construction |
 | T1 (`00` CW5) | 56.1 / 83.0 | gpt-5.4-mini, **full end-to-end** sharded simulation, the **complete unselected pool** (107 / 100) |
 
@@ -305,6 +328,12 @@ These all touch `writing/overleaf_repo/`, which is shared with Lianhui and Miche
 Overleaf. They were deliberately **not** actioned autonomously. Pull before editing
 (`git -C writing/overleaf_repo pull origin main`).
 
+**Do not work from this table alone — work from [`PAPER_EDITS.md`](PAPER_EDITS.md)** (T31b), which
+locates every item in the *current* `.tex`, quotes the text as it stands, and supplies the
+replacement. Where the two disagree, `PAPER_EDITS.md` is right: it re-derived each item against the
+file, and four of the rows below describe an edit whose target does not exist as described (F97).
+The **effort column has been corrected** against it.
+
 **Only PAPER-7 gates posting.** PAPER-11 is the largest and highest-stakes edit, but it is a
 *withdrawal* — a reviewer reading "we withdraw this claim" needs no paper edit to verify it,
 whereas PAPER-7 asserts corrected numbers a reviewer can check against a table that still prints
@@ -312,22 +341,37 @@ the old ones.
 
 | ID | Do this | From | Effort | Blocking for the rebuttal? |
 |---|---|---|---|---|
-| **PAPER-7** | Fix ERGO's denominators in `tab:main`. Ship math **80.0**, code **≈44.0**, database 12.0; actions is **unclosable** — print as interval **[43.5, 52.2]** or drop, never as a point estimate. **Never ship T17's 57.9 for code** (it overstates a competitor by ~14 pp; T18 measured k = 2.67/6, not 0/6). Lead the passage with F49: **no ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction** (code p=0.375, math p=1.00). Two body numbers move *in our favour*: code gap-closure 78% → 82%, "closes 55–80%" → "67–82%" | F42–F44, F48, D14 | 1–2 h | **YES — the only blocking item** (F58) |
-| **PAPER-11** | *(new)* **Remove the tau2 improvement claim from the paper.** Places, in `neurips/neurips_2026_conference.tex`: abstract L110 ("only approach that improves over full context across the entire spectrum" + "substantially outperforms full context in agentic tool use — by double-digit margins per respondent"); Fig. 1 caption L122; intro L139; `tab:megatable` tau2 block + caption L280 (the caption's own rate-limit-clipped concession becomes the finding); L328; §`sec:tau2-results` L356–L360; discussion L369, L372; conclusion L405; limitations L808. **Keep**: AO = 0% on every respondent (structural, reproduces exactly), and the honest replacement claim already drafted for the rebuttal — AC3 is *"the only method that remains **viable** in the stateful agentic setting, where blanket omission fails structurally."* Also fold in the unexplained gpt-5.4 collapse and the fork parser bug as stated limitations | **F78–F81, D21** | 3–5 h; touches abstract, figure, two sections and the conclusion | **No** — v5 posts the withdrawal in its own words. **But it is the highest-stakes item on this list and must land before any revision or arXiv push** |
-| **PAPER-9** | `tab:main` caption: state that instances are the 25 per task with the **highest full-context failure rate** across five GPT-5-mini baseline runs, and that the design-oracle rows use the same instances so the gap-closure percentages are pool-independent. Without this, the paper's 4.0% database baseline reads as a measurement when it is largely what the selection guarantees | F68 | 10 min | Camera-ready — but **highest value per minute on the list**; it is the discrepancy a reviewer is most likely to catch unaided |
-| **PAPER-6** | Delete per-run `adjusted_accuracy` as a reported metric; report **raw** as primary; keep the arm-symmetric pool-level pre-filter as the only FN adjustment and **defend** it; rewrite `tex:478-480`, which says "all user simulator messages" when the code collates only the visible ones | F28, F40–F42, D13 | 2–3 h | Camera-ready (v5 is already raw). **Do before arXiv** — it moves published magnitudes |
+| **PAPER-7** | Fix ERGO's denominators in `tab:main`. Ship math **80.0**, code **≈44.0** (T18 measures **43.9** — print that), database 12.0; actions is **unclosable** — print as interval **[43.5, 52.2]** or drop, never as a point estimate. **Never ship T17's 57.9 for code** (it overstates a competitor by ~14 pp; T18 measured k = 2.67/6, not 0/6). Lead the passage with F49: **no ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction** (code p=0.375, math p=1.00). **⚠ Correction: the two body numbers this row used to bundle in — code gap-closure 78% → 82% and "closes 55–80%" → "67–82%" — are consequences of the *optional* comparability pass (7b), not of the ERGO fix. Do not make them if you apply only 7a** (`PAPER_EDITS.md` §7b). Paste-ready at `PAPER_EDITS.md` §PAPER-7a, with a merged caption that also carries PAPER-9 | F42–F44, F48, D14 | **7a ~20 min** (7b optional, ~1 h) | **YES — the only blocking item** (F58) |
+| **PAPER-11** | *(new)* **Remove the tau2 improvement claim from the paper.** Places, in `neurips/neurips_2026_conference.tex`: abstract L110 ("only approach that improves over full context across the entire spectrum" + "substantially outperforms full context in agentic tool use — by double-digit margins per respondent"); Fig. 1 caption L122; intro L139; `tab:megatable` tau2 block + caption L280 (the caption's own rate-limit-clipped concession becomes the finding); L328; §`sec:tau2-results` L356–L360; discussion L369, L372; conclusion L405; limitations L808. **`PAPER_EDITS.md` has the full 25-location inventory, the paste-ready limitations paragraph, and three framing decisions (J1–J3) left open for you.** **Keep**: AO = 0% on every respondent (structural, reproduces exactly), and the honest replacement claim already drafted for the rebuttal — AC3 is *"the only method that remains **viable** in the stateful agentic setting, where blanket omission fails structurally."* Also fold in the unexplained gpt-5.4 collapse and the fork parser bug as stated limitations. **Three additions since T29: (a) Figure 1's *image* is false, not just its caption — see the blocker note below the table (F95); (b) the "appropriate intensity" ordering *inverts* (F96, §1 item 3) and is an authorial call, not a number swap; (c) `checklist.tex:98` carries a stale `Table~\ref{tab:main}d` cross-reference to a tau2 panel that no longer exists, plus best-of-3 reporting v5 replaces with mean ± std** | **F78–F81, D21**, F95–F97 | 3–5 h of text **plus a figure redraw of unknown cost**; touches abstract, figure, two sections and the conclusion | **No** — v5 posts the withdrawal in its own words. **But it is the highest-stakes item on this list and must land before any revision or arXiv push** |
+| **PAPER-9** | `tab:main` caption must disclose that the LiC pool is **difficulty-selected**, and that the design-oracle rows use the same instances so the gap-closure percentages are pool-independent. Without this, the paper's 4.0% database baseline reads as a measurement when it is largely what the selection guarantees. **⚠ The caption this handoff previously endorsed is wrong twice (F94) — do not paste it.** It came from T24 §7.4 and said the instances are "the 25 per task with the highest full-context failure rate across five GPT-5-mini baseline runs". Against `docs/lic_dev_set_provenance.md`: **math is not a top-25 selection — it had only 23 eligible instances and all were kept** (`:50,54`), and **code used four usable baseline runs, not five** (one run's artifacts lost to a directory collision, `:32`). **Use the corrected caption in `PAPER_EDITS.md` §PAPER-9.** That item also carries two body sentences (L328, L139) that currently imply the default subset is *not* difficulty-selected | F68, **F94** | 10–15 min | Camera-ready — but **highest value per minute on the list**; it is the discrepancy a reviewer is most likely to catch unaided |
+| **PAPER-6** | Report **raw** as primary; keep the arm-symmetric pool-level pre-filter as the only FN adjustment and **defend** it; rewrite `tex:478-480`, which says "all user simulator messages" when the code collates only the visible ones. **Correction: there is no metric to delete — the paper never names `adjusted_accuracy` anywhere**, so this reduces to the appendix rewrite, paste-ready at `PAPER_EDITS.md` §PAPER-6 | F28, F40–F42, D13 | **45 min** (not 2–3 h) | Camera-ready (v5 is already raw). **Do before arXiv** — it moves published magnitudes |
 | **PAPER-5** | **Delete** "we preserve what's correct and remove what's harmful" from the abstract, intro and method — do **not** re-attribute it to AC3-Rewrite. Replace with the mechanism supported for **both** operators: *detect → discard the assistant side → rebuild the specification from the user side*. **Also rewrite the ERGO differentiation**: the difference is not "we are selective and they are not" — it is that AC3 rebuilds the specification from the user side while ERGO rewrites user turns. Defensible empirical claims that remain: the 78.6% pollutant-naming rate, the factorial (9.3% → 59.8% with the pollutant still present), and T2B's 100% removal of causally-harmful natural spans. Same edit in `CLAUDE.md` / project overview | F25, **F66** | 1–2 h | Camera-ready — a **contribution-framing** change, not a number change, so budget review time |
-| **PAPER-1** | Reword LiC/CollabLLM "seeds" → "replicate runs (temperature 1.0)"; add the decoder-vs-sampling-variance caveat to limitations. **WildChat and tau2 keep "seeds"** — tau2's `--seed` genuinely threads (F81), best-effort at the provider. F19 fixed true seeding going forward; all prior runs reproduce bit-for-bit | F4, F19, F81 | 30–45 min | Camera-ready, but cheap and an integrity item — do it early |
-| **PAPER-8** | `neurips/neurips_2026_conference.tex:299` — replace "on the same prefixes" with: "($-$14.5pp vs.\ always-on Reset; $-$14.3pp on the 35 prefixes both arms were evaluated on, exact McNemar $p=0.125$)" | F55 | 5 min | Camera-ready only — the claim is struck from v5 |
-| **PAPER-4** | Any CollabLLM MATH-Hard "100" → "matches Baseline" (91.7 vs 91.7) | F16 | 15 min | Camera-ready (already fixed in v5) |
-| **PAPER-3** | Table 1's `+ Memory` rows are single-trial below a ~6 pp noise floor. Either re-run at **N ≥ 4** or soften the claim | F12 | 15 min to soften; hours of compute to re-run | Camera-ready |
-| **PAPER-10** | If any table reports assistant omission or Concatenate-User in **end-to-end** (non-replay) mode, label them baselines rather than upper bounds: they concatenate the *simulator's* paraphrases of the shards, not the original question. On T24's unselected pool AO reaches 69.2% and Concat-User 63.6% against a measured single-turn ceiling of 94.4%. Report the ceiling separately | F69 | 30 min | Camera-ready; conditional on which tables survive |
-| **PAPER-2** | The appendix variance table cites `docs/multi_run_variance_2026-05-07.md`, which does not exist; `docs/paper_experiments_provenance.md` names absent configs (`assistant_omit`, `concat_baseline`). Re-derive or re-source | F8 | Unknown — depends whether the runs are recoverable from `~/ac3/blob_staging/snapshot.tar.gz` | Camera-ready |
+| **PAPER-1** | **Correction: the paper does not have this defect.** `seed` appears exactly twice in the `.tex` (L360, L558) and **both are tau2, which keeps the word** (F81); the LiC and CollabLLM passages already say "$N{=}3$ replay-mode reruns" at temperature 1.0. The F4 defect lived in the launcher scripts and the rebuttal drafts, not in the paper. What remains is **one limitations sentence** at L808 stating what the replicates actually vary — paste-ready at `PAPER_EDITS.md` §PAPER-1 | F4, F19, F81, **F97** | 10 min | Camera-ready, but cheap and an integrity item — do it early |
+| **PAPER-8** | **Two locations, not one.** `PAPER_EDITS.md` §PAPER-8 has both paste-ready: **L300** (`tab:wildchat` caption — the line this handoff called `tex:299`) and a **second occurrence at L347** in §`sec:wildchat-results` ("Gated Reset on the same prefix set"), which T29 did not mention. Fixing one leaves caption and body disagreeing. Both become: 44 and 58 turns with 35 shared, $-$14.3pp on the matched 35, exact McNemar $p=0.125$. One hedge decision attached (the "we recommend always-on Reset" sentence now rests on p=0.125) | F55, **F97** | 10 min | Camera-ready only — the claim is struck from v5 |
+| **PAPER-4** | **Correction: no target exists. Close as not-applicable.** The string `100` does not occur anywhere in the 815-line `.tex`; the 100% was a **v4 rebuttal** claim about AC3-Augment on MATH-Hard, never a paper claim, and it is already corrected in v5. Keep the finding for the day a MATH-Hard figure is added: say "matches Baseline" (91.7 vs 91.7) | F16, **F97** | 0 | Not applicable |
+| **PAPER-3** | Table 1's `+ Memory` rows are single-trial below a ~6 pp noise floor. Either re-run at **N ≥ 4** or soften — softening is recommended and is paste-ready across **five** locations at `PAPER_EDITS.md` §PAPER-3 (re-running needs GPT-5-mini, which is unreachable from this environment). **Addition (F97): the LiC `+ Memory` protocol is *transductive* and the paper never says so.** L709 says only "On LiC, we use online learning"; operationally the cheatsheet applied to an instance is distilled from **other instances of the evaluation set itself, together with their gold answers** (`include_full_spec_q` / `ground_truth_a`). **This is a disclosure gap, not bookkeeping** — and it is free to close, because T13 measured that protocol's effect at **0.0 pp on both tasks** (n=15 database / 14 math). Ship the disclosure with the softening; it pre-empts a serious objection at no cost | F12, **F13, F97** | 20–30 min to soften + disclose; hours of compute to re-run | Camera-ready |
+| **PAPER-10** | **Correction: no table is mislabelled today.** Every LiC strategy in `tab:main` runs in replay mode (L456), so the `$^{\diamond}$` design-oracle marker is not the defect F69 describes and there is **no mandatory edit**. What is left is an *optional* caption line that **strengthens** the paper: on T24's complete unselected database pool (n=107, end-to-end) AO reaches 69.2% and Concat-User 63.6% against a measured single-turn ceiling of 94.4%, with AC3-Reset at 75.7% **above both** — a cleaner replication of the "exceeds the design oracle" claim than `tab:main`'s 48.0 vs 32.0. Paste-ready at `PAPER_EDITS.md` §PAPER-10 | F69, **F97** | 10 min | Camera-ready; optional, and it is a gain not a concession |
+| **PAPER-2** | **Correction: not a paper edit at all.** `grep -rn "multi_run_variance\|paper_experiments_provenance" writing/overleaf_repo/` returns **nothing** — no `.tex` cites the missing doc. The dangling references are in the **outer** repo: `docs/paper_experiments_provenance.md` (L41, 45, 138) and `docs/index.md` (L140, 250), the latter in violation of the CLAUDE.md rule that index entries resolve. The paper's variance table is separately attested: T17's PC5 reproduces the per-run values printed at L496–L499 to 0.1 pp. So this is a ~20-minute **outer-repo docs fix** that needs no pull/push through Overleaf — see `PAPER_EDITS.md` §PAPER-2 | F8, **F97** | 20 min (outer repo) | Camera-ready |
 
-**Order if time is short: PAPER-7 (blocking) → PAPER-9 (10 min) → PAPER-11 → PAPER-1 →
-PAPER-8 → PAPER-6 → PAPER-5 → PAPER-4 → PAPER-3 → PAPER-10 → PAPER-2.** The first two are
-~1.5 hours combined and cover the blocking item plus the cheapest high-value one; PAPER-11 is
-the one that cannot be skipped before any public revision.
+**Order if time is short — use T31b's, which supersedes T29's: PAPER-7a (20 min, blocking) →
+PAPER-9 (15 min; the merged caption makes it one paste with 7a) → PAPER-4 + PAPER-2 (0 + 20 min,
+both close without touching the paper) → PAPER-1 (10 min) → PAPER-8 (10 min) → PAPER-10 (10 min)
+→ PAPER-3 (25 min) → PAPER-6 (45 min) → PAPER-5 + PAPER-11 in one sitting.** Items 1–7 total
+roughly **1 h 30 m** and cover the blocker plus every mechanical item on the list. Do PAPER-5 and
+PAPER-11 together: they share an abstract, and doing them apart means rewriting it twice.
+
+**⚠ New camera-ready blocker, not on the table above (F95): Figure 1's *image* is false, not just
+its caption — and it cannot be regenerated from source.** `assets/ctxe_story.drawio.png` draws the
+"Ours" curve **strictly above** the flat "Vanilla" line across the whole x-axis **including the
+tau2-bench band**, with an inset reading *"Fine-grained context management remains robust in more
+complex, more referential interactions!"*. Under the withdrawal, at the tau2 end AC3 is at or below
+vanilla on all three respondents (68.4 / 70.2 / 78.9 for Baseline). The teal curve must cross or
+meet the orange line inside the tau2 band and the inset must change — **a redraw, not a caption
+edit**. And **`find` over the whole tree returns no `.drawio` file**, only exported PNGs, so
+whoever holds the draw.io document has to redraw it. **Budget this separately from PAPER-11's text
+edits and start chasing the source file early**, since it is the one item whose cost is not ours to
+control. The figure is labelled "Schematic of qualitative trends", which does give licence to
+redraw the band rather than replace it with real data (`PAPER_EDITS.md` PAPER-11 J3).
 
 **Not a paper item, but do it anyway:** patch `ctx_edit/analyzer.py:89-95` upstream in
 `matt-seb-ho/tau2_ctxe`. Half the analyzer briefings in that fork are corrupt and nobody knew
@@ -363,16 +407,21 @@ The deliberate phase-2 unsealing is recorded separately from phase 1, so the rec
    baseline reproduced exactly; the one real bug found is worth +2.3 pp. This belongs in the
    camera-ready as an open problem, and it is the kind of thing a hostile reviewer will ask
    about once we disclose the tau2 withdrawal.
-2. **U4** ("1 of 11 baseline failures attributable to context pollution", the paper's
+2. **Figure 1 cannot be corrected from anything in the repo** (F95, §4). The image contradicts the
+   tau2 withdrawal on its face and **no `.drawio` source exists anywhere in the tree** — only
+   exported PNGs. This is unresolved in the literal sense that the fix requires a file we do not
+   have, so it is the one camera-ready blocker whose timeline is not ours. Ask Lianhui and Michel
+   for the draw.io document before anything else on the figure.
+3. **U4** ("1 of 11 baseline failures attributable to context pollution", the paper's
    `tab:tau2-failure-modes`) is **unverified and characterises a tau2 baseline that has now
    moved**. Its traces are gone. Standing recommendation unchanged: **soften now, defer
    re-derivation to camera-ready** (F56). Note it was never re-run — T6 targeted the multi-model
    sweep, not the paper-era gpt-5-mini tau2 cells.
-3. **Red-team M1 — the self-correction count reads 3 / 5 / 7 / 10 (now 6 / 8 in places) across
+4. **Red-team M1 — the self-correction count reads 3 / 5 / 7 / 10 (now 6 / 8 in places) across
    four files.** Each count is defensible in its own scope; making them agree is a tone judgement
    about how prominently the general response should carry the total. Left to you deliberately
    (`tasks/T28/worklog.md` §8).
-4. **Declined and worth knowing about:** a human-validation study for the WildChat judge (5YHP's
+5. **Declined and worth knowing about:** a human-validation study for the WildChat judge (5YHP's
    third named check — v5 now names the gap explicitly rather than faking a stand-in), and
    U-Fold on tau2 (the red team's own suggested remedy was to *offer* it to the reviewer, not to
    run an unvalidated overnight adaptation of someone else's method).
@@ -384,6 +433,7 @@ The deliberate phase-2 unsealing is recorded separately from phase 1, so the rec
 | What | Where |
 |---|---|
 | **The rebuttal to post** | `neurips_review/replies/v5/` — `00_general_response.md` first, then `01`/`02`/`03`, then `04_response_to_AC.md`, then `05_final_remarks.md` at the end of the discussion period |
+| **The paper edits to make** | `neurips_review/autoresearch/PAPER_EDITS.md` — the ready-to-apply spec for PAPER-1..11: exact current text from the live `.tex`, paste-ready replacements, finding ID per number. **Nine items paste-ready, two (PAPER-5, PAPER-11) judgement calls with options.** This is the entry point for §4, not §4 itself. Method and caveats in `tasks/T31/worklog.md` |
 | **Claim-by-claim audit** | `neurips_review/replies/v5/CHANGES.md` — every v4 assertion, status, finding ID, artifact path, new wording. **§12 is T28's integration record** (T27 items, tau2 withdrawal, HOLD verification) |
 | **Pre-posting checklist, blockers, guardrails, rhetoric plan** | `neurips_review/replies/v5/README.md` — read "Accuracy guardrails" before you touch any number |
 | **The adversarial read** | `neurips_review/autoresearch/tasks/T23/RED_TEAM.md` — 30 items (10 HIGH, 15 MEDIUM, 5 LOW), each with quoted text, the attack, and drop-in revision wording. **Now annotated in place**: a D20 banner at the top, `⚠ SUPERSEDED — DO NOT APPLY` at M3 (`:451`) and M11 (`:556`), and `✅ RESOLVED` notes on M12/M15/M6. Its closing section is still the strongest single objection against us |
@@ -461,6 +511,20 @@ both would have handed a reviewer a checkable false statement in the exact parag
 rebut a suspicion. The red team wrote its wording under time pressure without running anything:
 its *attacks* were excellent, its *proposed replacements* need the same verification as any
 other claim. Both are now annotated in place so a future reader cannot apply them by accident.
+
+### The strongest recurring pattern of the session: **proposed wording gets inherited, not verified**
+
+Four instances, and they are the same failure every time. The red team's **two suggested fixes**
+were measured and found false (F74/D20). **Two numbers originating in orchestrator briefs** — the
+"+21 pp over AO" that T25 recomputed as +18.7, and the "83 audited claims" that turned out never to
+have been printed anywhere (D19, F92). And now **a drafted `tab:main` caption that this document
+endorsed**, carried from T24 §7.4 through two consolidation passes without anyone re-deriving it,
+of which two facts were wrong (F94). **Findings were re-derived reliably all night; *replacement
+text* was not** — the moment a claim becomes a proposed sentence, it stops being audited and starts
+being copied. Carry it into future sessions as a standing rule: **a suggested fix is a hypothesis
+with the same evidential burden as the claim it replaces**, and briefs should cite finding IDs so
+the receiving agent re-derives rather than inherits. Every one of the four was caught by the *next*
+agent downstream, never by the pass that wrote it.
 
 ### Three smaller rules earned tonight
 
