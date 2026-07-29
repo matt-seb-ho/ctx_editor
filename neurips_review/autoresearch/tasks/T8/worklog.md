@@ -323,6 +323,23 @@ quoted "20%" reads as 25% here. Treat both the quoted 20% and this 21.7% as "≈
   seed bug) — here the two arms' per-replicate scores move together across replicates while
   preserving a constant 3-problem gap.
 
+#### Environment soundness check — canonical solutions
+
+Because a broken sandbox silently scores 0 (§6), I bounded the environment by scoring each
+problem's own **ground-truth solution** (`single_turn_completion`) against its own tests:
+
+| draw | canonical solutions passing | failing |
+|---|---|---|
+| seed=42 (our main 20 problems) | **19/20** | `501` |
+| seed=1234 (bonus draw) | **18/20** | `201`, `35` |
+
+For the main results this is reassuring: only `BigCodeBench/501` is unscoreable in this
+environment, it is **never solved by either arm in any replicate**, and it penalises both arms
+identically. The effective bigcodebench ceiling here is therefore 19/20, and the Reset-vs-Baseline
+comparison is unaffected. This check is the recommended pre-flight before any future bigcodebench
+run — it distinguishes "the model failed" from "the sandbox is missing a library."
+
+
 ---
 
 ## 8. Verdict on the rebuttal claims

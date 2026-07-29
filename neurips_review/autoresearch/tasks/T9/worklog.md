@@ -181,3 +181,28 @@ ctx-editor experiment=context_edit_v2_no_gate \
   experiment_name=T9_rep1_code_<ARM> logging.output_dir=outputs/T9/rep1/code_<ARM>
 ```
 Observed rate: ~4 s/sample for the replay pass + ~9 s/sample for FN analysis ⇒ ~8-12 min/arm.
+
+## 7. Raw results, rep1 (appended as each arm lands)
+
+Raw accuracy (`Accuracy:` in `summary.txt`). Artifact root `outputs/T9/rep1/<task>_<arm>/`.
+
+| task | arm | analyzer | raw acc | correct/n | wall clock |
+|---|---|---|---|---|---|
+| code | baseline | — | 30.00% | 12/40 | 11:02→11:11 |
+| code | ds_v4_flash | DeepSeek-V4-Flash | 55.00% | 22/40 | 11:11→11:22 |
+| code | gpt54mini | gpt-5.4-mini_2026-03-17 | 45.00% | 18/40 | 11:22→11:32 |
+| database | baseline | — | 18.37% | 9/49 | 11:02→11:11 |
+| database | ds_v4_flash | DeepSeek-V4-Flash | 42.86% | 21/49 | 11:11→11:25 |
+| database | gpt54mini | gpt-5.4-mini_2026-03-17 | 48.98% | 24/49 | 11:25→11:32 |
+
+**Sanity check against the paper's phase-1 cell (same prefixes, same assistant, 2026-05 run):**
+code baseline 30.0% vs 30.0% today, code Reset 50.0% vs 55.0% today; database baseline 14.3% vs
+18.4% today, database Reset 51.0% vs 42.9% today. Reproduction is within sampling noise at
+temperature 1.0 for n=40/49 — the harness is behaving, and the phase-1 numbers replicate.
+
+**⚠ Note on `adjusted_accuracy` in this venue.** The FN classifier flags 17-19 of ~40-49 samples
+as "user-sim-induced" on the AC3 arms but only 0-5 on Baseline, so adjusted accuracy jumps to
+80-96% on AC3 arms and is **not comparable across arms** — the denominators differ wildly and in
+a strategy-correlated way. **Headline metric for T9 is therefore raw accuracy on the full,
+identical sample set**, which keeps the pairing exact. Adjusted numbers are recorded per run in
+`run_summary.json` but are not used for the sensitivity claim.

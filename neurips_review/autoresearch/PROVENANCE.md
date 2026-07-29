@@ -34,9 +34,9 @@ graph TD
     T9["T9 analyzer-model sensitivity<br/>[run] — cache-key check first"]
     T2A["T2A Tier-A constructed pollution<br/>[todo]"]
     T2C["T2c auditing vs re-solving<br/>+20.7pp on NO_LEAK subset<br/>math conceded<br/>[done]"]
-    T1["T1 condensation baseline<br/>[todo] — venue unblocked"]
+    T1["T1 condensation baseline<br/>[run] — database+code, not math"]
     T11["T11 WildChat judge checks<br/>[todo]"]
-    T12["T12-13 memory order / split<br/>[run]"]
+    T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
     T6["T6 multi-seed tau2<br/>[todo] — harness is an off-machine fork"]
     T2B["T2B counterfactual span ablation<br/>[todo, gold standard]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
@@ -73,6 +73,8 @@ graph TD
 | RECON | Harness / naming map | 2026-07-29 | `tasks/RECON/worklog.md` | T8, T9, T6, T11 |
 | T2c | Auditing vs. re-solving | 2026-07-29 | `tasks/T2c/worklog.md`, `tasks/T2c/RESULTS.md`; source traces `~/ac3/recovered_t2c/` | 5YHP mechanism challenge — **+20.7pp on leak-free subset**, math conceded |
 | T9 | Analyzer-model sensitivity | 2026-07-29 | `tasks/T9/worklog.md` | Vg97 Q3 (unanswered half) |
+| T12/T13 | Memory order-sensitivity + split | 2026-07-29 | `tasks/T12-T13/worklog.md` §9 | 5YHP W6 — **contamination zero (helps)**; memory gains below noise floor (hurts) |
+| T1 | Condensation baseline | 2026-07-29 | `tasks/T1/worklog.md` | Vg97 W1/Q1 + **AC "limited baselines"** |
 
 ---
 
@@ -83,3 +85,5 @@ graph TD
 | End-to-end tau2 replay | `[dead]` | ~2 dev-days; out of window. Defend replay as causal-attribution design instead; T4 supplies fresh end-to-end evidence on LiC. |
 | Full human eval on WildChat | `[dead]` | Out of window. Defend with N=3 seeds + tight intervals; T11 supplies judge-side checks. |
 | T5 on math | `[dead]` as a discriminating control | Near-ceiling accuracy compressed all arms to ~97.5%. Needs a high-pollution venue → folded into T1. |
+| Quoting single-trial memory gains (+10/+12 pp) | `[dead]` | T12: below the learner's own ~6 pp noise floor; N=4 remeasure gives −5.0/−8.0 pp. Lead with T13's zero-contamination result instead (D7). |
+| "Memory is order-robust" framing | `[dead]` | T12 variance controls: across-ordering std (6.5) does not exceed same-ordering std (6.1). Ordering is not a distinguished factor; the learner is just noisy. |

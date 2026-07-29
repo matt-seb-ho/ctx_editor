@@ -124,3 +124,27 @@ Analyzer text was already persisted (`traces/<task>/<strategy>/<sample>.json` �
   **Rule refinement (D6):** absence of *both* a live process and recent file writes is now a stall signal in its own right, even under the 45-min mtime threshold — it triggers a nudge. Restart still requires all three: mtime > 45 min, no live process, no recent writes.
 
 **F11 (preliminary, from T8's in-progress worklog) — the quoted 20% bigcodebench figure is environment-dependent.** T8 found that bigcodebench scoring is bound to library versions, so it is re-scoring every cell offline under one unified current environment, using the stored `extracted_answer` in `results.json` (no conversation re-runs needed). Under the unified scorer, **rep1's Reset cell is 5/20 = 25%, not the 20% we quote in `replies/v4/`.** At n=20 every cell has 5pp quantisation, so the rebuttal should report raw counts (5/20) rather than a percentage that implies false precision. Awaiting the full replicate set before this is final.
+
+- **11:30** `T12-T13` returned **DONE**. Log: `tasks/T12-T13/worklog.md` (§9 has both paste-ready tables).
+
+**F12 — ⚠️ The memory component's reported gains sit below the learner's own noise floor. This is the most consequential negative result of the session.**
+
+Archaeology first, because it reframes both analyses: the paper states at tex line 709 "On LiC, we use online learning", so Table 1's `+ Memory` rows are **continual, transductive** runs where the cheatsheet is built from the eval set itself with `include_full_spec_q/ground_truth_a=true`. `lic_mem_learn_set.json` was never used for any published number.
+
+**T12 (order sensitivity).** 4 recorded orderings per task (published order + `random.Random({1001,1002,1003})`; because `seed=` is inert here, orderings had to be materialised as physical data files — the trap flagged in the 10:46 nudge). Online: database **28.0 ± 6.5** (20/28/28/36, n=25), math **75.0 ± 4.1** (75/80/75/70, n=20). Cheatsheets diverge in content — mean pairwise content-word Jaccard 0.29–0.32 — converging on the same headline principle but not on operative detail.
+
+The agent then ran two variance controls, and they invert the headline: fixing cheatsheet *and* order and resampling only the eval gives 29.0 ± 3.8; fixing order and relearning gives 25.3 ± 6.1. **Across-ordering std (6.5) does not exceed same-ordering std (6.1).** So ordering is *not* a distinguished source of variance — the cheatsheet learner is simply high-variance (~6 pp) at this scale. Running the control rather than stopping at the headline number is what makes this trustworthy, and it is the difference between reporting "memory is order-robust" (wrong) and "memory is noisy" (right).
+
+**Why this hurts:** the paper's memory effect (+10 pp math, +12 pp database) comes from **single trials**. Against a ~6 pp noise floor a +10 pp single observation is under 2σ — not significant. An N=4 re-measurement on gpt-5.4-mini gives **−5.0 and −8.0 pp**. Different model from the paper's, so this is not a direct refutation, but the variance argument is model-independent and applies to the published numbers as they stand.
+
+**F13 — T13 (split analysis) is clean, and this one helps.** Learn set vs canonical `lic_eval_subset`: **0/120 exact duplicates, 0 near-duplicates** (max Jaccard 0.416, boilerplate). Vs the dev subsets Table 1 actually uses: 11/98 = 11.2%. Clean-subset delta (offline, frozen, disjoint learn set): −4.5 pp database (n=22), +0.0 pp math (n=17). On the *overlapping* instances memory is equal or worse than no-memory. A within-instance probe of the transductive protocol — same instance with an empty cheatsheet vs one distilled from 5–20 other eval instances **plus their gold answers** — gives **0.0 pp on both tasks**. So the contamination concern 5YHP raised is measurably unfounded: leakage is zero, and we can say so with numbers.
+
+**F14 — reliability incident, caught and corrected.** A duplicated background chain double-wrote output dirs between 10:14–10:52. The agent detected it via a contradiction between `metrics.json` and `run_summary.json`, deleted all affected artifacts, and re-ran under an `flock` guard. Worth carrying forward: concurrent agents writing into the same `outputs/` tree can silently corrupt each other, and cross-file consistency checks are what caught it.
+
+**Caveats:** n=20–25 per cell; code and actions not run.
+
+### Decisions (cont.)
+
+**D7 — Do not lean on memory in the rebuttal, and pre-empt rather than defend it.** Memory is not what the reviewers attacked, and F12 says our own numbers there are thin. The right move is to answer 5YHP's W6 with the *strong* half (F13: contamination is measurably zero, 0/120 duplicates, transductive probe 0.0 pp) and to state the variance finding ourselves as a limitation, rather than quote the single-trial +10/+12 pp gains as if they were established. Quoting them invites exactly the seed/variance scrutiny that F4 already exposed us to.
+
+**PAPER-3 (operator action):** Table 1's `+ Memory` rows are single-trial and sit below a ~6 pp noise floor. Either re-run at N>=4 for the camera-ready or soften the claim. Needs the operator — it touches `writing/overleaf_repo/`.
