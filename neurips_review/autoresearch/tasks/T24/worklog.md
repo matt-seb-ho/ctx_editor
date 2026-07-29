@@ -156,7 +156,7 @@ This is the load-bearing evidence. It uses only per-sample outcomes already stor
 `outputs/T1/main/*/results.json`, joined against the item lists of the other two pools. Same
 respondent, same evaluator, same protocol, same run — **only the item set changes.**
 
-Script: `/tmp/t24_pool.py` (re-runnable; joins on `sample_id`, 25/25 and 50/50 matched).
+Script: `neurips_review/autoresearch/tasks/T24/t24_pool.py` (re-runnable; joins on `sample_id`, 25/25 and 50/50 matched).
 
 ### LiC-database (gpt-5.4-mini, end-to-end, v2)
 
@@ -266,7 +266,7 @@ three, all on the same 107/100 pool, same respondent, same v2 evaluator, same ha
 
 Everything below is gpt-5.4-mini, end-to-end sharded, v2 evaluators, raw accuracy. Columns are
 item sets; the two right-hand columns are the *other two rows of the H1 table's* pools, so this
-single table prices all three venues on one model. Script: `/tmp/t24_full.py`.
+single table prices all three venues on one model. Script: `neurips_review/autoresearch/tasks/T24/t24_full.py`.
 
 **LiC-database**
 
@@ -289,15 +289,20 @@ single table prices all three venues on one model. Script: `/tmp/t24_full.py`.
 | arm | full LiC pool (n=100) | ∩ htn50_52 (n=44) | ∩ paper's dev subset (n=25) |
 |---|---|---|---|
 | **Fully-specified single turn (true ceiling)** | **98.0%** | 97.7% | **96.0%** |
+| AO / assistant omission (design "oracle") | 93.0% | 88.6% | 76.0% |
+| Concat User (design "oracle") | 93.0% | 93.2% | 80.0% |
 | **Baseline (full context, sharded)** | **83.0%** | 72.7% | **48.0%** |
 | **AC3-Reset** | **92.0%** | 86.4% | **72.0%** |
 | Summarisation 1/turn | 79.0% | 68.2% | 48.0% |
 | Summarisation 2/turn | 80.0% | 63.6% | 52.0% |
-| **multi-turn gap** | **15.0pp** | 25.0pp | **48.0pp** |
+| **multi-turn gap (ceiling − baseline)** | **15.0pp** | 25.0pp | **48.0pp** |
 | **fraction of gap closed by AC3-Reset** | **60%** | 55% | **50%** |
 
-(AO / Concat-User code arms were still running at write-up time; see `run_log.txt`. They do not
-affect any conclusion above.)
+All ten arms completed; see `run_log.txt` / `run_log_fullspec.txt`. Note that on **code** AC3-Reset
+does *not* clear the design oracles (92.0 vs AO/Concat 93.0 on the full pool; 72.0 vs 76.0/80.0 on
+the paper's subset) — which matches the published table (code: AO 77.8 > Reset 61.1) and is the
+same operator-by-regime picture. The "exceeds the oracle" claim is database-only in the paper and
+database-only here.
 
 ### 5.4 Answer: yes, T1's venue is high-pollution, and the invariant is the gap-closure fraction
 
@@ -313,6 +318,15 @@ levels move by 52 points across the three pools; the quantity the paper actually
 55–80% of the multi-turn gap") moves by 4 points. That is the reconciliation, and it is a much
 stronger statement than any of the three raw numbers.
 
+**Denominator note, so these are not confused with the paper's "55–80%".** The paper's
+gap-closure percentages use the **design-oracle** row as the ceiling (e.g. math
+(80.0−60.0)/(85.0−60.0) = 80%). Every percentage in §5.3 instead uses the **measured
+fully-specified single-turn ceiling**, which is a strictly larger denominator (94.4% vs the
+oracle's 69.2% on database). The §5.3 fractions are therefore *conservative* relative to the
+paper's convention — on the paper's own convention AC3-Reset's database figure on the unselected
+pool would exceed 100%, since 75.7% is above both design oracles. If we quote §5.3 in the
+rebuttal, quote the convention with it.
+
 **Did the condensation baselines get an easy ride?** No — the opposite. They were run on the same
 conversations as AC3, and on the unselected pool both summarisation budgets and MT-OSC score
 **below full context** (53.3 / 47.7 / 60.7 vs 56.1), while consuming 1.02–1.19× AC3-Reset's
@@ -327,8 +341,11 @@ simulator's paraphrase loss — which is exactly the premise of our own false-ne
 Two consequences: (i) `tab:main`'s "AC3-Reset 48.0 exceeds the oracle 32.0" is exceeding a
 *depressed* oracle, not the single-turn ceiling, and should be phrased that way; (ii) AO and
 Concat-User are oracles *by construction only in replay mode*, where the trajectory is fixed. In
-end-to-end mode they are ordinary baselines — and AC3-Reset beats both on the unselected pool
-(75.7 vs 69.2 / 63.6), which is a cleaner replication of the "exceeds AO" claim than the paper's.
+end-to-end mode they are ordinary baselines — and AC3-Reset beats both on the unselected database
+pool (75.7 vs 69.2 / 63.6), which is a cleaner replication of the "exceeds AO" claim than the
+paper's. The effect is task-dependent and worth stating as such: on **code** the paraphrase loss
+is small (Concat 93.0 vs ceiling 98.0) and AC3-Reset does not clear the oracles; on **database**
+it is 31pp (63.6 vs 94.4), because Spider shards drop schema-disambiguating detail.
 
 **Does T1 answer the AC?** Yes, on all three of the AC's requirements, and I would argue it is our
 single best experiment:
@@ -487,7 +504,7 @@ depressed by the user simulator's paraphrase loss (§5.4), so:
 - `data/t24_fullspec_single_shard.json` — derived pool: one shard = the fully-specified question.
 - `neurips_review/autoresearch/tasks/T24/run_log.txt`, `run_log_fullspec.txt`, `nohup*.out`.
 - `outputs/T24/{db_concat,db_ao,code_concat,code_ao,db_fullspec,code_fullspec}` — artifacts.
-- `/tmp/t24_pool.py`, `/tmp/t24_full.py` — the §3 / §5.3 re-slicing (no API calls; reproduce from
+- `neurips_review/autoresearch/tasks/T24/t24_pool.py`, `.../t24_full.py` — the §3 / §5.3 re-slicing (no API calls; reproduce from
   existing runs).
 
 ## 9. Ambiguities resolved without asking
