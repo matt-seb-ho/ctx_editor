@@ -172,6 +172,18 @@ overlap                       : 0 / 20   # fully disjoint problem draw
 code (the seed default is 42 either way, so behaviour would have been unchanged — but keeping the
 tree clean removes all doubt).
 
+**Where the fix ended up.** The fix was developed on `T8_collabllm_true_seed` as instructed. While
+that branch was checked out in the *shared* working tree, other agents' commits landed on it, so
+`main` had to be fast-forwarded to it afterwards to avoid discarding their work (`main` was a
+strict ancestor; the switch was done via `git branch -f` + `git symbolic-ref`, which updates refs
+only and leaves every agent's uncommitted files byte-identical). **Net effect: the seed fix is now
+on `main`.** That is safe — the default is 42 and the draw is verified bit-for-bit identical to the
+old hardcoded behaviour, so no existing result changes; `seed=` simply stops being a lie.
+
+*Process note for future agents:* do not `git checkout` a branch in this shared working tree while
+other agents are running — their commits will land on your branch. Prefer a worktree.
+
+
 ---
 
 ## 5. Failure encountered and resolved: bigcodebench execution scoring
