@@ -27,12 +27,12 @@ Numbers that could not be confirmed are flagged in-line and recorded in
 | ID | One-line | Blocks posting? | Status in this doc |
 |---|---|---|---|
 | **PAPER-7** | ERGO scored on unfiltered pools in `tab:main`; math 69.6 → **80.0**, code ≈44.0, database 12.0, actions uncorrectable | **YES — the only blocker** | ✅ (7a paste-ready; 7b ⚖) |
-| **PAPER-9** | `tab:main` caption must disclose the top-25-by-failure-rate instance selection | No (camera-ready) | ⏳ |
-| **PAPER-1** | LiC/CollabLLM "seeds" → "replicate runs (temperature 1.0)"; WildChat + tau2 keep "seeds" | No | ⏳ |
-| **PAPER-8** | Table 3 / §gated "on the same prefixes" is false; 35 shared prefixes, McNemar p=0.125 | No | ⏳ |
-| **PAPER-4** | CollabLLM MATH-Hard "100" → "matches Baseline" (91.7 vs 91.7) | No | ⏳ |
+| **PAPER-9** | `tab:main` caption must disclose the difficulty selection (math is 23-of-23, **not** top-25) | No (camera-ready) | ✅ paste-ready |
+| **PAPER-1** | "seeds" appears only twice in the paper, both tau2, both correct — reduces to one limitations sentence | No | ✅ paste-ready |
+| **PAPER-8** | "on the same prefixes" is false; **two** locations (L300 + L347), 35 shared, McNemar p=0.125 | No | ✅ paste-ready (one ⚖ hedge) |
+| **PAPER-4** | CollabLLM MATH-Hard "100" — **no occurrence of `100` in the paper**; not applicable | No | ✅ closed, no edit |
 | **PAPER-3** | `+ Memory` rows are single-trial below a ~6 pp noise floor — soften or re-run | No | ⏳ |
-| **PAPER-2** | Appendix cites `docs/multi_run_variance_2026-05-07.md`, which never existed | No | ⏳ |
+| **PAPER-2** | The dangling citation is in `docs/`, **not** in any `.tex` — an outer-repo docs fix | No | ✅ closed, no paper edit |
 | **PAPER-10** | AO / Concat-User in end-to-end mode are baselines, not upper bounds | No | ⏳ |
 | **PAPER-6** | Drop per-run `adjusted_accuracy`; report raw; fix the "all user simulator messages" sentence | No (do before arXiv) | ⏳ |
 | **PAPER-5** | Retract "preserve what's correct and remove what's harmful"; rewrite the ERGO differentiation | No | ⏳ **JUDGEMENT CALL** |
