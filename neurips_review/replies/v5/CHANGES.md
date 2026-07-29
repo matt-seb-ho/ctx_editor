@@ -1,28 +1,32 @@
 # CHANGES.md — v4 → v5 claim audit
 
-Every assertion in `replies/v4/` audited against the 2026-07-29 autoresearch session (findings **F1–F49**, decisions **D1–D11**: `../../autoresearch/WORKLOG.md`; retired claims: `../../autoresearch/PROVENANCE.md`). Task T15 worklog: `../../autoresearch/tasks/T15/worklog.md`.
+Every assertion in `replies/v4/` audited against the 2026-07-29 autoresearch session (findings **F1–F81**, decisions **D1–D21**: `../../autoresearch/WORKLOG.md`; retired claims: `../../autoresearch/PROVENANCE.md`). Task T15 worklog: `../../autoresearch/tasks/T15/worklog.md`.
 
-**Revision history.** T15 wrote this audit at F1–F38, with four claims on HOLD pending two in-flight audits. **T19** (`../../autoresearch/tasks/T19/worklog.md`) revised it once T14, T16, T17 and T18 landed: the T14 hold is resolved, U1 is retired, and the ERGO denominator disclosure is added as §9 and as claim rows 1.23 / 2.10 / 3.12 / 5.9 / 6.x. **The T6 (tau2) holds are untouched and remain live.**
+**Revision history.** T15 wrote this audit at F1–F38, with four claims on HOLD pending two in-flight audits. **T19** (`../../autoresearch/tasks/T19/worklog.md`) revised it once T14, T16, T17 and T18 landed: the T14 hold is resolved, U1 is retired, and the ERGO denominator disclosure is added as §9 and as claim rows 1.23 / 2.10 / 3.12 / 5.9 / 6.x. **The T6 (tau2) holds were untouched and still live at that point — they were discharged later, by T28; see §12.3.**
 
 ## Tally
 
 | Status | Count |
 |---|---|
 | **Unchanged** (re-verified, wording untouched) | 24 |
-| **Corrected** (number or wording changed) | 15 |
+| **Corrected** (number or wording changed) | 17 |
 | **Struck** (removed from v5) | 6 |
-| **Newly added** (result that did not exist in v4) | 16 |
-| **On HOLD** (blocked on an in-flight task) | 3 |
+| **Newly added** (result that did not exist in v4) | 21 |
+| **On HOLD** (blocked on an in-flight task) | **0** |
 | **UNVERIFIED** (no artifact found — see §7) | 1 |
-| **Total claims audited** | 67 |
+| **Total claims audited** | 69 |
 
-Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM assistant-omission column, FN-adjusted accuracy / end-to-end table, preservation attribution, WildChat headline, memory gains, auditing-on-math), **3 move in our favour** (BigCodeBench, database leak-free replication, budget accounting), and 5 are wording-only. Of the 5 claims T19 newly added, **all 5 are the ERGO denominator disclosure**, which moves against us by raising a competitor.
+*Bookkeeping note (T28): this table had drifted — T25's increment from 15 to 16 corrections was recorded in prose but never applied to the table, and the printed total of 67 did not equal the sum of its own rows. The counts above are the sum of the rows and are correct as of T28. The three T6 holds are discharged (§12.3), which is why On HOLD is now zero.*
+
+Of the 17 corrections, **8 move against us** (CollabLLM MATH-Hard, the CollabLLM assistant-omission column, FN-adjusted accuracy / end-to-end table, the selectivity claim — first re-attributed to Rewrite, then retracted for both operators — the WildChat headline, memory gains, auditing-on-math, and the tau2 withdrawal), **3 move in our favour** (BigCodeBench, database leak-free replication, budget accounting), and the remainder are wording-only. Of the 5 claims T19 newly added, **all 5 are the ERGO denominator disclosure**, which moves against us by raising a competitor. *(T30: this paragraph still read "of the 15 corrections … 7 move against us" after T25 and T28 had taken the count to 17. The two later additions are the T2B-driven selectivity retraction and the tau2 withdrawal, both against us.)*
 
 **Changes made by T19 to T15's tally.** Newly-added 11 → 16 (five ERGO disclosure rows). On-HOLD 4 → 3 (1.13, 2.4, 3.2, 4.4 were the four; the T14-gated provisional flag on all LiC figures is lifted, and 4.4's hold is now T6-only — the three remaining holds are all tau2). UNVERIFIED 5 → 4 (**U1 retired**: the gate-statistic artifacts do exist, at `scripts/analysis_rewrite_v_reset/data/gated_reset_reconstructed_{lic,collabllm}.md`, and T16 re-derived both independently from raw traces). Total 64 → 67.
 
 **Changes made by T21 (from T20's verification pass).** UNVERIFIED 4 → **1**: U2, U3, U4 and U5 are all resolved, leaving only U6, which is unclosable by construction. Corrections 14 → 15, the new one being the CollabLLM assistant-omission column taken from N=1 to N=3 (§10). On-HOLD stays at 3 — all three are tau2, and every INTERNAL/HOLD block in the reply files is byte-identical to what T15 wrote (verified mechanically; see §10).
 
 **Changes made by T25 (from T2B and the T23 red team).** Corrections 15 → **16**, and one of the existing sixteen changed direction: the "preserve what's correct" claim, which T19 had re-attributed to **AC3-Rewrite**, is now **retracted for both operators** after T2B measured selectivity causally on naturally occurring spans (F66). Rows 3.11 and 4.16 and §8 rule 3 are revised accordingly, and a new **§11** records the retraction, the assembled counter-case to the red team's strongest objection, and the nine red-team HIGH items applied or deferred. On-HOLD stays at 3 and every INTERNAL/HOLD block remains byte-identical (verified mechanically; see §11.4).
+
+**Changes made by T28 (from T27's measured items and T6's landing).** Corrections 16 → **17**, the new one being the **withdrawal of the tau2 improvement claim** after T6 re-ran the full published matrix at N=3 and found two of three published baselines did not replicate. On-HOLD 3 → **0**: all five `⚠ INTERNAL — HOLD` tau2 blocks and both `⚠ INTERNAL — T19 renumbering` notes are **resolved and removed**, which is what they were written for. Newly-added 16 → **21**, from T27's four resolved MEDIUM items (the neutral-prompt condenser control, MT-OSC at w=2, the item-level McNemar plus problem-clustered CIs, the M3 independence probes and bootstrap, and the M6 human-validation disclosure). Two of the red team's own suggested fixes were measured and found **false**; neither is posted, and both are annotated in place in `AR/tasks/T23/RED_TEAM.md` per decision **D20**. New **§12** records all of it, including the two places that needed reconciling and the per-block HOLD verification.
 
 ## Path legend
 
@@ -51,7 +55,7 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | 1.10 | "Both operators improve over the baseline in every one of the three reruns" | **unchanged in substance**, wording fixed | holds on raw: Reset +7.5/+7.5/+2.5, Gated +5.0/+7.5/+10.0 | "…in every one of the three **runs**", with per-run deltas shown |
 | 1.11 | "not an artifact of … replay, or a **single seed**" | **corrected** (wording) | **F4** — `cfg.seed` is inert on LiC; replicates varied by temperature-1.0 sampling only | "…or a **single run**", plus a new paragraph stating that LiC/CollabLLM intervals estimate **decoder variance** |
 | 1.12 | *(new)* | **newly added** | **F28**, `AR/tasks/T1/RESULTS.md` (adjusted-vs-raw columns), `AR/tasks/T1/fn_rejudge.json`, `AR/tasks/T14/worklog.md` §1 (file:line mechanism) | New CW2 paragraph disclosing the FN-adjustment bias (9% vs 62% exclusion; 89.0% → 77.1%) and committing to raw reporting |
-| 1.13 | CW4 tau2 table (FC 68.4/31.6/26.3; AO 0/0/0; best AC3 84.2/57.9/73.7) | **HOLD** | **T6 in flight.** Interim N=3 Baselines: gpt-5.4 68.4±13.9, DSV4F **70.2±11.0** (published 31.6), Kimi **80.4±2.5** (published 26.3) — `AR/tasks/T6/worklog.md` 15:10 entry | Table moved inside a `⚠ INTERNAL — HOLD` block with fallback wording drafted |
+| 1.13 | CW4 tau2 table (FC 68.4/31.6/26.3; AO 0/0/0; best AC3 84.2/57.9/73.7) | **struck / corrected against us (T28)** | **T6 landed.** N=3 over the full published matrix, 855 scored rollouts: FC 68.4±13.9 / **70.2±11.0** (published 31.6) / **78.9±0.0** (published 26.3); AO 0.0 everywhere; best AC3 arm below the re-measured baseline on all three models. Controls: gpt-5.4 FC and AO both reproduce published values exactly — `AR/tasks/T6/worklog.md` | Table **replaced** by the N=3 matrix and the **tau2 improvement claim withdrawn**; the AO = 0% structural result kept and carried on its own. See §12 |
 | 1.14 | "Assistant omission collapses to 0% on every model" | **unchanged, and strengthened** | T6 positive control #2: AO rollouts terminate on `max_steps`, never `user_stop`, while the other four arms return reward 1.0 in the same process — `AR/tasks/T6/worklog.md` 13:58 | Promoted to carry CW4 on its own, with the mechanism stated |
 | 1.15 | Kimi footnote: "rate-limit-clipped, so we quote a conservative **+24 to +34pp**" | **struck** | **T6 interim**: the whole Kimi baseline cell is a clipped floor; re-measured 80.4 is above every published Kimi AC3 number. A "conservative" range off a broken control is not conservative | removed |
 | 1.16 | "only **1 of 11** baseline failures on gpt-5-mini attributable to context pollution" | **CORRECTED — softened** (T21, from T20/§7 U4) | **F56**. Number traced to `~/ac3/tau2_ctxe/ctx_edit/EXPERIMENT_LOG.md` commit `169b044`, but the 20 traces and any labels file are **unrecoverable**, the labelling had no rubric and no second annotator, and it is the 45.0% trial while the table reports best-of-3 | "1 of 11" dropped. Now: the baseline failures were **dominated by missing domain knowledge and step-budget exhaustion**, with a single repetitive-loop case; stated explicitly as a qualitative reading of one trial rather than a rubric-based annotation, with a proper taxonomy promised for the camera-ready |
@@ -73,7 +77,7 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | 2.1 | W1 database replication 49.0 / 56.2 / 55.1 vs oracle 45.6 / 27.9 / 30.6 | **unchanged** | `RPT/post_neurips_ac3_phase{1,2}.md` (raw) | verbatim, labelled "(raw accuracy)" |
 | 2.2 | *(new)* | **newly added** | **F10**, `AR/tasks/T2c/RESULTS.md` Table 2 | Database gain survives leak-free: 1/147 verified leaks; **+26.0pp** on n=146, p < 0.0001 |
 | 2.3 | W2 cross-reference quoting **AC3-Reset 100.0 +/- 0.0** | **corrected** | as 1.9 | "**AC3-Reset 93.3 +/- 4.2**, with Reset ahead in every run" |
-| 2.4 | W3 tau2 defence | **HOLD** + **newly added concession** | **T6**, `AR/tasks/T6/worklog.md` 14:38 | New: at n=19, binomial sd ≈ **10.7pp**, our N=3 Baseline re-measurement spreads **±13.9pp**; "several of the differences we reported at N=1 are inside that". Magnitudes held |
+| 2.4 | W3 tau2 defence | **HOLD → resolved (T28); the improvement claim is withdrawn** + **newly added concession** | **T6**, `AR/tasks/T6/worklog.md` 14:38 | New: at n=19, binomial sd ≈ **10.7pp**, our N=3 Baseline re-measurement spreads **±13.9pp**; "several of the differences we reported at N=1 are inside that". Magnitudes **not** held — `01` W3 now reports the two non-replicating baselines and the withdrawal (§12.3) |
 | 2.5 | W3 "~20% per-turn cost … Gated-Reset is deployment-relevant" | **corrected** (upgraded from assertion to measurement) | **F27** budget table | AC3-Reset 6.2 strategy calls/conv, Gated-Reset 2.6 = **0.41x** for +17.8pp vs +19.6pp |
 | 2.6 | Q1 end-to-end table | **corrected** | as 1.9 | raw table + per-run values + explicit FN-adjustment correction paragraph |
 | 2.7 | Q1 "By your stated criterion, the generalization claim stands." | **unchanged**, with a new limits paragraph | — | kept; followed by "at n=40 the per-run margins are two to four problems and this experiment on its own is not powered for significance" |
@@ -88,7 +92,7 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | # | Claim as written in v4 | Status | Evidence | New wording in v5 |
 |---|---|---|---|---|
 | 3.1 | W1/Q1 "**We are adding** a condensation baseline … will report the result either way" | **replaced by results** | **F27** | Three-part answer: summarisation loses, budget over-consumed, MT-OSC structurally inapplicable |
-| 3.2 | W2 cross-reference to tau2 | **HOLD** + **newly added concession** | **T6** | Adds the 10.7pp noise-floor concession; no magnitudes |
+| 3.2 | W2 cross-reference to tau2 | **HOLD → resolved (T28)** + **newly added concession** | **T6** | Adds the 10.7pp noise-floor concession; `02` W2 now also carries the withdrawal itself (§12.3) |
 | 3.3 | Q2 WildChat 89.8 / 92.1 | **corrected** | **F31** | 87.8 +/- 2.1 / 91.2 +/- 2.1 + judge-agreement summary |
 | 3.4 | Q2 "tau2 … per-model results against baseline rather than best-of-3" | **corrected** (wording) | **T6** | "mean +/- std over three replicates per cell" |
 | 3.5 | *(new)* | **newly added** | **F28** | Proactive disclosure of the FN-adjustment bias in the Q2 answer |
@@ -109,7 +113,7 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | 4.1 | W1 scope defence (structural exclusion is the scope, not a gap; Table 5; Appendix D) | **unchanged** | — | verbatim |
 | 4.2 | *(new)* | **newly added — the strongest new mechanism evidence** | **F10**, `AR/tasks/T2c/RESULTS.md`, `AR/tasks/T2c/{answer_check.jsonl,math_numeric_probe.json,leak_labels_final.jsonl}`; source traces `~/ac3/recovered_t2c/ctx_editor/outputs/post_neurips_ac3_phase1/` | Auditing-vs-re-solving table: leak rates (code 0%, database 1%, actions 2%, math 38%) and leak-free gains (code **+30.2**, database **+26.0**, pooled **+20.7 [+14.8, +25.3] p<0.0001**) |
 | 4.3 | *(new)* | **newly added — concession** | **F10** | **Math conceded outright**: leak-free gain **−2.6pp** (n=77, p=0.815); math's entire +9.7pp sits on the leaking subset. Conceded in the same paragraph, before the wins |
-| 4.4 | W1 "On tau2-bench … blanket omission scores 0% on all three models **while AC3 beats full context on all three**" | **half struck** | AO=0% corroborated by T6 PC2; the AC3 half depends on the contested cells | Keeps AO=0% with the mechanism; drops "AC3 beats full context on all three" pending T6 |
+| 4.4 | W1 "On tau2-bench … blanket omission scores 0% on all three models **while AC3 beats full context on all three**" | **half struck; the struck half is now permanent (T28)** | AO=0% corroborated by T6 PC2; the AC3 half depended on the contested cells and **T6 refuted it** | Keeps AO=0% with the mechanism; "AC3 beats full context on all three" is **gone for good**, not pending (§12.3) |
 | 4.5 | W1 "On WildChat, AC3 wins **72-92%** of pairwise comparisons" | **corrected, then partly restored** | **F31**, **F53** | The *headline* is the order-balanced pooled figure (87.8 / 91.2). The 72–92% per-cell range is **verified** (T20: all 22 populated `tab:wildchat` cells re-derived, 22/22 exact; min 71.6, max 91.5) and T21 restored it to `03` W1 as a **separate bullet** describing the spread across configurations — never as the win-rate claim, and never in the same sentence as the pooled headline (see §7 U3) |
 | 4.6 | W3 end-to-end numbers 87.5 / 100.0 / 99.1 | **corrected** | as 1.9 | raw 87.5 / 93.3 / 95.0 + self-correction sentence |
 | 4.7 | W3 replay-is-causal defence | **unchanged** | — | verbatim |
@@ -142,21 +146,21 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | 5.1 | "Validity of theoretical assumptions" reading + empirical-not-formal argument | **unchanged** | — | verbatim, plus the auditing-vs-re-solving evidence and the math concession |
 | 5.2 | Generalizability paragraph incl. "tau2 confirms the rule directly" | **corrected** | as 1.17 | tau2 rule removed; replaced by the five-analyzer, four-family sweep |
 | 5.3 | Evidence table row "New unbiased … **AC3-Reset 100.0 +/- 0.0**" | **corrected** | as 1.9 | raw values |
-| 5.4 | Evidence table row "Corrected tau2 reporting: AO 0% on every model; best AC3 beats full context on every model" | **half struck / HOLD** | as 1.13 / 4.4 | row removed from the table pending T6; AO=0% survives in the body |
+| 5.4 | Evidence table row "Corrected tau2 reporting: AO 0% on every model; best AC3 beats full context on every model" | **half struck / HOLD → resolved (T28)** | as 1.13 / 4.4 | Row was removed pending T6; **T28 restored a tau2 row to the evidence table** reporting the re-run and the withdrawal ("Against us…"), with AO = 0% carried in the body |
 | 5.5 | "MATH-Hard 100 vs 95 and 90; BigCodeBench 20 vs 5 and 15" | **corrected** | as 4.8 / 4.9 | replaced by the N=3 correction, listed as self-correction #1 |
-| 5.6 | *(new)* | **newly added** | F16, F28, F25, F31, F12, T8 §5 | A numbered "corrections we are making to our own numbers" list (4 items posted, 2 more in `05_final_remarks.md`), made part of the tractability argument |
+| 5.6 | *(new)* | **newly added** | F16, F28, F25, F31, F12, T8 §5 | A numbered "corrections we are making to our own numbers" list, made part of the tractability argument. T15 wrote 4 items here and 6 in `05_final_remarks.md`; after T19 (ERGO) and T28 (tau2) the lists stand at **6 in `04` and 8 in `05`** — `04` carries the six most consequential, `05` all eight |
 | 5.7 | *(new)* | **newly added** | F27 | Evidence-table rows for the condensation baseline, MT-OSC engagement rate, analyzer sensitivity, detector evaluation, WildChat judge audit |
 | 5.8 | Closing tractability argument | **unchanged**, extended | — | adds: "the corrections listed above are the discussion period working as intended … every one was found by us" |
 | 5.9 | *(new — added by T19)* | **newly added — disclosure** | **F42/F43/F44/F47/F48/F49**, `AR/tasks/T17/RESULTS.md`, `AR/tasks/T18/worklog.md` R1/R4 | Numbered correction **5** added to the "corrections we are making" list, and the lead-in changed from "four corrections" to "five", with the fifth explicitly labelled as moving against us by *raising a baseline*. Carries math 69.6 → 80.0, code ≈44.0, database untouched, actions unclosable, and the n≈20 non-significance result. Closes on why we would rather state it: it is recoverable from our own printed percentages |
-| 5.10 | Placement relative to the T6 HOLD block | **bookkeeping (T19)** | — | The T6 HOLD block is left **byte-identical** and still refers to the pending tau2 withdrawal as "a fifth correction". A separate `⚠ INTERNAL — T19 renumbering note` was added *after* it recording that tau2 becomes item **6**. The HOLD block was not edited, softened or resolved |
+| 5.10 | Placement relative to the T6 HOLD block | **bookkeeping (T19); discharged (T28)** | — | The T6 HOLD block was left **byte-identical** by T19 and T25 and still referred to the pending tau2 withdrawal as "a fifth correction"; a separate `⚠ INTERNAL — T19 renumbering note` recorded that tau2 becomes item **6**. **T28 removed both**, and tau2 is item **6** in `04` as predicted. Nothing on hold remains |
 
 ---
 
 ## 6. `05_final_remarks.md`
 
-Mirrors the above. All ten revision bullets updated to the corrected numbers; four bullets converted from promise to result (condensation, detector, judge audit, memory split); three bullets added (auditing-vs-re-solving, analyzer sensitivity, memory variance); one new section added listing the six self-corrections; one `⚠ INTERNAL` HOLD note for a possible seventh (tau2).
+Mirrors the above. All ten revision bullets updated to the corrected numbers; four bullets converted from promise to result (condensation, detector, judge audit, memory split); three bullets added (auditing-vs-re-solving, analyzer sensitivity, memory variance); one new section added listing the six self-corrections; one `⚠ INTERNAL` HOLD note for a possible seventh (tau2). *(As written by T15. The list is now **eight** items — T19 added ERGO as item 7, T28 added the tau2 withdrawal as item 8 and removed the HOLD note; see §12.3.)*
 
-**T19 additions.** A **seventh** numbered correction added for the ERGO denominator defect (**F43/F44/F48/F49**; `AR/tasks/T18/worklog.md` R1/R4): math 69.6 → 80.0 above AC3-Reset's 75.0 and level with AC3-Gated-Reset's 80.0, code ≈44.0, database 12.0 untouched, actions unclosable and printed as an interval, closing on the n≈20 non-significance result. The condensation-baseline revision bullet gained a closing sentence pointing at it. As in `04`, the T6 HOLD block is left **byte-identical** — it still says the tau2 withdrawal would be "a seventh item", and a separate `⚠ INTERNAL — T19 renumbering note` after it records that tau2 becomes item **8**.
+**T19 additions.** A **seventh** numbered correction added for the ERGO denominator defect (**F43/F44/F48/F49**; `AR/tasks/T18/worklog.md` R1/R4): math 69.6 → 80.0 above AC3-Reset's 75.0 and level with AC3-Gated-Reset's 80.0, code ≈44.0, database 12.0 untouched, actions unclosable and printed as an interval, closing on the n≈20 non-significance result. The condensation-baseline revision bullet gained a closing sentence pointing at it. As in `04`, the T6 HOLD block was left **byte-identical** by T19 — it still said the tau2 withdrawal would be "a seventh item", and a separate `⚠ INTERNAL — T19 renumbering note` after it recorded that tau2 becomes item **8**. **T28 removed both and tau2 is item 8**, exactly as predicted.
 
 ---
 
@@ -187,7 +191,8 @@ Mirrors the above. All ten revision bullets updated to the corrected numbers; fo
 3. **Never a bare 97.6% removal rate** (**D9**). Always detection + removal + preservation + edit-precision-vs-chance. **Selectivity is attributed to no operator** (**F66**, T25): on natural spans Reset keeps 5/66 and Rewrite 0/66, edit precision at the base rate for both. The mechanism statement for both is *detect → discard the assistant side → rebuild the specification from the user side*. Lead the detector passages with what *is* supported: 78.6% pollutant naming, the causal factorial (9.3% → 59.8% with the pollutant still present), and T2B's 100% removal of causally-harmful natural spans.
 4. **Never the single-trial memory gains** (**D7**). Lead with contamination-zero; state variance as our own limitation.
 5. **Concessions open the paragraph.** Applied to the CollabLLM correction, the FN-adjustment, the preservation attribution, the WildChat headline, math in the auditing analysis, and the memory noise floor.
-6. **No tau2 magnitudes until T6 lands.** Five `⚠ INTERNAL — HOLD` blocks mark every affected passage (`00` x2, `01`, `04`, `05`), plus an orientation preamble at the top of `00`.
+6. **tau2 magnitudes — RESOLVED by T6 and WITHDRAWN (T28).** All five `⚠ INTERNAL — HOLD` blocks (`00` x2, `01`, `04`, `05`) and both `⚠ INTERNAL — T19 renumbering` notes are now resolved and removed. The rule that replaces the hold: **no tau2 improvement claim on any model**, do not soften the withdrawal into "mixed results", keep the AO = 0% structural result, keep the gpt-5.4 Gated-Reset regression, and disclose the gpt-5.4 AC3 collapse as unexplained. Only `00`'s orientation preamble remains as an `⚠ INTERNAL` block.
+6b. **Never quote the matrix-wide AC3-vs-AO item-level McNemar (p = 0.010) as a win** (**T27/F77**). It ignores the clustering of 1,668 items inside 191 problems and is anti-conservative here. The primary statistic is the problem-clustered bootstrap: **+2.8pp, 95% CI [−0.3, +5.9]**, which includes zero. Matrix-wide is a wash; the separation is on database, **+18.6pp [+10.7, +26.6]**. This is deliberately consistent with §11.2's assembled counter-case, which already says the same thing at cell level (+2.6pp, 15/17/4).
 7. **ERGO's corrected values are math 80.0 and code ≈44.0** (**T19**, from F47/F48). T17's estimated 57.9 for code is **never** used — T18 measured the free parameter directly and shipping 57.9 would overstate a competitor by ~14pp, an error in the opposite direction and equally unacceptable. Database stays 12.0; actions is unclosable and is promised as an interval.
 8. **Every ERGO passage leads with the significance frame, not an ordering** (**T19**, from F49). "No `tab:main` ERGO-vs-AC3 difference is significant at n≈20 in either direction" is stated plainly and early, before any per-cell number, and is noted to hold of the published table as well as the corrected one. We do not compensate for the correction by claiming ERGO still loses overall: the measured scorecard is 3/12 ERGO wins-or-ties, up from a published 1/12.
 9. **The pool-level pre-filter is defended, not conceded** (**T19**, from F42). `tab:main`'s 20/19/25/23 denominators are arm-symmetric and correct. Only per-run `adjusted_accuracy` is invalid, and rule 2 above already excludes it. Do not let the FN-adjustment concession bleed into an admission that the denominators themselves are wrong — they are not, except on the ERGO row.
@@ -202,7 +207,7 @@ Mirrors the above. All ten revision bullets updated to the corrected numbers; fo
 | **T16** — gate statistics | 15:55 | Claim reproduces to the digit; the *labelling* was wrong, and U1's provenance alarm was false | Correction already applied to `03` by the main thread at 15:57. T19 retired **§7 U1** and added the firing-rate caveat (claim 4.18a) |
 | **T17** — ERGO denominator audit | 16:20 | Defect **confirmed** against Overleaf commit `d856247`; ERGO alone on unfiltered pools. Bound too wide to publish on code | Superseded on code by T18; the mechanism, the `d856247` confirmation and the actions-column provenance gap all ship |
 | **T18** — closing the bound | 17:10 | **math 80.0 CLOSED** (k=0 measured, 3 replicates) — ships. **code ≈43.9**, i.e. T17's 57.9 was ~14pp too generous to ERGO — T17's figure must **not** ship. Actions unmeasurable. F49: nothing is significant at n≈20 | The ERGO disclosure written into `00` CW5, `01` W1, `02` W1, `04` correction 5, `05` correction 7 |
-| **T6** — multi-replicate tau2 | **STILL RUNNING** | Unknown. Preliminary Baseline cells (DSV4F 70.2 ± 11.0, Kimi 80.4 ± 2.5 against published 31.6 and 26.3) suggest the published tau2 baselines may not replicate | **Nothing.** All five `⚠ INTERNAL — HOLD` blocks and their pre-drafted withdrawal wording are left byte-identical to what T15 wrote, and so is the T6 item in `00`'s orientation preamble. Not resolved, not softened, not guessed |
+| **T6** — multi-replicate tau2 | **LANDED (T28 applied it)** | **Against us.** Full published matrix at N=3 (3 models x 5 arms x 3 replicate runs x 19 tasks = **855 scored rollouts**, 15/15 cells). Two of three published baselines do **not** replicate: DSV4F 31.6 → **70.2 ± 11.0**, Kimi 26.3 → **78.9 ± 0.0**. On all three models the re-measured baseline is **at or above every AC3 arm**; AC3-Augment is significantly worse on all three. Positive controls hold (gpt-5.4 baseline 68.4 vs published 68.4; AO 0.0 in 9/9 cells, 171 rollouts; `gpt-5-mini` reachable; byte-identical invocation strings; no substitution), so this is "the published baselines were clipped floors", not "not comparable" | **The tau2 improvement claim is withdrawn.** See §12 |
 
 ### What the corrected ERGO numbers actually are, stated precisely
 
@@ -457,7 +462,10 @@ within 2pp.
 setting — its measured single-turn ceiling is **94.4% / 98.0%**, so it carries a **38.3pp /
 15.0pp** multi-turn gap, and AC3-Reset closes **51% / 60%** of it against **50%** on `tab:main`'s
 much harder subset. **Our baselines move 52 points across venues; the fraction of the gap we close
-moves four.** Condensation got no easy ride either: it scores below full context in every venue.
+moves by ten points at most.** Condensation got no easy ride either: it scores below full context in every venue.
+*(T30: this line read "moves four" until the coherence pass. "Four" is T24 §5.4's database-only
+spread across three pools (47–51%); the sentence as printed in `00` CW5 and `04` quotes 51 / 60
+against 50, whose largest gap is ten. Corrected to ten in both reviewer-facing files.)*
 
 Applied to `00` CW5 (three-note comparability block + the ceiling paragraph), `01` W1 (n clause)
 and W2 (the F70 swap), `00` CW2 (sample-size disclosure), `02` Q1 (comparability note), `04` (the
@@ -474,3 +482,111 @@ is inside a blockquote. Verified mechanically against the pre-T25 commit: `git d
 replies/v5/ | grep '^[-+].*⚠ INTERNAL'` returns nothing, and `git diff <pre-T25> -U0 --
 replies/v5/*.md | grep -E '^[-+]>'` returns nothing — no blockquote line anywhere in the reply
 files was added, removed or altered. T6's outcome remains unknown and nothing here pre-empts it.
+
+---
+
+## 12. T28 integration record — T27's measured items applied, and the T6 tau2 withdrawal
+
+Two independent inputs landed on the same pass. T27 (`AR/tasks/T27/worklog.md`, findings
+**F73–F77**) resolved four of the five red-team MEDIUM items that needed measurement, and **T6**
+(`AR/tasks/T6/worklog.md`) finished the multi-replicate tau2 sweep the five HOLD blocks were
+sealed for. T28 applied both. Decision **D20** governs the first: *adversarial-reader output is a
+hypothesis list, not a patch set* — two of `RED_TEAM.md`'s own suggested fixes turned out to be
+false, and both are now annotated in place in that document rather than deleted.
+
+### 12.1 T27's items
+
+| Item | What changed | Where | Evidence |
+|---|---|---|---|
+| **M11** — the neutral-prompt condenser control "did not finish in the window" | **The concession is replaced by a result, and it comes out in our favour.** The neutral-prompt condenser (our "compression, not evaluation" clause deleted) scores **51.4%** against full context's 56.1%, landing **between two replicate runs of our own prompt** (53.3 and 47.7) — so the condensation result does not depend on our phrasing. AC3 leads it by **+24.3pp** (Reset, 31/5) and **+22.4pp** (Gated-Reset, 30/6), p ≤ 0.0001. The decisive detail is the mechanism: with the clause removed the condenser flags an assistant error **0 times out of 340**, identical to with it (0/336, 0/341). A summariser does not audit, whatever you instruct it to do | `00` CW5, `02` Q1, `04` addition table, `05` condensation bullet; `00` "Summary of New Evidence" item 4 | F74/F75; `AR/tasks/T27/worklog.md` §7.3 |
+| **M11 (b)** — the budget ordering | **Not claimed.** The −2.8 → −8.4pp contrast between the 1-call and 2-call condenser does **not** survive replication: a second run of the **1-call** arm scores −8.4pp, exactly the 2-call value, and the two 1-call replicates differ by more (p = 0.29, 0.26) than 1-call differs from 2-call. The cell carries ≈±6pp of run-to-run variation. We print only "neutral-to-negative at either budget" | `00` CW5, `02` Q1 | F73; T27 §7.1 |
+| **M12** — MT-OSC's window | **Our own low-engagement defence is retired because we no longer need it.** At w=2 (the smallest window in MT-OSC's published sweep) the method engages **9× more** — 5.7 compaction events per conversation against 0.6 at w=4, with `raw_pairs_carried` 133 against the archived buggy run's 0 — and scores **47.7%, −13.1pp against its own w=4 run** (22 L / 8 W, p = 0.016); AC3-Reset leads it by **+28.0pp** (37/7). The MT-OSC w=2 row is added to `00` CW5's table. The reply now says "we scaled the window and it hurt" rather than "it barely fires", which rules out the reading that MT-OSC would have won if tuned | `00` CW5 (paragraph + table row), `02` Q1, `04` MT-OSC row, `05` condensation bullet | F76; T27 §7.2 |
+| **M12 (b)** — U-Fold on tau2 | Silence replaced by an **honest offer**: we did not manage an adaptation in the window, we say so, we give the engagement argument as our reason for expecting it to behave like the compaction family, we do not claim that settles it, and we ask Vg97 whether they want it run during the discussion period | `02` Q1 | T27 §6.6 |
+| **M15** — the sign test | The 36-cell sign test is **kept as the assumption-light cross-check** and supplemented by two stronger statistics on the same data at the item level (n = **1,668** paired items, arm-symmetric intersection, 191 problem clusters): AC3-Reset **+15.4pp, 95% CI [+11.5, +19.4]**, **350 W / 93 L**. The interval also sharpens the row we like least — AC3-Rewrite is not −0.3pp but **exactly neutral, [−3.8, +3.8]** | `00` CW2 (full table), `01` Q2 (one-line version), `02` Q2 (full table — Vg97 asked) | F77; T27 §4 |
+| **M15 (b)** — AC3 vs assistant omission | Interval attached to the head-to-head: matrix-wide **+2.8pp, 95% CI [−0.3, +5.9]** (we do not claim it), LiC-database **+18.6pp, [+10.7, +26.6]**. **Guardrail carried into the text and into rule 6b of §8: the matrix-wide item-level McNemar (p = 0.010) is never quoted as a win** — it treats 1,668 correlated items as independent. Reconciled with §11.2's cell-level statement (+2.6pp, 15/17/4): both now say a wash matrix-wide, concentrated on database | `00` CW2 AO subsection, `04`, `05` | F77; T27 §4.2 |
+| **M3** — the `95.0 ± 0.0` cell | **The measured answer, not the proposed one.** Across the three replicates, **39 of 39** comparable conversations have differing analyzer outputs, the two failed problems are a **different pair each run (intersection 0, union 5)**, and turn counts and extracted answers differ on **7 and 5 of 40**. A problem-clustered bootstrap is added: FC **87.5 [79.2, 95.0]**, Reset **93.3 [87.5, 98.3]**, Gated-Reset **95.0 [90.0, 99.2]**; paired, Gated-Reset **+7.5pp [+1.7, +15.0]** (p = 0.023) and Reset **+5.8pp [+0.0, +12.5]** (p = 0.119), and we print the one that does not reach significance | `00` CW3, `01` Q1 | T27 §3.2–3.3 |
+| **M6** — human validation | One sentence, undressed: **we did not run a human study**, the degraded-copy control (39/40, 36/40, 40/40) establishes that the judges discriminate and not that they agree with people, and a human-agreement study with released rubric and raw labels is queued for the camera-ready | `03` W4 | T27 §5 |
+
+**Two of the red team's own suggested fixes were measured and are FALSE. Neither is posted, and both are now annotated in `AR/tasks/T23/RED_TEAM.md` with an inline `⚠ SUPERSEDED — DO NOT APPLY` note** (originals kept — the record of what was proposed and why it was wrong is worth keeping):
+
+* **M3's** proposed clause *"the analyzer cache was disabled for these runs"* is **false**.
+  `context_edit_v2_gated.yaml:18` sets `analysis_cache_dir: outputs/analysis_cache` and
+  `run_exp1_reps.sh` never overrides it; the runs' own `config.yaml` confirms the path. Posting it
+  would have handed a reviewer a checkable false statement inside the paragraph whose purpose is
+  to rebut a caching suspicion. The independence probes above are the true, stronger answer.
+* **M11's** proposed *"it degrades with more budget (−2.8 → −8.4pp), which is itself the mechanism
+  prediction"* asserts a mechanism from an ordering that **dissolves under replication** (F73).
+
+### 12.2 Two places that needed reconciling
+
+1. **`00` CW3's "this experiment alone is not powered for significance"** now sits beside a
+   bootstrap in which Gated-Reset reaches p = 0.023. Reworded to *"we do not rest our headline
+   significance on it"*, which is true and does not contradict the interval. Same fix in `01` Q1.
+2. **The AO head-to-head appears in three places at two levels of analysis.** §11.2's assembled
+   counter-case gives the cell-level +2.6pp / 15-17-4; T27's item-level pass gives +2.8pp with a
+   clustered CI. They agree, and the text now says so rather than printing two numbers for the
+   same quantity. The anti-conservative McNemar p is excluded from all three (§8 rule 6b).
+
+### 12.3 The T6 tau2 withdrawal
+
+T6 completed the full published tau2 matrix at **N=3** — 3 models x 5 arms x 3 replicate runs x
+19 tasks = **855 scored rollouts**, 15/15 cells.
+
+| tau2 (reward %) | gpt-5.4 | DSV4F | Kimi-K2.6 |
+|---|---|---|---|
+| FC published (N=1) | 68.4 | **31.6** | **26.3** |
+| **FC re-measured (N=3)** | **68.4 ± 13.9** | **70.2 ± 11.0** | **78.9 ± 0.0** |
+| AO | 0.0 | 0.0 | 0.0 |
+| AC3-Augment | 47.4 ± 5.3 | 50.9 ± 8.0 | 57.9 ± 9.1 |
+| AC3-Gated-Reset | 57.9 ± 21.1 | 57.9 ± 10.5 | 71.9 ± 11.0 |
+| AC3-Rewrite | 47.4 ± 5.3 | 57.9 ± 13.9 | 66.7 ± 8.0 |
+
+**On all three models the re-measured baseline is at or above every AC3 arm**, and AC3-Augment is
+significantly *worse* than baseline on all three (−21.1 p=0.008; −19.3 p=0.043; −21.1 p=0.012).
+**The tau2 improvement claim is withdrawn**, not softened into "mixed results".
+
+*This is "our published baselines were wrong", not "not comparable", and that was tested.*
+gpt-5.4's baseline reproduces at **68.4** against a published 68.4; AO reproduces at **0.0 in all
+nine cells / 171 rollouts**; `gpt-5-mini` was reachable; invocation strings byte-identical to the
+committed sweep scripts; no model substitution. Our own source report already described the Kimi
+baseline cells as floors (14/20 and 19/20 short-exits).
+
+**What survives and is still posted:** AO = **0.0% on every model**, structurally — rollouts never
+reach `user_stop` and exhaust the 50-step budget, paired −68.4 / −69.6 / −78.9pp at p < 0.0001.
+It does not depend on the baseline's level, which is why the correction leaves it standing.
+**Kept, not upgraded:** the gpt-5.4 Gated-Reset regression iNYK identified, 57.9 ± 21.1 vs 68.4,
+paired −10.5pp, exact p = 0.238 over 57 pairs. **Disclosed as unexplained:** gpt-5.4's AC3
+collapse (Augment 84.2 → 47.4) with its baseline reproducing exactly — substitution, non-firing,
+degenerate termination and rate limits all ruled out, and the one real fork defect found (53% of
+analyzer calls falling back to splicing a raw completion into the briefing) is worth **+2.3pp**
+when patched. Phrasing: **"N=3 replicate runs (seeds 42/43/44)"** — `--seed` genuinely threads to
+the provider's `seed` parameter on this fork, best-effort.
+
+**Red-team H9 is closed.** The "improves over full context across the entire spectrum" sentence
+would have been false on the benchmark it was sharpened to survive. README Blocker 5's pre-drafted
+fallback is now **applied** in `00` CW4, `01` W3, `04` correction 6 and `05` — "improves over full
+context on every self-contained and referential benchmark, and the only method that remains
+**viable** in the stateful agentic setting".
+
+**Correction counts move.** `04` goes from five numbered corrections to **six** (tau2 is item 6);
+`05` from seven to **eight** (tau2 is item 8) — exactly the numbering the two T19 renumbering notes
+predicted, which is why both notes are now discharged rather than carried. `README.md`'s concession
+count moves from ten to **eleven**. Red-team **M1** (the count reads differently in four files)
+remains open and is unchanged by this.
+
+### 12.4 HOLD blocks — verification, and the deliberate unsealing
+
+Two phases, recorded separately because they have different statuses.
+
+**Phase 1 (T27 items).** Per-block SHA-256 over each `⚠ INTERNAL — HOLD` region, computed from the
+pre-edit commit `d989c50` and again after the T27 pass. **All nine detected regions match to the
+digit** (five reply-file HOLD blocks plus the four `CHANGES.md` lines that mention HOLD); only line
+numbers shifted. Baseline recorded at `AR/tasks/T28/hold_baseline.txt`. Nothing in the T27 pass
+touched a held passage.
+
+**Phase 2 (T6).** The orchestrator routed T6's landing to T28 mid-task, which **supersedes the
+byte-identical constraint**: the blocks existed to be resolved on exactly this outcome. All five
+`⚠ INTERNAL — HOLD (T6 in flight)` blocks and both `⚠ INTERNAL — T19 renumbering` notes were
+**resolved and removed**, and their pre-drafted withdrawal wording applied. `00`'s orientation
+preamble is retained, with its T6 item rewritten from "on HOLD" to "resolved, and it goes against
+us". `grep -rn "⚠ INTERNAL" replies/v5/*.md` now returns only the preamble.
