@@ -28,13 +28,13 @@ graph TD
   R --> S1
 
   subgraph S2["Session 2 - 2026-07-29 (this session)"]
-    BLK["BLOCK-spider<br/>acquire Spider SQLite DBs<br/>[run]"]
+    BLK["BLOCK-spider<br/>Spider SQLite DBs recovered<br/>17/17 db_ids, test-suite semantics<br/>[done]"]
     RC["RECON<br/>harness map + operator naming<br/>[run]"]
     T8["T8 CollabLLM N=3<br/>competent user sim<br/>[todo]"]
     T9["T9 analyzer-model sensitivity<br/>[todo]"]
     T2A["T2A Tier-A constructed pollution<br/>[todo]"]
-    T2C["T2c auditing vs re-solving<br/>[todo]"]
-    T1["T1 condensation baseline<br/>[blocked on BLOCK-spider for best venue]"]
+    T2C["T2c auditing vs re-solving<br/>[run]"]
+    T1["T1 condensation baseline<br/>[todo] — venue unblocked"]
     T11["T11-13 WildChat judge checks,<br/>memory order/split<br/>[todo]"]
     T6["T6 multi-seed tau2<br/>[todo, expensive]"]
     T2B["T2B counterfactual span ablation<br/>[todo, gold standard]"]
@@ -64,8 +64,9 @@ graph TD
 | T3 | Paired significance across LiC matrix | 2026-07-27 | `neurips_review/experiments/paired_analysis.py`, `paired_analysis_results.txt` | General Response; AC reply |
 | T4 | Random unbiased subset, end-to-end N=3 | 2026-07-27 | `neurips_review/experiments/exp1_reps_results.txt`; `data/rebuttal_random_math40.json`; `outputs/rebuttal_random/` | iNYK Q1 |
 | T5 | Equal-budget reflection control | 2026-07-27 | `neurips_review/experiments/exp2_results.txt` | Vg97 Q3 (compute half) |
-| BLOCK-spider | Spider DB acquisition | 2026-07-29 | `tasks/BLOCK-spider/worklog.md` | T1, T2A, T5-redo |
+| BLOCK-spider | Spider DB acquisition | 2026-07-29 | `tasks/BLOCK-spider/worklog.md`; `data/spider/databases/` (4.9 GB, gitignored) | T1, T2A, T5-redo |
 | RECON | Harness / naming map | 2026-07-29 | `tasks/RECON/worklog.md` | T8, T9, T6, T11 |
+| T2c | Auditing vs. re-solving | 2026-07-29 | `tasks/T2c/worklog.md` | 5YHP mechanism challenge |
 
 ---
 
