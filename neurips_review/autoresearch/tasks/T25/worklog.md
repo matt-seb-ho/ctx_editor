@@ -25,12 +25,16 @@ lifted from `T2B/RESULTS.md`. Writing task only.
    `00_general_response.md`, with a summary paragraph in `04_response_to_AC.md`. It follows the
    red team's four-move plan and leads with the concession (the matrix-wide head-to-head is a
    wash) so the regime-specific evidence is credible when it arrives.
-3. **Nine red-team HIGH items actioned; H1 deferred to T24 by instruction.** H2, H3, H4, H5, H6,
-   H7, H8, H10 applied. H9 recorded as a new `README.md` blocker with pre-drafted fallback
-   wording, deliberately **not** applied to reviewer text because it is tau2-dependent and T6 is
-   still running.
-4. **All eight `⚠ INTERNAL` blocks are byte-identical.** Verified two ways (§6).
-5. **One number in the brief was wrong and I printed the measured one instead.** The brief said
+3. **All ten red-team HIGH items actioned.** H2, H3, H4, H5, H6, H7, H8, H10 applied directly;
+   **H1 applied mid-task** once T24 landed and the orchestrator routed it to me (§3b); H9
+   recorded as a new `README.md` blocker with pre-drafted fallback wording, deliberately **not**
+   applied to reviewer text because it is tau2-dependent and T6 is still running.
+4. **T24's `F-T24-1`/F70 fixed — a false statement in the reply to iNYK.** The claim that the
+   36-comparison matrix is on "the full, non-difficulty-selected pool" is false and is now
+   corrected in `01` W2 and disclosed in `00` CW2. This was the single most checkable falsehood
+   in the reply set, and it sat in the answer to the reviewer whose objection it misdescribes.
+5. **All eight `⚠ INTERNAL` blocks are byte-identical.** Verified two ways (§6).
+6. **One number in the brief was wrong and I printed the measured one instead.** The brief said
    "+21 pp over AO on database across three models". The measured value is **+18.7pp** (mean of
    9 paired triples). Printing +21 would have been a 2.3pp overstatement in our own favour, in a
    document whose entire theme is that a reviewer will check our arithmetic.
@@ -148,7 +152,7 @@ the pollutant still present), and T2B's concentration + 100%-removal results.
 
 | # | Severity | Status | What I did |
 |---|---|---|---|
-| H1 | HIGH | **DEFERRED — T24 owns it** | Three full-context baselines 52 points apart. Not touched by instruction; T24 is producing the reconciling clause. Recorded as `README.md` Blocker 5's sibling (Blocker 6a) |
+| H1 | HIGH | **APPLIED (mid-task) — T24 measured it, I applied it** | Three full-context baselines 52 points apart, now reconciled in `00` CW5, `01` W1, `02` Q1, `04` and `05`. See §3b |
 | H2 | HIGH | **APPLIED** | AC3-Rewrite's paired row (−0.3pp, 6/6/0, n=12) printed in `00` CW2 with a dagger footnote: pre-analyzer-parity, one model, explicit "we do not claim Rewrite improves LiC accuracy", and the closing line *"we would rather show the operator that loses on LiC than present four operators and print the three that win"* |
 | H3 | HIGH | **APPLIED** | Same dagger footnote explains Gated-Reset's 12-of-36. One deployment sentence now used in `00`, `01`, `02`, `03`: *always-on Reset where an intervention is cheap; Gated-Reset where an unnecessary edit carries state-disruption cost.* Removed "the configuration we recommend" (`00` CW5, `04` correction 5) and "our strongest operator overall" (`03` W5) |
 | H4 | HIGH | **APPLIED** | (a) `03` W4: states the AC3 column is a per-row best, that **Rewrite** was not re-run on CollabLLM at N=3, and **withdraws rather than substitutes**. (b) `01` W1: gives **Gated-Reset**'s new database figure — the operator iNYK named — **49.7% (73/147)** on DSV4F, prefixes 44.9 / 49.0 / 55.1, against FC 22.4 and AO 45.6, computed tonight from `RPT/post_neurips_ac3_phase1.md`. (c) Selection rule stated in `00` CW1 and `01`: the 33/36 row is a **single fixed configuration**, not a per-cell maximum |
@@ -182,7 +186,61 @@ the pollutant still present), and T2B's concentration + 100%-removal results.
 
 ---
 
-## 4. Things I changed my mind about while working
+## 3b. Mid-task scope addition — T24's H1 and F70, routed to me
+
+T24 finished at 19:30 and the orchestrator routed both its outputs to me rather than dispatching
+a second editor onto `replies/v5/` (the double-write pattern that corrupted output directories
+earlier in the session). Draft wording came from `tasks/T24/worklog.md` §7; I applied §7.1, §7.2,
+§7.3 and the §7.4 AC paragraph, adapting each to its host document.
+
+### 3b.1 F70 — a false statement in the reply to iNYK (the highest-priority item in the set)
+
+`01_reviewer_iNYK.md` W2 said the 36-comparison paired matrix is on **"the full,
+non-difficulty-selected pool"**. It is not: it runs on `htn50_52_*`, the 50 highest-failure-rate
+instances per task from the GPT-5.2 logs, with replay prefixes *additionally* weighted toward
+baseline failures (74–86% failure-prefixes on database). Difficulty selection is precisely what
+iNYK's W2 complains about, so the rebuttal was answering the reviewer's own objection with a
+claim the reviewer could falsify from our own artifacts.
+
+**Fixed as a swap, not a retraction**, per T24's §7.2. The sentence now says outright that the
+matrix **is** difficulty-selected, that its +15.9pp on 33/36 is a valid **paired effect but not a
+population estimate**, and points the unbiased claim at the two experiments that genuinely
+satisfy it: the uniformly random n=40 end-to-end subset (Q1) and the complete-unselected-pool
+condensation experiment (CW5, n=107/100). I propagated the same disclosure to **`00` CW2's
+sample-size paragraph**, because the general response is read first and leaving the honest
+version only in a per-reviewer reply would recreate the problem one document over.
+
+### 3b.2 H1 / F68–F69 — the baseline reconciliation
+
+Added a three-row population table plus the restriction evidence to **`04`** (the letter that
+decides), a three-note comparability block plus the ceiling argument to **`00` CW5** (where the
+56.1/83.0 numbers appear), an n-and-provenance clause under **`01` W1's** 3-model table, a short
+note to **`02` Q1**, and one clause to **`05`**'s condensation bullet.
+
+The load-bearing content: the spread is **pool difficulty selection**, verified by restriction
+rather than argument (T1's own run restricted to the paper's 25 items: 56.1 → **32.0**, code
+83.0 → **48.0**; LiC's released logs independently give GPT-5-mini 29.9% on the full pool vs 4.0%
+on its top-25 — two routes, ≈25pp, agreeing within 2pp). And the line that turns it from a
+liability into a strength: the unselected pool's measured single-turn ceiling is **94.4 / 98.0**,
+so it still carries a **38.3 / 15.0pp** multi-turn gap, and AC3 closes **51% / 60%** of it against
+**50%** on the paper's much harder pool. **Baselines move 52 points across venues; gap-closure
+moves four.**
+
+**Not applied:** T24 §7.4's `tab:main` caption addition and §7.5's "the design oracles are not
+oracles in end-to-end mode" note are **paper edits**. `writing/overleaf_repo/` is out of bounds
+for autoresearch agents, so both are queued for the operator alongside PAPER-1..8. §7.5 is in any
+case conditional on reporting AO/Concat on the new pool, which the reply set does not do.
+
+### 3b.3 Knock-on consistency work this forced
+
+* The paired table is repeated in `01` Q2 and `02` Q2. Both now carry the **AC3-Rewrite** row and
+  a compact dagger footnote, so H2's fix is not undone by two copies of the old table.
+* `01` Q2's "AC3-Reset's mean also clears the assistant-omission design-oracle across the matrix"
+  is now qualified with the +2.6pp / 15-17-4 head-to-head, matching `00`'s new subsection.
+* `00`'s summary item 2 and `05`'s paired-testing bullet likewise qualified.
+
+---
+
 
 * **I nearly printed "+21pp over AO on database" from the brief.** Recomputing gave **+18.7pp**.
   A 2.3pp overstatement in our own favour, in the one document arguing that a reviewer will

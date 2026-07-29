@@ -30,11 +30,13 @@ On tau2 in particular, we now agree with you more strongly than we did, and can 
 
 **Response to Q1:** We have run it. The result is in **Common Weakness 5**; we summarise the three things we think you will most want to check.
 
-**Summarisation does not close the gap — it moves accuracy down.** On our two highest-pollution LiC tasks, paired against identical conversations: on database, summarisation at 1 call/turn is **−2.8pp** and at 2 calls/turn is **−8.4pp** against full context, while AC3-Reset is **+19.6pp** (p = 0.0005); on code, summarisation is **−4.0 / −3.0pp** while AC3-Reset is **+9.0pp** (p = 0.023). Head-to-head and paired, AC3-Reset beats summarisation by +22.4 / +28.0pp on database and +13.0 / +12.0pp on code, all p < 0.01. This is the mechanism prediction we made in Related Work behaving as predicted: a good-faith condenser preserves invalidated reasoning in compressed form.
+**Summarisation does not close the gap — it moves accuracy down.** On our two highest-pollution LiC tasks, run on the **complete, unselected** LiC pool (n=107 database / 100 code, full end-to-end simulation rather than replay) and paired against identical conversations: on database, summarisation at 1 call/turn is **−2.8pp** and at 2 calls/turn is **−8.4pp** against full context, while AC3-Reset is **+19.6pp** (p = 0.0005); on code, summarisation is **−4.0 / −3.0pp** while AC3-Reset is **+9.0pp** (p = 0.023). Head-to-head and paired, AC3-Reset beats summarisation by +22.4 / +28.0pp on database and +13.0 / +12.0pp on code, all p < 0.01. This is the mechanism prediction we made in Related Work behaving as predicted: a good-faith condenser preserves invalidated reasoning in compressed form.
 
 **The budget comparison came out better than parity.** We instrumented every LLM call and token per component. The budget-matched summariser **over-consumed** AC3-Reset — 1.02–1.19x its strategy calls and 1.62–2.14x its strategy tokens — and still lost by 12 to 28 points.
 
 **On MT-OSC we decline to claim a win.** Our reimplementation at the published window (w=4) improves database by +4.7pp (p = 0.383), but it fired only **30 times across 107 conversations, 0.3 per conversation**, because it cannot compact before turn 6 and LiC conversations average 4.1 turns. That is not a fair test of MT-OSC's idea. What it does establish is a scoping claim about the whole family: a length-triggered compaction schedule **structurally cannot engage** with pollution that arrives in the first few turns. We will report it in exactly those terms, cite MT-OSC as concurrent work (2026), and release both condenser prompts verbatim.
+
+One comparability note, since this experiment's absolute accuracies are far above Table 1's: it runs on the complete unselected pool with a newer respondent and end-to-end rather than replay, so the absolute levels are not comparable to Table 1 and the paired Δ is the quantity to read. That does not make it an easy setting — the measured single-turn ceiling on this pool is 94.4% (database) and 98.0% (code), so the multi-turn gap is still 38.3pp and 15.0pp, and AC3-Reset closes 51% and 60% of it, the same fraction it closes on Table 1's much harder subset. Full accounting in **Common Weakness 5**.
 
 Limits we state ourselves: one respondent model, one run per cell, two tasks; the neutral-prompt robustness variant of the summariser was implemented but did not finish in the discussion window.
 
@@ -48,8 +50,11 @@ Limits we state ourselves: one respondent model, one run per cell, two tasks; th
 |---|---|---|---|
 | **AC3-Reset** | **+15.9pp** | **33 / 2 / 1** | **< 0.0001** |
 | **AC3-Augment** | **+15.2pp** | 31 / 1 / 4 | **< 0.0001** |
-| AC3-Gated-Reset | +17.0pp | 11 / 1 / 0 | 0.0063 |
+| AC3-Gated-Reset† | +17.0pp | 11 / 1 / 0 | 0.0063 |
+| AC3-Rewrite† | −0.3pp | 6 / 6 / 0 | 1.00 |
 | Assistant omission | +13.3pp | 31 / 4 / 1 | < 0.0001 |
+
+† These two rows cover 12 of the 36 triples, on one respondent model, which is why their counts do not sum to 36. We print the AC3-Rewrite row for completeness even though it is our worst — its cells predate the analyzer-parity fix and we do not claim Rewrite improves LiC accuracy; its evidence is on referential settings. See Common Weakness 2 for the full footnote and for where AC3 does and does not separate from assistant omission.
 
 Sample size on LiC grew from 18-25 per cell to **up to 50 problems per task across 3 prefixes** (up to 150 conversations per cell) on **3 models**. On **tau2** we now report mean +/- std over three replicates per cell rather than best-of-3 (**Common Weakness 4**).
 
@@ -85,7 +90,18 @@ Limits we state ourselves: n = 40 + 49 per replicate and the intervals are a spr
 
 We previously reported a matched-call-budget self-reflection control on a random math subset, where reflection reached 97.5 against AC3-Reset 97.5 and full context 90.0. We were explicit at the time that a near-ceiling task cannot discriminate between the two hypotheses, and we have now re-run the control where there is headroom. On LiC database and code, with per-component call and token metering, the budget-matched condenser **used more compute than AC3-Reset** (1.02–1.19x strategy calls, 1.62–2.14x strategy tokens) and scored **12 to 28 points below it**, and below full context in three of four cells. AC3-Gated-Reset reaches +17.8pp on **0.41x** AC3-Reset's strategy calls. Full table in **Common Weakness 5**.
 
-**Latency.** At equal turn counts and equal concurrency, the matched-budget control adds roughly **13% wall-clock** over baseline (231s vs. 205s for the same 40 conversations). Measured per-conversation on LiC-database, AC3-Reset issues 6.2 strategy calls and AC3-Gated-Reset 2.6, against 3.1 and 6.3 for the two summariser budgets. Gated-Reset is the deployment-relevant configuration because gating skips the intervention entirely when the analyzer finds no issue.
+**Latency.** You asked for AC3's latency, and our earlier answer gave the control's. Here is ours. On the LiC-database runs behind the table in **Common Weakness 5** — the same 107 conversations, the same machine, arms run back-to-back at identical concurrency — end-to-end wall-clock is:
+
+| Arm | Wall-clock (107 conversations) | vs. full context | Avg. turns | Seconds per turn |
+|---|---|---|---|---|
+| Full context | 578 s | — | 4.1 | 1.30 |
+| MT-OSC (w=4) | 587 s | +2% | 4.3 | 1.27 |
+| **AC3-Gated-Reset** | **781 s** | **+35%** | 5.3 | **1.38** |
+| Summarisation, 1 call/turn | 835 s | +44% | 7.3 | 1.07 |
+| **AC3-Reset** | **1,051 s** | **+82%** | 6.9 | **1.43** |
+| Summarisation, 2 calls/turn (budget-matched) | 1,214 s | +110% | 7.3 | 1.55 |
+
+We should not present the +82% as smaller than it is: end-to-end, always-on Reset takes nearly twice as long as full context on this benchmark, and that is a real deployment cost. But the decomposition matters, so we give it. Most of the difference is **turn inflation** rather than per-turn slowdown — a decontaminated assistant asks the clarifying questions the polluted one skipped, so conversations run 6.9 turns instead of 4.1. **Per turn**, AC3-Reset adds **9%** over full context and AC3-Gated-Reset **5%**, while the budget-matched summariser adds **19%** per turn and scores 28 points lower. Gating is the lever: **+17.8pp of the +19.6pp at 0.41× the strategy calls and less than half the added wall-clock**, which is why we recommend always-on Reset only where an intervention is cheap and Gated-Reset where it is not. On the earlier n=40 LiC-math control, the same picture at a near-ceiling task: full context 205 s, matched-budget self-reflection 231 s (+13%), AC3-Gated-Reset 266 s (+30%), AC3-Reset 547 s (+167%) — again driven by turns (8.5 vs. 5.2). These are single runs and the timings include process start-up and offline scoring, so we quote them to two significant figures and would re-measure with per-call timing for the camera-ready. Per conversation, AC3-Reset issues 6.2 strategy calls and AC3-Gated-Reset 2.6, against 3.1 and 6.3 for the two summariser budgets.
 
 ---
 
@@ -103,11 +119,16 @@ We previously reported a matched-call-budget self-reflection control on a random
 
 The analyzer-sensitivity sweep in Q3 is the empirical form of the "Essential" label on row 1: the same analyzer interface, swapped across four model families, produces the same qualitative behaviour and a monotone-in-strength quantitative one.
 
-We should also make an operator-level distinction that our own new measurements force, because it bears directly on your question about what is shared and what is not. **Reset and Rewrite do genuinely different things to the context**, and we had been describing them with a single sentence. On constructed pollution, Reset removes 97.6% of an injected false span but preserves only 4.0% of an injected true span — it detects, discards the assistant side, and re-derives the specification from the user side. Rewrite sits at the opposite corner (27.0% removal, 38.9% preservation) — it is the selective operator. Both are the same analyzer with a different intervention; but "we preserve what is correct and remove what is harmful" is a claim about **Rewrite**, not about Reset, and we are correcting the paper's phrasing to attribute it. Details in our reply to **5YHP (W5)**.
+We should also correct an operator-level description that our own new measurements force, because it bears directly on your question about what is shared and what is not. We had been describing AC3 as *preserving what is correct and removing what is harmful* — a selective-editing claim. We ran two studies to test it, and neither supports it.
+
+* On **constructed** pollution (one known-false and one known-true span injected per conversation), AC3-Reset removes 97.6% of the false span but preserves only 4.0% of the true one, an edit precision of 50.4% against a 50% chance baseline. AC3-Rewrite looked like the exception at that stage (27.0% removal, 38.9% preservation).
+* On **naturally occurring** spans, measured causally with no detector and no judge anywhere in the label path — 111 spans in 30 conversations, each re-run 14× present and 12× removed — **neither operator is selective**. Reset keeps 5 of 66 probe-admissible spans, Rewrite keeps **0 of 66**; preservation on causally useful spans is 0% for both; edit precision is 63.6% for both, exactly the base rate. Rewrite's apparent selectivity on the constructed spans was an artifact of their form: a short, self-contained injected sentence can be carried across verbatim by a compacting operator, whereas the model's own verbose prose and code get paraphrased and nothing distinctive survives.
+
+So the honest mechanism statement is the **same** for Reset and Rewrite, and it is not the one in the paper: AC3 **detects, discards the assistant side, and rebuilds the specification from the user side** — Reset by dropping that side, Rewrite by recompacting it — rather than excising harmful content span by span. The two operators differ in *how much* they rebuild, not in whether they are selective, which keeps the operator a knob rather than a second method. We are removing the "preserve what is correct" framing from the paper rather than re-attributing it. What the same studies *do* support is that the analyzer detects (it names the injected pollutant in 78.6% of conversations) and that AC3 removes **100%** of the natural spans a counterfactual ablation proves causally harmful. Details in our reply to **5YHP (W5)**.
 
 The two cases you flag are the stated theory applied, not departures from it. **CollabLLM** turns structural exclusion off because our claim is that it applies when user turns independently specify the task, and CollabLLM is exactly the regime where intent is co-constructed across assistant turns; applying it there would contradict our own analysis. The **tau2** variant is the same analyzer with environment-state tracking added because the environment is stateful.
 
-**Revision:** We will add this table, a unified algorithm statement, and the operator-level mechanism distinction to Section 3, and rename the tau2 variant so the continuity is explicit.
+**Revision:** We will add this table, a unified algorithm statement, and the corrected per-operator mechanism statement to Section 3, remove the "preserve what is correct" framing from the abstract and introduction, and rename the tau2 variant so the continuity is explicit.
 
 ---
 

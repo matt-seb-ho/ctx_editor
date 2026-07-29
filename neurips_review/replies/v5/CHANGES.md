@@ -22,6 +22,8 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 
 **Changes made by T21 (from T20's verification pass).** UNVERIFIED 4 → **1**: U2, U3, U4 and U5 are all resolved, leaving only U6, which is unclosable by construction. Corrections 14 → 15, the new one being the CollabLLM assistant-omission column taken from N=1 to N=3 (§10). On-HOLD stays at 3 — all three are tau2, and every INTERNAL/HOLD block in the reply files is byte-identical to what T15 wrote (verified mechanically; see §10).
 
+**Changes made by T25 (from T2B and the T23 red team).** Corrections 15 → **16**, and one of the existing sixteen changed direction: the "preserve what's correct" claim, which T19 had re-attributed to **AC3-Rewrite**, is now **retracted for both operators** after T2B measured selectivity causally on naturally occurring spans (F66). Rows 3.11 and 4.16 and §8 rule 3 are revised accordingly, and a new **§11** records the retraction, the assembled counter-case to the red team's strongest objection, and the nine red-team HIGH items applied or deferred. On-HOLD stays at 3 and every INTERNAL/HOLD block remains byte-identical (verified mechanically; see §11.4).
+
 ## Path legend
 
 | Shorthand | Full path |
@@ -42,7 +44,7 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | 1.3 | Paired significance: AC3-Reset **+15.9pp, 33/2/1, p < 0.0001** | **unchanged**, now explicitly labelled *raw accuracy* | `EXP/paired_analysis_results.txt`; source tables `RPT/post_neurips_ac3_phase{1,2}.md`. **Verified raw**: every (task, prefix) cell uses one denominator across all strategies, so the F28 FN-adjustment bias does not touch this table | "…across all 36 paired comparisons …, on **raw accuracy**:" |
 | 1.4 | "50 problems per task" | **corrected** (wording) | `RPT/post_neurips_ac3_phase1.md` — per-cell denominators are 36–50, not uniformly 50 (code_v2 conv2 = 36) | "**up to 50** problems per task … (36–50 conversations per prefix depending on task, up to 150 per cell)" |
 | 1.5 | Per-model paired gains **+17.1 / +16.7 / +13.9pp** | **unchanged** | `EXP/paired_analysis_results.txt` | verbatim |
-| 1.6 | AC3-Reset "outperforms the assistant-omission design-oracle" (+15.9 vs +13.3) | **unchanged** | `EXP/paired_analysis_results.txt` | verbatim |
+| 1.6 | AC3-Reset "outperforms the assistant-omission design-oracle" (+15.9 vs +13.3) | **qualified by T25** | `EXP/paired_analysis_results.txt`; head-to-head recomputed by T25 from `RPT/post_neurips_ac3_phase{1,2}.md` | The two means are correct, but the head-to-head over the same 36 triples is **+2.6pp on 15 W / 17 L / 4 T** — a wash outside LiC-database (+18.7pp, 8/9). A reviewer can derive this from the two printed rows, so v5 now states it itself and uses it to make the operator-by-regime argument (see §11.2) |
 | 1.7 | WildChat "**89.8 +/- 1.4** (Reset) and **92.1 +/- 1.3** (Augment)" | **corrected** | **F31**, `AR/tasks/T11/worklog.md` §(a); raw `AR/tasks/T11/out/order_gpt5mini.jsonl` | "**87.8 +/- 2.1** (Reset) and **91.2 +/- 2.1** (Augment) … order-balanced values from a full re-judge" |
 | 1.8 | WildChat "over 3 **seeds**" | **unchanged** | **F4** — WildChat's N=3 *are* real seeds (42/43/44), confirmed in `AR/tasks/T11/worklog.md` | keeps "seeds" |
 | 1.9 | CW3 end-to-end table: Full context 87.5±2.0, **AC3-Reset 100.0±0.0**, **Gated-Reset 99.1±1.2** | **CORRECTED — the largest numeric change in v5** | **F28**. Those were FN-*adjusted*. Source rows: `EXP/exp1_results.txt` (rep1: reset "100.00% (39/39) [1 excluded]"), `EXP/exp1_reps_results.txt` (rep2 "Accuracy 95.00% (38/40)" vs adjusted 100.00% (38/38) [2 excluded]; rep3 raw 87.50% vs adjusted 100.00% [5 excluded]). Baseline had **0** exclusions in all three runs | Raw: Full context **87.5 +/- 2.0** (90.0/87.5/85.0), **AC3-Reset 93.3 +/- 4.2** (97.5/95.0/87.5), **AC3-Gated-Reset 95.0 +/- 0.0**; plus an explicit self-correction paragraph |
@@ -95,7 +97,7 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | 3.8 | Q3 latency "**13% wall-clock** (231s vs 205s for 40 conversations)" | **unchanged** | `EXP/exp1_results.txt` / `EXP/exp2_results.txt` wallclock fields | verbatim, plus measured per-conversation strategy-call counts from **F27** |
 | 3.9 | Q3 analyzer-model sensitivity — **v4 never answered this half of the question** | **newly added** | **F20/F21/F22**, `AR/tasks/T9/worklog.md` (commit `1f4f32d`), `OUT/T9/{rep1,rep2}/<task>_<arm>/` | Five-analyzer table (Kimi +39.9 / DSV4F +28.7 / gpt-5.4-mini +27.0 / Llama-70B +18.0 / gpt-4o-mini +12.9), n=178 matched pairs, exact McNemar; the under-detect-not-mis-detect mechanism; the non-OpenAI point; stated limits |
 | 3.10 | Q4 component table | **unchanged** | — | verbatim |
-| 3.11 | *(new)* | **newly added** | **F25**, `AR/tasks/T2A/RESULTS.md` §"Contrast: AC3-Rewrite" | Operator-level mechanism distinction added to Q4: Reset = detect/discard/re-derive (97.6 removal, 4.0 preservation); Rewrite = selective (27.0 / 38.9) |
+| 3.11 | *(new)* | **newly added, then REVISED by T25** | **F25** + **F66**, `AR/tasks/T2A/RESULTS.md`, `AR/tasks/T2B/RESULTS.md` §4 | Q4 now carries the *corrected* operator-level statement. T19 wrote "Rewrite is the selective operator (27.0 / 38.9)"; **T2B retracts that** — on natural spans Reset keeps 5/66 and Rewrite keeps **0/66**, preservation 0% for both, edit precision 63.6% = base rate for both. Q4 now says the mechanism is the **same for both operators** (detect → discard the assistant side → rebuild from the user side) and that they differ in *how much* they rebuild, which keeps the operator a knob rather than a second method |
 | 3.12 | *(new — added by T19)* | **newly added — disclosure** | **F43/F44/F48/F49**, `AR/tasks/T18/worklog.md` R1/R4 | New paragraph in the **W1** answer. Vg97's central weakness is the *baseline set*, so a defect in how an existing baseline was scored belongs there. Same three numbers plus the n≈20 non-significance result, explicitly tied back to Vg97's own W2 statistical-reliability point; cross-references CW5 |
 
 ---
@@ -119,7 +121,7 @@ Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | 4.13 | W4 "**We will add** judge-agreement and position-bias checks for WildChat" | **replaced by results** | **F30/F31/F32/F33**, `AR/tasks/T11/worklog.md` §(a)–(d), `AR/tasks/T11/out/*.jsonl` | Position bias (+5.5pp toward slot 2, p=1.8e-4, opposite-signed on the other two judges); corrected headline; PABAK 0.79–0.83 / AC1 0.84–0.87; self-consistency 96.9%; punitive 2-of-3 rule 82.5%; positive controls 39/40, 36/40, 40/40 |
 | 4.14 | *(new)* | **newly added — disclosure** | **F33** | "our judge does not run at temperature 0 … the provider overrides it to 1.0. The 96.9% self-consistency figure replaces any determinism claim" |
 | 4.15 | W5 "**We are adding** a span-level evaluation … removal recall / preservation precision / gating accuracy … as a confusion matrix" | **replaced by results** | **F23/F24/F26**, `AR/tasks/T2A/RESULTS.md`, `AR/tasks/T2A/{inject.py,measure.py,manifest.jsonl,per_conversation.json}`, `OUT/T2A/` (32 cells), commit `88cacb3` | Full judge-free constructed-pollution study with the two-span design and four offline positive controls |
-| 4.16 | *(new)* | **newly added — correction to a paper claim** | **F25**, D9 | "We preserve what's correct and remove what's harmful" is attributed to **Rewrite** (27.0 removal / 38.9 preservation), **not** Reset (97.6 / 4.0, edit precision 50.4% vs 50% chance). Reset's mechanism restated as *detect, discard the assistant side, re-derive from the user side* |
+| 4.16 | *(new)* | **newly added — correction to a paper claim; RE-CORRECTED by T25** | **F25**, D9, superseded by **F66** / `AR/tasks/T2B/RESULTS.md` §4 | v5 as written by T15/T19 **re-attributed** "we preserve what's correct and remove what's harmful" to **Rewrite** (27.0 / 38.9) on the strength of the *constructed*-span study. **T2B measured the same thing on naturally occurring spans, causally, with no detector or judge in the label path, and the attribution does not survive**: Reset keeps 5/66 probe-admissible spans, **Rewrite keeps 0/66**, preservation on causally useful spans is 0% for both, and edit precision is 63.6% — exactly the base rate — for both. The label-free aggregate test agrees (Reset removed−kept = −0.014, p = 0.85). **The claim is now retracted for both operators, not re-attributed.** Explanation shipped alongside it, because it makes T2B an *extension* of T2A rather than a contradiction: a compactor can copy a short self-contained injected sentence verbatim, but paraphrases the model's own verbose prose and code, so nothing distinctive survives. T2A flagged synthetic salience as an upper-bound caveat and the caveat was load-bearing |
 | 4.17 | *(new)* | **newly added** | **F24**, `AR/tasks/T2A/RESULTS.md` §factorial | Detector-free causal ladder: harmful span **−11.1pp** on unedited context, true span **+15.1pp**; clean 24.7% → polluted 9.3% → AC3-Reset with pollutant present **59.8%** |
 | 4.18 | W5 gate-open rates **97.3%** LiC (n=554), **98.3%** CollabLLM (n=119), ~72% WildChat | **corrected (T16), and U1 retired** | **F39**, `AR/tasks/T16/{report.md,gate_stats.py,gate_stats.json}`; the 2026-06 artifacts U1 could not find **do exist**, at `scripts/analysis_rewrite_v_reset/data/gated_reset_reconstructed_{lic,collabllm}.md`, stating `539/554 (97.3%)` and `117/119 (98.3%)` verbatim | Both figures reproduce to the digit; the *labelling* was wrong. Now: LiC **97.3% per-conversation** (98.5% turn-level, n=547) and CollabLLM **95.3% turn-level** (n=659 calls over 120 conversations; 98.3% per-conversation) |
 | 4.18a | *(new — added by T19)* | **newly added — self-stated limitation** | **F39** (T16's new caveat), `AR/tasks/T16/report.md` | New paragraph after the gate rates: they are a **firing rate, not a detection rate** — 29% (LiC) / 73% (CollabLLM) of gate-open records have the analyzer writing `issues: "None"` while still setting `needs_edit=true`. Names it before a reviewer handed `gate_stats.py` would; redirects the detection claim to T2A's 78.6% pollutant-naming rate. The existing "we would not over-read firing rates into a precision/recall claim" sentence is kept and now has evidence behind it |
@@ -182,7 +184,7 @@ Mirrors the above. All ten revision bullets updated to the corrected numbers; fo
 
 1. **"Seeds" → "replicate runs at temperature 1.0"** wherever the number came from LiC or CollabLLM (**F4**, D4). WildChat keeps "seeds" — its N=3 are real. We state *what the replicates vary* and that the intervals are decoder variance; we do **not** confess a harness bug in a rebuttal.
 2. **Raw accuracy everywhere on LiC** (**F28**). `adjusted_accuracy` is never quoted for a context-editing arm.
-3. **Never a bare 97.6% removal rate** (**D9**). Always detection + removal + preservation + edit-precision-vs-chance, with selectivity attributed to Rewrite.
+3. **Never a bare 97.6% removal rate** (**D9**). Always detection + removal + preservation + edit-precision-vs-chance. **Selectivity is attributed to no operator** (**F66**, T25): on natural spans Reset keeps 5/66 and Rewrite 0/66, edit precision at the base rate for both. The mechanism statement for both is *detect → discard the assistant side → rebuild the specification from the user side*. Lead the detector passages with what *is* supported: 78.6% pollutant naming, the causal factorial (9.3% → 59.8% with the pollutant still present), and T2B's 100% removal of causally-harmful natural spans.
 4. **Never the single-trial memory gains** (**D7**). Lead with contamination-zero; state variance as our own limitation.
 5. **Concessions open the paragraph.** Applied to the CollabLLM correction, the FN-adjustment, the preservation attribution, the WildChat headline, math in the auditing analysis, and the memory noise floor.
 6. **No tau2 magnitudes until T6 lands.** Five `⚠ INTERNAL — HOLD` blocks mark every affected passage (`00` x2, `01`, `04`, `05`), plus an orientation preamble at the top of `00`.
@@ -289,3 +291,186 @@ added, PAPER-8** (Table 3 caption). Every INTERNAL/HOLD tau2 block in the reply 
 Verified two ways against the pre-T21 commit `1382e61`: `git diff 1382e61 -U0 -- replies/v5/ |
 grep -E '^[-+]>'` returns **nothing** (no blockquote line anywhere in v5 was added or
 removed), and the extracted HOLD blocks of `00`, `01`, `04` and `05` hash identically.
+
+---
+
+## 11. T25 integration record — the Rewrite retraction (T2B) and the assembled counter-case (T23 red team)
+
+T25 did two things: it **retracted** a claim that v5 had just finished re-attributing, because
+T2B's causal measurement landed and overturned it; and it **assembled** the counter-evidence to
+the red team's strongest single objection, which existed but was scattered across six files.
+It also applied the red-team HIGH items that need no new measurement.
+
+### 11.1 The retraction — "we preserve what's correct and remove what's harmful"
+
+**What v5 said before T25.** T2A injected one known-false and one known-true span per
+conversation and found AC3-Reset non-selective (edit precision 50.4% against 50% chance,
+preservation 4.0%) while AC3-**Rewrite** looked selective (27.0% removal, 38.9% preservation).
+On that basis, five places in v5 — `02` Q4, `03` W5, `04` correction 3, `05` correction 3, and
+the `README.md` guardrail — attributed the paper's selectivity claim to **Rewrite**.
+
+**What T2B measured** (`AR/tasks/T2B/RESULTS.md`, F65–F67, commit `289de75`). 111 spans
+occurring **naturally** in 30 LiC database and code conversations, each re-run **14× present and
+12× removed**, everything else byte-identical (3,357 assistant turns, 0 errors). **No detector,
+no judge and no LLM of any kind appears anywhere in the path that produces the labels.** All
+three controls pass: contentless span **+0.033** (n.s.), T2A's validated pollutant **+0.368**,
+the full-spec/gold-SQL span **−0.447**.
+
+| | AC3-Reset | AC3-Rewrite |
+|---|---|---|
+| Probe-admissible spans **kept** | 5 / 66 | **0 / 66** |
+| Removal on causally harmful spans | 100.0% (7/7) | 100.0% (7/7) |
+| Preservation on causally useful spans | 0.0% (0/4) | 0.0% (0/4) |
+| Edit precision (base rate 63.6%) | 63.6% | 63.6% |
+| Label-free aggregate (removed − kept) | −0.014, p = 0.85 | not computable — kept nothing |
+
+**Verdict: the Rewrite attribution does not survive, and it is retracted rather than moved
+again.** The honest mechanism statement for **both** operators is **rebuild-from-the-user-side,
+not surgical excision**.
+
+**Why the two studies disagree, stated in the reviewer text rather than left to be asked.**
+Rewrite looked selective on T2A's spans because they were **short, self-contained sentences
+anchored on a rare token**, which a compacting operator can carry across verbatim. On the
+model's own verbose prose and code it paraphrases, and nothing distinctive survives the
+paraphrase. T2A flagged synthetic salience as an upper-bound caveat in its own first paragraph;
+the caveat turned out to be load-bearing. That framing makes T2B an **extension** of T2A rather
+than a contradiction of it, which is how the reply presents it.
+
+**This is not written up as a loss.** T2B is the causal gold standard the reviewer asked for and
+it establishes two things we did not previously have: **natural pollution is real and
+concentrated** (SD of per-span effects **0.155** against a replicate-matched null's **0.125**,
+p = **0.0085**; **16** spans with |Δ| ≥ 0.25 where the null predicts **9.3**, p = **0.0170**;
+mean effect over all spans +0.020 [−0.010, +0.048], i.e. the typical span is inert), and **AC3
+removes 100% of the spans the ablation proves harmful**. Reviewer 5YHP's W5 asked for exactly
+this measurement, and the reply says so — including the part that cost us.
+
+**Files changed for the retraction.** `03` W5 (rewritten: the "by construction" frame for
+Reset's precision, the missing false-alarm-control disclosure, the full T2B block with its own
+eight limits, the retraction paragraph, and the corrected mechanism sentence); `02` Q4 (two-study
+bullet list replacing the "Rewrite is the selective operator" paragraph); `04` correction 3
+(rewritten as "our first fix was also wrong"); `05` correction 3 and the detector bullet;
+`README.md` concession table + guardrail; `CHANGES.md` rows 3.11 / 4.16 and §8 rule 3.
+**`HANDOFF.md` row 5 and the PAPER-5 action were rewritten**: PAPER-5 previously said
+*attribute the claim to Rewrite*; it now says **delete the framing** and state the
+rebuild-from-the-user-side mechanism for both operators.
+
+### 11.2 The assembled counter-case — new subsection in Common Weakness 2
+
+`AR/tasks/T23/RED_TEAM.md` closes with the strongest objection available to a reviewer: that
+v5's own concessions have quietly reduced AC3-Reset to *assistant omission plus a
+spec-extraction call*, and that we conceded every piece of it separately without ever seeing it
+assembled. The counter-evidence existed; it was in four different files. T25 followed the
+red team's four-move plan and added **"Where AC3 separates from assistant omission, and where it
+does not"** to `00` Common Weakness 2, with a two-sentence pointer from `04`.
+
+What it says, and the numbers behind each line:
+
+* **The matrix-wide head-to-head is a wash, and we say so first.** AC3-Reset vs. AO over all 36
+  triples: mean **+2.6pp**, **15 W / 17 L / 4 T**. Recomputed by T25 from
+  `RPT/post_neurips_ac3_phase{1,2}.md` with `EXP/paired_analysis.py`'s own parser. A reviewer
+  can derive this from the two printed rows (+15.9 vs +13.3), so surfacing it is not optional.
+* **The separation is concentrated where the mechanism predicts.** LiC-database **+18.7pp,
+  8 W / 1 L** over 9 triples (49.0 / 56.2 / 55.1 against 45.6 / 27.9 / 30.6). Note: the red-team
+  brief called this "+21pp"; the measured value is **+18.7pp** and T25 printed the measured one.
+  math −3.1 (1/7/1), code −3.8 (2/6/1), actions −1.3 (4/3/2) — printed alongside, not omitted.
+* **tau2**: AO is 0% on every model and fails *structurally* (rollouts exhaust the step budget
+  because omission destroys tool-call results).
+* **WildChat**: every populated cell of the per-respondent table favours AC3, 13 of them against
+  AO; pooled order-balanced 87.8 / 91.2.
+* **Two results no delete-everything editor can produce**: the factorial (9.3% → **59.8%** with
+  the pollutant still in context) and T2B's concentration result plus 100% harmful-span removal.
+* **The claim we actually defend** (red-team move 4): AC3 is a **decision procedure over
+  operators indexed by referentiality**, of which AO is the correct choice in exactly one regime,
+  and the regime is identifiable from a property observable *before* running anything. That
+  claim predicts AO's successes instead of needing to beat them everywhere.
+
+### 11.3 Red-team HIGH items applied
+
+| Item | What was wrong | What T25 did |
+|---|---|---|
+| **H2** | `paired_analysis_results.txt` has a fifth row (Rewrite −0.3pp, 6/6/0, n=12) that v5 did not print, while CW1 claims "the same four operators" | Row **printed** in `00` CW2 with a dagger footnote: pre-analyzer-parity, one model, n=12; explicit "we do not claim Rewrite improves LiC accuracy"; Rewrite's evidence pointed at WildChat (Kimi/Rewrite 91.5% vs AO, the top cell of Table 3) |
+| **H3** | Gated-Reset's 11/1/0 sums to 12 inside a table headed "36 comparisons"; three files gave three different recommendations | Same footnote explains the 12 (one respondent, reported separately not pooled). **One** deployment sentence now used in `00`, `01`, `02`, `03`: *always-on Reset where an intervention is cheap; Gated-Reset where an unnecessary edit carries state-disruption cost.* "the configuration we recommend" removed from `00` CW5 and `04`; "our strongest operator overall" removed from `03` |
+| **H4** | Three places answer a criticism of one operator with a different operator's result | `03` W4: states plainly that the AC3 column is a per-row best, that **Rewrite** was not re-run on CollabLLM at N=3, and **withdraws rather than substitutes**. `01` W1: gives **Gated-Reset**'s new database figure — **49.7% (73/147)** on DSV4F, three prefixes 44.9 / 49.0 / 55.1, against full context 22.4 and AO 45.6 — the operator iNYK actually named. Selection rule stated once in `00` CW1 and again in `01`: the 33/36 row is a **single fixed configuration**, not a per-cell maximum |
+| **H5** | We concede the FN metric was "biased in our own favour" and never say Table 1 is unaffected, though F40–F42 establish exactly that | Defending sentences added to `00` CW2 and `04` correction 2: Table 1's 20/19/25/23 come from an **arm-symmetric pool-level pre-filter** applied before any method runs; the per-run metric touches ≤4 cells at ≤1 sample each and 2 of those favour prior work; what is withdrawn is the *reported statistic*, not the main table |
+| **H6** | `00` CW5 says no difference in `tab:main` is resolvable at n≈20 and then asserts three orderings from it, one of which breaches our own guardrail | Rewritten to apply the same standard to our own rows and to point at the 36-comparison matrix as the headline evidence. **"every AC3 operator still clears the full-context baseline in every cell" deleted outright** — it is false globally (Table 2 has AC3-Reset 47.0 vs Baseline 55.0 on gpt-5.4/CollabLLM) |
+| **H7** | "22 populated cells … AC3 beats **assistant omission** in every cell" — 9 of the 22 are against full context, and 4 × 4 ≠ 22 | `03` W1 now reads "four operators × four respondents, against **two** baselines, 22 populated cells … every populated cell favours AC3 — 13 against assistant omission and 9 against full context" |
+| **H8** | The one cell we lose is explained away using an unblinded single-annotator reading of the *worst* of three trials, whose traces no longer exist | `00` CW4 and `01` W3 now open with **"we do not have a defensible failure taxonomy for it"**, offer the reading as a hypothesis, and commit to a published rubric with a second annotator over all trials |
+| **H9** | The "only method that improves over full context across the entire spectrum" sentence is tau2-dependent and sits **outside** every HOLD block | Reviewer text deliberately **not** changed (nothing may pre-empt T6). Added as **Blocker 5** in `README.md` with the pre-drafted "remains **viable** in the stateful agentic setting" fallback, ready to swap into `00`, `01` and `05` the moment T6 lands |
+| **H10** | Vg97 asked for AC3's latency; we reported the summariser control's | **AC3's own wall-clock now reported**, recovered with zero API calls from `OUT/T1/main/*/experiment.log` timestamps (107 conversations, concurrency 5, arms back-to-back on one machine): full context **578 s**, MT-OSC 587 s (+2%), **Gated-Reset 781 s (+35%)**, summariser-1 835 s (+44%), **Reset 1,051 s (+82%)**, summariser-2 1,214 s (+110%). Decomposed honestly: most of the gap is **turn inflation** (6.9 vs 4.1 turns), and **per turn** Reset is +9%, Gated-Reset +5%, summariser-2 **+19%**. The n=40 math figures are given too (205 / 231 / 266 / **547 s**), since the old text quoted the control's 231 s and dropped AC3-Reset's 547 s |
+
+**Deferred, with reasons.**
+
+* **H1 and T24's `F-T24-1` / F70 — initially deferred, then routed to T25 mid-task and APPLIED.**
+  See §11.3b: the false *"full, non-difficulty-selected pool"* sentence in `01` W2 is corrected,
+  and the three-way baseline reconciliation is folded into `00` CW2/CW5, `01` W1, `02` Q1, `04`
+  and `05`. Two of T24's items stay open because they are **paper** edits and
+  `writing/overleaf_repo/` is out of bounds for autoresearch agents: the `tab:main` caption
+  addition (T24 §7.4) and the "the design oracles are not oracles in end-to-end mode" note
+  (§7.5). Both queued for the operator alongside PAPER-1..8.
+* **M11** (neutral-prompt condenser control did not finish), **M12** (U-Fold never run or
+  mentioned), **M6** (human validation, the third of 5YHP's three judge checks), **M14's**
+  clean-arm naming rate, **M3's** bootstrap CI, **M15's** clustered bootstrap — all need runs or
+  re-analysis beyond a text pass. **M14 was partly closed for free**: `03` W5 now discloses that
+  naming precision against non-injected spans was never measured and points at the causal work
+  as the better argument.
+* **M1** (self-correction count reads 3 / 5 / 7 / 10 across four files), **M2** ("no
+  per-benchmark tuning"), **M4**, **M7**, **M8**, **M9**, **M10**, **M13**, **L1**, **L3**–**L5**
+  — real but survivable, and several are tone judgements the operator may want to make. **M5**
+  is closed (the "by construction" frame is now in `03` W5 and `04` correction 3) and **L2** is
+  closed (the 554/547 sentence is reworded).
+
+### 11.3b T24's findings folded in (routed to T25 mid-task, to avoid two editors on one tree)
+
+T24 resolved the red team's **H1** and, while doing so, found something worse (**F70**). Both were
+routed to T25 rather than dispatched to a second agent, because two editors on `replies/v5/` is
+the double-write pattern that corrupted output directories earlier in the session.
+
+**F70 — a false statement in the reply to iNYK, now fixed.** `01_reviewer_iNYK.md` W2 said the
+36-comparison paired matrix is on *"the full, non-difficulty-selected pool"*. **It is not** — it
+runs on `htn50_52_*`, the 50 highest-failure-rate instances per task from the GPT-5.2 logs, with
+replay prefixes further weighted toward baseline failures (74–86% failure-prefixes on database).
+Difficulty selection is exactly what iNYK's W2 complained about, so we were answering the
+reviewer's own objection with a claim they could falsify. **The fix is a swap, not a retraction:**
+the sentence now states plainly that the matrix *is* difficulty-selected, that its +15.9pp on
+33/36 is a valid **paired effect but not a population estimate**, and points the unbiased claim at
+the two experiments that genuinely satisfy it — the uniformly random n=40 end-to-end subset
+(CW3/Q1) and the condensation experiment on the **complete, unselected** pool (CW5, n=107/100,
+end-to-end). The same disclosure was added to `00` CW2's sample-size paragraph, since the general
+response is read first, and an n-and-provenance clause was added under `01` W1's 3-model table.
+
+**H1 / F68–F69 — the baseline spread is explained, and the explanation is a strength.** All three
+full-context numbers are correct measurements of deliberately different populations:
+
+| Where it appears | Full context | Population |
+|---|---|---|
+| `tab:main` (submission) | 4.0 / 15.8 | 25 instances/task, **selected for highest** full-context failure rate under GPT-5-mini; last-turn replay |
+| `01` W1 (3-model matrix) | 19.0–22.4 | 50 instances/task selected the same way from GPT-5.2 logs, prefixes further failure-weighted |
+| `00` CW5 (condensation) | 56.1 / 83.0 | The **complete, unselected** pool (107 / 100), full end-to-end simulation |
+
+Verified **by restriction, not inference**: restricting T1's own baseline run to `tab:main`'s exact
+25 items — same model, same evaluator, same protocol — gives 56.1 → **32.0** (database) and
+83.0 → **48.0** (code); independently, LiC's released logs put GPT-5-mini at 29.9% on the whole
+107-item pool against 4.0% on its top-25 subset. Two routes to a ≈25pp selection effect, agreeing
+within 2pp.
+
+**The line that defuses the attack, now in `00` CW5 and `04`:** the unselected pool is not an easy
+setting — its measured single-turn ceiling is **94.4% / 98.0%**, so it carries a **38.3pp /
+15.0pp** multi-turn gap, and AC3-Reset closes **51% / 60%** of it against **50%** on `tab:main`'s
+much harder subset. **Our baselines move 52 points across venues; the fraction of the gap we close
+moves four.** Condensation got no easy ride either: it scores below full context in every venue.
+
+Applied to `00` CW5 (three-note comparability block + the ceiling paragraph), `01` W1 (n clause)
+and W2 (the F70 swap), `00` CW2 (sample-size disclosure), `02` Q1 (comparability note), `04` (the
+three-row reconciliation table + ceiling argument), `05` (condensation bullet). Source:
+`AR/tasks/T24/worklog.md` §7. One item **not** applied: T24 §7.4's `tab:main` caption addition and
+§7.5's "not an oracle in end-to-end mode" note are **paper edits** — `writing/overleaf_repo/` is
+out of bounds for autoresearch agents, so they are queued for the operator alongside PAPER-1..8.
+
+### 11.4 HOLD blocks
+
+**All five `⚠ INTERNAL — HOLD` tau2 blocks, both `⚠ INTERNAL — T19 renumbering` notes and the
+orientation preamble in `00` are byte-identical to what T15 and T19 wrote.** Nothing T25 touched
+is inside a blockquote. Verified mechanically against the pre-T25 commit: `git diff <pre-T25> --
+replies/v5/ | grep '^[-+].*⚠ INTERNAL'` returns nothing, and `git diff <pre-T25> -U0 --
+replies/v5/*.md | grep -E '^[-+]>'` returns nothing — no blockquote line anywhere in the reply
+files was added, removed or altered. T6's outcome remains unknown and nothing here pre-empts it.
