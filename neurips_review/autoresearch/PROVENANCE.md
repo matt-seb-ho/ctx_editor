@@ -47,7 +47,8 @@ graph TD
     T19["T19 fold settled findings into v5<br/>ERGO disclosed in 5 places<br/>tau2 HOLDs byte-identical<br/>[done]"]
     T20["T20 verify remaining claims<br/>U3/U5 verified, U2 restruck,<br/>U4 softened; found unre-scored AO cell<br/>[done]"]
     T21["T21 apply wordings + AO N=3<br/>UNVERIFIED 4->1; AO margin<br/>+6.7pp -> +3.3pp (claim dropped)<br/>[done]"]
-    T22["T22 operator handoff<br/>[run] — HANDOFF.md"]
+    T22["T22 operator handoff<br/>v5 drafted but NOT postable<br/>[done]"]
+    T23["T23 red-team v5<br/>[run] — hostile-reviewer read"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
   S1 --> S2
@@ -71,6 +72,8 @@ graph TD
   T18 --> T19
   T19 --> T20
   T20 --> T21
+  T21 --> T22
+  T22 --> T23
   T8 --> T21
   T11 --> T20
   T14 --> T19
@@ -116,7 +119,8 @@ graph TD
 | T19 | Fold settled findings into `replies/v5/` | 2026-07-29 | `tasks/T19/worklog.md`; `replies/v5/` (`0154041`) | Lands T14/T16/T17/T18; ERGO disclosed in 5 places; T17's 57.9 grep-verified absent |
 | T20 | Verify remaining unverified claims | 2026-07-29 | `tasks/T20/worklog.md` | §7: **U3 + U5 verified, U2 re-justified, U4 softened**; found AO cell never re-scored |
 | T21 | Apply wordings + AO N=3 | 2026-07-29 | `tasks/T21/worklog.md` (`99e28ba`, `89dfecf`) | UNVERIFIED 4→1; AO N=3 narrows Reset-over-AO to +3.3 pp → claim dropped |
-| T22 | Operator handoff | 2026-07-29 | `autoresearch/HANDOFF.md` | The briefing Matthew reads first |
+| T22 | Operator handoff | 2026-07-29 | `autoresearch/HANDOFF.md` (`11d8e40`) | 14 must-change claims; PAPER-1..8 with effort estimates |
+| T23 | Red-team `replies/v5/` | 2026-07-29 | `tasks/T23/RED_TEAM.md` | Adversarial read — what a hostile reviewer attacks |
 
 ---
 
