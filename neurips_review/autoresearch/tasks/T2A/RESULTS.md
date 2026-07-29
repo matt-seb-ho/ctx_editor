@@ -190,11 +190,9 @@ The clean-arm figure is a *reference base rate*, **not** a false-positive rate: 
 
 AC3-Rewrite on the injected arm: 63.5% (80/126).
 
-- Injecting one false span costs the **Baseline** +8.7pp (35/126 -> 46/126).
-- It costs **AC3** +0.0pp (82/126 -> 82/126).
-- Difference-in-differences (AC3's protection against the injected pollution): **-8.7pp**.
+The `injected` arm carries **both** spans, so its effect is a net of the two. Injecting the pair moves the **Baseline** by +8.7pp (35/126 -> 46/126) and **AC3** by +0.0pp (82/126 -> 82/126). AC3 is essentially **invariant** to injected assistant-side content: it drops the false span and the true span alike. Section 4 decomposes the two effects; section 5 gives the accuracy story on the causally-harmful subset, which is the one that answers the mechanistic question.
 
-Per-conversation split by whether AC3 actually removed the injected span:
+Per-conversation split by whether AC3 actually removed the injected span (**underpowered — AC3 removes almost everything, so the 'no' cell is tiny**; the factorial in section 4 is the load-bearing evidence, not this table):
 
 | AC3 removed the harmful span? | n | Baseline acc | AC3 acc | delta |
 |---|---|---|---|---|

@@ -432,12 +432,15 @@ The mechanism this supports is *detect-and-rebuild-from-the-user-side*, not *sel
     ac = sum(1 for r in comp if r.get("ac3_clean_correct"))
     ai = sum(1 for r in comp if r.get("ac3_injected_correct"))
     n = len(comp)
-    P(f"\n- Injecting one false span costs the **Baseline** {100*(bi-bc)/n:+.1f}pp "
-      f"({bc}/{n} -> {bi}/{n}).")
-    P(f"- It costs **AC3** {100*(ai-ac)/n:+.1f}pp ({ac}/{n} -> {ai}/{n}).")
-    P(f"- Difference-in-differences (AC3's protection against the injected pollution): "
-      f"**{100*((ai-ac)-(bi-bc))/n:+.1f}pp**.")
-    P("\nPer-conversation split by whether AC3 actually removed the injected span:")
+    P(f"\nThe `injected` arm carries **both** spans, so its effect is a net of the two. Injecting "
+      f"the pair moves the **Baseline** by {100*(bi-bc)/n:+.1f}pp ({bc}/{n} -> {bi}/{n}) and "
+      f"**AC3** by {100*(ai-ac)/n:+.1f}pp ({ac}/{n} -> {ai}/{n}). AC3 is essentially **invariant** "
+      f"to injected assistant-side content: it drops the false span and the true span alike. "
+      f"Section 4 decomposes the two effects; section 5 gives the accuracy story on the "
+      f"causally-harmful subset, which is the one that answers the mechanistic question.")
+    P("\nPer-conversation split by whether AC3 actually removed the injected span "
+      "(**underpowered — AC3 removes almost everything, so the 'no' cell is tiny**; the "
+      "factorial in section 4 is the load-bearing evidence, not this table):")
     P("\n| AC3 removed the harmful span? | n | Baseline acc | AC3 acc | delta |")
     P("|---|---|---|---|---|")
     for lab, sel in (("yes", True), ("no", False)):
