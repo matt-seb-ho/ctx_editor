@@ -513,3 +513,165 @@ provenance doc names configs `assistant_omit` and `concat_baseline` that do not 
 **I did not apply this** — it is a docs edit outside T31b's scope, and the operator may prefer to
 attempt recovery of the runs first.
 
+
+---
+
+## PAPER-3 — the `+ Memory` rows are single trials below their own noise floor ✅ (+ one undisclosed protocol detail)
+
+**Summary.** Table 1's `+ Memory` gains (+10.0 math, +12.8 code, +12.0 database on Augment) are
+**single-trial point estimates against a measured ~6 pp run-to-run standard deviation** for the
+cheatsheet learner. They are inside 2σ. Either re-run at N ≥ 4 or soften. **Blocking:** no —
+memory is dropped from v5 entirely, so nothing posted depends on it.
+
+### What was measured (F12, F13, D7)
+
+| Quantity | Value | Note |
+|---|---|---|
+| Across-ordering std, Augment+Memory online, database (n=25, 4 orderings) | **28.0 ± 6.5** | 20.0 / 28.0 / 28.0 / 36.0 |
+| Same-ordering std, relearn cheatsheet (Control B) | **25.3 ± 6.1** | across-ordering does **not** exceed it → ordering is not a distinguished factor; the learner is simply noisy |
+| Same-ordering, fixed cheatsheet, resample eval (Control A) | 29.0 ± 3.8 | |
+| math online, 4 orderings | **75.0 ± 4.1** | 75 / 80 / 75 / 70 |
+| Instance-level instability across orderings | database **8/25 (32%)**, math **4/20 (20%)** | |
+| N=4 remeasure on **gpt-5.4-mini** | **−8.0 pp** online / −4.5 offline (database); **−5.0** online / +0.0 offline (math) | different respondent, so **not a direct refutation** of the GPT-5-mini rows — the variance argument is the model-independent part |
+
+Artifacts: `tasks/T12-T13/worklog.md` §9, `outputs/T12_T13/`, cheatsheets in
+`tasks/T12-T13/memories/`.
+
+**The counterweight is real and should ship with the softening (F13, D7):** contamination is
+**measurably zero**. Learn set vs the canonical `lic_eval_subset`: **0/120 exact duplicates, 0
+near-duplicates** (max Jaccard 0.416, boilerplate only). Overlap with the dev subsets Table 1 uses
+is 11/98 (11.2%), and on exactly those instances memory is **equal or worse**. The within-instance
+transduction probe returns **0.0 pp on both tasks**.
+
+### Option A — soften (15 min, recommended)
+
+**Location 1 — `tab:main` caption, L254.** Append to the `+ Memory` sentence.
+
+Current substring:
+
+```latex
+Indented \texttt{+ Memory} rows add the memory-based learner.
+```
+
+Replacement:
+
+```latex
+Indented \texttt{+ Memory} rows add the memory-based learner; these are single trials, and a separate four-ordering measurement puts the learner's own run-to-run standard deviation at roughly 6pp (Appendix~\ref{app:memory-details}), so \texttt{+ Memory} differences smaller than about 12pp should not be read as resolved.
+```
+
+**Location 2 — §Results, L323–324.** Current:
+
+```latex
+\noindent\textbf{Memory amplifies analysis.}
+Augment~+~Memory reaches 90.0\% on math, exceeding the AO oracle (85.0\%), and improves code by +12.8pp and database by +12.0pp; on Actions it is neutral, matching the no-memory Augment baseline at 47.8\%. Memory has no effect on Baseline, confirming memory improves analysis and edit quality, not raw task performance.
+```
+
+Replacement:
+
+```latex
+\noindent\textbf{Memory is a promising but underpowered direction.}
+Augment~+~Memory reaches 90.0\% on math, exceeding the AO oracle (85.0\%), and is +12.8pp on code and +12.0pp on database; on Actions it is neutral, matching the no-memory Augment baseline at 47.8\%, and on database it is $-$4.0pp under Reset. These are single trials, and we measured the learner's own variability separately: across four trajectory orderings the online cheatsheet's accuracy has a standard deviation of roughly 6pp, and the across-ordering spread does not exceed the spread from simply relearning the cheatsheet at a fixed ordering --- so the learner is high-variance at this scale rather than order-sensitive. We therefore report these rows as a direction rather than a measured effect. Memory has no effect on Baseline, which is consistent with memory acting on analysis and edit quality rather than on raw task performance.
+```
+
+**Location 3 — intro, L139**, final sentence. Current:
+
+```latex
+Memory-based learning improves results further without parameter updates.
+```
+
+Replacement:
+
+```latex
+A lightweight memory-based learner is a promising further direction, though at our sample sizes its gains are not separable from its own run-to-run variance (Section~\ref{sec:memory-discussion}).
+```
+
+**Location 4 — conclusion, L405.** Current substring:
+
+```latex
+and a memory-based learner further improves analysis quality without parameter updates.
+```
+
+Replacement:
+
+```latex
+and a memory-based learner is a promising extension, though not one our sample sizes can separate from its own run-to-run variance.
+```
+
+**Location 5 — discussion, L383 (`sec:memory-discussion`).** Current substring:
+
+```latex
+Memory amplifies analysis when headroom exists: Augment~+~Memory reaches 90\% on LiC math (exceeding AO, Table~\ref{tab:main}) and improves DeepSeek's Reset on WildChat by +13.8pp (Table~\ref{tab:wildchat-memory}), while being neutral on near-ceiling GPT-5-mini.
+```
+
+Replacement:
+
+```latex
+Memory appears to amplify analysis when headroom exists: Augment~+~Memory reaches 90\% on LiC math (exceeding AO, Table~\ref{tab:main}) and improves DeepSeek's Reset on WildChat by +13.8pp (Table~\ref{tab:wildchat-memory}), while being neutral on near-ceiling GPT-5-mini. We report this as a direction rather than a measured effect: the LiC rows are single trials and the learner's run-to-run standard deviation across four trajectory orderings is roughly 6pp, so the LiC gains are within about twice their own noise. What we can state positively is that the gains are not contamination: the memory learn set has zero exact and zero near-duplicate overlap with the canonical LiC evaluation set, and on the 11 of 98 dev-subset instances that do overlap, memory is equal or worse.
+```
+
+### ⚠ Separately: an undisclosed protocol detail nobody has flagged as a paper item
+
+**L709** says *"On LiC, we use online learning."* What that means operationally is that the
+cheatsheet Table 1's `+ Memory` rows use is **distilled from other instances of the evaluation set
+itself, together with their gold answers** (`include_full_spec_q` / `ground_truth_a` both true).
+That is a transductive protocol, and the paper never says so. **T13 measured its effect and it is
+0.0 pp on both tasks** (15 database / 14 math instances observed in both positions, empty vs
+loaded cheatsheet), so the disclosure costs nothing and pre-empts a serious objection. Suggested
+addition at the end of the `app:memory-details` paragraph at L709:
+
+```latex
+On LiC the online regime is transductive: the cheatsheet applied to a given instance is distilled from other instances of the same evaluation set, including their reference answers. We measured the effect of that exposure directly by comparing the same instance evaluated with an empty cheatsheet against the same instance evaluated with a cheatsheet distilled from 5--20 other evaluation instances: the difference is $0.0$pp on both database ($n{=}15$) and math ($n{=}14$). The designated memory learn set also has zero exact and zero near-duplicate overlap with the canonical LiC evaluation set.
+```
+
+Evidence: **F12, F13, D7**; `tasks/T12-T13/worklog.md` §9.
+
+### Option B — re-run at N ≥ 4
+
+Hours of compute on GPT-5-mini, which is **unreachable** from this environment (F46: `dl-openai-3`
+returns 401; TRAPI serves only `gpt-5.4-mini`/`gpt-4o`). A re-run on a different respondent does
+not replace the row. **Recommend Option A.**
+
+**Effort:** 20–30 min for Option A across five locations. **Risk:** low; it is a softening, and
+the contamination result is a net gain in the same paragraph.
+
+---
+
+## PAPER-10 — "design-oracle" labelling for AO / Concat-User ✅ **conditional; currently no mislabelled table**
+
+**Summary as written in HANDOFF:** if any table reports assistant omission or Concatenate-User in
+**end-to-end** (non-replay) mode, label them baselines rather than upper bounds.
+
+**Verified: no table in the paper does.** `tab:main` is explicitly replay-mode for every LiC
+strategy (L456: *"we run all LiC strategies in \emph{replay mode}"*), and `tab:megatable`'s LiC
+block replays the same protocol. The `$^{\diamond}$` design-oracle marker at L264–L265 is
+therefore not the defect F69 describes. **PAPER-10 has no mandatory edit today.**
+
+**But the label is still stronger than the evidence, and the fix is cheap.** F69/T24 measured AO
+and Concat-User end-to-end on the **complete unselected** LiC pool and they are nowhere near a
+ceiling:
+
+| Arm, LiC database, complete 107-item pool, end-to-end | Accuracy |
+|---|---|
+| Fully-specified single turn (**true ceiling**) | **94.4%** |
+| AO ("design oracle") | 69.2% |
+| Concat User ("design oracle") | 63.6% |
+| AC3-Reset | **75.7%** |
+
+So on an unselected pool **AC3-Reset clears both "oracles"** — a cleaner replication of the
+paper's "exceeds the design oracle on database" claim than `tab:main`'s 48.0 vs 32.0, which rests
+on 25 selected items. On the paper's 25 items both oracles sit at 32.0%; on code the headroom is
+small (Concat 93.0 vs ceiling 98.0) and AC3-Reset does not clear them.
+
+**Recommended addition** to the `tab:main` caption, after the `$^{\diamond}$` sentence:
+
+```latex
+The $^{\diamond}$ label is a statement about the LiC \emph{construction} (each instance is a single-turn question sharded across turns), not a measured ceiling: measured end-to-end on the complete unselected database pool ($n{=}107$), AO reaches 69.2\% and Concat User 63.6\% against a fully-specified single-turn ceiling of 94.4\%, with \method-Reset at 75.7\% above both.
+```
+
+**Evidence:** **F69**, `tasks/T24/worklog.md` §"design-oracle label" (lines 275–277, 337–348) and
+§7.1; ceiling positive control — LiC's own `full` band for this pool is 89.7–98.1%
+(`data/sota_model_results.csv`), ours 94.4%, inside the band.
+
+**Effort:** 10 min. **Blocking:** no. **Risk:** none — this edit *strengthens* the paper's
+strongest LiC claim by giving it an unselected-pool replication.
+
