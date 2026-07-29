@@ -44,7 +44,8 @@ graph TD
     T14["⚠ T14 FN-adjustment audit<br/>2 flips on Rewrite (unpublished cells)<br/>Reset/Gated survive all 8<br/>found ERGO denominator defect<br/>[done]"]
     T17["⚠⚠ T17 ERGO denominator fix<br/>ERGO 69.6->80.0 math, beats Reset<br/>ties Gated-Reset; bound too wide<br/>[done]"]
     T18["T18 close ERGO bound<br/>math 80.0 CLOSED (ships)<br/>code ~43.9 — T17 was +14pp wrong<br/>no diff significant at n≈20<br/>[done]"]
-    T19["T19 fold settled findings into v5<br/>[run]"]
+    T19["T19 fold settled findings into v5<br/>ERGO disclosed in 5 places<br/>tau2 HOLDs byte-identical<br/>[done]"]
+    T20["T20 verify remaining claims<br/>[run] — U2/U3/U4/U5"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
   S1 --> S2
@@ -66,6 +67,8 @@ graph TD
   T14 --> T17
   T17 --> T18
   T18 --> T19
+  T19 --> T20
+  T11 --> T20
   T14 --> T19
   T16 --> T19
   T6 -.->|"⚠ baselines may not replicate"| T15
@@ -106,7 +109,8 @@ graph TD
 | T14 | FN-adjustment audit | 2026-07-29 | `tasks/T14/{RESULTS.md,corrected_matrix.*}` (`30089f3`) | **`tab:main` pool filter is sound; per-run `adjusted_accuracy` must go; ERGO denominators wrong** |
 | T17 | ERGO denominator fix | 2026-07-29 | `tasks/T17/{RESULTS.md,build_corrected.py,corrected_tabmain.json}` (`6ebc59b`) | **PAPER-7 — ERGO ties/beats AC3 on 3 of 4 tasks once corrected** |
 | T18 | Close the ERGO bound | 2026-07-29 | `tasks/T18/worklog.md` | **math 80.0 confirmed; code ~43.9 (T17 overstated by 14 pp); nothing significant at n≈20** |
-| T19 | Fold settled findings into `replies/v5/` | 2026-07-29 | `tasks/T19/worklog.md`; `replies/v5/CHANGES.md` | Lands T14/T16/T17/T18 in the reply text |
+| T19 | Fold settled findings into `replies/v5/` | 2026-07-29 | `tasks/T19/worklog.md`; `replies/v5/` (`0154041`) | Lands T14/T16/T17/T18; ERGO disclosed in 5 places; T17's 57.9 grep-verified absent |
+| T20 | Verify remaining unverified claims | 2026-07-29 | `tasks/T20/worklog.md` | `CHANGES.md` §7 U2/U3/U4/U5 |
 
 ---
 

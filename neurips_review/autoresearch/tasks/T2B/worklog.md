@@ -300,3 +300,42 @@ The 2×2 alignment table is produced under all three.
 Main matrix 24/172 runs; AC3 alignment 3/12 runs. Rate is steady at ≈ 1.1 runs/min and the AC3
 stream (running at `max_concurrent=3` alongside the main stream's 5) has not slowed it. Projected
 finish ≈ 19:00 for the matrix.
+
+### 4.3 Status 17:11 — AC3 alignment arms complete, matrix ~28%
+
+* `run_ac3.sh` finished its first 3 replicates at 17:01 and was extended to 5 (both arms, both
+  tasks) since the alignment stream is cheap and a 5-way majority vote is more stable than a 3-way.
+  It runs at `max_concurrent=3` beside the main stream's 5; measured throughput of the main stream
+  is unchanged (1.07 runs/min before and after), so the two streams are not contending.
+* Main matrix 48/172 runs at 17:11. **0 errors in 1020+ samples** so far
+  (`sum(metrics.json.errors)` across all T2B run dirs).
+* Added to `analyze.py` while waiting: §3.1 (the eight most harmful and eight most useful natural
+  spans, with excerpts — the qualitative face of the causal labels) and §5 (raw accuracy of
+  Baseline / AC3-Reset / AC3-Rewrite on exactly this corpus, plus the TODO's "close the loop"
+  correlation between the fraction of causally-harmful spans AC3 removes and its accuracy gain).
+
+---
+
+## 5. First real read of the controls (17:19, ~5 present / ~4 ablation / ~3 control replicates)
+
+**All three controls behave, and decisively:**
+
+| control | expected | measured effect of ablating it | 95% CI | perm p |
+|---|---|---|---|---|
+| `ctl_filler` (contentless) | ≈ 0 | **+0.029** | [−0.042, +0.102] | 0.79 |
+| `ctl_harm` (T2A `H_PHANTOM_*`) | > 0 | **+0.344** | [+0.198, +0.500] | < 1e-4 |
+| `ctl_answer` (full spec + gold SQL) | ≪ 0 | **−0.440** | [−0.573, −0.305] | 1e-4 |
+
+Read the middle row carefully: injecting T2A's causally-validated pollutant drove accuracy on those
+24 conversations from 0.344 to **0.000**, and removing it restored it. And the bottom row: injecting
+the full specification drove accuracy from 0.383 to **0.823**. So the harness can see a large
+positive effect and a large negative effect, and reports ~0 when nothing is there. That is the
+"before trusting any ablation number, run a control where you know the answer" requirement
+discharged in both directions on this exact code path.
+
+The `ctl_harm` number also **ties T2A and T2B onto one scale**: T2A measured the same injection
+types at −11.1 pp on a mixed corpus; here, on a corpus selected for headroom, the same spans are
+worth −34.4 pp. The natural-span effects in §3 are measured against that yardstick.
+
+Note the empirical null threshold is still loose (95th pct of |filler effect| = 0.500) purely
+because the filler arm has only ~3 replicates so far; it will tighten as the matrix fills.

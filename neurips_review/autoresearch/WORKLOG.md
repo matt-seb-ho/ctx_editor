@@ -432,3 +432,27 @@ k transfers across the model gap because **full-context Baseline solves 0/6 prun
 **F49 — The whole ordering dispute is inside the noise.** Paired exact sign tests on the same items show **no ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction** (code p=0.375, math p=1.00). This deserves its own line in the paper: it reframes the ERGO comparison from "who wins" to "n≈20 cannot resolve this", which is both true and far more defensible than either ordering.
 
 **Cost note:** ≈$6 across 40 runs against a $0.20 brief. The overage is the comparator arms and the pruned-items probe, logged as deliberate deviations — and it bought the k-measurement that closed the bound, so the deviation was correct. Worth recording that the brief's estimate was wrong, not the agent's judgement.
+
+### Decisions D11–D14 (backfilled 17:30 — see correction note below)
+
+**D11 — Pivot to T14 over the queued T2B (15:10).** T1's F28 showed `adjusted_accuracy` excludes 50–78% of editing-arm failures vs 9% for baseline, with one shipped cell at 89.0% vs 77.1% corrected. An inflated headline table a reviewer can reconstruct is existential; T2B would only add a third evidence tier to a question T2A had already answered non-circularly. Protecting the existing result outranked strengthening an answered point.
+
+**D12 — Dispatch T15 (claims audit → `replies/v5/`) over T2B (15:45).** Tonight invalidated seven claims already written into the rebuttal drafts. Research that never reaches the submitted text is worth zero. Zero API cost.
+
+**D13 — Endorse T14's metric recommendation (16:15).** Report **raw** as primary; keep the pool-level pre-filter as the only FN adjustment (it is arm-symmetric and reproduces `tab:main`'s denominators exactly — **defend it**); **delete per-run `adjusted_accuracy`**; rewrite `tex:478-480`, which claims "all user simulator messages" when the code collates only the visible ones.
+
+**D14 — Final ERGO position (17:10).** Ship corrected ERGO/math **80.0** (beats AC3-Reset 75.0, ties Gated-Reset 80.0) — real, reviewer-visible, must be disclosed. **Do not** ship T17's code 57.9; T18 measured k = 2.67/6, giving ≈43.9 against the published 44.0. Lead the framing with F49: no ERGO-vs-AC3 difference is significant at n≈20 in either direction (code p=0.375, math p=1.00), so report "n≈20 cannot resolve this" rather than any ordering. ERGO/actions is uncorrectable — no sidecar has ever existed.
+
+**Correction to my own bookkeeping.** D11–D14 were written to `logs/orchestrator.jsonl` at the time but never mirrored into this file, and D11 was referenced here without being written out. T19 caught it while working from this log as its source of truth. Backfilled above. **Lesson: the JSONL is the machine log and this file is the human one; a decision recorded only in the former is invisible to anyone reading the latter, which is every downstream agent.**
+
+- **17:30** `T19` returned **DONE**. Commit `0154041`. Log: `tasks/T19/worklog.md`.
+
+**F50 — v5 needed no numeric changes from T14, which vindicates T15's precaution.** No accuracy figure moved: v5 was already raw throughout, which is exactly what the provisional flagging was for. The substantive change is reframing — `tab:main`'s 20/19/25/23 denominators come from an arm-symmetric pool-level pre-filter and are now **defended, not conceded**. T19 added a cross-cutting rule forbidding the FN-metric concession (which v5 makes loudly in five places) from bleeding into an admission that the denominators themselves are wrong. That drift risk was real and worth blocking explicitly.
+
+**F51 — The ERGO disclosure is placed in five locations, each chosen for rhetorical fit:** `00` CW5 (where ERGO is named), `01` W1 (iNYK's own noise complaint, so it reads as vindication rather than concession), `02` W1 (Vg97's central weakness is the baseline set), `04` correction 5, `05` correction 7. Ships math 69.6 → **80.0** and code **≈44.0**. **T17's 57.9 appears nowhere except as an explicit "do not ship" guardrail — verified by grep.** F49 leads the framing throughout, and T19 added a guardrail against the obvious compensating move ("ERGO still loses overall"), since the measured scorecard is 3/12 against a published 1/12.
+
+**F52 — T19 corrected its own draft mid-task, which is the behaviour we want.** It first wrote "we re-ran ERGO on the filtered pools" — an overstatement of T18, whose positive control did *not* reproduce (ERGO/database 44.0 vs published 12.0; `gpt-5-mini` unreachable), so no absolute level is substitutable. Rewritten to "we measured the correction… we replayed ERGO against those excluded items directly", and the reply now says "roughly half" on code rather than quoting 43.9 as if it were a measured level.
+
+**Hold integrity verified mechanically:** all five tau2 `⚠ INTERNAL — HOLD` blocks are **byte-identical** (`git diff | grep '^[-+].*⚠ INTERNAL'` shows zero removed HOLD lines). Adding numbered corrections made the blocks' internal cross-references stale, so T19 appended separate renumbering notes rather than editing sealed blocks — the right call.
+
+**Remaining exposure per T19:** **T6/tau2, and not close.** Everything else is measured or explicitly bounded. Second-order: **U4** ("1 of 11 baseline failures") is unverified *and* characterises a baseline T6 may move, so it must be re-checked in the same pass as T6 rather than after.

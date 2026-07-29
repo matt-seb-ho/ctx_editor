@@ -447,3 +447,42 @@ New complete cells since last entry:
 — a malformed tool-call `arguments` payload from DeepSeek that the JSON parser
 rejects. That rep is scored over n=18 and the aggregator reports it. No rate-limit
 failures at all since the pooling patch went in.
+
+## 17:16 UTC — the picture resolves: AC3 arms replicate, the DSV4F/Kimi *baselines* do not
+
+Newly complete: gpt-5.4 Rewrite; DSV4F Augment; Kimi Augment; Kimi Rewrite (near).
+
+| cell | published | remeasured (N=3) | verdict |
+|---|---|---|---|
+| DSV4F Augment | 57.9 | **59.1 ± 7.1** | replicates |
+| DSV4F Gated-Reset | 47.4 | 57.3 ± 9.7 | replicates (within 1 sd) |
+| Kimi Augment | 57.9 | **57.9 ± 9.1** | replicates exactly |
+| Kimi Gated-Reset | 68.4 | **71.9 ± 11.0** | replicates |
+| Kimi Rewrite | 73.7 | 68.1 ± 8.9 | replicates |
+| gpt-5.4 Baseline | 68.4 | **68.4 ± 13.9** | replicates exactly |
+| **DSV4F Baseline** | 31.6 | **70.2 ± 11.0** | **does not — +39 pp** |
+| **Kimi Baseline** | 26.3 | **78.9 ± 0.0** | **does not — +53 pp** |
+| **gpt-5.4 Augment** | 84.2 | **47.4 ± 5.3** | **does not — -37 pp** |
+
+This is a much sharper story than "everything is noisy". **Nine of twelve completed
+cells replicate inside one replicate sd.** The three that do not are:
+
+1. **DSV4F and Kimi Baseline.** Both move sharply *up*. Both are exactly the cells that
+   the source report identifies (for Kimi) or plausibly shares (for DSV4F) as
+   rate-limit-clipped, and both are on the Foundry endpoint that produced 429s for me
+   too until I added rotate-and-backoff. The AC3 arms on those same two models — which
+   the report says "ran clean" — replicate. **The evidence now points squarely at
+   degraded *controls*, not at a flaky benchmark.**
+2. **gpt-5.4 Augment**, which moves sharply *down* and is the one I cannot explain
+   (its own baseline reproduced exactly; the arm is verifiably firing and terminating
+   cleanly; see 16:02).
+
+**Consequence for the tau2 row.** With corrected baselines, the published gains
++26.3 pp (DSV4F) and +47.4 pp (Kimi) do not survive: on my numbers DSV4F Baseline 70.2
+beats Augment 59.1 and Gated-Reset 57.3, and Kimi Baseline 78.9 beats Augment 57.9,
+Gated-Reset 71.9 and Rewrite 68.1. **On all three models, remeasured Baseline is at or
+above every AC3 arm.** I want the AO cells and the DSV4F Rewrite cell in before I state
+that as the finding, but that is where it is heading and I am not going to soften it.
+
+Status 17:16: gpt5_4 {s0,s1,s2,s3} done, ao 3/60. dsv4f s1 53/60, then {s3, ao}.
+kimi {s0,s1,s2} done, s3 52/60, then ao. Still exactly 1 errored rollout in the sweep.

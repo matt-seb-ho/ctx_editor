@@ -312,6 +312,21 @@ def main() -> int:
               f"{sum(x['delta'] for x in tr)/len(tr):+.4f}; harmful {c['harmful']} / useful {c['useful']}")
     P()
 
+    P("### 3.1 The spans at the extremes (qualitative, for the reader)")
+    P()
+    srt = sorted(rows, key=lambda r: -r["delta"])
+    for title, sub in (("Most **harmful** natural spans (removing them helped most)", srt[:8]),
+                       ("Most **useful** natural spans (removing them hurt most)", srt[::-1][:8])):
+        P(title)
+        P()
+        P("| task | kind | delta | 95% CI | p | excerpt |")
+        P("|---|---|---|---|---|---|")
+        for r in sub:
+            ex = re.sub(r"\s+", " ", r["text"])[:110].replace("|", "\\|")
+            P(f"| {r['task'].replace('_v2','')} | {r['kind']} | **{r['delta']:+.3f}** | "
+              f"[{r['ci_lo']:+.2f}, {r['ci_hi']:+.2f}] | {r['p']:.3f} | `{ex}` |")
+        P()
+
     json.dump(rows, open(os.path.join(HERE, "per_span.json"), "w"), indent=1)
 
     # ---------------------------------------------------------- alignment #
