@@ -331,3 +331,25 @@ def degrade(text: str) -> str:
 All judges routed through `load_balancer=t9_foundry_trapi` (gpt-5-mini on `dl-openai-3`;
 DeepSeek-V4-Flash and Kimi-K2.6 on `mgalley-foundry2`). Nothing under `src/` was modified;
 no `git checkout` was performed; all outputs are T11-scoped.
+
+### 03:10 — T11 complete
+All artifacts committed (`feat(T11): WildChat judge position-bias + cross-family agreement checks`).
+Verified every number in the deliverable against the completed run files (the earlier per-variant
+subset table was computed from partial Kimi data; recomputed with all 320 Kimi judgements and
+unchanged). No `src/` file was modified, no `git checkout` performed, outputs are T11-scoped.
+
+**Ambiguities I resolved myself (recorded per instructions):**
+- The promise says "judge-agreement and position-bias checks for WildChat" without specifying
+  the dimension. I ran the **quality** dimension as primary, since the 89.8/92.1 headline is a
+  quality win-rate, and report on-topic for the headline judge as a secondary line.
+- "A second judge from a different model family" — I ran **two** (DeepSeek-V4-Flash, Kimi-K2.6),
+  because a single second judge cannot distinguish "the judges agree" from "these two models
+  happen to agree", and because the two disagreed with each other about the direction of
+  position bias, which is itself informative.
+- Position bias was measured on all 452 pairs for the headline judge (not a subset) so the
+  corrected headline is computed over the same pool as the published one. Cross-family
+  agreement used a frozen 160-pair stratified subset to keep cost bounded.
+- Order-balanced win-rate is defined as the **mean of the two per-order win-rates** (an
+  unbiased corrected estimator). The stricter "must win in both orders" rule is used only for
+  the order-balanced *label* in agreement analysis, and is reported separately as the
+  conservative 82.5% 2-of-3-judge figure so the two are not confused.
