@@ -1,0 +1,82 @@
+# T9 load balancer: multi_endpoint_foundry + TRAPI.
+#
+# Created 2026-07-29 for the T9 analyzer-model sensitivity sweep, which needs a
+# Foundry-served assistant (DeepSeek-V4-Flash) and, in one arm, a TRAPI-served
+# analyzer (gpt-5.4-mini_2026-03-17). The stock `multi_endpoint_foundry` cannot
+# route TRAPI models and `load_balancer.py` hard-fails ("No endpoints configured
+# for model X") on anything unlisted.
+#
+# Enable with: ctx-editor load_balancer=t9_foundry_trapi
+#
+# This is a strict superset of multi_endpoint_foundry.yaml as of 2026-07-29
+# (including the T8 gpt-4o-mini re-listing on dl-openai-3); the only addition is
+# the trapi-redmond-interactive endpoint block copied from trapi.yaml.
+
+endpoints:
+  - name: "mgalley-foundry2"
+    type: "azure_foundry"
+    endpoint: "https://mgalley-foundry2.services.ai.azure.com/openai/v1/"
+    auth_method: "azure_identity"
+    max_concurrent: 10
+    priority: 1
+    supported_models:
+      DeepSeek-V3.2: 10
+      DeepSeek-V3.1: 10
+      DeepSeek-V3.2-Speciale: 10
+      DeepSeek-V4-Flash: 250
+      DeepSeek-R1-0528: 10
+      grok-4-1-fast-non-reasoning: 10
+      grok-4-1-fast-reasoning: 10
+      grok-4-20-non-reasoning: 10
+      grok-4-20-reasoning: 10
+      Kimi-K2.6: 100
+      Llama-3.3-70B-Instruct: 10
+      Phi-4: 1
+      Phi-4-reasoning: 1
+      Mistral-Large-3: 10
+      gpt-oss-120b: 250
+      gpt-5.5: 250
+
+  - name: "dl-openai-3"
+    type: "azure"
+    endpoint: "https://dl-openai-3.openai.azure.com"
+    api_version: "2024-10-21"
+    auth_method: "azure_cli"
+    max_concurrent: 10
+    priority: 1
+    supported_models:
+      gpt-4o: 10
+      gpt-4o-mini: 150
+      gpt-5: 10
+      gpt-5-mini: 150
+      gpt-5-nano: 10
+
+  # TRAPI (MSR gateway). OpenAI-v1 dialect, AAD scope api://trapi/.default.
+  - name: "trapi-redmond-interactive"
+    type: "azure_foundry"
+    endpoint: "https://trapi.research.microsoft.com/redmond/interactive/openai/v1/"
+    auth_method: "azure_identity"
+    aad_scope: "api://trapi/.default"
+    max_concurrent: 20
+    priority: 1
+    supported_models:
+      gpt-5.4-mini_2026-03-17: 100
+      gpt-4o_2024-11-20: 50
+
+  # fxdata-shared returns 401 PermissionDenied for the current identity
+  # (verified 2026-07-29, RECON §B.0). Kept at priority 2 as a dead fallback
+  # only; nothing should route here in practice.
+  - name: "fxdata-shared"
+    type: "azure"
+    endpoint: "https://fxdata-shared.openai.azure.com"
+    api_version: "2024-10-21"
+    auth_method: "azure_cli"
+    max_concurrent: 10
+    priority: 2
+    supported_models:
+      gpt-4o: 10
+      gpt-5: 10
+
+routing_strategy: "least_loaded"
+fallback_enabled: true
+max_retries_per_endpoint: 2

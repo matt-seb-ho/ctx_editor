@@ -19,7 +19,7 @@ from collections import defaultdict
 from pathlib import Path
 
 ROOT = Path("/home/t-matthewho/ac3/ctx_editor")
-T1 = ROOT / "outputs" / "T1"
+T1 = ROOT / "outputs" / "T1" / "main"
 HERE = Path(__file__).parent
 
 # tag -> (pretty arm name, run-dir suffix)
@@ -27,6 +27,8 @@ ARMS = [
     ("baseline", "Baseline (full context)"),
     ("summarize1", "Summarisation (1 call/turn)"),
     ("summarize2", "Summarisation (2 calls/turn, budget-matched)"),
+    ("mtosc_w2", "MT-OSC (reimpl., w=2)"),
+    ("mtosc_w4", "MT-OSC (reimpl., w=4, as published)"),
     ("reset", "AC3-Reset"),
     ("gated", "AC3-Gated-Reset"),
 ]
@@ -109,8 +111,9 @@ def main():
     P = lines.append
     P("# T1 — Summarisation baseline vs AC3, LiC database + code")
     P("")
-    P("gpt-5.4-mini (TRAPI), sharded user sim, N=30 samples/task, 1 run per cell.")
-    P("Pairing: same 30 samples in every arm; McNemar exact on discordant pairs.")
+    P("gpt-5.4-mini (TRAPI), sharded user sim, full LiC pool "
+      "(`data/sharded_instructions_600.json`): n=107 database, n=100 code. 1 run per cell.")
+    P("Pairing: same samples in every arm; McNemar exact on discordant pairs.")
     P("Budgets measured from `call_meter.json` (pre-false-negative-analysis snapshot).")
     P("")
 
@@ -142,7 +145,7 @@ def main():
     P("")
 
     # --- pooled
-    P("## Pooled over both tasks (paired, n=60)")
+    P("## Pooled over both tasks (paired)")
     P("")
     P("| Arm | Acc | Δ vs baseline | 95% CI | W/L | McNemar p |")
     P("|---|---|---|---|---|---|")
@@ -172,7 +175,7 @@ def main():
     P("| Task | Comparison | Δ | W/L | McNemar p |")
     P("|---|---|---|---|---|")
     for task, tname in TASKS:
-        for tag in ("summarize1", "summarize2"):
+        for tag in ("summarize1", "summarize2", "mtosc_w2", "mtosc_w4"):
             a, b = data.get((task, "reset")), data.get((task, tag))
             if a is None or b is None:
                 continue
@@ -181,7 +184,7 @@ def main():
     P("")
 
     # --- budgets
-    P("## Measured budget (per arm, whole run: 30 conversations)")
+    P("## Measured budget (per arm, whole run)")
     P("")
     P("| Task | Arm | LLM calls total | strategy calls | assistant | user sim | system judge "
       "| total tokens | strategy tokens | calls/conv | strategy calls/conv | avg turns |")

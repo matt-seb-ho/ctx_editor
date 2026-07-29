@@ -30,6 +30,7 @@ from .legacy import (
     ContextEditStrategy,
     ReflectionStrategy,
 )
+from .mtosc import MTOSCStrategy
 from .prior_work_baselines import ConcatenateUserStrategy, OmitAssistantStrategy
 from .summarization import SummarizationStrategy
 
@@ -47,6 +48,7 @@ __all__ = [
     "ConcatenateUserStrategy",
     "OmitAssistantStrategy",
     "SummarizationStrategy",
+    "MTOSCStrategy",
     # Shared analyzer
     "ConversationAnalyzer",
     # Backwards-compatible aliases (predate AC3 naming)
