@@ -295,3 +295,24 @@ This is the most serious methodological finding of the session. The bias runs *i
 **F29 — A 30 pp low score was a harness fault, and was caught.** MT-OSC w=2 scored 26.2% because the agent's schedule dropped raw pairs completed after the condensation window (fixed in `c1dd523`). The buggy run is archived; **do not quote its 26.2%**. Fourth time tonight that treating an anomalous number as a suspected fault rather than a result was correct.
 
 **Confidence:** high on direction and significance (n=207 paired, consistent across two tasks, two summariser budgets, and both accuracy metrics); moderate on exact magnitudes (N=1 per cell — `seed=` is inert on LiC). **Not run**, having converged on the scope directive: MT-OSC w=2 post-fix, all code MT-OSC/Gated cells, both neutral-prompt robustness cells (implemented; prompt in the worklog appendix).
+
+- **15:20** `T11` returned **DONE**. 1,824 judgements, 0 hard failures. Log: `tasks/T11/worklog.md` (paste-ready tables + both prompts verbatim); raw JSONL and `analysis_full.txt` in `tasks/T11/out/`.
+
+**F30 — Position bias is real and significant, but does not contaminate the published number.** The headline judge (gpt-5-mini) prefers the **second**-presented response: AC3 wins 92.3% shown second vs 86.7% shown first (452 pairs, 904 judgements). Of 44 order-discordant pairs, 32 flip toward the second slot vs 8 toward the first — exact binomial **p = 1.8e-4**. Swap-consistency 90.3%. The other two judges lean the *opposite* way (DeepSeek −6.2 pp, Kimi −3.1 pp, neither significant), so this is a per-model quirk rather than a prompt artefact.
+
+Why the paper is nonetheless safe: `pairwise_judge.py` **already randomises A/B 50/50 per call**, so the published number is unbiased for the order-balanced quantity in expectation. It discards the realised assignment, which is why this needed re-judging rather than re-analysis — worth an appendix note, because it is also the reason we could not have checked this from the existing logs.
+
+**F31 — The 89.8/92.1 headline survives with a small honest correction.**
+
+| | published | order-balanced (corrected) | Δ |
+|---|---|---|---|
+| AC3-Reset | 89.8 ± 1.4 | **87.8 ± 2.1** | −2.0 |
+| AC3-Augment | 92.1 ± 1.3 | **91.2 ± 2.1** | −0.9 |
+
+A 200-draw random-order resimulation puts Augment's published value inside the interval and Reset's ~0.5 pp outside, so **report the corrected numbers** rather than defend the originals. Cheap concession, and it makes the rest of the section more credible.
+
+**F32 — Judge agreement holds under cross-family and self-consistency checks.** Shared 160-pair subset, matched presentation: gpt-5-mini vs DeepSeek-V4-Flash raw 87.5% / κ 0.449; vs Kimi-K2.6 raw 88.8% / κ 0.507; DeepSeek vs Kimi 85.9% / κ 0.445. κ is depressed by the ~90% marginal (the kappa paradox), so the agent also reports **PABAK 0.79–0.83 and Gwet's AC1 0.84–0.87** — the right response to a known statistical artefact rather than quietly quoting the flattering statistic. Self-consistency (identical prompt and order, independent call) is raw **96.9%, κ 0.810**, materially higher than swap-consistency, which cleanly attributes most judge instability to **order rather than sampling**. Each judge's own order-balanced win-rate: 88.8 / 85.6 / 85.3 — max spread 3.5 pp. Under a punitive "2-of-3 judges in both orders" rule it is still **82.5%**.
+
+**Positive controls pass** (intact vs a degraded copy of itself, both orders, n=20 pairs each): gpt-5-mini 39/40, DeepSeek 36/40, Kimi 40/40; zero cases of the degraded copy winning outright for gpt-5-mini/Kimi.
+
+**F33 — incidental:** the judge never ran at temperature 0. The client logs `gpt-5 models require temperature=1.0, overriding 0.0 -> 1.0`. Any claim that judging was deterministic is wrong; the 96.9% self-consistency figure is the honest substitute.

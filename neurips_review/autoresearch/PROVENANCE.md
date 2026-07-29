@@ -35,10 +35,11 @@ graph TD
     T2A["T2A Tier-A constructed pollution<br/>removal 97.6%, precision 50.4% (=chance)<br/>Reset not surgical<br/>[done]"]
     T2C["T2c auditing vs re-solving<br/>+20.7pp on NO_LEAK subset<br/>math conceded<br/>[done]"]
     T1["T1 condensation baseline<br/>summarisation does NOT close gap<br/>over-budget and still loses<br/>[done]"]
-    T11["T11 WildChat judge checks<br/>[run]"]
+    T11["T11 WildChat judge checks<br/>position bias real but pre-randomised<br/>headline survives, -2.0/-0.9pp<br/>[done]"]
     T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
     T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
     T2B["T2B counterfactual span ablation<br/>[deferred] — superseded in priority"]
+    T15["T15 claims audit -> replies/v5<br/>[run]"]
     T14["⚠ T14 FN-adjustment audit<br/>adjusted_accuracy inflates our own<br/>numbers 89.0 -> 77.1<br/>[run]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
@@ -57,6 +58,8 @@ graph TD
   T2A --> T2B
   T2C --> T2B
   T1 --> T14
+  T14 -.->|"LiC figures provisional"| T15
+  T6 -.-> T15
   T14 -.->|"corrects magnitudes in"| P0
 
   P3 -->|"N=1 claim we already<br/>assert in replies/v4"| T8
@@ -86,6 +89,8 @@ graph TD
 | T11 | WildChat judge checks | 2026-07-29 | `tasks/T11/worklog.md` | 5YHP W4 (promised in replies/v4) |
 | T1 | Condensation baseline | 2026-07-29 | `tasks/T1/{worklog.md,RESULTS.md,analyze.py}`; `outputs/T1/` | Vg97 W1/Q1 + AC — **summarisation −2.8 to −8.4 pp vs AC3-Reset +19.6 pp** |
 | T14 | FN-adjustment audit | 2026-07-29 | `tasks/T14/worklog.md` | **Corrects the paper's headline LiC magnitudes** |
+| T11 | WildChat judge checks | 2026-07-29 | `tasks/T11/{worklog.md,out/}` | 5YHP W4 — bias real but pre-randomised; corrected 87.8 / 91.2 |
+| T15 | Claims audit → `replies/v5/` | 2026-07-29 | `replies/v5/CHANGES.md`; `tasks/T15/worklog.md` | Lands F1–F33 in the submitted text |
 
 ---
 
