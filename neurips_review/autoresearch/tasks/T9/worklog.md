@@ -1,0 +1,126 @@
+# T9 — Analyzer-model sensitivity (Reviewer Vg97 Q3, the half we never answered)
+
+**Question:** hold the assistant fixed, swap only the analyzer. Does AC3's gain degrade
+gracefully as the analyzer weakens, or collapse? Does a non-gpt analyzer work at all?
+
+**Status:** in progress (2026-07-29 overnight session). Operator asleep — no questions asked;
+every ambiguity resolved here.
+
+---
+
+## 0. TRAP CHECK #1 — is `analysis_cache` safe under an analyzer swap?
+
+**Verdict: the key DOES include the analyzer model identity. I disabled the cache anyway.**
+
+Evidence:
+
+- `src/ctx_editor/strategies/analysis_cache.py:83-107` — `AnalysisCache.make_key()` builds its
+  SHA-256 over a payload containing `"analyzer_model"` (line 92), alongside `trace_hash`,
+  `prompt_version`, `spec_only`, `memory_target_query`, `enforce_compliance`, `memory_present`.
+- `src/ctx_editor/strategies/analyzer.py:585-593` — the only call site:
+  ```python
+  cache_key = AnalysisCache.make_key(
+      trace_hash=trace_hash,
+      analyzer_model=self.model,        # <-- analyzer.py:587
+      prompt_version=self.prompt_version,
+      ...
+  )
+  ```
+  `self.model` is the live analyzer model, set from the strategy's `analyzer_model` ctor arg
+  (`context_edit_v2.py:41,54`; `append_analysis.py:53,68`), which Hydra binds to
+  `${model.ctx_editor.model}` (`config/experiment/context_edit_v2_no_gate.yaml:9`).
+  So `model.ctx_editor.model=X` propagates into the cache key. A cross-analyzer stale hit is
+  **not** possible.
+- `analyzer.py:620-628` also re-writes `analyzer_model` into the stored `key_inputs`, so any
+  cached entry can be audited after the fact.
+
+**Decision D0:** despite the key being correct, every T9 run passes
+`experiment.strategy.analysis_cache_dir=null`. Rationale: (a) the cost of a cache miss on a
+~90-sample replay is a couple of dollars, (b) belt-and-braces beats a subtle key bug in an
+experiment whose entire point is that the analyzer output differs per arm, (c) a shared cache
+also removes analyzer-sampling variance in a way that would *flatter* the comparison.
+Recorded so the deliverable is not contingent on trusting the cache.
+
+RECON's Unknown #9 ("cache-key logic was not read; assume unsafe") is hereby **closed: key is
+model-aware**. Prior runs that used `outputs/analysis_cache` with a *different* analyzer than
+the one that filled it were therefore not corrupted.
+
+---
+
+## 1. Venue selection
+
+Requirement from the task: a venue with real headroom, not near-ceiling math.
+
+Chosen: **LiC `code_v2` and `database_v2`, last-turn replay, `conv0` prefix pool**, i.e. exactly
+the design of the paper's phase-1 LiC matrix.
+
+- Prefix pool on disk: `data/valid_prefixes_htn50_52/deepseek_v4_flash_foundry/{code_v2,database_v2}/conv0`
+  (41 and 50 prefix files).
+- The paper's own phase-1 numbers on this exact pool (recovered from the snapshot at
+  `~/ac3/recovered_t2c/ctx_editor/outputs/post_neurips_ac3_phase1/`, raw accuracy):
+
+  | task | n | Baseline | AC3-Reset (`context_edit_v2_no_gate`) | Δ |
+  |---|---|---|---|---|
+  | code_v2 conv0 | 40 | 30.0% | 50.0% | +20.0 |
+  | database_v2 conv0 | 49 | 14.3% | 51.0% | +36.7 |
+  | (math_v2 conv0) | 48 | 56.3% | 72.9% | +16.7 |
+
+  Baseline ≈ 21% pooled on code+db — enormous headroom, and a +29pp effect to degrade.
+  This is the opposite of the `rebuttal_random` math cell (87.5% baseline) that killed T5.
+
+**Decision D1 — assistant = `DeepSeek-V4-Flash` (Foundry), not gpt-5.4-mini.** Reasons:
+1. It is the model that *generated* these prefixes, so the replay is self-consistent (a
+   gpt-5.4-mini assistant resuming a DeepSeek prefix adds a confound orthogonal to the question).
+2. It is the paper's phase-1 headline LiC assistant, so the T9 arms drop straight into an
+   existing table.
+3. It is far from ceiling here; gpt-5.4-mini on math is not.
+4. It frees the TRAPI quota that other overnight agents are using.
+The assistant is held **fixed across all arms** — that is the only thing the design requires.
+
+**Decision D2 — strategy = `context_edit_v2_no_gate` (AC3-Reset, always-on).** `min_turns: 1`,
+`max_resets: 100`, so the analyzer fires on **every** sample. A gated arm would let a weak
+analyzer duck the question by simply not firing; always-on maximises the analyzer's causal
+share and is therefore the right probe for analyzer sensitivity. (Gate-behaviour under a weak
+analyzer is a separate, secondary question — added as a Gated arm only if budget allows.)
+
+---
+
+## 2. The analyzer ladder
+
+Deliberately spans strength AND family, per the task's "include a genuinely weaker analyzer".
+
+| Arm | Analyzer model | Endpoint | Family | Intended rung |
+|---|---|---|---|---|
+| `ref` | `DeepSeek-V4-Flash` | mgalley-foundry2 | DeepSeek | reference (= phase-1 default, self-analyzer) |
+| `gpt54mini` | `gpt-5.4-mini_2026-03-17` | TRAPI redmond/interactive | OpenAI (reasoning) | strong; the paper's default analyzer elsewhere |
+| `kimi` | `Kimi-K2.6` | mgalley-foundry2 | Moonshot | cross-family control |
+| `gpt4omini` | `gpt-4o-mini` | dl-openai-3 | OpenAI (non-reasoning) | clearly weaker |
+| `llama70b` | `Llama-3.3-70B-Instruct` | mgalley-foundry2 | Meta | genuinely weak + cross-family (budget permitting) |
+| `baseline` | — (no analyzer) | — | — | floor |
+
+Note this ladder gives **three** non-gpt families (DeepSeek, Moonshot, Meta), so the
+"AC3 is not a gpt-specific artifact" claim is answerable independently of the sensitivity curve.
+
+---
+
+## 3. TRAP CHECK #2/#3/#4 — endpoints, overrides, FN analysis
+
+- **#2 reasoning_effort:** `model/deepseek_v4_flash_foundry.yaml` has **no**
+  `ctx_editor.reasoning_effort` key, and `context_edit_v2_no_gate.yaml:10` reads it via
+  `${oc.select:model.ctx_editor.reasoning_effort,null}` → resolves to `null`. So the gpt-4o
+  reasoning_effort trap does **not** apply to this model config. No override needed.
+  (It *would* apply if I had used `gpt5_4_mini_trapi.yaml` as the base — noted, avoided.)
+- **#3 load balancer:** `load_balancer=multi_endpoint_foundry` already serves DeepSeek-V4-Flash,
+  Kimi-K2.6, Llama-3.3-70B-Instruct (mgalley-foundry2) and gpt-4o-mini / gpt-5-mini
+  (dl-openai-3, gpt-4o-mini re-listed by T8 earlier tonight). It does **not** serve TRAPI.
+  → new file `src/ctx_editor/config/load_balancer/t9_foundry_trapi.yaml` = multi_endpoint_foundry
+  + the TRAPI `redmond/interactive` block. Edits recorded in §4.
+- **#4 FN analysis:** this experiment does **not** touch TRAPI for the assistant/system roles, so
+  the TRAPI-only FN model rule does not bind. `false_negative_analysis.model` default is
+  `gpt-5-mini`, which **is** served (dl-openai-3, quota 150) — same as the phase-1 runs it is
+  being compared against. Left at the default deliberately, for comparability.
+- **#5 seed:** no `seed=` overrides anywhere. Replicates (if any) are sampling replicates at
+  `temperature: 1.0`.
+- **#6 sample count:** not used — replay mode takes its n from the prefix pool.
+
+---
