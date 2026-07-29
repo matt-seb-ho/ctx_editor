@@ -476,3 +476,22 @@ Usefully, T20 established that **U4 is decoupled from T6** — T6's matrix is gp
 - **17:46** Heartbeat tick. All 3 healthy, no intervention. **T21 moved fast**: Part 1 is already committed (`99e28ba` — U2's reason changed to non-significance, U3's range restored, U4 softened, U5 cleared) and Part 2 is running with two `collabllm_assistant_omit` processes taking the AO column to N=3. T6 worklog 11m, three `run_parallel.py` workers, now ~4h in. T2B worklog 2m with a baseline arm. No dispatch, no pivot.
 - **18:01** Heartbeat tick. All 3 healthy and converging, no intervention. T6 worklog 6m with `run_parallel.py` workers down 3 → 2, and T21 down 2 → 1 `collabllm_assistant_omit` — falling worker counts here are replicates finishing, not attrition, since both worklogs are fresh. T2B worklog 17m with a baseline arm. No dispatch, no pivot.
 - **18:24** Heartbeat tick. All 3 under threshold, no intervention. T2B worklog 5m with a baseline arm. T6 worklog 29m, two `run_parallel.py` workers. T21 worklog 20m with its `collabllm_assistant_omit` processes now gone — consistent with the offline re-scoring step its brief required (unified dependency environment, from stored `extracted_answer`) rather than idleness, since that step is pure local computation. No dispatch, no pivot.
+
+- **18:30** `T21` returned **DONE**. Commits `99e28ba` (Part 1) and `89dfecf` (Part 2). Log: `tasks/T21/worklog.md`. **UNVERIFIED count 4 → 1** (only U6 survives).
+
+**Part 1 applied:** U3's 72–92% range restored to `03_reviewer_5YHP.md` W1 as its own bullet, labelled as a spread across 22 single-run configurations (binomial sd 4–5 pp each) — never as the win-rate claim, and deliberately never in the same sentence as the 87.8/91.2 headline, which is the confusion that would have invited an attack. U2 kept struck with the reason changed to non-significance. U4 softened in both `00` and `01`. U5 recorded verified. PAPER-8 (the false Table 3 caption) recorded in both `CHANGES.md` and `README.md`.
+
+**F57 — The AO column at N=3 narrows a margin we should therefore stop claiming.** T8's exact config, $0.178, 25 minutes:
+
+| Dataset | rep1 | rep2 | rep3 | mean ± sd | prior N=1 |
+|---|---|---|---|---|---|
+| MATH-Hard | 18/20 | 17/20 | 18/20 | **88.3 ± 2.9** | 90.0 |
+| BigCodeBench (re-scored) | 3/20 | 3/20 | 5/20 | **18.3 ± 5.8** | 15.0 |
+
+Absolutely the cells barely move (<1 problem each), but the BigCodeBench shift narrows **AC3-Reset's margin over assistant omission from +6.7 pp to +3.3 pp** (13/60 vs 11/60 instances) — inside the noise. v5 now **declines to claim that ordering** and rests instead on AC3-Reset over *full context* (+15 pp, 3/3 replicates), which is untouched. Per-problem the two arms succeed on partly different problems, which is the substantive reason not to read 3.3 pp as a ranking at all.
+
+This is the fourth time tonight that adding replicates dissolved a margin we had asserted from N=1 (after math-hard 100%, the memory gains, and the ERGO ordering). The pattern is consistent enough to be worth stating in the paper's limitations: **at n≈20 per cell, this benchmark family cannot resolve differences below roughly 10 pp**, and several of our narrower claims were reading noise.
+
+**Controls, all run before launch:** judge verified live (2/2 AO smoke with real verdicts); canonical-solution preflight 19/20 with `501` failing, matching T8; the re-scorer reproduced T8's 5/20 and 2/20 and T20's 3/20 exactly, and the final pass re-derived T8's full N=3 grids for all four other arms. **New finding:** `BigCodeBench/859` has a **seedless stochastic SVM test** (7 of 8 full-suite passes; 7/7 in isolation) — reported at its mode, disclosed in the reply, no replicate dropped.
+
+**Hold integrity re-verified mechanically:** `git diff 1382e61 HEAD -- replies/v5/ | grep '^[-+].*⚠ INTERNAL'` returns nothing; no blockquote line in v5 was added or removed; the extracted HOLD blocks of `00`/`01`/`04`/`05`/`README` hash identically to pre-T21. T21 also updated `04` and `05` *without renumbering*, deliberately, so the T6 HOLD block's "fifth correction" cross-reference stays valid — a small piece of foresight that will save a reconciliation pass when T6 lands.
