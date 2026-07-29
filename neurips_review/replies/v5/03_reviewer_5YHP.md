@@ -12,21 +12,23 @@ Our contribution is to identify **when** assistant history can be safely exclude
 
 Your framing also implicitly raises a mechanism question we had not tested and should have: is the analyzer *auditing* the conversation, or is it just *re-solving the task* and handing the answer over? We tested it directly, and the answer is partly against us.
 
-We took every analyzer output in the LiC replay matrix (n=547) and checked, per conversation, whether the analyzer's text contains the **verified correct answer**. Then we split the paired AC3-vs-baseline comparison on that label:
+We took every analyzer output in the LiC replay matrix (n=547) and asked, per conversation, whether the analyzer's own text hands the assistant the answer. We label that with a deliberately **high-recall union of two independent detectors**: (i) an answer-verification pass confirming the analyzer states a value or artifact matching the ground truth, and (ii) on math, where the answer is a number, a **model-free** probe for the gold number appearing in the analyzer's text but in *neither* the user's shards nor the assistant's own prior turns. A conversation counts as leaking if **either** fires, which makes the no-leak stratum conservative — it is the stratum our claim rests on, so we would rather over-populate the leaking side. Then we split the paired AC3-vs-baseline comparison on that label:
 
-| Task | Leak rate (analyzer output verified to contain the correct answer) | Paired gain on the **no-leak** subset |
+| Task | Leak rate (either detector fires) | Paired gain on the **no-leak** subset |
 |---|---|---|
 | code | **0%** (0/106) | **+30.2pp** (32.1 → 62.3, n=106, p < 0.0001) |
 | database | **1%** (1/147) | **+26.0pp** (22.6 → 48.6, n=146, p < 0.0001) |
 | actions | 2% (3/150) | +6.8pp (n=147, p = 0.099) |
-| **math** | **38%** (54/144) | **−2.6pp** (68.8 → 66.2, n=77, p = 0.815) |
-| math + code + database pooled | 11% overall | **+20.7pp** [+14.8, +25.3], n=329, p < 0.0001 |
+| **math** | **47%** (67/144) | **−2.6pp** (68.8 → 66.2, n=77, p = 0.815) |
+| math + code + database pooled | 17% (68/397) | **+20.7pp** [+14.8, +25.3], n=329, p < 0.0001 |
+
+Every leak rate and every subset size in that table comes from this one union label, so the columns reconcile (e.g. math 144 − 67 = 77). For reference, the answer-verification detector *alone* puts math at 38% (54/144) and the three pooled tasks at 14% (55/397); the numeric probe alone puts math at 40% (57/144). The two detectors agree closely on math, the only task where both apply, which cross-validates each. We do not report either in isolation, because the union is what defines the subsets analysed here.
 
 **We concede math outright.** On math the analyzer does frequently derive the gold answer, and math's entire +9.7pp gain sits on the leaking subset; on the leak-free subset it is −2.6pp. We think the reason is principled rather than embarrassing — on grade-school word problems, to say "your total of 3,270 is wrong because year 9 contributes 0" you must compute the correct total, so auditing and solving are not separable on that task — but it is a concession and we will state it as one in the paper.
 
 **On code and database the auditing interpretation holds cleanly.** Code has *zero* verified leaks across 106 conversations and still gains +30.2pp. AC3-Gated-Reset reproduces the pooled effect (+19.6pp on 311 leak-free conversations). Under a looser judge-based leak label the no-leak gain is *larger* than the leak gain (+24.5 vs +17.3pp), so both label definitions agree.
 
-Caveats we state ourselves: this conditions on a post-treatment variable, and the analyzer leaks on easier items (baseline accuracy is 36.5% on the no-leak subset against 75.0% on the leaking one), so the *between*-stratum contrast is not causal even though the within-stratum paired test is valid; single respondent model; one run per cell. On math we validated the detector by hand — the precision of the no-leak label is 29/32, with all three errors on math and 24/24 correct on database, code and actions.
+Caveats we state ourselves: this conditions on a post-treatment variable, and the analyzer leaks on easier items (baseline accuracy is 36.5% on the no-leak subset against 75.0% on the leaking one), so the *between*-stratum contrast is not causal even though the within-stratum paired test is valid; single respondent model; one run per cell. We also hand-adjudicated 32 conversations that our *LLM-judge* leak label called leak-free: 29/32 were genuinely leak-free, and **all three errors were on math**, against 24/24 correct on database, code and actions. That math-specific weakness of judge-based labelling is precisely why the primary label above adds the model-free numeric probe instead of trusting a judge, and why math's leak rate lands at 47% rather than the judge-only or verification-only figures.
 
 Structural exclusion is also **not the only mechanism AC3 provides**, and referential settings are not left unaddressed. The operator family handles them, and we have direct evidence in those settings rather than extrapolation from LiC:
 

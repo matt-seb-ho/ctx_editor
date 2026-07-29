@@ -2,7 +2,7 @@
 
 Every assertion in `replies/v4/` audited against the 2026-07-29 autoresearch session (findings **F1–F81**, decisions **D1–D21**: `../../autoresearch/WORKLOG.md`; retired claims: `../../autoresearch/PROVENANCE.md`). Task T15 worklog: `../../autoresearch/tasks/T15/worklog.md`.
 
-**Revision history.** T15 wrote this audit at F1–F38, with four claims on HOLD pending two in-flight audits. **T19** (`../../autoresearch/tasks/T19/worklog.md`) revised it once T14, T16, T17 and T18 landed: the T14 hold is resolved, U1 is retired, and the ERGO denominator disclosure is added as §9 and as claim rows 1.23 / 2.10 / 3.12 / 5.9 / 6.x. **The T6 (tau2) holds were untouched and still live at that point — they were discharged later, by T28; see §12.3.**
+**Revision history.** T15 wrote this audit at F1–F38, with four claims on HOLD pending two in-flight audits. **T19** (`../../autoresearch/tasks/T19/worklog.md`) revised it once T14, T16, T17 and T18 landed: the T14 hold is resolved, U1 is retired, and the ERGO denominator disclosure is added as §9 and as claim rows 1.23 / 2.10 / 3.12 / 5.9 / 6.x. **The T6 (tau2) holds were untouched and still live at that point — they were discharged later, by T28; see §12.3.** **T30** audited the whole set for internal coherence and left four items open; **T32** (`../../autoresearch/tasks/T32/worklog.md`) settled the two factual ones from artifacts, with no re-runs — see §13.
 
 ## Tally
 
@@ -111,7 +111,7 @@ Of the 17 corrections, **8 move against us** (CollabLLM MATH-Hard, the CollabLLM
 | # | Claim as written in v4 | Status | Evidence | New wording in v5 |
 |---|---|---|---|---|
 | 4.1 | W1 scope defence (structural exclusion is the scope, not a gap; Table 5; Appendix D) | **unchanged** | — | verbatim |
-| 4.2 | *(new)* | **newly added — the strongest new mechanism evidence** | **F10**, `AR/tasks/T2c/RESULTS.md`, `AR/tasks/T2c/{answer_check.jsonl,math_numeric_probe.json,leak_labels_final.jsonl}`; source traces `~/ac3/recovered_t2c/ctx_editor/outputs/post_neurips_ac3_phase1/` | Auditing-vs-re-solving table: leak rates (code 0%, database 1%, actions 2%, math 38%) and leak-free gains (code **+30.2**, database **+26.0**, pooled **+20.7 [+14.8, +25.3] p<0.0001**) |
+| 4.2 | *(new)* | **newly added — the strongest new mechanism evidence** | **F10**, `AR/tasks/T2c/RESULTS.md`, `AR/tasks/T2c/{answer_check.jsonl,math_numeric_probe.json,leak_labels_final.jsonl}`; source traces `~/ac3/recovered_t2c/ctx_editor/outputs/post_neurips_ac3_phase1/` | Auditing-vs-re-solving table: leak rates under the primary `leak_final` union label (code 0%, database 1%, actions 2%, **math 47%**, pooled 17%) and leak-free gains (code **+30.2**, database **+26.0**, pooled **+20.7 [+14.8, +25.3] p<0.0001**). **Math corrected 38% → 47% by T32**: 38% was the answer-verification component alone and did not reconcile with the printed n=77 subset |
 | 4.3 | *(new)* | **newly added — concession** | **F10** | **Math conceded outright**: leak-free gain **−2.6pp** (n=77, p=0.815); math's entire +9.7pp sits on the leaking subset. Conceded in the same paragraph, before the wins |
 | 4.4 | W1 "On tau2-bench … blanket omission scores 0% on all three models **while AC3 beats full context on all three**" | **half struck; the struck half is now permanent (T28)** | AO=0% corroborated by T6 PC2; the AC3 half depended on the contested cells and **T6 refuted it** | Keeps AO=0% with the mechanism; "AC3 beats full context on all three" is **gone for good**, not pending (§12.3) |
 | 4.5 | W1 "On WildChat, AC3 wins **72-92%** of pairwise comparisons" | **corrected, then partly restored** | **F31**, **F53** | The *headline* is the order-balanced pooled figure (87.8 / 91.2). The 72–92% per-cell range is **verified** (T20: all 22 populated `tab:wildchat` cells re-derived, 22/22 exact; min 71.6, max 91.5) and T21 restored it to `03` W1 as a **separate bullet** describing the spread across configurations — never as the win-rate claim, and never in the same sentence as the pooled headline (see §7 U3) |
@@ -500,7 +500,7 @@ false, and both are now annotated in place in that document rather than deleted.
 |---|---|---|---|
 | **M11** — the neutral-prompt condenser control "did not finish in the window" | **The concession is replaced by a result, and it comes out in our favour.** The neutral-prompt condenser (our "compression, not evaluation" clause deleted) scores **51.4%** against full context's 56.1%, landing **between two replicate runs of our own prompt** (53.3 and 47.7) — so the condensation result does not depend on our phrasing. AC3 leads it by **+24.3pp** (Reset, 31/5) and **+22.4pp** (Gated-Reset, 30/6), p ≤ 0.0001. The decisive detail is the mechanism: with the clause removed the condenser flags an assistant error **0 times out of 340**, identical to with it (0/336, 0/341). A summariser does not audit, whatever you instruct it to do | `00` CW5, `02` Q1, `04` addition table, `05` condensation bullet; `00` "Summary of New Evidence" item 4 | F74/F75; `AR/tasks/T27/worklog.md` §7.3 |
 | **M11 (b)** — the budget ordering | **Not claimed.** The −2.8 → −8.4pp contrast between the 1-call and 2-call condenser does **not** survive replication: a second run of the **1-call** arm scores −8.4pp, exactly the 2-call value, and the two 1-call replicates differ by more (p = 0.29, 0.26) than 1-call differs from 2-call. The cell carries ≈±6pp of run-to-run variation. We print only "neutral-to-negative at either budget" | `00` CW5, `02` Q1 | F73; T27 §7.1 |
-| **M12** — MT-OSC's window | **Our own low-engagement defence is retired because we no longer need it.** At w=2 (the smallest window in MT-OSC's published sweep) the method engages **9× more** — 5.7 compaction events per conversation against 0.6 at w=4, with `raw_pairs_carried` 133 against the archived buggy run's 0 — and scores **47.7%, −13.1pp against its own w=4 run** (22 L / 8 W, p = 0.016); AC3-Reset leads it by **+28.0pp** (37/7). The MT-OSC w=2 row is added to `00` CW5's table. The reply now says "we scaled the window and it hurt" rather than "it barely fires", which rules out the reading that MT-OSC would have won if tuned | `00` CW5 (paragraph + table row), `02` Q1, `04` MT-OSC row, `05` condensation bullet | F76; T27 §7.2 |
+| **M12** — MT-OSC's window | **Our own low-engagement defence is retired because we no longer need it.** At w=2 (the smallest window in MT-OSC's published sweep) the method engages **~8× more** — 2.2 condensations per conversation against 0.3 at w=4 (237 vs 30 over the same 107 conversations), with `raw_pairs_carried` 133 against the archived buggy run's 0 — and scores **47.7%, −13.1pp against its own w=4 run** (22 L / 8 W, p = 0.016); AC3-Reset leads it by **+28.0pp** (37/7). The MT-OSC w=2 row is added to `00` CW5's table. The reply now says "we scaled the window and it hurt" rather than "it barely fires", which rules out the reading that MT-OSC would have won if tuned | `00` CW5 (paragraph + table row), `02` Q1, `04` MT-OSC row, `05` condensation bullet | F76; T27 §7.2; **engagement counter corrected by T32** |
 | **M12 (b)** — U-Fold on tau2 | Silence replaced by an **honest offer**: we did not manage an adaptation in the window, we say so, we give the engagement argument as our reason for expecting it to behave like the compaction family, we do not claim that settles it, and we ask Vg97 whether they want it run during the discussion period | `02` Q1 | T27 §6.6 |
 | **M15** — the sign test | The 36-cell sign test is **kept as the assumption-light cross-check** and supplemented by two stronger statistics on the same data at the item level (n = **1,668** paired items, arm-symmetric intersection, 191 problem clusters): AC3-Reset **+15.4pp, 95% CI [+11.5, +19.4]**, **350 W / 93 L**. The interval also sharpens the row we like least — AC3-Rewrite is not −0.3pp but **exactly neutral, [−3.8, +3.8]** | `00` CW2 (full table), `01` Q2 (one-line version), `02` Q2 (full table — Vg97 asked) | F77; T27 §4 |
 | **M15 (b)** — AC3 vs assistant omission | Interval attached to the head-to-head: matrix-wide **+2.8pp, 95% CI [−0.3, +5.9]** (we do not claim it), LiC-database **+18.6pp, [+10.7, +26.6]**. **Guardrail carried into the text and into rule 6b of §8: the matrix-wide item-level McNemar (p = 0.010) is never quoted as a win** — it treats 1,668 correlated items as independent. Reconciled with §11.2's cell-level statement (+2.6pp, 15/17/4): both now say a wash matrix-wide, concentrated on database | `00` CW2 AO subsection, `04`, `05` | F77; T27 §4.2 |
@@ -590,3 +590,104 @@ byte-identical constraint**: the blocks existed to be resolved on exactly this o
 **resolved and removed**, and their pre-drafted withdrawal wording applied. `00`'s orientation
 preamble is retained, with its T6 item rewritten from "on HOLD" to "resolved, and it goes against
 us". `grep -rn "⚠ INTERNAL" replies/v5/*.md` now returns only the preamble.
+
+---
+
+## 13. T32 integration record — T30's two factual open items (J1, J2) settled from artifacts
+
+T30's coherence pass left four open items. J3 and J4 are internal wording/bookkeeping and remain
+open by design. **J1 and J2 were factual questions with determinate answers**, so T32 settled them
+against the code and the run artifacts rather than handing the operator a choice. Zero API calls,
+no experiments, no `git checkout`; `writing/overleaf_repo/` untouched. Full evidence:
+`../../autoresearch/tasks/T32/worklog.md`.
+
+### 13.1 J1 — MT-OSC's engagement rate is **condenser calls**, and the ratio is ~8×, not 9×
+
+**The conflict.** `00` CW5 and `02` Q1 printed MT-OSC's w=4 engagement as 0.3/conversation and
+0.6/conversation three sentences apart; `04` and `05` printed 0.3 *with* "nine times", and
+"nine-fold" only reconciles against 0.6. At least one sentence was wrong however it resolved.
+
+**What settled it.** `src/ctx_editor/strategies/mtosc.py` emits **three distinct log types**, not
+one: `mtosc_decider` at every scheduled trigger turn (`:336`), `mtosc_condensation` when the
+condenser call returns a parseable condensation (`:345`), and `mtosc_applied` when a pending
+condensation is actually spliced into the context (`:327`). T27's "log events / conversation"
+(`AR/tasks/T27/worklog.md:446–450`) summed all three. That is **not** an engagement rate — it is
+~3 records per single condensation — and T27 used it correctly, as a *positive control that the
+schedule was live after the `raw_pairs_carried` fix*, never as a reviewer-facing statistic. T1's
+counter (`AR/tasks/T1/worklog.md:354`) counted condenser calls, which is what "MT-OSC fired" means
+to a reader.
+
+**Recounted directly from the run traces** (`outputs/T1/main/db_mtosc_w4/traces/database/mtosc_w4/`
+and `outputs/T27/db_mtosc_w2/traces/database/mtosc_w2/`, 107 conversations each):
+
+| counter | w=4 | w=2 | ratio |
+|---|---|---|---|
+| `mtosc_decider` | 30 (0.28/conv) | 237 (2.22/conv) | 7.9× |
+| **`mtosc_condensation`** (condenser calls — **adopted**) | **30 (0.28/conv)** | **237 (2.22/conv)** | **7.9×** |
+| `mtosc_applied` (reached the context) | 6 (0.06/conv) | 133 (1.24/conv) | 22.2× |
+| *all `mtosc_*` records* (T27's composite) | *66 (0.62/conv)* | *607 (5.67/conv)* | *9.2×* |
+
+Decider and condensation counts are identical because the Decider **never withheld** in either run
+(0/30 and 0/237) — exactly as `mtosc.py`'s docstring predicts, since τ = 1000 user tokens is never
+reached by LiC's short sharded messages. So the composite counter's 9.2× was an artefact of summing
+log types, and "nine-fold" was numerology on a quantity nobody would recognise as engagement.
+
+**Applied:** 0.3 (w=4) and **2.2** (w=2) condensations per conversation, ratio **~8×**, in `00`
+CW5, `02` Q1, `04`'s additions table, `05`'s condensation bullet, `README` (two places) and §12's
+M12 row. "5.7 / 0.6 events" and "nine-fold" / "nine times" appear nowhere in the reply set; the
+`README` carries a do-not-quote note so the retired figures cannot migrate back.
+
+**One strengthening fact added** to `00` CW5, since it is measured and it is the point of the
+paragraph: because the paper's condenser runs with a deliberate one-turn lag, only **6 of the 30**
+w=4 condensations were ever applied to a context before the conversation ended. The "nearly a
+no-op" characterisation is if anything understated. We keep **0.3** as the headline rather than
+0.06 because 0.3 is the *conservative* choice — it is the figure least favourable to our own
+argument.
+
+### 13.2 J2 — the leak table now uses one label end to end; math's rate rises 38% → 47%
+
+**The conflict.** `03` W1 printed math leak 38% (54/144) beside a no-leak subset of n=77, and
+144 − 54 = 90 ≠ 77. The pooled cell read "11% overall", a rate over all four tasks inside a row
+covering three.
+
+**What settled it.** `AR/tasks/T2c/final_tables.py:37` defines the primary label:
+`leak_final = LEAK if (verdict == "CORRECT_ANSWER_STATED" or pderived)` — the **union** of the
+answer-verification pass and the math-only model-free numeric probe. Line `:116` passes
+`leak_final` to every split in Table 2, so **n=77 and n=329 were always union-label subsets**;
+line `:64` computes Table 1's rate column from `answer_verdict` **alone**. The two tables were
+therefore reporting different partitions, and T2c's own Table 2 caption ("strict: analyzer output
+verified to contain the correct answer") describes only the first arm of the union. Recounted from
+`leak_labels_final.jsonl`: math union LEAK **67**, NO_LEAK **77** (67 + 77 = 144 ✓); pooled
+math+code+database union LEAK **68**, NO_LEAK **329** ✓; verification-alone gives math 54 and
+pooled 55.
+
+**The headline check the brief asked for: the +20.7pp on n=329 is a `leak_final` row**, so the
+union label is the one backing the result, and it is the label we now report throughout. The judge
+label stays where it already was — a robustness note (`03`: no-leak gain +24.5 vs leak +17.3, so
+both definitions agree in direction).
+
+**Applied** in `03` W1: column relabelled "Leak rate (either detector fires)", the lead-in now
+states the union explicitly, **math 38% (54/144) → 47% (67/144)**, pooled **11% overall → 17%
+(68/397)**, and a following sentence gives the single-detector rates (verification 38% math /
+14% pooled; probe 40% math) as reference values that are deliberately not used to cut subsets.
+`04`'s and `05`'s one-line summaries are reworded from "never states the correct answer" to also
+cover the numeric probe. Code (0/106), database (1/147) and actions (3/150) are **unchanged** —
+the probe is math-only, so their union equals their verification count.
+
+**Direction: against us.** Math's admitted leak rate rises by 9 points. **No headline number
+moves**: +30.2 code, +26.0 database, +20.7 pooled, −2.6 math and every n were already computed on
+this label.
+
+**Knock-on correction.** `03`'s caveat sentence cited the 29/32 hand-validation as validating "the
+no-leak label". `AR/tasks/T2c/worklog.md:238–251` shows that adjudication was drawn from records
+the **v3 LLM judge** called `NO_LEAK`, not from the `leak_final` stratum, so as written it
+validated a different label than the table used. Reworded to attribute it to the judge label and
+to state what it actually implies — all three errors were on math, which is *why* the primary
+label adds the model-free probe.
+
+### 13.3 Tally impact: none
+
+Both corrections land on rows already booked as **newly added** in v5 (row 5.7, the MT-OSC
+engagement rate; row 4.2, the auditing-vs-re-solving table). They are not v4 claims, so the
+Corrected count stays at **17** and the total stays at **69**. Recorded explicitly because T30's F8
+found this exact tally drifting twice.
