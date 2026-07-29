@@ -16,23 +16,33 @@
 > for baseline and is not comparable across arms. For span ablation the quantity of interest is
 > literally the assistant's raw success rate under a fixed prefix, so raw accuracy is both the
 > honest and the correct choice. All numbers below are raw.
+## Headline
+
+* **111 natural spans** across **30 LiC conversations** (database + code) received causal labels, from 14 present + 12 ablated replicate runs each at temperature 1.0 (3357 assistant turns, 0 errors).
+* **All three controls pass**: a contentless span +0.033 [-0.010, +0.082] (n.s.), T2A's causally-validated pollutant +0.368 [+0.223, +0.512], the full-spec/gold-SQL span -0.447 [-0.574, -0.315]. The harness resolves a large effect in both directions and reports ~0 when nothing is there.
+* **Minimum detectable effect**: 0.333 as an observed difference; +0.53 as a true effect at 80% power. Per-span labels resolve only large effects; *inconclusive is not inert*.
+* **Natural spans do carry real causal effects, and they are concentrated.** Against a replicate-matched null, the spread of per-span effects is significantly wider than noise (SD of effects 0.155 vs null 0.125, p = 0.0085), and there are **16 spans with |delta| >= 0.25 where the null predicts 9.3** (p = 0.0170). But the *mean* effect over all spans is +0.020 [-0.010, +0.048] — the typical natural span is causally inert. Pollution is a minority phenomenon, not a diffuse fog.
+* **Split** (point-estimate labels, |delta| >= 0.25): **11 harmful, 5 useful, 95 inconclusive**. Under the strict Fisher test: 3 harmful, 0 useful.
+* **Alignment — neither operator is selective on natural spans.** **AC3-Reset** keeps 5/66 probe-admissible spans; removal rate on causally harmful spans 100.0% (7/7), preservation rate on causally useful spans 0.0% (0/4). **AC3-Rewrite** keeps 0/66 probe-admissible spans; removal rate on causally harmful spans 100.0% (7/7), preservation rate on causally useful spans 0.0% (0/4). Both remove essentially everything, so removal rate is high for the same reason preservation is ~0: the mechanism is rebuild-from-the-user-side, not surgical excision.
+
 
 ## 0. Corpus and replicate counts
 
 * conversations: **30** (Counter({'database_v2': 17, 'code_v2': 13}))
 * spans: **111** (Counter({'prose': 68, 'code': 43}))
-* replicate runs at temperature 1.0 — present: {'code_v2': 9, 'database_v2': 9}, ablation (min over conditions): {1: {'code_v2': 9, 'database_v2': 9}, 2: {'code_v2': 9, 'database_v2': 9}, 3: {'code_v2': 9, 'database_v2': 9}, 4: {'code_v2': 8, 'database_v2': 9}}
+* 32 conversations were selected and run; 2 code conversations produced no admissible span (every prefix assistant message was a single block, so no in-place ablation exists), which is why the span table covers 30. The control arms and §5 use all 32.
+* replicate runs at temperature 1.0 — present: {'code_v2': 14, 'database_v2': 14}, ablation (min over conditions): {1: {'code_v2': 12, 'database_v2': 12}, 2: {'code_v2': 12, 'database_v2': 12}, 3: {'code_v2': 12, 'database_v2': 12}, 4: {'code_v2': 12, 'database_v2': 12}}
 * controls: {'ctl_filler': {'code_v2': 8, 'database_v2': 8}, 'ctl_harm': {'code_v2': 8, 'database_v2': 8}, 'ctl_answer': {'code_v2': 8, 'database_v2': 8}}
 
 ## 1. Minimum detectable effect at the realised N
 
-n_present = 9, n_ablated = 8, mean present accuracy p0 = 0.396.
+n_present = 14, n_ablated = 12, mean present accuracy p0 = 0.393.
 
 | quantity | value |
 |---|---|
-| smallest **observed** difference that can reach two-sided Fisher p < 0.05 | **0.500** |
-| smallest **true** upward effect detectable with 80% power at p0=0.40 | **not reachable** |
-| smallest **true** downward effect detectable with 80% power at p0=0.40 | **not reachable — bounded by p0 = 0.40** |
+| smallest **observed** difference that can reach two-sided Fisher p < 0.05 | **0.333** |
+| smallest **true** upward effect detectable with 80% power at p0=0.39 | **+0.53** |
+| smallest **true** downward effect detectable with 80% power at p0=0.39 | **not reachable — bounded by p0 = 0.39** |
 
 Read this honestly: **per-span labels resolve only large effects.** A span that shifts the
 assistant's success probability by 10-20 pp is invisible at this N and will be scored
@@ -47,9 +57,9 @@ Every control is a **paired, per-conversation** comparison against the same `pre
 
 | control | expected sign | n conv | present acc | injected acc | ablation effect (removed − present) | 95% CI | perm p |
 |---|---|---|---|---|---|---|---|
-| `ctl_filler` | ≈ 0 | 32 | 0.396 | 0.359 | **+0.036** | [-0.017, +0.090] | 0.7043 |
-| `ctl_harm` | > 0 | 24 | 0.384 | 0.010 | **+0.374** | [+0.230, +0.522] | 0.0001 |
-| `ctl_answer` | ≪ 0 | 32 | 0.396 | 0.840 | **-0.444** | [-0.572, -0.309] | 0.0001 |
+| `ctl_filler` | ≈ 0 | 32 | 0.393 | 0.359 | **+0.033** | [-0.010, +0.082] | 0.7264 |
+| `ctl_harm` | > 0 | 24 | 0.378 | 0.010 | **+0.368** | [+0.223, +0.512] | 0.0001 |
+| `ctl_answer` | ≪ 0 | 32 | 0.393 | 0.840 | **-0.447** | [-0.574, -0.315] | 0.0000 |
 
 **Controls pass: True** ({'ctl_filler': True, 'ctl_harm': True, 'ctl_answer': True}).
 
@@ -62,35 +72,48 @@ causally-validated injected pollution on the same scale.
 
 `ctl_filler` gives 32 genuine null ablations (a contentless span removed from a real conversation), scored by exactly the ablation code path. Their |effect| distribution is the empirical noise floor:
 
-* mean +0.0365, mean |effect| 0.0998, max |effect| 0.4028
-* **95th percentile of |effect| under the null = 0.319** — used below as the data-driven threshold `TAU_null`. The filler control runs at fewer replicates than the ablation arms, so its noise floor is if anything *wider* than the ablation arms', which makes this threshold conservative.
+* mean +0.0335, mean |effect| 0.0792, max |effect| 0.3750
+* **95th percentile of |effect| under the null = 0.339** — used below as the data-driven threshold `TAU_null`. The filler control runs at fewer replicates than the ablation arms, so its noise floor is if anything *wider* than the ablation arms', which makes this threshold conservative.
 
 ## 3. Per-span causal labels
 
 Spans with a usable comparison: **111** of 111.
 
-* **strict (two-sided Fisher p < 0.05)**: harmful 0, useful 0, inconclusive 111 (0.0% (0/111) harmful, 0.0% (0/111) useful)
-* **null-calibrated (|delta| > 95th pct of the filler null)**: harmful 15, useful 6, inconclusive 90 (13.5% (15/111) harmful, 5.4% (6/111) useful)
-* **lenient (|delta| >= 0.25, point estimate)**: harmful 16, useful 6, inconclusive 89 (14.4% (16/111) harmful, 5.4% (6/111) useful)
-* **How many of those are real?** The null-calibrated threshold is the 95th percentile of a genuine null, so **5.6** of 111 spans would be labelled by chance. **21** were labelled (binomial p = 1.39e-07), i.e. an excess of ≈ **15 genuinely causal spans** over the noise floor.
+* **strict (two-sided Fisher p < 0.05)**: harmful 3, useful 0, inconclusive 108 (2.7% (3/111) harmful, 0.0% (0/111) useful)
+* **null-calibrated (|delta| > 95th pct of the filler null)**: harmful 4, useful 3, inconclusive 104 (3.6% (4/111) harmful, 2.7% (3/111) useful)
+* **lenient (|delta| >= 0.25, point estimate)**: harmful 11, useful 5, inconclusive 95 (9.9% (11/111) harmful, 4.5% (5/111) useful)
+* **How many of those are real?** The null-calibrated threshold is the 95th percentile of a genuine null, so **5.6** of 111 spans would be labelled by chance. **7** were labelled (binomial p = 3.20e-01), i.e. an excess of ≈ **1** over that floor. This particular comparison is **conservative to the point of being uninformative** — the filler null is measured at 8 replicates while the ablation arms run at 12-14, so its threshold is too wide. §3.0 redoes it with a replicate-matched null, which is the version to read.
+
+### 3.0 Is *anything* here above noise? A matched parametric null
+
+The filler null above is measured at 8 replicates while the ablation arms run at 12-14, so it is systematically **wider** than the ablation noise and under-detects. The clean comparison is a parametric null with the *same* replicate counts and the *same* per-span base rate but **no effect**, simulated 2000 times over all 111 spans:
+
+| statistic | observed | null mean | null 95th pct | p |
+|---|---|---|---|---|
+| SD of delta across spans | **0.1554** | 0.1249 | 0.1439 | 0.0085 |
+| # spans with |delta| >= 0.25 | **16** | 9.341 | 14 | 0.0170 |
+| # spans with Fisher p < 0.05 | **3** | 1.458 | 4 | 0.1734 |
+
+This is the well-powered version of the question the per-span labels cannot answer individually: *does the set of natural spans contain real causal effects at all?*
+
 * surviving Benjamini–Hochberg at q = 0.10: **0** spans (0 harmful, 0 useful)
 
-Mean ablation effect over **all** spans: **+0.0280** [95% CI -0.0091, +0.0668] — i.e. the average natural span is close to causally inert, which is itself the finding: pollution is concentrated, not diffuse.
+Mean ablation effect over **all** spans: **+0.0195** [95% CI -0.0095, +0.0485] — i.e. the average natural span is close to causally inert, which is itself the finding: pollution is concentrated, not diffuse.
 
 | bucket | n |
 |---|---|
-| delta <= -0.50 | 3 |
-| -0.50 < delta <= -0.25 | 3 |
-| -0.25 < delta < -0.05 | 17 |
-| |delta| <= 0.05 | 58 |
-| 0.05 < delta < 0.25 | 14 |
-| 0.25 <= delta < 0.50 | 16 |
-| delta >= 0.50 | 0 |
+| delta <= -0.50 | 0 |
+| -0.50 < delta <= -0.25 | 5 |
+| -0.25 < delta < -0.05 | 18 |
+| |delta| <= 0.05 | 59 |
+| 0.05 < delta < 0.25 | 18 |
+| 0.25 <= delta < 0.50 | 10 |
+| delta >= 0.50 | 1 |
 
-* **database_v2** (63 spans): mean delta -0.0088; strict labels harmful 0 / useful 0 / inconclusive 63
-* **code_v2** (48 spans): mean delta +0.0764; strict labels harmful 0 / useful 0 / inconclusive 48
-* **code spans** (43): mean delta +0.0526; harmful 0 / useful 0
-* **prose spans** (68): mean delta +0.0125; harmful 0 / useful 0
+* **database_v2** (63 spans): mean delta -0.0110; strict labels harmful 2 / useful 0 / inconclusive 61
+* **code_v2** (48 spans): mean delta +0.0595; strict labels harmful 1 / useful 0 / inconclusive 47
+* **code spans** (43): mean delta +0.0507; harmful 2 / useful 0
+* **prose spans** (68): mean delta -0.0002; harmful 1 / useful 0
 
 ### 3.1 The spans at the extremes (qualitative, for the reader)
 
@@ -98,27 +121,27 @@ Most **harmful** natural spans (removing them helped most)
 
 | task | kind | delta | 95% CI | p | excerpt |
 |---|---|---|---|---|---|
-| code | code | **+0.444** | [-0.01, +0.71] | 0.153 | ````python def sort_list_copy(lst): return sorted(lst) ```` |
-| code | prose | **+0.444** | [-0.01, +0.71] | 0.153 | `Here's a Python function that returns a sorted copy of a list of non-negative numbers:` |
-| database | prose | **+0.444** | [+0.01, +0.72] | 0.131 | `Also, would you like to see the airport codes, city names, or other details?` |
-| database | code | **+0.444** | [+0.05, +0.73] | 0.082 | ````sql SELECT e.City FROM employee e JOIN hiring h ON e.Employee_ID = h.Employee_ID GROUP BY e.City HAVING AVG` |
-| database | code | **+0.444** | [+0.05, +0.73] | 0.082 | ````sql SELECT e.City FROM employee e JOIN hiring h ON e.Employee_ID = h.Employee_ID WHERE e.Age < 30 GROUP BY ` |
-| code | prose | **+0.444** | [+0.05, +0.73] | 0.082 | `I don't have enough context to help you with a specific number of carrots, but I can write a Python function t` |
-| code | prose | **+0.444** | [+0.05, +0.73] | 0.082 | `Wait, this means the sequence would be all zeros if the first three terms start as 0, 0, 0. But you mentioned ` |
-| code | code | **+0.417** | [-0.05, +0.69] | 0.153 | ````python def sort_non_negative(lst): return sorted(lst) ```` |
+| code | prose | **+0.500** | [+0.16, +0.73] | 0.006 | `I don't have enough context to help you with a specific number of carrots, but I can write a Python function t` |
+| database | code | **+0.429** | [+0.10, +0.67] | 0.017 | ````sql SELECT e.City FROM employee e JOIN hiring h ON e.Employee_ID = h.Employee_ID GROUP BY e.City HAVING AVG` |
+| database | code | **+0.429** | [+0.10, +0.67] | 0.017 | ````sql SELECT e.City FROM employee e JOIN hiring h ON e.Employee_ID = h.Employee_ID WHERE e.Age < 30 GROUP BY ` |
+| code | code | **+0.381** | [+0.00, +0.64] | 0.113 | ````python def min_cost_to_make_all_same(bits): """ bits: list of integers (0 or 1) Returns minimum cost to mak` |
+| database | prose | **+0.333** | [-0.03, +0.59] | 0.110 | `Also, would you like to see the airport codes, city names, or other details?` |
+| code | code | **+0.333** | [-0.03, +0.59] | 0.110 | ````python def sort_list_copy(lst): return sorted(lst) ```` |
+| code | code | **+0.286** | [-0.07, +0.57] | 0.218 | ````python def swap_case(message: str) -> str: """Return a new string with uppercase letters converted to lower` |
+| database | prose | **+0.250** | [-0.02, +0.53] | 0.085 | `I understand you want to analyze pet types. Could you please clarify what specific analysis you need? For exam` |
 
 Most **useful** natural spans (removing them hurt most)
 
 | task | kind | delta | 95% CI | p | excerpt |
 |---|---|---|---|---|---|
-| code | code | **-0.556** | [-0.78, -0.10] | 0.057 | ````python def smallest_diff_at_least(arr, min_value): if len(arr) < 2: return None arr_sorted = sorted(arr) sm` |
-| code | prose | **-0.556** | [-0.78, -0.10] | 0.057 | `You could modify the function to take an additional parameter representing the required minimum value. Then fi` |
-| database | code | **-0.556** | [-0.78, -0.10] | 0.057 | ````sql SELECT t.Name AS Teacher_Name, c.Course AS Course_Name FROM teacher t JOIN course_arrange ca ON t.Teach` |
-| database | prose | **-0.444** | [-0.71, +0.01] | 0.153 | `This query joins the `teacher`, `course_arrange`, and `course` tables, then selects the teacher's name and cou` |
-| database | prose | **-0.333** | [-0.65, +0.03] | 0.206 | `Sure! To analyze only students who have pets, I need to know what specific metrics or breakdown you're interes` |
-| database | prose | **-0.333** | [-0.65, +0.03] | 0.206 | `Certainly! To help you analyze students, could you clarify what specific analysis you need? For example:` |
-| database | code | **-0.222** | [-0.55, +0.20] | 0.637 | ````sql SELECT contestant_number, contestant_name FROM CONTESTANTS; ```` |
-| database | prose | **-0.222** | [-0.55, +0.20] | 0.637 | `Based on your request "cities with young employees", I need to clarify what you mean by "young employees". Cou` |
+| database | prose | **-0.393** | [-0.64, -0.01] | 0.062 | `This query joins the `teacher`, `course_arrange`, and `course` tables, then selects the teacher's name and cou` |
+| database | code | **-0.393** | [-0.64, -0.01] | 0.062 | ````sql SELECT t.Name AS Teacher_Name, c.Course AS Course_Name FROM teacher t JOIN course_arrange ca ON t.Teach` |
+| database | prose | **-0.345** | [-0.62, -0.01] | 0.065 | `Sure! To analyze only students who have pets, I need to know what specific metrics or breakdown you're interes` |
+| code | prose | **-0.321** | [-0.59, +0.05] | 0.130 | `You could modify the function to take an additional parameter representing the required minimum value. Then fi` |
+| database | prose | **-0.262** | [-0.54, +0.05] | 0.148 | `Certainly! To help you analyze students, could you clarify what specific analysis you need? For example:` |
+| code | code | **-0.238** | [-0.53, +0.13] | 0.267 | ````python def smallest_diff_at_least(arr, min_value): if len(arr) < 2: return None arr_sorted = sorted(arr) sm` |
+| database | prose | **-0.238** | [-0.53, +0.13] | 0.267 | `Here's the query to find cities with more than one employee under 30:` |
+| database | prose | **-0.238** | [-0.53, +0.13] | 0.267 | `Based on your request "cities with young employees", I need to clarify what you mean by "young employees". Cou` |
 
 ## 4. Does AC3 remove the spans the ablation proves harmful?
 
@@ -137,57 +160,39 @@ PC-other is the specificity control that matters: it shows the probe is testing 
 
 ### AC3-Reset  (replicates {'code_v2': 5, 'database_v2': 5}; 66 probe-admissible spans)
 
-**strict (Fisher p<0.05) labels** — causally harmful n=0, causally useful n=0
+**Graded survival** (mean fraction of the span's unique tokens reaching the assistant), so the binary keep/remove call can be audited:
+
+| span kind | n | mean survival | median | frac > 0 | frac >= 0.5 (= "kept") |
+|---|---|---|---|---|---|
+| all | 66 | 0.119 | 0.000 | 0.333 | 0.076 |
+| code | 14 | 0.044 | 0.000 | 0.286 | 0.000 |
+| prose | 52 | 0.139 | 0.000 | 0.346 | 0.096 |
+
+**Caveat, stated rather than buried.** The probe measures *lexical* survival. For a **code** span the unique tokens are identifiers (`nummanufacturers`, a column name, a function name) and their absence is causally decisive — an identifier the assistant never sees cannot be used. For a **prose** span the unique tokens are often ordinary words (`bit`, `detail`, `provide`), so an editor that preserves the *meaning* in its own words scores as having removed the span. The prose rows are therefore a **lower bound** on preservation; the code rows are the trustworthy ones, and the 2x2 is repeated on code spans alone below.
+
+**strict (Fisher p<0.05) labels** — causally harmful n=1, causally useful n=0
 
 | | causally harmful | causally useful |
 |---|---|---|
-| **AC3 removed** | 0 | 0 |
+| **AC3 removed** | 1 | 0 |
 | **AC3 kept** | 0 | 0 |
 
-- pollution removal rate = n/a (0)
+- pollution removal rate = 100.0% (1/1)  [95% CI 20.7–100.0%]
 - preservation rate = n/a (0)
-- edit precision = n/a (0)  (base rate: harmful spans are n/a (0) of the labelled set)
+- edit precision = 100.0% (1/1)  (base rate: harmful spans are 100.0% (1/1) of the labelled set)
 
-**null-calibrated labels** — causally harmful n=7, causally useful n=4
-
-| | causally harmful | causally useful |
-|---|---|---|
-| **AC3 removed** | 6 | 4 |
-| **AC3 kept** | 1 | 0 |
-
-- pollution removal rate = 85.7% (6/7)  [95% CI 48.7–97.4%]
-- preservation rate = 0.0% (0/4)  [95% CI 0.0–49.0%]
-- edit precision = 60.0% (6/10)  (base rate: harmful spans are 63.6% (7/11) of the labelled set)
-
-**lenient (|delta|>=0.25) labels** — causally harmful n=8, causally useful n=4
+**null-calibrated labels** — causally harmful n=2, causally useful n=2
 
 | | causally harmful | causally useful |
 |---|---|---|
-| **AC3 removed** | 7 | 4 |
-| **AC3 kept** | 1 | 0 |
-
-- pollution removal rate = 87.5% (7/8)  [95% CI 52.9–97.8%]
-- preservation rate = 0.0% (0/4)  [95% CI 0.0–49.0%]
-- edit precision = 63.6% (7/11)  (base rate: harmful spans are 66.7% (8/12) of the labelled set)
-
-**Label-free aggregate test.** Mean causal effect of the spans AC3-Reset *removed* (61) minus that of the spans it *kept* (5): **-0.0605** (permutation p = 0.4954). A selective editor should score **positive**: it should be dropping the spans whose removal helps and keeping the spans whose removal hurts. This test uses no per-span label at all, so it is not limited by the per-span MDE.
-  - mean delta | removed = +0.0061 (n=61); kept = +0.0667 (n=5)
-  - analyzer gate opened on 0.970 of replicates
-
-### AC3-Rewrite  (replicates {'code_v2': 5, 'database_v2': 5}; 66 probe-admissible spans)
-
-**strict (Fisher p<0.05) labels** — causally harmful n=0, causally useful n=0
-
-| | causally harmful | causally useful |
-|---|---|---|
-| **AC3 removed** | 0 | 0 |
+| **AC3 removed** | 2 | 2 |
 | **AC3 kept** | 0 | 0 |
 
-- pollution removal rate = n/a (0)
-- preservation rate = n/a (0)
-- edit precision = n/a (0)  (base rate: harmful spans are n/a (0) of the labelled set)
+- pollution removal rate = 100.0% (2/2)  [95% CI 34.2–100.0%]
+- preservation rate = 0.0% (0/2)  [95% CI 0.0–65.8%]
+- edit precision = 50.0% (2/4)  (base rate: harmful spans are 50.0% (2/4) of the labelled set)
 
-**null-calibrated labels** — causally harmful n=7, causally useful n=4
+**lenient (|delta|>=0.25) labels** — causally harmful n=7, causally useful n=4
 
 | | causally harmful | causally useful |
 |---|---|---|
@@ -198,26 +203,85 @@ PC-other is the specificity control that matters: it shows the probe is testing 
 - preservation rate = 0.0% (0/4)  [95% CI 0.0–49.0%]
 - edit precision = 63.6% (7/11)  (base rate: harmful spans are 63.6% (7/11) of the labelled set)
 
-**lenient (|delta|>=0.25) labels** — causally harmful n=8, causally useful n=4
+**lenient, **code spans only** (the trustworthy probe) labels** — causally harmful n=3, causally useful n=0
 
 | | causally harmful | causally useful |
 |---|---|---|
-| **AC3 removed** | 8 | 4 |
+| **AC3 removed** | 3 | 0 |
 | **AC3 kept** | 0 | 0 |
 
-- pollution removal rate = 100.0% (8/8)  [95% CI 67.6–100.0%]
+- pollution removal rate = 100.0% (3/3)  [95% CI 43.8–100.0%]
+- preservation rate = n/a (0)
+- edit precision = 100.0% (3/3)  (base rate: harmful spans are 100.0% (3/3) of the labelled set)
+
+**Label-free aggregate test.** Mean causal effect of the spans AC3-Reset *removed* (61) minus that of the spans it *kept* (5): **-0.0139** (permutation p = 0.8500). A selective editor should score **positive**: it should be dropping the spans whose removal helps and keeping the spans whose removal hurts. This test uses no per-span label at all, so it is not limited by the per-span MDE.
+  - mean delta | removed = +0.0146 (n=61); kept = +0.0286 (n=5)
+  - analyzer gate opened on 0.970 of replicates
+
+### AC3-Rewrite  (replicates {'code_v2': 5, 'database_v2': 5}; 66 probe-admissible spans)
+
+**Graded survival** (mean fraction of the span's unique tokens reaching the assistant), so the binary keep/remove call can be audited:
+
+| span kind | n | mean survival | median | frac > 0 | frac >= 0.5 (= "kept") |
+|---|---|---|---|---|---|
+| all | 66 | 0.079 | 0.040 | 0.576 | 0.000 |
+| code | 14 | 0.026 | 0.000 | 0.357 | 0.000 |
+| prose | 52 | 0.094 | 0.050 | 0.635 | 0.000 |
+
+**Caveat, stated rather than buried.** The probe measures *lexical* survival. For a **code** span the unique tokens are identifiers (`nummanufacturers`, a column name, a function name) and their absence is causally decisive — an identifier the assistant never sees cannot be used. For a **prose** span the unique tokens are often ordinary words (`bit`, `detail`, `provide`), so an editor that preserves the *meaning* in its own words scores as having removed the span. The prose rows are therefore a **lower bound** on preservation; the code rows are the trustworthy ones, and the 2x2 is repeated on code spans alone below.
+
+**strict (Fisher p<0.05) labels** — causally harmful n=1, causally useful n=0
+
+| | causally harmful | causally useful |
+|---|---|---|
+| **AC3 removed** | 1 | 0 |
+| **AC3 kept** | 0 | 0 |
+
+- pollution removal rate = 100.0% (1/1)  [95% CI 20.7–100.0%]
+- preservation rate = n/a (0)
+- edit precision = 100.0% (1/1)  (base rate: harmful spans are 100.0% (1/1) of the labelled set)
+
+**null-calibrated labels** — causally harmful n=2, causally useful n=2
+
+| | causally harmful | causally useful |
+|---|---|---|
+| **AC3 removed** | 2 | 2 |
+| **AC3 kept** | 0 | 0 |
+
+- pollution removal rate = 100.0% (2/2)  [95% CI 34.2–100.0%]
+- preservation rate = 0.0% (0/2)  [95% CI 0.0–65.8%]
+- edit precision = 50.0% (2/4)  (base rate: harmful spans are 50.0% (2/4) of the labelled set)
+
+**lenient (|delta|>=0.25) labels** — causally harmful n=7, causally useful n=4
+
+| | causally harmful | causally useful |
+|---|---|---|
+| **AC3 removed** | 7 | 4 |
+| **AC3 kept** | 0 | 0 |
+
+- pollution removal rate = 100.0% (7/7)  [95% CI 64.6–100.0%]
 - preservation rate = 0.0% (0/4)  [95% CI 0.0–49.0%]
-- edit precision = 66.7% (8/12)  (base rate: harmful spans are 66.7% (8/12) of the labelled set)
+- edit precision = 63.6% (7/11)  (base rate: harmful spans are 63.6% (7/11) of the labelled set)
 
-**Label-free aggregate test.** Mean causal effect of the spans AC3-Rewrite *removed* (66) minus that of the spans it *kept* (0): **+nan** (permutation p = nan). A selective editor should score **positive**: it should be dropping the spans whose removal helps and keeping the spans whose removal hurts. This test uses no per-span label at all, so it is not limited by the per-span MDE.
+**lenient, **code spans only** (the trustworthy probe) labels** — causally harmful n=3, causally useful n=0
 
+| | causally harmful | causally useful |
+|---|---|---|
+| **AC3 removed** | 3 | 0 |
+| **AC3 kept** | 0 | 0 |
+
+- pollution removal rate = 100.0% (3/3)  [95% CI 43.8–100.0%]
+- preservation rate = n/a (0)
+- edit precision = 100.0% (3/3)  (base rate: harmful spans are 100.0% (3/3) of the labelled set)
+
+**Label-free aggregate test.** Not computable: AC3-Rewrite removed 66 spans and kept 0. An editor that removes *everything* leaves nothing to compare against, which is itself the answer — it is not selective.
   - analyzer gate opened on 1.000 of replicates
 
 ## 5. Context: raw accuracy of each arm on this corpus
 
 | arm | n conv | raw accuracy | 95% CI |
 |---|---|---|---|
-| Baseline (present, unedited) | 32 | 0.396 | [0.267, 0.535] |
+| Baseline (present, unedited) | 32 | 0.393 | [0.263, 0.525] |
 | AC3-Reset | 32 | 0.519 | [0.369, 0.681] |
 | AC3-Rewrite | 32 | 0.531 | [0.388, 0.675] |
 
@@ -225,8 +289,8 @@ These are the same conversations the ablation ran on, so the editing arms' gain 
 
 ### 5.1 Does removal of causally-harmful spans predict AC3's gain? (exploratory)
 
-* **AC3-Reset**: n = 6 conversations with at least one causally-harmful span; Pearson r between (fraction of harmful spans removed) and (accuracy gain) = **-0.376**. Underpowered by design — reported, not leaned on.
-* **AC3-Rewrite**: n = 6 conversations with at least one causally-harmful span; Pearson r between (fraction of harmful spans removed) and (accuracy gain) = **+nan**. Underpowered by design — reported, not leaned on.
+* **AC3-Reset**: n = 6 conversations with at least one causally-harmful span, and the predictor has **zero variance** — AC3-Reset removed 100-100% of the causally-harmful spans in every one of them. The correlation is undefined, and that is the substantive answer: you cannot ask whether *selective* removal predicts the gain when the editor is not selective. **Not answerable with this operator.**
+* **AC3-Rewrite**: n = 6 conversations with at least one causally-harmful span, and the predictor has **zero variance** — AC3-Rewrite removed 100-100% of the causally-harmful spans in every one of them. The correlation is undefined, and that is the substantive answer: you cannot ask whether *selective* removal predicts the gain when the editor is not selective. **Not answerable with this operator.**
 
 ## 6. What this does and does not cover
 

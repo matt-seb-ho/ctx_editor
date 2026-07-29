@@ -351,3 +351,102 @@ Main matrix **85/172** runs (≈ 49%), steady at 1.06 runs/min; projected finish
 Main matrix **120/172** (70%). Still 0 errors. Projected finish ≈ 19:08. Added `analyze.py` §6,
 the explicit "what this does and does not cover" list, so the final RESULTS.md carries its own
 limitations rather than leaving them to the summary message.
+
+---
+
+## 6. Matrix complete 19:12 — results
+
+172/172 runs, plus 20 AC3 alignment runs and 12 pilot runs. **3357 assistant turns, 0 errors,
+$62.80.** `metrics.json` and `run_summary.json` agree in every cell (trap 5 check runs inside
+`load_cond`, which prints on mismatch; it printed nothing).
+
+Final matrix: 14 present replicates, 12 ablation replicates per span, 8 control replicates,
+5 AC3 replicates per operator per task. 111 spans over 30 conversations (32 selected; 2 code
+conversations had no assistant message with ≥2 blocks so contributed no span).
+
+### 6.1 The controls, at full replicates
+
+| control | expected | measured | 95% CI | perm p | verdict |
+|---|---|---|---|---|---|
+| `ctl_filler` (contentless) | ≈ 0 | **+0.033** | [−0.010, +0.082] | 0.73 | PASS |
+| `ctl_harm` (T2A `H_PHANTOM_*`) | > 0 | **+0.368** | [+0.223, +0.512] | 1e-4 | PASS |
+| `ctl_answer` (full spec + gold SQL) | ≪ 0 | **−0.447** | [−0.574, −0.315] | < 1e-4 | PASS |
+
+Injecting T2A's pollutant drove accuracy to **0.010**; injecting the full spec drove it to
+**0.840**. The instrument resolves ±0.45 and reports ~0 for nothing.
+
+Probe controls: PC-identity 1.000, PC-nuke 0.000, PC-other 0.000, PC-self 1.000.
+
+### 6.2 A methodological correction I made after seeing the first full read
+
+My original "empirical null" took the 95th percentile of |effect| from `ctl_filler`. At full
+replicates that threshold is **0.339** — but the filler arm runs at 8 replicates against the
+present arm's 14, while the ablation arms run at 12 against 14. **The filler null is therefore
+systematically wider than the ablation noise**, and using it under-detects: it found 7 labelled
+spans against 5.6 expected, p = 0.32, i.e. nothing.
+
+That would have been a false negative caused by a mismatched null, which is the same family of
+error as the brief's "denominator that counted never-ran as gate-closed". Replaced with a
+**replicate-matched parametric null**: 2000 simulations that redraw every span under its own pooled
+base rate with the *actual* n_present = 14 and n_ablated = 12 and **no effect**. Result:
+
+| statistic | observed | null mean | null 95th pct | p |
+|---|---|---|---|---|
+| SD of per-span effect | **0.155** | 0.125 | 0.144 | **0.0085** |
+| # spans with abs(effect) ≥ 0.25 | **16** | 9.3 | 14 | **0.0170** |
+| # spans with Fisher p < 0.05 | 3 | 1.5 | 4 | 0.17 |
+
+So **natural spans do carry real causal effects** — the distribution is wider than noise and there
+is an excess of ~7 large-effect spans — while **the mean effect over all spans is +0.020
+[−0.010, +0.048]**, i.e. the typical natural span is inert. Pollution is concentrated in a minority
+of spans, not spread thinly across the context. Both the filler null and the matched null are
+reported, with the matched one flagged as the version to read.
+
+### 6.3 The alignment answer
+
+| operator | keeps | removal rate on causally harmful | preservation on causally useful | edit precision | base rate |
+|---|---|---|---|---|---|
+| AC3-Reset | 5/66 | 100.0% (7/7) | 0.0% (0/4) | 63.6% | 63.6% |
+| AC3-Rewrite | 0/66 | 100.0% (7/7) | 0.0% (0/4) | 63.6% | 63.6% |
+
+Edit precision equals the base rate exactly, for both operators: **neither is selective on natural
+spans.** The label-free aggregate test agrees — for Reset, the mean causal effect of removed spans
+minus kept spans is **−0.014 (permutation p = 0.85)**; for Rewrite it is not computable because it
+kept nothing, which is itself the answer.
+
+This *extends* T2A rather than contradicting it. T2A found Reset non-selective (edit precision 50.4%
+vs 50% chance) and Rewrite selective (27.0%/38.9%) — but on **injected** spans, which are short,
+self-contained sentences a compactor can copy verbatim. On **natural** spans, Rewrite's apparent
+selectivity disappears: it paraphrases the model's own verbose prose and code into its own words,
+and the distinctive tokens do not come through. Stated caveat: the probe measures *lexical*
+survival, so for prose spans a meaning-preserving paraphrase scores as removal. The 2×2 is therefore
+also reported on **code spans only**, where the unique tokens are identifiers and their absence is
+causally decisive: removal rate 100% (3/3), preservation n/a (no code span was labelled useful).
+
+### 6.4 Closing the loop — not answerable, and why
+
+The TODO's follow-on (does the fraction of harmful spans removed predict the accuracy gain?) has a
+**zero-variance predictor**: both operators removed 100% of the causally-harmful spans in all 6
+conversations that had one. You cannot correlate selectivity with outcome when the editor is not
+selective. Reported as not answerable with these operators rather than as a null result.
+
+### 6.5 End-to-end on the same corpus (raw accuracy)
+
+Baseline 0.393 [0.263, 0.525] · AC3-Reset 0.519 [0.369, 0.681] · AC3-Rewrite 0.531 [0.388, 0.675].
+
+---
+
+## 7. Artifacts
+
+| file | what |
+|---|---|
+| `RESULTS.md` | the report |
+| `per_span.json` | 111 spans: effect, Newcombe CI, Fisher p, three labellings |
+| `per_span_alignment.json` | the 66 probe-admissible spans + per-operator keep/remove and graded survival |
+| `spans.jsonl` | span manifest (position, kind, text) |
+| `selection.json`, `selection_report.json` | the 32 conversations and the pilot rates they were chosen on |
+| `build_corpus.py` | corpus builder (span splitting, ablation, controls) |
+| `select_conversations.py` | pilot-based selection |
+| `measure_lib.py`, `analyze.py` | stats + report generator |
+| `run_pilot.sh`, `run_main.sh`, `run_ac3.sh` | the runs |
+| `outputs/T2B/` | 205 run directories |
