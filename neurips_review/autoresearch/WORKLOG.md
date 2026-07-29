@@ -378,3 +378,6 @@ This is the most dangerous single item found tonight. An error that inflates our
 **T14's recommendation (endorsed):** report **raw** as primary; keep the pool filter as the only FN adjustment; **delete per-run `adjusted_accuracy`**; rewrite `tex:478-480` (it claims "all user simulator messages"; the code collates only the visible ones); and **fix the ERGO/Gated-Reset denominators first.**
 
 **Controls:** shipped metric reproduced to 1e-6 across 499 runs; 0 cross-file mismatches; no archived run hit the TRAPI FN no-op condition.
+- **16:01** Heartbeat tick. All 3 fresh and healthy — T6 worklog 2m with three `run_parallel.py` workers, T17 worklog 3m (it logged within three minutes of dispatch), T2B worklog 8m with a baseline arm running. No dispatch, no pivot; the queue is empty.
+
+  The two open severe items are both in flight: **F37** (do the published tau2 baselines replicate — T6) and **F42** (ERGO scored on unfiltered denominators — T17). Everything else this session has either landed or been retired.

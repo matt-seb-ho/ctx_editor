@@ -372,3 +372,56 @@ it because it is directionally consistent across independent runs, but tau2 at n
 cannot resolve a 10 pp effect."* Do not upgrade this to "we fixed it" or "it was noise".
 
 Status 15:32: gpt5_4 s0/s2 done, s1 running. dsv4f s2 16/60. kimi s2 27/60. 0 FAILED.
+
+## 16:02 UTC — gpt-5.4 Augment is coming back at HALF its published value. Checked hard; not a harness fault.
+
+| Model | Arm | rep1 | rep2 | rep3(partial) | mean ± sd | published |
+|---|---|---|---|---|---|---|
+| gpt-5.4 | AC3-Augment | 42.1 | 52.6 | (2 tasks in) | **48.2 ± 5.5** | **84.2** |
+
+Paired vs Baseline over 40 pairs: **-20.0 pp, exact sign test p = 0.039**. i.e. in this
+environment Augment *significantly hurts* gpt-5.4, where the paper reports it as the
+headline tau2 win (+15.8 pp). This is the single most alarming number of the run, so I
+went looking for a harness fault before believing it:
+
+- **Analyzer is alive and producing real content.** Dumped `analysis_log` from the
+  seed-42 traces: 18/20 carry entries with a populated `task_spec` and a detailed
+  `valid_progress` (real tool-call values, customer ids, diagnostics). The 2 empty ones
+  are conversations that ended before the `min_turns=2` warm-up — expected.
+- **Arm is firing.** median 2 analyses per rollout on s1, same as s2.
+- **No degenerate terminations.** gpt5_4 s1: **42/42 `user_stop`**, zero `max_steps`.
+  Median message count 24 — identical to baseline's 24. Augment is not blowing up the
+  context or stalling the agent; it is losing on task outcomes.
+- **Gating is as designed** (`ctx_edit/agents.py:589-597`): Augment has no `needs_edit`
+  gate, it fires whenever warm. Behaviour matches the code.
+
+I could not find a defect. Recording it as a genuine measurement in this environment.
+
+### The pattern across all arms so far
+
+Published-vs-remeasured differences are large **in both directions**:
+
+| cell | published | remeasured | delta |
+|---|---|---|---|
+| gpt-5.4 Baseline | 68.4 | 68.4 ± 13.9 | 0 |
+| gpt-5.4 Augment | 84.2 | 48.2 ± 5.5 | **-36** |
+| gpt-5.4 Gated-Reset | 52.6 | 57.9 ± 21.1 | +5 |
+| DSV4F Baseline | 31.6 | 70.2 ± 11.0 | **+39** |
+| DSV4F Gated-Reset | 47.4 | 76.2 ± 21.6 | **+29** |
+| Kimi Baseline | 26.3 | 78.9 ± 0.0 | **+53** |
+| Kimi Gated-Reset | 68.4 | 71.9 ± 11.0 | +4 |
+
+Two-directional, up to 50 pp. If the cause were a systematic environment difference
+(different analyzer snapshot, different transport) I would expect a consistent sign.
+A mix of +50 and -36 is what an **n=19 benchmark read once** looks like. The DSV4F and
+Kimi *baselines* still look like the infrastructure-degradation story (see 15:10), but
+gpt-5.4 Augment cannot be explained that way — its baseline reproduced exactly.
+
+**Bottom line forming: the tau2 row of the paper is N=1 on a benchmark whose 1-sigma
+replicate spread is 11-21 pp. Individual cells are not reproducible, and neither the
+wins nor the losses in that row should be quoted as point estimates.** That is a
+stronger and more useful answer to reviewer iNYK than a tidied-up table would be, but
+it is bad news for the tau2 row as currently written.
+
+Status 16:02: gpt5_4 s1 42/60; dsv4f s2 40/60; kimi s1 11/60. 0 FAILED anywhere.
+Remaining: gpt5_4 {s1,s3,ao}, dsv4f {s2,s1,s3,ao}, kimi {s1,s3,ao}. ETA ~19:00 UTC.
