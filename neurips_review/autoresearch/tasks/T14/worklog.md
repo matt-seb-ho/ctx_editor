@@ -274,3 +274,88 @@ On non-reset arms the shipped and symmetric inputs are identical, so shipped-vs-
 agreement there is a **direct measurement of judge-model drift** (gpt-5-mini → gpt-5.4-mini) —
 and it is ~0. On the reset arm the shipped judge excluded 20/20 and the symmetric judge 0/20.
 That is the whole finding in one line.
+
+### ~T+150min — ⚠ TWO QUALITATIVE CONCLUSIONS FLIP. Full corrected matrix below.
+
+Arm-symmetric re-judge complete on `post_neurips_ac3_phase1`: deepseek-v4-flash, 4 tasks × 6
+arms × 3 replicate runs = 72 cells, **1217 incorrect samples re-judged, 0 errors, 0 missing
+traces**. Judge `gpt-5.4-mini_2026-03-17` on trapi, concurrency 5.
+Artifacts: `rejudge_post_neurips_ac3_phase1_symmetric.json`, `corrected_matrix.json`,
+`corrected_matrix.txt`.
+
+**Controls, stated:**
+- **C1 — judge-model drift is not the effect.** On the three arms that never reset, the
+  symmetric input *is* the shipped input, so any shipped-vs-symmetric difference is pure
+  gpt-5-mini→gpt-5.4-mini drift (and the forced `temperature=1.0` for gpt-5-class judges).
+  Measured: **34 decision changes over 610 judged samples = 5.6%**. On the three reset arms the
+  same comparison gives **448 over 607 = 73.8%**. 13× separation, and the 5.6% floor bounds how
+  much of the reset-arm effect could be judge noise.
+- **C2 — the mechanism, measured.** Mean *user turns the judge actually saw* per sample:
+  symmetric view 4.9–5.4 for every arm (flat by construction). Shipped view for AC3-Rewrite:
+  **1.00**. Exactly one shard, exactly as `format_user_messages` + `reset_conversation` predict.
+- **C3 — shipped numbers reproduced.** `correct/(n − shipped_excluded)` reproduces every
+  archived `adjusted_accuracy` to 1e-6 across 499 runs (see T+70min entry).
+
+#### Corrected matrix — shipped-adjusted vs raw vs arm-symmetric
+
+n and correct are pooled over the 3 replicate runs per cell.
+
+| arm | task | n | correct | RAW | shipped excl | SHIPPED-ADJ | sym excl | SYM-ADJ | shipped−raw | sym−raw |
+|---|---|---|---|---|---|---|---|---|---|---|
+| Baseline | math | 144 | 104 | 72.2% | 3/40 | 73.8% | 3/40 | 73.8% | +1.5 | +1.5 |
+| Baseline | code | 113 | 39 | 34.5% | 11/74 | 38.2% | 5/74 | 36.1% | +3.7 | +1.6 |
+| Baseline | database | 147 | 33 | 22.4% | 1/114 | 22.6% | 2/114 | 22.8% | +0.2 | +0.3 |
+| Baseline | actions | 150 | 114 | 76.0% | 3/36 | 77.6% | 0/36 | 76.0% | +1.6 | +0.0 |
+| AO | math | 144 | 124 | 86.1% | 1/20 | 86.7% | 3/20 | 87.9% | +0.6 | +1.8 |
+| AO | code | 113 | 68 | 60.2% | 11/45 | 66.7% | 6/45 | 63.6% | +6.5 | +3.4 |
+| AO | database | 147 | 67 | 45.6% | 1/80 | 45.9% | 1/80 | 45.9% | +0.3 | +0.3 |
+| AO | actions | 150 | 129 | 86.0% | 7/21 | 90.2% | 2/21 | 87.2% | +4.2 | +1.2 |
+| AC3-Augment | math | 144 | 121 | 84.0% | 1/23 | 84.6% | 1/23 | 84.6% | +0.6 | +0.6 |
+| AC3-Augment | code | 113 | 66 | 58.4% | 9/47 | 63.5% | 6/47 | 61.7% | +5.1 | +3.3 |
+| AC3-Augment | database | 147 | 61 | 41.5% | 1/86 | 41.8% | 1/86 | 41.8% | +0.3 | +0.3 |
+| AC3-Augment | actions | 150 | 126 | 84.0% | 7/24 | 88.1% | 2/24 | 85.1% | +4.1 | +1.1 |
+| **AC3-Reset** | math | 144 | 118 | 81.9% | **25/26** | **99.2%** | 4/26 | 84.3% | **+17.2** | +2.3 |
+| **AC3-Reset** | code | 113 | 67 | 59.3% | **42/46** | **94.4%** | 7/46 | 63.2% | **+35.1** | +3.9 |
+| **AC3-Reset** | database | 147 | 72 | 49.0% | **44/75** | **69.9%** | 1/75 | 49.3% | **+20.9** | +0.3 |
+| **AC3-Reset** | actions | 150 | 125 | 83.3% | **24/25** | **99.2%** | 1/25 | 83.9% | **+15.9** | +0.6 |
+| **AC3-Gated-Reset** | math | 144 | 119 | 82.6% | **25/25** | **100.0%** | 3/25 | 84.4% | **+17.4** | +1.8 |
+| **AC3-Gated-Reset** | code | 113 | 63 | 55.8% | **43/50** | **90.0%** | 5/50 | 58.3% | **+34.2** | +2.6 |
+| **AC3-Gated-Reset** | database | 147 | 73 | 49.7% | **47/74** | **73.0%** | 0/74 | 49.7% | **+23.3** | +0.0 |
+| **AC3-Gated-Reset** | actions | 150 | 128 | 85.3% | **21/22** | **99.2%** | 1/22 | 85.9% | **+13.9** | +0.6 |
+| **AC3-Rewrite** | math | 144 | 106 | 73.6% | **37/38** | **99.1%** | 2/38 | 74.6% | **+25.5** | +1.0 |
+| **AC3-Rewrite** | code | 113 | 32 | 28.3% | **75/81** | **84.2%** | 9/81 | 30.8% | **+55.9** | +2.5 |
+| **AC3-Rewrite** | database | 147 | 41 | 27.9% | **61/106** | **47.7%** | 1/106 | 28.1% | **+19.8** | +0.2 |
+| **AC3-Rewrite** | actions | 150 | 111 | 74.0% | **39/39** | **100.0%** | 1/39 | 74.5% | **+26.0** | +0.5 |
+
+Inflation for no-reset arms: **+0.2 to +6.5 pp**. For reset arms: **+13.9 to +55.9 pp**.
+After the correction, adjusted ≈ raw everywhere (**+0.0 to +3.9 pp**, uniform across arms) —
+which is the definition of the metric behaving.
+
+#### ⚠ FLIPS — two of them
+
+Δ vs Baseline, per task:
+
+| arm | task | Δ raw | Δ shipped-adj | Δ sym-adj | |
+|---|---|---|---|---|---|
+| AC3-Reset | math / code / database / actions | +9.7 / +24.8 / +26.5 / +7.3 | +25.4 / +56.1 / +47.3 / +21.7 | +10.5 / +27.1 / +26.6 / +7.9 | holds |
+| AC3-Gated-Reset | math / code / database / actions | +10.4 / +21.2 / +27.2 / +9.3 | +26.2 / +51.8 / +50.4 / +21.7 | +10.6 / +22.2 / +26.9 / +9.9 | holds |
+| **AC3-Rewrite** | **code** | **−6.2** | **+46.0** | **−5.3** | **FLIP** |
+| **AC3-Rewrite** | **actions** | **−2.0** | **+22.4** | **−1.5** | **FLIP** |
+| AC3-Rewrite | math / database | +1.4 / +5.4 | +25.3 / +25.1 | +0.9 / +5.3 | holds (barely) |
+
+**AC3-Rewrite beats baseline in all four cells under the shipped metric and LOSES to baseline in
+two of four under the correction.** On code it goes from +46.0 pp ahead to 5.3 pp *behind*. That
+is a win turning into a loss, driven entirely by the metric.
+
+**Scope of the flip — do not overstate it.** `tab:main` has **no AC3-Rewrite LiC row**, and
+`tab:megatable`, where AC3-Rewrite does appear, is computed from raw
+(`scripts/build_mega_table.py:87-96`). So this flip is **not currently a published error**. It is
+a demonstration that the metric is capable of manufacturing a win from a loss, on our own arm,
+on our own data — which is the strongest possible argument for removing it, and the thing a
+reviewer would find if they ran our pipeline.
+
+**Conclusions that do hold:** AC3-Reset and AC3-Gated-Reset beat Baseline in **every one of the
+8 cells** under raw, shipped-adjusted and arm-symmetric alike. The Gated-vs-Reset ordering is
+preserved cell-for-cell across all three metrics (Gated ahead on math/database/actions, Reset
+ahead on code) — the one exception is that the shipped metric ties them on actions (99.2 vs
+99.2) purely because both are pinned near the 100% ceiling by exclusion.
