@@ -316,3 +316,6 @@ A 200-draw random-order resimulation puts Augment's published value inside the i
 **Positive controls pass** (intact vs a degraded copy of itself, both orders, n=20 pairs each): gpt-5-mini 39/40, DeepSeek 36/40, Kimi 40/40; zero cases of the degraded copy winning outright for gpt-5-mini/Kimi.
 
 **F33 — incidental:** the judge never ran at temperature 0. The client logs `gpt-5 models require temperature=1.0, overriding 0.0 -> 1.0`. Any claim that judging was deterministic is wrong; the 96.9% self-consistency figure is the honest substitute.
+- **15:24** Heartbeat tick. All 3 healthy, no intervention. T6 worklog 5m with three `run_parallel.py` workers; T14 worklog 2m, extracting `outputs/`, `scripts/` and `docs/` from `snapshot.tar.gz` to reach the historical runs it needs; T15 dispatched 5 min ago, no worklog yet as expected. No dispatch — the queue is empty apart from the deliberately deferred T2B.
+
+  **Session shape from here:** T6 (tau2 replicates) and T14 (FN-adjustment audit) are the last two results outstanding, and T15 is writing `replies/v5/` around clearly-marked placeholders for both. T14 is the one that could still move numbers — it may reduce the paper's headline LiC magnitudes, which is why every LiC figure in v5 is flagged provisional.
