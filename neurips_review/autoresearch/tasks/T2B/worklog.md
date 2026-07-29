@@ -255,3 +255,48 @@ abl4 12/11, ctl_filler 17/15, ctl_harm 13/11, ctl_answer 17/15. 111 spans total
 Both branches of T2A's `carried_context()` therefore fire correctly on T2B traces, so the alignment
 probe will not be silently reading an empty string (which is exactly how a "0.0 removal rate"
 harness fault would look).
+
+---
+
+## 4. Analysis pipeline built and dry-run against partial data (16:30–16:47)
+
+`measure_lib.py` (stats + probe) and `analyze.py` (RESULTS.md generator). T2A is reused directly:
+`analyze.py` imports `carried_context()` and `full_body()` from `tasks/T2A/measure.py`, so the
+definition of "the context AC3 actually handed the assistant" is **literally the same function** in
+both studies, including its handling of the Rewrite (`context_compaction`) log schema and its
+exclusion of `issues`.
+
+Dry-run on 1–2 replicates confirmed the whole pipeline runs end to end and, more usefully, that the
+**probe controls behave**:
+
+| probe control | expected | measured (66 admissible spans) |
+|---|---|---|
+| PC-identity — carried context = the full unedited conversation | 1.00 | **1.000** |
+| PC-nuke — carried context = "" | 0.00 | **0.000** |
+| PC-other — carried context = the conversation *minus this span* | 0.00 | **0.000** |
+
+PC-other is the one that matters: it proves the probe is testing *this span* rather than the
+conversation's general vocabulary. It is 0 by construction (uniqueness is defined against the rest
+of the conversation), which is precisely why spans without ≥2 unique tokens are **excluded** rather
+than guessed at — 66 of 111 spans (59.5%) are probe-admissible.
+
+### 4.1 Empirical null added — using the negative control as the noise floor
+
+A fixed threshold like |delta| ≥ 0.25 is arbitrary and, at these replicate counts, roughly 1.3
+standard errors — so a meaningful share of truly inert spans would clear it by chance. Rather than
+argue about the threshold I take it from the data: **`ctl_filler` is a genuine null ablation**
+(a contentless span removed from a real conversation, scored by exactly the ablation code path), so
+the 95th percentile of its |effect| distribution is an empirical noise floor. Three labellings are
+now reported side by side:
+
+1. **strict** — two-sided Fisher exact p < 0.05 (conservative; resolves only large effects);
+2. **null-calibrated** — |delta| above the 95th percentile of the filler null (the principled one);
+3. **lenient** — |delta| ≥ 0.25 (exploratory, reported for continuity with T2A's framing).
+
+The 2×2 alignment table is produced under all three.
+
+### 4.2 Status at 16:47
+
+Main matrix 24/172 runs; AC3 alignment 3/12 runs. Rate is steady at ≈ 1.1 runs/min and the AC3
+stream (running at `max_concurrent=3` alongside the main stream's 5) has not slowed it. Projected
+finish ≈ 19:00 for the matrix.

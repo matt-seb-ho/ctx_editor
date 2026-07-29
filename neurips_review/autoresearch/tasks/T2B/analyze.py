@@ -229,11 +229,47 @@ def main() -> int:
     P()
 
     # ------------------------------------------------------------ the split #
+    # ---- empirical null calibration from the filler control -------------- #
+    null_deltas = []
+    facc, _ = ctls["ctl_filler"]
+    for k, v in facc.items():
+        if k in present and len(v) >= 2 and len(present[k]) >= 2:
+            null_deltas.append(sum(present[k]) / len(present[k]) - sum(v) / len(v))
+    tau_null = None
+    if len(null_deltas) >= 10:
+        a = sorted(abs(x) for x in null_deltas)
+        tau_null = a[min(len(a) - 1, int(math.ceil(0.95 * len(a))) - 1)]
+    for r in rows:
+        r["label_null"] = (
+            "inconclusive" if tau_null is None
+            else "harmful" if r["delta"] > tau_null
+            else "useful" if r["delta"] < -tau_null
+            else "inconclusive"
+        )
+    P("### 2.1 Empirical null, taken from the negative control")
+    P()
+    if tau_null is not None:
+        P(f"`ctl_filler` gives {len(null_deltas)} genuine null ablations (a contentless span removed "
+          f"from a real conversation), scored by exactly the ablation code path. Their |effect| "
+          f"distribution is the empirical noise floor:")
+        P()
+        P(f"* mean {sum(null_deltas)/len(null_deltas):+.4f}, "
+          f"mean |effect| {sum(abs(x) for x in null_deltas)/len(null_deltas):.4f}, "
+          f"max |effect| {max(abs(x) for x in null_deltas):.4f}")
+        P(f"* **95th percentile of |effect| under the null = {tau_null:.3f}** — used below as the "
+          f"data-driven threshold `TAU_null`. The filler control runs at fewer replicates than the "
+          f"ablation arms, so its noise floor is if anything *wider* than the ablation arms', which "
+          f"makes this threshold conservative.")
+    else:
+        P("Not enough filler replicates yet for an empirical null.")
+    P()
+
     P("## 3. Per-span causal labels")
     P()
     P(f"Spans with a usable comparison: **{len(rows)}** of {len(spans)}.")
     P()
     for name, key in (("strict (two-sided Fisher p < 0.05)", "label_strict"),
+                      ("null-calibrated (|delta| > 95th pct of the filler null)", "label_null"),
                       ("lenient (|delta| >= %.2f, point estimate)" % TAU, "label_lenient")):
         c = Counter(r[key] for r in rows)
         P(f"* **{name}**: harmful {c['harmful']}, useful {c['useful']}, "
@@ -280,6 +316,8 @@ def main() -> int:
 
     # ---------------------------------------------------------- alignment #
     write_alignment(rows)
+
+    write_endtoend(rows)
 
     with open(os.path.join(HERE, "RESULTS.md"), "w") as f:
         f.write("\n".join(LINES) + "\n")
@@ -349,7 +387,7 @@ def write_alignment(rows):
     P()
     P("PC-other is the specificity control that matters: it shows the probe is testing *this span*, "
       "not the conversation's general vocabulary. It is 0 by construction because uniqueness is "
-      "defined against the rest of the conversation — which is exactly why unpr obeable spans are "
+      "defined against the rest of the conversation — which is exactly why unprobeable spans are "
       "excluded rather than guessed at.")
     P()
 
@@ -370,7 +408,9 @@ def write_alignment(rows):
         usable = [r for r in adm if r.get(f"{arm}_kept") is not None]
         P(f"### {arm}  (replicates {reps}; {len(usable)} probe-admissible spans)")
         P()
-        for lname, lkey in (("strict", "label_strict"), ("lenient", "label_lenient")):
+        for lname, lkey in (("strict (Fisher p<0.05)", "label_strict"),
+                            ("null-calibrated", "label_null"),
+                            ("lenient (|delta|>=%.2f)" % TAU, "label_lenient")):
             H = [r for r in usable if r[lkey] == "harmful"]
             U = [r for r in usable if r[lkey] == "useful"]
             hr = sum(1 for r in H if not r[f"{arm}_kept"])
@@ -411,6 +451,69 @@ def write_alignment(rows):
         [{k: v for k, v in r.items() if not k.startswith("_")} for r in adm],
         open(os.path.join(HERE, "per_span_alignment.json"), "w"), indent=1,
     )
+
+
+def write_endtoend(rows):
+    """Section 5 -- raw accuracy of the three arms on exactly this corpus, plus
+    the TODO's 'close the loop' test: does the fraction of causally-harmful spans
+    AC3 removes predict its accuracy gain on that conversation?"""
+    P("## 5. Context: raw accuracy of each arm on this corpus")
+    P()
+    present, _ = load_cond("present")
+    arms = {}
+    for arm in ("reset", "rewrite"):
+        acc = defaultdict(list)
+        for d in sorted(glob.glob(os.path.join(OUT, f"ac3{arm}_*_r*"))):
+            m = re.match(rf"^ac3{arm}_(database_v2|code_v2)_r(\d+)$", os.path.basename(d))
+            if not m or not os.path.exists(os.path.join(d, "run_summary.json")):
+                continue
+            for r in json.load(open(os.path.join(d, "results.json"))):
+                acc[(m.group(1), r["sample_id"])].append(int(bool(r["is_correct"])))
+        arms[arm] = acc
+    P("| arm | n conv | raw accuracy | 95% CI |")
+    P("|---|---|---|---|")
+    for name, acc in (("Baseline (present, unedited)", present),
+                      ("AC3-Reset", arms["reset"]), ("AC3-Rewrite", arms["rewrite"])):
+        keys = [k for k in acc if acc[k]]
+        if not keys:
+            P(f"| {name} | 0 | not run | — |")
+            continue
+        per = [sum(acc[k]) / len(acc[k]) for k in keys]
+        lo, hi = boot_mean_ci(per)
+        P(f"| {name} | {len(keys)} | {sum(per)/len(per):.3f} | [{lo:.3f}, {hi:.3f}] |")
+    P()
+    P("These are the same conversations the ablation ran on, so the editing arms' gain and the "
+      "span-level causal effects are measured on one population. Raw accuracy throughout.")
+    P()
+    # close the loop
+    P("### 5.1 Does removal of causally-harmful spans predict AC3's gain? (exploratory)")
+    P()
+    for arm in ("AC3-Reset", "AC3-Rewrite"):
+        key = arm.split("-")[1].lower()
+        acc = arms[key]
+        xs, ys = [], []
+        by_conv = defaultdict(list)
+        for r in rows:
+            if r.get(f"{arm}_kept") is not None and r.get("label_null") in ("harmful", "useful"):
+                by_conv[(r["task"], r["sample_id"])].append(r)
+        for k, rs in by_conv.items():
+            H = [r for r in rs if r["label_null"] == "harmful"]
+            if not H or k not in acc or k not in present or not acc[k] or not present[k]:
+                continue
+            xs.append(sum(1 for r in H if not r[f"{arm}_kept"]) / len(H))
+            ys.append(sum(acc[k]) / len(acc[k]) - sum(present[k]) / len(present[k]))
+        if len(xs) >= 5:
+            mx, my = sum(xs) / len(xs), sum(ys) / len(ys)
+            num = sum((a - mx) * (b - my) for a, b in zip(xs, ys))
+            den = math.sqrt(sum((a - mx) ** 2 for a in xs) * sum((b - my) ** 2 for b in ys))
+            rho = num / den if den else float("nan")
+            P(f"* **{arm}**: n = {len(xs)} conversations with at least one causally-harmful span; "
+              f"Pearson r between (fraction of harmful spans removed) and (accuracy gain) = "
+              f"**{rho:+.3f}**. Underpowered by design — reported, not leaned on.")
+        else:
+            P(f"* **{arm}**: too few conversations with a labelled harmful span "
+              f"({len(xs)}) to correlate. **Not established.**")
+    P()
 
 
 _BODY_CACHE: dict = {}
