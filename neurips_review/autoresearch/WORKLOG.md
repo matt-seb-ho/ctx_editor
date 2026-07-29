@@ -679,3 +679,13 @@ So the honest position is: **the tau2 comparison must be withdrawn.** AC3 does n
 - **20:46** Heartbeat tick. T29 and T30 dispatched 9 min ago; no worklogs yet, which is expected. **0 live processes, and that is correct** — both are zero-API writing/reading tasks with no subprocess signature, so `pgrep` is uninformative for them and worklog mtime is the only usable liveness signal. Worth noting explicitly because the same reading on an *experiment* task would be a stall indicator; the check has to be interpreted against what the task actually does.
 
   Queue empty, every experiment complete, no dispatch, no pivot. The session is now purely in consolidation: `HANDOFF.md` refresh and the end-to-end coherence pass over `replies/v5/`.
+
+- **20:55** `T29` returned **DONE**. `HANDOFF.md` refreshed in place at F1–F83 / D1–D21, committed alone (`60b9e3f`). It verified every claim against `WORKLOG.md` and the task worklogs rather than my brief, and correctly left T30's uncommitted `replies/v5/` edits untouched.
+
+**F84 — ⚠️ New top-level item: `replies/v5/` is rewritten around the tau2 withdrawal, but the *paper* is not.** That is now **PAPER-11**, and it is much larger than the other paper items because tau2 is threaded through the whole document: **abstract, Fig. 1, introduction, `tab:megatable`, the tau2 results section, discussion, and conclusion**. I had been tracking the withdrawal as a rebuttal edit; it is also a substantial paper edit, and nobody had said so until T29 traced it.
+
+Importantly, **PAPER-11 does not block posting** — it is a *withdrawal*, so it is camera-ready-mandatory rather than rebuttal-blocking. **PAPER-7 (the ERGO `tab:main` fix, 1–2 h) remains the only item that gates posting**, because v5 commits us to that correction in front of the reviewers in five places.
+
+**The counterweight, which T29 correctly places in the same breath rather than in a separate "positives" section:** T27/M11 closed the Area Chair's baseline reservation — neutral condenser 51.4% vs full context 56.1%, landing between our own prompt's two replicates, AC3 +24.3 / +22.4 pp, and **0 errors flagged in 340 summaries** with the "find errors" clause removed. M15 gives +15.4 pp, 95% CI [+11.5, +19.4]. **All eight LiC cells still win under raw, shipped-adjusted and corrected accuracy alike.**
+
+Left unsmoothed, as it should be: gpt-5.4's tau2 AC3 collapse (84.2 → 47.4) is unexplained, and the real fork bug found accounts for only +2.3 pp of it.
