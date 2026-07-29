@@ -102,3 +102,19 @@ Consequences, in order of severity:
 - **10:46** Heartbeat tick — **first intervention.** T12-T13's worklog crossed the 45-min staleness threshold (47m), but a process-level check showed it had launched two `append_analysis_memory` replay runs one minute earlier, so it was alive and working, just not logging. Nudged it to log incrementally rather than restarting. T8 (worklog 1m old, now on `collabllm_baseline` / bigcodebench) and T2c (20m) both healthy.
 
   **Rule refinement (D5):** worklog mtime alone produces false-positive stalls. Escalation is now two-stage — mtime > 45 min triggers a *process check*; nudge if a live process exists, restart only if there is neither a live process nor recent output writes. Naively restarting on mtime would have killed a healthy run mid-replicate.
+
+- **11:00** `T2c` returned **DONE**. Logs: `tasks/T2c/worklog.md`, `tasks/T2c/RESULTS.md` (+ scripts and label files).
+
+**F10 — The auditing interpretation survives on code and database, and must be conceded on math.** This is the answer to 5YHP's mechanism challenge, and it is stronger for being partial.
+
+Analyzer text was already persisted (`traces/<task>/<strategy>/<sample>.json` → `conversation_analysis`, `context_edit_output.edited_context`), so no re-runs were needed. Venue: the paper's phase-1 LiC replay matrix (DeepSeek-V4-Flash, 4 tasks × 3 prefixes, 554 samples), recovered from `blob_staging/snapshot.tar.gz`. `rebuttal_random/` was correctly rejected as primary — baseline sits at 87.5% there, so no power. Replay makes the arms sample- and prefix-matched, so pairing is exact at `(task, conv, sample_id)`.
+
+**Leakage base rate (strict: injected text verified to contain the *correct* answer):** math 38% (n=144), code **0%** (n=106), database 1% (n=147), actions 2% (n=150); **overall 11%** (n=547). A model-free numeric probe on math independently returns 40% against the LLM's 38% — two methods converging is what makes this quotable.
+
+**Paired gain on the NO_LEAK subset (exact McNemar):** math+code+database, n=329, **36.5% → 57.1% = +20.7pp [+14.8, +25.3], p < 0.0001.** Code alone +30.2pp with *zero* leaks; database +26.0pp with one. Gated-Reset replicates it (+19.6pp, n=311). Under the looser judge label the NO_LEAK gain is *larger* than the LEAK gain (+24.5 vs +17.3), so both label definitions agree.
+
+**Math is the exception and we should concede it outright.** NO_LEAK n=77 gives **−2.6pp [−11.9, +7.6]** — math's entire +9.7pp sits on the leaking subset. The reason is principled rather than embarrassing: on GSM8K, to say "your total of 3,270 is wrong because year 9 is 0" you must compute the right total. Auditing and solving are not separable on that task. Conceding this and holding code/database is far more credible than claiming the mechanism everywhere.
+
+**Classifier honesty.** The raw 3-way label is not trustworthy — two prompts failed validation, and v3 scores only 10/24 exact on a held-out draw (12/13 errors are over-calls). So the agent measured the quantity that actually matters: **precision of the NO_LEAK label = 29/32 (91%)**, with all three errors on math and 24/24 on database/code/actions. Primary numbers use a stricter union detector (answer-verification + numeric probe), not the raw label. Reporting a validated sub-metric instead of an unvalidated headline label is the right call.
+
+**Caveat to state in the rebuttal ourselves:** this conditions on a post-treatment variable. Baseline accuracy is 36.5% on NO_LEAK vs 75.0% on LEAK — the analyzer leaks on easy items — so the *between*-stratum contrast is not causal, though the within-stratum paired test is valid. Single model, one run per cell.

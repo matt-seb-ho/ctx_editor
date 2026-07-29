@@ -198,19 +198,87 @@ First five ids per ordering (for audit):
 
 ## 6. Results
 
-*(filled in as runs land — see the two paste-ready tables at the end)*
+### 6.0 Verification that the manipulation is real (per orchestrator reminder)
 
-### Reference cells
+- **`seed=` is not used anywhere in this task.** RECON §0.1 documents that `cfg.seed` is inert on the LiC harness. Orderings are materialised as **four physical data files per task** (`data/dev_<task>_ord{0,1001,1002,1003}.json`) whose element order differs; `load_samples` (`run_experiment.py:87-110`) preserves file order through the task filter, and `BatchedRunner._batches` (`batched.py:72`) slices `problems[i:i+batch_size]` in that order, so the file order *is* the cheatsheet-construction order. Confirmed empirically as well: the four orderings produce four **different** cheatsheets (mean pairwise content-word Jaccard 0.30, §6.3) and four different accuracies — which could not happen if the shuffle were inert.
+- **`false_negative_analysis.model=gpt-5.4-mini_2026-03-17` is passed on every cell** via the `COMMON` array in both driver scripts. All FN-adjusted numbers below therefore come from a model that TRAPI actually serves. On these replay cells the FN adjustment is almost always a no-op anyway (0 user-sim-induced on 8 of 10 database cells), which is expected: replay fixes the user trajectory.
 
-| Cell | Task | n | Raw acc | FN-adjusted | Cost | Dir |
-|---|---|---:|---:|---:|---:|---|
-| Augment, no memory (`ref_nomem`) | database | 25 | 36.00% (9/25) | 36.00% | $0.237 | `outputs/T12_T13/database/ref_nomem` |
+### 6.1 T12 — order sensitivity, LiC-database (n=25, the paper's biggest memory cell)
 
-Sanity check: the paper's Table-1 Augment/database cell is 32.0% on gpt-5-mini; we get 36.0% on gpt-5.4-mini on the same 25 instances and the same replay traces. The venue replicates.
+Reference: **Augment, no memory = 36.0% (9/25)**. (Paper's Table-1 Augment/database cell is 32.0% on gpt-5-mini; we get 36.0% on gpt-5.4-mini on the same 25 instances and the same replay traces — the venue replicates.)
+
+Online (continual) memory, one cell per ordering:
+
+| Ordering | correct | accuracy |
+|---|---:|---:|
+| ord0 (published order) | 5/25 | 20.0% |
+| ord1001 | 7/25 | 28.0% |
+| ord1002 | 7/25 | 28.0% |
+| ord1003 | 9/25 | 36.0% |
+
+**Mean ± std = 28.0 ± 6.5 pp; range 20.0–36.0 (16.0 pp spread = 4 of 25 instances).**
+Delta vs no memory: **−8.0 pp on average**; the best ordering only reaches parity with no memory.
+Instance-level instability: **8/25 (32%) of instances change correctness across orderings.**
+Paired, pooled over the four orderings: memory fixes 6 instance-runs, breaks 14; exact sign test p = 0.115.
+
+**This is an unflattering result and we should report it as one.** On the cell where the paper claims memory's largest LiC gain (+12.0 pp), under gpt-5.4-mini memory is (a) net harmful and (b) more sensitive to trajectory ordering than the effect size the paper attributes to it.
+
+### 6.2 T12 — order sensitivity, LiC-math (n=20)
+
+Reference: **Augment, no memory = 80.0% (16/20)** — an exact match to the paper's Table-1 Augment/math cell (16/20), so this venue replicates too.
+
+| Ordering | correct | raw | FN-adjusted |
+|---|---:|---:|---:|
+| ord0 | 16/20 | 80.0% | 84.2% (1 user-sim-induced excluded) |
+| ord1001 | 17/20 | 85.0% | 85.0% |
+| ord1002 | 16/20 | 80.0% | 84.2% (1 excluded) |
+| ord1003 | 16/20 | 80.0% | 80.0% |
+
+**Mean ± std = 81.2 ± 2.5 pp (raw); 83.4 ± 2.3 pp (FN-adjusted).** Delta vs no memory +1.2 pp.
+Instance-level instability: 2/20 (10%). Sign test on pooled pairs: 4 fixes / 3 breaks, p = 1.0.
+
+Math is near-ceiling for gpt-5.4-mini (baseline Augment already 80%), so both the memory effect and its order sensitivity are compressed. Consistent with the paper's own claim that memory helps only where headroom exists — but it also means math cannot discriminate, and the discriminating venue (database) is the one that came back negative.
+
+### 6.3 Cheatsheet divergence across orderings
+
+Same 25 (resp. 20) trajectories, different presentation order:
+
+| Task / regime | words per cheatsheet | mean pairwise Jaccard (content words, len>3) |
+|---|---|---:|
+| database, online | 813 / 907 / 1060 / 1014 | **0.300** |
+| math, online | 1060 / 989 / 1075 / 932 | **0.320** |
+
+Qualitatively: the four cheatsheets **converge thematically and diverge operationally**. All four database cheatsheets open with the same headline principle — *rebuild the task spec from user turns only; treat the latest user turn as authoritative; do not let assistant framing enter the spec.* But the structure (flat bullet list vs. numbered sections vs. prose), the granularity, and the specific operative sub-rules differ substantially, which is what a 0.30 Jaccard means. So the learner reliably recovers the *gist* and unreliably recovers the *detail* — and it is the detail that is injected into the analyzer's Query 2 and drives the 16 pp accuracy spread.
+
+### 6.4 T13 — dose-response (free contamination probe from the online arms)
+
+Accuracy by batch index, pooled over the four orderings (batch *b* is evaluated with a cheatsheet distilled from 5(*b*−1) **other** eval instances plus their gold answers):
+
+| batch | prior eval instances in memory | database | math |
+|---|---:|---:|---:|
+| 1 | 0 (empty cheatsheet) | 4/20 = 20.0% | 18/20 = 90.0% |
+| 2 | 5 | 7/20 = 35.0% | 17/20 = 85.0% |
+| 3 | 10 | 5/20 = 25.0% | 17/20 = 85.0% |
+| 4 | 15 | 7/20 = 35.0% | 13/20 = 65.0% |
+| 5 | 20 | 5/20 = 25.0% | — |
+
+No monotone increase in either task; math trends *down*. **There is no dose-response in exposure to other evaluation instances**, which is the strongest available evidence that the online LiC memory numbers are not driven by transductive leakage — the cheatsheet is not accumulating eval-set-specific knowledge, it is accumulating (increasingly stale, increasingly general) analyzer priors. That is exactly 5YHP's W6 hypothesis, and we can now say we measured it.
 
 ---
 
-## 7. Dead ends / notes
+## 7. Incident: duplicated background chain (2026-07-29 10:13–10:52)
+
+**What happened.** After the T12-database sweep, the follow-on runs were launched from a wrapper script whose guard was `while pgrep -f "run_t12.sh database"; do sleep 20; done`. That pattern matched the wrapper's *own* command line (the string appears in the `bash -c` that created the script), so the wrapper spun forever. Killing the visible PID killed the `bash -c` parent but **not** the detached `/tmp/chain.sh`, and a `pkill -f "^/tmp/chain.sh"` failed to match because the actual cmdline is `/bin/bash /tmp/chain.sh`. A replacement wrapper was then launched, so **two identical chains ran concurrently from 10:14 to 10:52**, both writing to the same `outputs/T12_T13/...` directories and both at `max_concurrent=5` (so 10 against the shared TRAPI cap, over the agreed budget).
+
+**How it was detected.** `outputs/T12_T13/database/frozen_ord0/` had `metrics.json`/`results.json` reporting 10/25 correct and `run_summary.json`/`summary.txt` reporting 8/25 — an internal contradiction impossible within a single run, since both are serialised from the same `metrics` dict (`run_experiment.py:595-650`).
+
+**Blast radius and remedy.** The T12-database sweep (09:53–10:12) predates the incident and was launched once; all five of its cells were verified internally consistent (`metrics.correct == run_summary.metrics.correct == count(results.is_correct)` for `ref_nomem`, `mem_ord0/1001/1002/1003`). Everything produced after 10:14 — `database/{train_traj,offlinelearn_*,frozen_*}`, all of `math/`, and the corresponding cheatsheets — was **deleted and re-run under a single chain with an `flock` guard**. The T12-math numbers in §6.2 and the divergence numbers for math in §6.3 are from the re-run, not from the contaminated pass.
+
+**Lesson for other agents in this session:** do not guard a background chain with `pgrep -f <script name>`; use `flock` on a lockfile, and verify `metrics.json` agrees with `run_summary.json` before trusting any output dir.
+
+---
+
+## 8. Dead ends / notes
 
 - `data/dev_math_train.json` and `data/dev_*_test.json` (referenced by `config/task/dev_*_{train,test}.yaml` and by `scripts/run_spec_curation_memory_experiment.sh`) **do not exist on disk**. The soft-attention spec-curation train/test split reported in appendix `app:soft-attention` is therefore not reproducible here; it is a separate, already-clean split and is not what W6 asks about, so it was not chased.
 - No memory snapshot (`*cheatsheet*.json`) exists anywhere on the machine (confirms RECON §B.4), so every cheatsheet in this task is freshly learned. The paper-era cheatsheets cannot be diffed against ours.

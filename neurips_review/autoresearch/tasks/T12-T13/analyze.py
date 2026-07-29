@@ -19,6 +19,18 @@ def acc(p):
     return c, len(r), 100.0 * c / len(r)
 
 
+def adj(p):
+    """FN-adjusted accuracy from run_summary.json (canonical headline number)."""
+    try:
+        with open(f"{p}/run_summary.json") as f:
+            d = json.load(f)
+    except FileNotFoundError:
+        return None
+    m = d.get("metrics", d)
+    a = d.get("adjusted_accuracy", m.get("adjusted_accuracy"))
+    return 100.0 * a if a is not None and a <= 1.0 else a
+
+
 def summary(p):
     with open(f"{p}/run_summary.json") as f:
         return json.load(f)
@@ -51,10 +63,36 @@ def cheat(p):
     return d["content"]
 
 
+def integrity(task):
+    """Flag run dirs whose metrics.json, run_summary.json and results.json disagree.
+
+    A mismatch means two processes wrote the same output dir (see worklog §7).
+    """
+    import glob
+    bad = []
+    for d in sorted(glob.glob(f"{ROOT}/outputs/T12_T13/{task}/*")):
+        try:
+            m = json.load(open(f"{d}/metrics.json"))["correct"]
+            s = json.load(open(f"{d}/run_summary.json"))["metrics"]["correct"]
+            r = sum(1 for x in load_results(f"{d}/results.json") if x["is_correct"])
+        except (FileNotFoundError, KeyError):
+            continue
+        if not (m == s == r):
+            bad.append((os.path.basename(d), m, s, r))
+    if bad:
+        print("\n*** INTEGRITY FAILURE — these dirs were written by >1 process ***")
+        for b in bad:
+            print(f"   {b[0]}: metrics={b[1]} summary={b[2]} results={b[3]}")
+    else:
+        print("integrity check: all run dirs internally consistent")
+    return not bad
+
+
 def report(task):
     out = f"{ROOT}/outputs/T12_T13/{task}"
     mem = f"{D}/memories/{task}"
     print(f"\n{'='*78}\nTASK: {task}\n{'='*78}")
+    integrity(task)
 
     # ---- reference ----
     ref = None
