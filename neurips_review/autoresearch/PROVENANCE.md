@@ -39,7 +39,8 @@ graph TD
     T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
     T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
     T2B["T2B counterfactual span ablation<br/>[deferred] — superseded in priority"]
-    T15["T15 claims audit -> replies/v5<br/>[run]"]
+    T15["T15 claims audit -> replies/v5<br/>64 claims: 24 unchanged, 14 corrected,<br/>6 struck, 11 added, 5 unverified<br/>[done]"]
+    T16["T16 verify gate stats<br/>[run] — zero API"]
     T14["⚠ T14 FN-adjustment audit<br/>adjusted_accuracy inflates our own<br/>numbers 89.0 -> 77.1<br/>[run]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
@@ -59,7 +60,8 @@ graph TD
   T2C --> T2B
   T1 --> T14
   T14 -.->|"LiC figures provisional"| T15
-  T6 -.-> T15
+  T6 -.->|"⚠ baselines may not replicate"| T15
+  T15 --> T16
   T14 -.->|"corrects magnitudes in"| P0
 
   P3 -->|"N=1 claim we already<br/>assert in replies/v4"| T8
@@ -90,7 +92,8 @@ graph TD
 | T1 | Condensation baseline | 2026-07-29 | `tasks/T1/{worklog.md,RESULTS.md,analyze.py}`; `outputs/T1/` | Vg97 W1/Q1 + AC — **summarisation −2.8 to −8.4 pp vs AC3-Reset +19.6 pp** |
 | T14 | FN-adjustment audit | 2026-07-29 | `tasks/T14/worklog.md` | **Corrects the paper's headline LiC magnitudes** |
 | T11 | WildChat judge checks | 2026-07-29 | `tasks/T11/{worklog.md,out/}` | 5YHP W4 — bias real but pre-randomised; corrected 87.8 / 91.2 |
-| T15 | Claims audit → `replies/v5/` | 2026-07-29 | `replies/v5/CHANGES.md`; `tasks/T15/worklog.md` | Lands F1–F33 in the submitted text |
+| T15 | Claims audit → `replies/v5/` | 2026-07-29 | `replies/v5/{CHANGES.md,README.md}` (`5775f71`); `tasks/T15/worklog.md` | Lands F1–F33 in the submitted text; **found F34/F36/F37** |
+| T16 | Verify gate statistics | 2026-07-29 | `tasks/T16/{worklog.md,gate_stats.py}` | F38 — the one unverifiable number in the detector reply |
 
 ---
 
@@ -98,6 +101,8 @@ graph TD
 
 | Direction | Verdict | Reason |
 |---|---|---|
+| "BigCodeBench cannot be evaluated with executable tests" | `[dead]` | Factually wrong — T8 §5 shows that path runs real `untrusted_check` execution. We conceded a limitation that does not exist; struck along with the dependent judge-discrimination figures. |
+| Rebuttal end-to-end "AC3-Reset 100.0 ± 0.0" | `[dead]` | FN-adjusted with asymmetric exclusions (Reset 1/2/5 items, baseline 0). Raw: 87.5 ± 2.0 / 93.3 ± 4.2 / 95.0 ± 0.0. Claim survives; the perfect score does not. |
 | MT-OSC as a fair pollution baseline | `[dead]` | T1: at published w=4 it fired 0.3×/conversation — it cannot touch context before turn 6 and LiC conversations average 4.1 turns. Report as *structurally inapplicable*, which supports our scoping argument, rather than as a beaten baseline. |
 | End-to-end tau2 replay | `[dead]` | ~2 dev-days; out of window. Defend replay as causal-attribution design instead; T4 supplies fresh end-to-end evidence on LiC. |
 | Full human eval on WildChat | `[dead]` | Out of window. Defend with N=3 seeds + tight intervals; T11 supplies judge-side checks. |

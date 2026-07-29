@@ -341,3 +341,34 @@ in-flight, no results.json). Two fixes:
 Relaunched 15:19:12-14. All three s0 cells correctly SKIPped (60/60 traces), all three
 s2 cells resumed. Note for whoever picks this up: **poll the trace counts, not the
 background-task status** — `ls ctx_edit/outputs/T6_reps/<cell>/traces | wc -l` vs 60.
+
+## 15:32 UTC — gpt-5.4 Gated-Reset complete (N=3). The regression reproduces in sign, not in significance.
+
+| Model | Arm | rep1 | rep2 | rep3 | mean ± sd | range | published |
+|---|---|---|---|---|---|---|---|
+| gpt-5.4 | Baseline | 52.6 | 78.9 | 73.7 | 68.4 ± 13.9 | 52.6–78.9 | 68.4 |
+| gpt-5.4 | **Gated-Reset** | 36.8 | 57.9 | 78.9 | **57.9 ± 21.1** | 36.8–78.9 | 52.6 |
+
+**Direction reproduces: Gated-Reset (57.9) < Baseline (68.4) on gpt-5.4.** But the two
+ranges are nested — Gated-Reset spans 36.8-78.9 and Baseline spans 52.6-78.9, and the
+Gated-Reset sd is 21.1 pp. On unpaired cell means the two arms are indistinguishable.
+
+Added `ctx_edit/t6_paired.py` — pairs on **(task, seed)** and runs an exact two-sided
+sign test over discordant pairs (McNemar, exact form). Pairing removes task difficulty
+and replicate effects, which is the only way to get power out of a 19-task benchmark.
+
+| Model | Arm | paired obs | arm wins | base wins | ties | delta | exact p |
+|---|---|---|---|---|---|---|---|
+| gpt-5.4 | Gated-Reset | 57 | 6 | 12 | 39 | **-10.5 pp** | **0.238** |
+
+So: with 3x the data and the paired test, the gpt-5.4 Gated-Reset regression is
+**-10.5 pp and not significant (p = 0.24)**. It is a real directional effect that has
+now shown up twice, but it is not something the benchmark can resolve. Note also that
+39/57 pairs are ties — Gated-Reset changes the outcome on under a third of rollouts.
+
+Honest framing for the rebuttal: *"the gpt-5.4 Gated-Reset regression reproduces at
+N=3 (57.9 ± 21.1 vs 68.4 ± 13.9; paired -10.5 pp, exact sign test p = 0.24). We report
+it because it is directionally consistent across independent runs, but tau2 at n=19
+cannot resolve a 10 pp effect."* Do not upgrade this to "we fixed it" or "it was noise".
+
+Status 15:32: gpt5_4 s0/s2 done, s1 running. dsv4f s2 16/60. kimi s2 27/60. 0 FAILED.
