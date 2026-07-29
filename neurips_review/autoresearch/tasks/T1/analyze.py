@@ -27,6 +27,7 @@ ARMS = [
     ("baseline", "Baseline (full context)"),
     ("summarize1", "Summarisation (1 call/turn)"),
     ("summarize2", "Summarisation (2 calls/turn, budget-matched)"),
+    ("summarize_neutral", "Summarisation (neutral prompt, 1 call/turn)"),
     ("mtosc_w2", "MT-OSC (reimpl., w=2)"),
     ("mtosc_w4", "MT-OSC (reimpl., w=4, as published)"),
     ("reset", "AC3-Reset"),
@@ -175,7 +176,7 @@ def main():
     P("| Task | Comparison | Δ | W/L | McNemar p |")
     P("|---|---|---|---|---|")
     for task, tname in TASKS:
-        for tag in ("summarize1", "summarize2", "mtosc_w2", "mtosc_w4"):
+        for tag in ("summarize1", "summarize2", "summarize_neutral", "mtosc_w2", "mtosc_w4"):
             a, b = data.get((task, "reset")), data.get((task, tag))
             if a is None or b is None:
                 continue

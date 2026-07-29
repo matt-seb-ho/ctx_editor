@@ -63,3 +63,9 @@ run_cell context_edit_v2_gated   code_v2     code_gated    $NOCACHE
 run_cell mtosc_w4                code_v2     code_mtosc_w4
 
 echo "=== [$(date -Is)] ALL CELLS DONE" | tee -a "$LOG"
+
+# --- robustness arm: neutral summariser prompt (no "compression not evaluation")
+run_cell summarize_v2_neutral    database_v2 db_summarize_neutral
+run_cell summarize_v2_neutral    code_v2     code_summarize_neutral
+
+echo "=== [$(date -Is)] ALL CELLS + ROBUSTNESS DONE" | tee -a "$LOG"
