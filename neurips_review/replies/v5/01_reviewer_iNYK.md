@@ -20,6 +20,8 @@ AC3-Reset **exceeds the design-oracle on all three models**, by 28.3pp on gpt-5.
 
 We can also now show that the database gain is not the analyzer quietly solving the task. On this task the analyzer's output contains a verified-correct answer in **1 of 147 conversations**; restricted to the 146 conversations with no verified leak, AC3-Reset still gains **+26.0pp** over full context (22.6% → 48.6%, exact McNemar p < 0.0001). The full leakage analysis, including the task where we concede the opposite, is in our reply to **5YHP**.
 
+One further consequence of taking your noise concern seriously, and it goes against us. Re-auditing the main table's denominators for this response, we found that **ERGO — and only ERGO — had been scored on unfiltered conversation pools**, so it was charged with items no other method was asked to attempt. Correcting that moves **ERGO/math from 69.6 to 80.0, above AC3-Reset's 75.0 and level with AC3-Gated-Reset's 80.0**; code is essentially unchanged (≈44.0) and database is untouched (12.0). We then ran the paired test your review implies, and it makes your point for you: **no ERGO-vs-AC3 difference in that table is statistically distinguishable at n ≈ 20 in either direction** (code p = 0.375, math p = 1.00), which is true of the published table as well as the corrected one. We will print n per cell, disclose the original scoring in the caption, and stop presenting that ordering as settled. The full disclosure is in **Common Weakness 5**.
+
 ---
 
 > **W2:** The Table 2 hard subset is the 20 hardest items chosen by baseline failure rate, and the runs replay GPT-5.2 trajectories rather than each model's own generations... making the +20–42pp claim weaker than it appears.

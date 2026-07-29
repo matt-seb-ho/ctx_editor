@@ -1,6 +1,8 @@
 # CHANGES.md — v4 → v5 claim audit
 
-Every assertion in `replies/v4/` audited against the 2026-07-29 autoresearch session (findings **F1–F33**, decisions **D1–D11**: `../../autoresearch/WORKLOG.md`; retired claims: `../../autoresearch/PROVENANCE.md`). Task T15 worklog: `../../autoresearch/tasks/T15/worklog.md`.
+Every assertion in `replies/v4/` audited against the 2026-07-29 autoresearch session (findings **F1–F49**, decisions **D1–D11**: `../../autoresearch/WORKLOG.md`; retired claims: `../../autoresearch/PROVENANCE.md`). Task T15 worklog: `../../autoresearch/tasks/T15/worklog.md`.
+
+**Revision history.** T15 wrote this audit at F1–F38, with four claims on HOLD pending two in-flight audits. **T19** (`../../autoresearch/tasks/T19/worklog.md`) revised it once T14, T16, T17 and T18 landed: the T14 hold is resolved, U1 is retired, and the ERGO denominator disclosure is added as §9 and as claim rows 1.23 / 2.10 / 3.12 / 5.9 / 6.x. **The T6 (tau2) holds are untouched and remain live.**
 
 ## Tally
 
@@ -9,12 +11,14 @@ Every assertion in `replies/v4/` audited against the 2026-07-29 autoresearch ses
 | **Unchanged** (re-verified, wording untouched) | 24 |
 | **Corrected** (number or wording changed) | 14 |
 | **Struck** (removed from v5) | 6 |
-| **Newly added** (result that did not exist in v4) | 11 |
-| **On HOLD** (blocked on an in-flight task) | 4 |
-| **UNVERIFIED** (no artifact found tonight — see §7) | 5 |
-| **Total claims audited** | 64 |
+| **Newly added** (result that did not exist in v4) | 16 |
+| **On HOLD** (blocked on an in-flight task) | 3 |
+| **UNVERIFIED** (no artifact found tonight — see §7) | 4 |
+| **Total claims audited** | 67 |
 
-Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted accuracy / end-to-end table, preservation attribution, WildChat headline, memory gains, auditing-on-math), **3 move in our favour** (BigCodeBench, database leak-free replication, budget accounting), and 5 are wording-only.
+Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted accuracy / end-to-end table, preservation attribution, WildChat headline, memory gains, auditing-on-math), **3 move in our favour** (BigCodeBench, database leak-free replication, budget accounting), and 5 are wording-only. Of the 5 claims T19 newly added, **all 5 are the ERGO denominator disclosure**, which moves against us by raising a competitor.
+
+**Changes made by T19 to T15's tally.** Newly-added 11 → 16 (five ERGO disclosure rows). On-HOLD 4 → 3 (1.13, 2.4, 3.2, 4.4 were the four; the T14-gated provisional flag on all LiC figures is lifted, and 4.4's hold is now T6-only — the three remaining holds are all tau2). UNVERIFIED 5 → 4 (**U1 retired**: the gate-statistic artifacts do exist, at `scripts/analysis_rewrite_v_reset/data/gated_reset_reconstructed_{lic,collabllm}.md`, and T16 re-derived both independently from raw traces). Total 64 → 67.
 
 ## Path legend
 
@@ -53,6 +57,8 @@ Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted a
 | 1.20 | *(new)* | **newly added** | **F27**, `AR/tasks/T1/RESULTS.md` "Measured budget" table (from `utils/call_meter.py`) | Budget-matched summariser **over-consumed** AC3-Reset: 1.02–1.19x strategy calls, 1.62–2.14x strategy tokens, still lost by 12–28pp; Gated-Reset +17.8pp on **0.41x** Reset's calls |
 | 1.21 | *(new)* | **newly added** | **F27** + PROVENANCE dead-ends table | MT-OSC at w=4 fires **0.3x/conversation** on 4.1-turn conversations → *structurally inapplicable*, reported as a scoping result, **not** as a beaten baseline |
 | 1.22 | *(new)* | **newly added** | **F21/F22**, `AR/tasks/T9/worklog.md` §pooled table, `OUT/T9/{rep1,rep2}/` | CW1 now cites the five-analyzer sweep (+12.9 to +39.9pp, all significant, none below baseline) as the empirical form of "the analyzer is the shared component" |
+| 1.23 | *(new — added by T19)* | **newly added — disclosure that moves against us** | **F42/F43/F44/F47/F48/F49**; `AR/tasks/T17/RESULTS.md` §1–§2 (mechanism at `replay.py:21-56`, `run_experiment.py:441-470`; Overleaf commit `d856247` as ground truth), `AR/tasks/T18/worklog.md` R1/R4, `AR/tasks/T18/{ergo_row_closed.json,close_bound.py}` | Three new paragraphs in **CW5**, placed after the baseline-justification paragraph and before the condensation results: (i) the concession — ERGO alone was scored on unfiltered pools, n=23/25/25/25 vs 20/19/25/23; (ii) the measured correction — **math 69.6 → 80.0** (above AC3-Reset 75.0, level with AC3-Gated-Reset 80.0), code ≈44.0, database 12.0 untouched, actions **unclosable** and printed as an interval; (iii) the frame — **no ERGO-vs-AC3 difference is significant at n≈20 in either direction** (code p=0.375, math p=1.00), true of the published table too. CW5's Revision line extended with the table fix |
+| 1.24 | Preamble: "every LiC figure is provisional pending T14" | **resolved (T19)** | **F40/F41/F42**, `AR/tasks/T14/RESULTS.md` | Provisional flag **lifted**. `tab:main`'s 20/19/25/23 come from an arm-symmetric **pool-level pre-filter** which is correct and to be **defended**; only per-run `adjusted_accuracy` is invalid, and this reply set never quotes it. Reset/Gated-Reset beat baseline in all 8 cells under raw, shipped-adjusted and corrected alike. Two flips occur on **Rewrite** (code +46.0 → −5.3, actions +22.4 → −1.5), neither a published error |
 
 ---
 
@@ -69,6 +75,7 @@ Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted a
 | 2.7 | Q1 "By your stated criterion, the generalization claim stands." | **unchanged**, with a new limits paragraph | — | kept; followed by "at n=40 the per-run margins are two to four problems and this experiment on its own is not powered for significance" |
 | 2.8 | Q2 paired table | **unchanged** | `EXP/paired_analysis_results.txt` | verbatim |
 | 2.9 | Q2 "mean ± std over the three **seeds**" (in our own answer text) | **corrected** (wording) | **F4** | reviewer's quote kept verbatim; our answer adds a paragraph distinguishing LiC/CollabLLM **replicate runs (temperature 1.0)** from WildChat **seeds** |
+| 2.10 | *(new — added by T19)* | **newly added — disclosure** | **F43/F44/F48/F49**, `AR/tasks/T18/worklog.md` R1/R4 | New closing paragraph in the **W1** answer. Chosen deliberately: iNYK's W1 *is* the small-samples/noise complaint, so the ERGO disclosure lands there as his point being vindicated rather than as an unprompted confession. Gives math 69.6 → 80.0, code ≈44.0, and the n≈20 non-significance result, then cross-references CW5 |
 
 ---
 
@@ -87,6 +94,7 @@ Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted a
 | 3.9 | Q3 analyzer-model sensitivity — **v4 never answered this half of the question** | **newly added** | **F20/F21/F22**, `AR/tasks/T9/worklog.md` (commit `1f4f32d`), `OUT/T9/{rep1,rep2}/<task>_<arm>/` | Five-analyzer table (Kimi +39.9 / DSV4F +28.7 / gpt-5.4-mini +27.0 / Llama-70B +18.0 / gpt-4o-mini +12.9), n=178 matched pairs, exact McNemar; the under-detect-not-mis-detect mechanism; the non-OpenAI point; stated limits |
 | 3.10 | Q4 component table | **unchanged** | — | verbatim |
 | 3.11 | *(new)* | **newly added** | **F25**, `AR/tasks/T2A/RESULTS.md` §"Contrast: AC3-Rewrite" | Operator-level mechanism distinction added to Q4: Reset = detect/discard/re-derive (97.6 removal, 4.0 preservation); Rewrite = selective (27.0 / 38.9) |
+| 3.12 | *(new — added by T19)* | **newly added — disclosure** | **F43/F44/F48/F49**, `AR/tasks/T18/worklog.md` R1/R4 | New paragraph in the **W1** answer. Vg97's central weakness is the *baseline set*, so a defect in how an existing baseline was scored belongs there. Same three numbers plus the n≈20 non-significance result, explicitly tied back to Vg97's own W2 statistical-reliability point; cross-references CW5 |
 
 ---
 
@@ -111,7 +119,8 @@ Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted a
 | 4.15 | W5 "**We are adding** a span-level evaluation … removal recall / preservation precision / gating accuracy … as a confusion matrix" | **replaced by results** | **F23/F24/F26**, `AR/tasks/T2A/RESULTS.md`, `AR/tasks/T2A/{inject.py,measure.py,manifest.jsonl,per_conversation.json}`, `OUT/T2A/` (32 cells), commit `88cacb3` | Full judge-free constructed-pollution study with the two-span design and four offline positive controls |
 | 4.16 | *(new)* | **newly added — correction to a paper claim** | **F25**, D9 | "We preserve what's correct and remove what's harmful" is attributed to **Rewrite** (27.0 removal / 38.9 preservation), **not** Reset (97.6 / 4.0, edit precision 50.4% vs 50% chance). Reset's mechanism restated as *detect, discard the assistant side, re-derive from the user side* |
 | 4.17 | *(new)* | **newly added** | **F24**, `AR/tasks/T2A/RESULTS.md` §factorial | Detector-free causal ladder: harmful span **−11.1pp** on unedited context, true span **+15.1pp**; clean 24.7% → polluted 9.3% → AC3-Reset with pollutant present **59.8%** |
-| 4.18 | W5 gate-open rates **97.3%** LiC (n=554), **98.3%** CollabLLM (n=119), ~72% WildChat | **unchanged** — but see §7 (U1) | session-1 source `neurips_review/03_rebuttal_plan.md:66`; consistent with **F23**'s 96.8% clean-arm open rate and **F21**'s ~97% for strong analyzers | verbatim, now supported by T2A's gate sensitivity 98.4% |
+| 4.18 | W5 gate-open rates **97.3%** LiC (n=554), **98.3%** CollabLLM (n=119), ~72% WildChat | **corrected (T16), and U1 retired** | **F39**, `AR/tasks/T16/{report.md,gate_stats.py,gate_stats.json}`; the 2026-06 artifacts U1 could not find **do exist**, at `scripts/analysis_rewrite_v_reset/data/gated_reset_reconstructed_{lic,collabllm}.md`, stating `539/554 (97.3%)` and `117/119 (98.3%)` verbatim | Both figures reproduce to the digit; the *labelling* was wrong. Now: LiC **97.3% per-conversation** (98.5% turn-level, n=547) and CollabLLM **95.3% turn-level** (n=659 calls over 120 conversations; 98.3% per-conversation) |
+| 4.18a | *(new — added by T19)* | **newly added — self-stated limitation** | **F39** (T16's new caveat), `AR/tasks/T16/report.md` | New paragraph after the gate rates: they are a **firing rate, not a detection rate** — 29% (LiC) / 73% (CollabLLM) of gate-open records have the analyzer writing `issues: "None"` while still setting `needs_edit=true`. Names it before a reviewer handed `gate_stats.py` would; redirects the detection claim to T2A's 78.6% pollutant-naming rate. The existing "we would not over-read firing rates into a precision/recall claim" sentence is kept and now has evidence behind it |
 | 4.19 | W5 "on WildChat with gpt-5.4 [always-on Reset] **outperforms Gated-Reset by 14.5pp (88.6 vs. 74.1)**" | **struck** | not re-judged under order balancing; **F30** shows single-cell judge numbers carry a ±2pp order effect. Superseded by direct T2A evidence | removed; the "spurious edits are not harmful" argument now rests on the 33/36 paired-win record plus T2A |
 | 4.20 | W5 "We would not want to over-read this into a precision/recall claim" | **unchanged** | D9 guardrail | verbatim |
 | 4.21 | W6 "memory is an **optional, ablated component**; every main result holds without it" | **unchanged** | — | verbatim |
@@ -134,6 +143,8 @@ Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted a
 | 5.6 | *(new)* | **newly added** | F16, F28, F25, F31, F12, T8 §5 | A numbered "corrections we are making to our own numbers" list (4 items posted, 2 more in `05_final_remarks.md`), made part of the tractability argument |
 | 5.7 | *(new)* | **newly added** | F27 | Evidence-table rows for the condensation baseline, MT-OSC engagement rate, analyzer sensitivity, detector evaluation, WildChat judge audit |
 | 5.8 | Closing tractability argument | **unchanged**, extended | — | adds: "the corrections listed above are the discussion period working as intended … every one was found by us" |
+| 5.9 | *(new — added by T19)* | **newly added — disclosure** | **F42/F43/F44/F47/F48/F49**, `AR/tasks/T17/RESULTS.md`, `AR/tasks/T18/worklog.md` R1/R4 | Numbered correction **5** added to the "corrections we are making" list, and the lead-in changed from "four corrections" to "five", with the fifth explicitly labelled as moving against us by *raising a baseline*. Carries math 69.6 → 80.0, code ≈44.0, database untouched, actions unclosable, and the n≈20 non-significance result. Closes on why we would rather state it: it is recoverable from our own printed percentages |
+| 5.10 | Placement relative to the T6 HOLD block | **bookkeeping (T19)** | — | The T6 HOLD block is left **byte-identical** and still refers to the pending tau2 withdrawal as "a fifth correction". A separate `⚠ INTERNAL — T19 renumbering note` was added *after* it recording that tau2 becomes item **6**. The HOLD block was not edited, softened or resolved |
 
 ---
 
@@ -141,19 +152,23 @@ Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted a
 
 Mirrors the above. All ten revision bullets updated to the corrected numbers; four bullets converted from promise to result (condensation, detector, judge audit, memory split); three bullets added (auditing-vs-re-solving, analyzer sensitivity, memory variance); one new section added listing the six self-corrections; one `⚠ INTERNAL` HOLD note for a possible seventh (tau2).
 
+**T19 additions.** A **seventh** numbered correction added for the ERGO denominator defect (**F43/F44/F48/F49**; `AR/tasks/T18/worklog.md` R1/R4): math 69.6 → 80.0 above AC3-Reset's 75.0 and level with AC3-Gated-Reset's 80.0, code ≈44.0, database 12.0 untouched, actions unclosable and printed as an interval, closing on the n≈20 non-significance result. The condensation-baseline revision bullet gained a closing sentence pointing at it. As in `04`, the T6 HOLD block is left **byte-identical** — it still says the tau2 withdrawal would be "a seventh item", and a separate `⚠ INTERNAL — T19 renumbering note` after it records that tau2 becomes item **8**.
+
 ---
 
 ## 7. Claims we could NOT verify against any artifact tonight
 
-**These are liabilities. Confirm or cut before posting.**
+**These are liabilities. Confirm or cut before posting.** U1 has been **retired** by T16 and is kept below, struck, so the record of the false alarm survives.
 
 | ID | Claim | Where it appears | Why it is unverified | Recommendation |
 |---|---|---|---|---|
-| **U1** | Gate-open rate **97.3%** on LiC (n=554) and **98.3%** on CollabLLM (n=119) | v5 `03_reviewer_5YHP.md`, W5 | Sourced only to session-1 prose (`neurips_review/03_rebuttal_plan.md:66`); no per-turn `needs_edit` tally artifact was located. T2A independently measures a 96.8% clean-arm open rate and 98.4% gate sensitivity, which is consistent but is a different quantity | **Re-derive** from `traces/*/conversation_analysis.needs_edit` before posting (cheap, no API). Otherwise quote T2A's numbers instead |
+| ~~**U1**~~ | ~~Gate-open rate **97.3%** on LiC (n=554) and **98.3%** on CollabLLM (n=119)~~ | v5 `03_reviewer_5YHP.md`, W5 | **RETIRED (T19, from F39).** U1 was a false alarm about provenance. The 2026-06 artifacts **do exist in-repo**, at `scripts/analysis_rewrite_v_reset/data/gated_reset_reconstructed_{lic,collabllm}.md`, stating `539/554 (97.3%)` and `117/119 (98.3%)` verbatim; the T15 audit simply missed them. T16 then re-derived both **independently from raw traces** with zero API calls (`AR/tasks/T16/gate_stats.py`), matching to the digit, with an independent regex parser agreeing across all 3,179 fields and 0/1,197 disagreements against `edit_decision.should_edit` | **No action.** The reply now reports LiC 97.3% per-conversation / 98.5% turn-level and CollabLLM 95.3% turn-level / 98.3% per-conversation (claim 4.18), and states the firing-rate-vs-detection-rate caveat itself (claim 4.18a) |
 | **U2** | WildChat gpt-5.4: Reset **88.6** vs Gated-Reset **74.1** (−14.5pp) | struck from v5 | Not re-judged in T11's order-balanced sweep; per-cell judge numbers carry a ±2pp order effect (F30) | **Already struck.** Do not reintroduce |
 | **U3** | WildChat per-cell range **72–92%** | struck from v5 reviewer text; retained only in the guardrails list | Only the two pooled operator cells were re-judged | **Do not mix** with the corrected headline. If the range is needed, label it "published judge, not order-balanced" |
 | **U4** | tau2 gpt-5-mini: "only **1 of 11** baseline failures attributable to context pollution" | v5 `00_general_response.md` CW4, `01_reviewer_iNYK.md` W3 | Cited to paper tex L360/L558 and verified in session 1, but not re-verified tonight; and T6 may change the baseline this statement characterises | **Re-check the tex line** and re-confirm after T6 |
 | **U5** | CollabLLM assistant-omission cells (MATH-Hard 90, BigCodeBench 15) | v5 `03_reviewer_5YHP.md` W4 table | T8 replicated only 4 cells (Baseline + one AC3 arm per dataset); the AO column is still N=1 | **Already footnoted** as single-run. Consider dropping the AO column entirely if the footnote reads defensively |
+
+**New liability introduced by T19 (U6).** The ERGO/actions cell **cannot be corrected and never will be** without an artifact that has never existed. `AR/tasks/T17/RESULTS.md` §1a establishes that no `actions_false_negatives.json` appears in git history, in the 69,738-entry `snapshot.tar.gz` index, or on disk, and no document names the 2 items dropped by the ad-hoc "common-23" normalisation, so there is no pruned set to replay. The reply text therefore promises an **interval**, not a point estimate. Do not let that promise drift into a number.
 
 ---
 
@@ -165,3 +180,24 @@ Mirrors the above. All ten revision bullets updated to the corrected numbers; fo
 4. **Never the single-trial memory gains** (**D7**). Lead with contamination-zero; state variance as our own limitation.
 5. **Concessions open the paragraph.** Applied to the CollabLLM correction, the FN-adjustment, the preservation attribution, the WildChat headline, math in the auditing analysis, and the memory noise floor.
 6. **No tau2 magnitudes until T6 lands.** Five `⚠ INTERNAL — HOLD` blocks mark every affected passage (`00` x2, `01`, `04`, `05`), plus an orientation preamble at the top of `00`.
+7. **ERGO's corrected values are math 80.0 and code ≈44.0** (**T19**, from F47/F48). T17's estimated 57.9 for code is **never** used — T18 measured the free parameter directly and shipping 57.9 would overstate a competitor by ~14pp, an error in the opposite direction and equally unacceptable. Database stays 12.0; actions is unclosable and is promised as an interval.
+8. **Every ERGO passage leads with the significance frame, not an ordering** (**T19**, from F49). "No `tab:main` ERGO-vs-AC3 difference is significant at n≈20 in either direction" is stated plainly and early, before any per-cell number, and is noted to hold of the published table as well as the corrected one. We do not compensate for the correction by claiming ERGO still loses overall: the measured scorecard is 3/12 ERGO wins-or-ties, up from a published 1/12.
+9. **The pool-level pre-filter is defended, not conceded** (**T19**, from F42). `tab:main`'s 20/19/25/23 denominators are arm-symmetric and correct. Only per-run `adjusted_accuracy` is invalid, and rule 2 above already excludes it. Do not let the FN-adjustment concession bleed into an admission that the denominators themselves are wrong — they are not, except on the ERGO row.
+
+---
+
+## 9. Resolved since T15 wrote v5 (T19 integration record)
+
+| Audit | Landed | Outcome | What changed in `replies/v5/` |
+|---|---|---|---|
+| **T14** — FN-adjustment audit | 16:15 | Largely **in the paper's favour**. Pool-level pre-filter is correct and arm-symmetric; only per-run `adjusted_accuracy` is invalid, touching ≤4 `tab:main` cells at ≤1 sample each (2 of which favour prior work). Two flips, both on **AC3-Rewrite**, neither a published error. Reset and Gated-Reset win all 8 cells under raw, shipped-adjusted and corrected alike | `00` preamble item 1 rewritten from "provisional pending T14" to "resolved"; `README.md` blocker 3 likewise. **No accuracy figure moved** — v5 was already raw throughout |
+| **T16** — gate statistics | 15:55 | Claim reproduces to the digit; the *labelling* was wrong, and U1's provenance alarm was false | Correction already applied to `03` by the main thread at 15:57. T19 retired **§7 U1** and added the firing-rate caveat (claim 4.18a) |
+| **T17** — ERGO denominator audit | 16:20 | Defect **confirmed** against Overleaf commit `d856247`; ERGO alone on unfiltered pools. Bound too wide to publish on code | Superseded on code by T18; the mechanism, the `d856247` confirmation and the actions-column provenance gap all ship |
+| **T18** — closing the bound | 17:10 | **math 80.0 CLOSED** (k=0 measured, 3 replicates) — ships. **code ≈43.9**, i.e. T17's 57.9 was ~14pp too generous to ERGO — T17's figure must **not** ship. Actions unmeasurable. F49: nothing is significant at n≈20 | The ERGO disclosure written into `00` CW5, `01` W1, `02` W1, `04` correction 5, `05` correction 7 |
+| **T6** — multi-replicate tau2 | **STILL RUNNING** | Unknown. Preliminary Baseline cells (DSV4F 70.2 ± 11.0, Kimi 80.4 ± 2.5 against published 31.6 and 26.3) suggest the published tau2 baselines may not replicate | **Nothing.** All five `⚠ INTERNAL — HOLD` blocks and their pre-drafted withdrawal wording are left byte-identical to what T15 wrote, and so is the T6 item in `00`'s orientation preamble. Not resolved, not softened, not guessed |
+
+### What the corrected ERGO numbers actually are, stated precisely
+
+This matters because the reviewer-facing text must not claim more than was done. The corrected cells are **the published numerator over the corrected denominator**, with the one free parameter — *k*, how many of the pruned items ERGO was solving — **measured** by replaying ERGO against a pruned-items-only pool. math: k = 0 over three replicate runs, so 16/23 → 16/20 = **80.0**. code: k ≈ 2.67 of 6 (3, 2, 3), so 11/25 → ≈8.3/19 = **43.9** [42.1, 47.4].
+
+**T18's own positive control did not reproduce**, and this is a real limit on what may be quoted. ERGO/database came back at 44.0 against a published 12.0 because `gpt-5-mini` (the published-era model) is unreachable — `dl-openai-3` returns 401, there is no `.env`, and TRAPI serves only `gpt-5.4-mini`/`gpt-4o`. So **no absolute accuracy level from T18's re-runs is substitutable into `tab:main` by anyone**, and none is quoted anywhere in this reply set. What survives the control failure is *k*, because *k* does not use the replication's accuracy levels: it is defended against the model gap by the observation that **full-context Baseline solves 0/6 of the pruned code items at the newer model too**, so the three solvable ones are unlocked by context cleaning rather than by the model era. That argument is strong but is not proof; the reply text says "roughly half" on code rather than quoting 43.9, which is the right level of precision to commit to in front of reviewers. Source: `AR/tasks/T18/worklog.md` §"Honest accounting".

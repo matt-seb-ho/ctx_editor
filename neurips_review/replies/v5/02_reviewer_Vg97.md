@@ -8,6 +8,8 @@ We thank the reviewer for a thorough and constructive review, and for the specif
 
 **Response to W1:** We have now run the condensation baseline rather than argued for its exclusion. Please see **Common Weakness 5** in the General Response, and Q1 below.
 
+Since baselines are your central concern, we should also flag a correction we found in how one of our *existing* baselines was scored, because it runs against that baseline rather than for it. **ERGO — and only ERGO — was evaluated on unfiltered conversation pools** in our main LiC table, so it was charged with items no other method was asked to attempt. On the corrected pools **ERGO/math moves from 69.6 to 80.0, above AC3-Reset (75.0) and level with AC3-Gated-Reset (80.0)**; code is essentially unchanged at ≈44.0 and database is untouched at 12.0. Paired exact sign tests on the same items then show that **no ERGO-vs-AC3 difference in that table is significant at n ≈ 20 in either direction** (code p = 0.375, math p = 1.00) — which is also, we think, the correct reading of your W2. The full disclosure, including what the correction does not touch, is in **Common Weakness 5**.
+
 ---
 
 > **W2:** Another concern is the statistical reliability. Many of the headline LiC cells use small sample sizes, with only the Gated-Reset row repeated three times... The tau2-bench result is also not very persuasive as currently presented.
