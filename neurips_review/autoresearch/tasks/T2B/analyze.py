@@ -334,6 +334,8 @@ def main() -> int:
 
     write_endtoend(rows)
 
+    write_limits()
+
     with open(os.path.join(HERE, "RESULTS.md"), "w") as f:
         f.write("\n".join(LINES) + "\n")
     print("\n".join(LINES[:40]))
@@ -466,6 +468,52 @@ def write_alignment(rows):
         [{k: v for k, v in r.items() if not k.startswith("_")} for r in adm],
         open(os.path.join(HERE, "per_span_alignment.json"), "w"), indent=1,
     )
+
+
+def write_limits():
+    P("## 6. What this does and does not cover")
+    P()
+    P("**Covered.**")
+    P()
+    P("* Causal, detector-free labels for every span in the corpus, on **naturally occurring** "
+      "assistant content — the exact limitation T2A flagged about itself.")
+    P("* A negative control (contentless span → no effect) and two positive controls in opposite "
+      "directions (T2A's validated pollutant → large positive; the full spec + gold SQL → large "
+      "negative), all scored by the same code path as the natural spans.")
+    P("* The 2×2 alignment table against **both** operators, plus a label-free aggregate test that "
+      "does not depend on the per-span MDE.")
+    P("* An empirical noise floor taken from the negative control rather than asserted.")
+    P()
+    P("**Not covered — stated rather than implied.**")
+    P()
+    P("1. **Per-span power.** At these replicate counts only very large per-span effects reach "
+      "significance. Most natural spans are scored *inconclusive*, and *inconclusive is not "
+      "inert*: a span worth 10-20 pp is real and invisible here. Scaling this to a confident "
+      "per-span label for every span would need roughly an order of magnitude more replicates.")
+    P("2. **Useful spans are under-detectable by construction.** A span cannot be shown useful in a "
+      "conversation the assistant never solves, and LiC database sits near the floor. The corpus was "
+      "selected to have headroom, which mitigates but does not remove this asymmetry — the harmful "
+      "count and the useful count are **not** on equal footing and should not be read as a symmetric "
+      "split.")
+    P("3. **Corpus selection.** 32 conversations chosen from the conv0 replay pools by pilot accuracy "
+      "(all mid-range first, then evenly spaced over the rest). This is a **high-power subsample, "
+      "not a representative sample** of LiC; the marginal rate of harmful spans in the wild is not "
+      "estimated here.")
+    P("4. **Probe coverage.** Roughly 40% of spans have no token unique to them and cannot be scored "
+      "for AC3 alignment without a judge. They receive causal labels but are excluded from the 2×2, "
+      "and boilerplate prose is over-represented among the excluded — so the 2×2 is computed on a "
+      "slightly more content-bearing subset than the label set.")
+    P("5. **One model, one analyzer, one replay turn.** gpt-5.4-mini throughout, "
+      "`replay_turns=1`, so nothing here speaks to compounding across turns.")
+    P("6. **Single-span ablation only.** Interactions between spans are not measured; a pair of "
+      "spans that is jointly harmful but individually inert would be scored inert twice.")
+    P("7. **Tier C (the scalable oracle-informed judge) is not run.** T2B was scoped as the "
+      "validation anchor, per the TODO. Calibrating a Tier-C judge against these labels remains "
+      "open; `per_span.json` is the artifact that would make it a small job.")
+    P("8. **No seeds.** The `seed=` dispatcher fix is not on `main` in this tree, so replicates are "
+      "independent draws at temperature 1.0 rather than reproducible seeds. Individual replicates "
+      "are not bit-for-bit reproducible; the aggregates are.")
+    P()
 
 
 def write_endtoend(rows):

@@ -548,3 +548,30 @@ if it stays near 42 the collapse is real.
   `foundry/` path binds its bearer token into `llm_args` at agent-build time, so a
   single rollout that outlives the remaining TTL can fail. 1 occurrence; my pooled path
   re-stamps the token per call and never hit this.
+
+## 17:55 UTC — DIAGNOSTIC RESULT: the parser bug is real but does NOT explain the AC3 collapse
+
+gpt-5.4 Augment, seed 42, `T6_FIX_TAG_PARSE=1`, n=18 (19th rollout still running,
+`break_apn_settings` excluded):
+
+| condition | JSON-fallback rate | accuracy |
+|---|---|---|
+| sweep rep1 (bug present) | 66% | **42.1%** |
+| fixparse (bug mostly fixed) | 25% (9/36) | **44.4%** |
+| published seed-42 | ? | 84.2% |
+
+Fixing the extraction cut the fallback rate by roughly two thirds and moved accuracy by
+**+2.3 pp** — inside a single task flip (1/19 = 5.3 pp). **It does not recover the
+published 84.2.**
+
+So I chased the most plausible confound and it is worth ~2 pp, not ~37 pp. I am
+therefore reporting the AC3 underperformance on tau2 as a genuine measurement in this
+environment, not as an artefact. The parser defect should still be fixed in the fork —
+it is silently corrupting half of all analyzer briefings and nobody knew — but it is
+not the explanation.
+
+Residual 25% fallback = Q1 completions that are neither tagged nor a parseable JSON
+object keyed by the tag. Not chased further.
+
+Status 17:55: gpt-5.4 block **COMPLETE** (all 5 arms x 3 reps). Kimi has s0/s1/s2/s3,
+ao running (9/60). DSV4F has s0/s1/s2, s3 running (14/60), then ao.
