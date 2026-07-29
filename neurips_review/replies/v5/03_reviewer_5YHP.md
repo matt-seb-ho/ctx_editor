@@ -32,6 +32,7 @@ Structural exclusion is also **not the only mechanism AC3 provides**, and refere
 
 * On **tau2-bench**, where state exists only in assistant turns, blanket omission scores **0% on all three models**, and we can now show this is behavioural rather than a scoring artifact: AO rollouts never terminate naturally, they exhaust the step budget, because omission destroys tool-call results that exist only in assistant turns.
 * On **WildChat** (real human-AI dialogue), AC3 wins **87.8 +/- 2.1%** (Reset) and **91.2 +/- 2.1%** (Augment) of pairwise comparisons against assistant omission, under a full order-balanced re-judge with cross-family judge agreement (W4 below).
+* The same conclusion holds cell by cell rather than only in the pooled figure. Across our full per-respondent WildChat breakdown (four operators x four respondent models, 22 populated cells), AC3 beats assistant omission in **every** cell, with per-cell win-rates between **72% and 92%**. These are single-run cells with a binomial standard deviation of 4–5pp each, so we quote them as a spread across configurations rather than as a confidence interval; the order-balanced pooled figures above are the estimate we would defend, and this range is the consistency check behind it.
 
 **Revision:** We will state this scope explicitly in Section 3, add the leakage analysis as its own subsection, and concede the math case there.
 
