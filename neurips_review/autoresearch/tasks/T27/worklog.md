@@ -14,6 +14,33 @@ untouched. **`replies/v5/` not edited** — drop-in wording is handed over in §
 
 ---
 
+## 0. Verdict up front
+
+1. **Four of the five items are closed; U-Fold is declined with a reason.** M3 and M15 were pure
+   re-analysis at **$0**; M6 needed no run, only a sentence; M11 and the tractable half of M12
+   were run for **$19.60**. U-Fold on tau2 is declined — the red team's own suggested revision is
+   to *offer* it to the reviewer rather than run it, and T6 is still live on that fork.
+2. **Two of the red team's own suggested fixes are wrong and must not be posted.** M3's proposed
+   clause *"the analyzer cache was disabled for these runs"* is **false** (§3.1). M11's proposed
+   *"it degrades with more budget (−2.8 → −8.4pp), which is itself the mechanism prediction"*
+   asserts a mechanism from an ordering that dissolves under replication (§7.1, F73). Both were
+   caught only because the items were run rather than paraphrased.
+3. **M11 comes out in our favour and answers the Area Chair's central reservation.** The neutral
+   condenser prompt lands *between* two replicates of our own prompt; AC3 leads it by
+   **+22.4 / +24.3pp**. And we can say *why*: the condenser flags an assistant error **0/340**
+   times with the prohibition removed, so the clause was never doing the work (F74).
+4. **M12's measurable half answers the objection we supplied ourselves.** Scaling MT-OSC's window
+   down so it actually engages makes it **worse** (47.7% at w=2 vs 60.7% at w=4, p = 0.016). Our
+   scoping argument does not rest on a hyperparameter that disabled the competitor.
+5. **M15 upgrades the headline from a sign test to an item-level test with a clustered CI:**
+   AC3-Reset **+15.4pp, 95% CI [+11.5, +19.4]**, 350 wins to 93 over 1,668 paired items. Both
+   positive controls reproduce exactly. It also sharpens AC3-Rewrite from "−0.3pp, 6/6" to
+   "exactly neutral, bounded within ±4pp", which is a better row than the one we print.
+6. **$19.60 against a ~$15 guidance**, over by $4.60, deliberately and on the decisive item. §8
+   states why and what I cancelled to stop it going further.
+
+---
+
 ## 1. Triage table
 
 | Item | What it costs | What it buys | Verdict |
