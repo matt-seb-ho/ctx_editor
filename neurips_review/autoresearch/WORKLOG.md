@@ -738,3 +738,19 @@ The regeneration was done properly: T33 **first confirmed the pre-edit generator
 It is internal-only — **nothing reviewer-facing quotes the 17** — but `CHANGES.md` is the artifact the operator was told to check first, and a document whose own tally does not reconcile undermines confidence in everything it certifies. Dispatching **T34** to re-derive the buckets rather than leaving it: it is zero-API, and it makes the primary review artifact trustworthy.
 
 **D27 — Fix the tally rather than leave it.** Dispatched T34 to re-derive `CHANGES.md`'s buckets. Constraints that matter: **change no claim and no row** — if re-deriving shows a *row* is wrong, report it rather than fixing it, which is the distinction that made this an escalation in the first place; and on any ambiguous bucket boundary, take the **least flattering** reading (a row that could be "corrected" or "struck" is struck). Also required: write the bucket scheme into the document, and add a rule that the tally is derived from the rows and must be re-derived when rows change — naming the decay mechanism so it does not silently recur. (Logged to `logs/orchestrator.jsonl` in the same command.)
+
+- **21:24** Heartbeat tick — **ran an explicit safety check on the paper repo, and it passes.** `git -C writing/overleaf_repo status` shows six untracked paths (four `assets/fig1_bars_gpt54*` files, `assets/temp`, `neurips_2026_conference_v2.tex`). **All are dated 2026-06-01 — nearly two months before this session began (09:38 on 2026-07-29).** They are pre-existing working-tree state from the operator's own earlier work, not agent writes. **No agent touched `writing/overleaf_repo/` tonight**, which is the hard constraint every brief carried. Recording the check and its evidence, because "the repo is clean" is worth verifying rather than assuming after ~30 dispatched agents, and the raw `git status` output looks alarming until you read the dates.
+
+- **21:25** `T34` returned **DONE**. Commit `9ef0058`. `CHANGES.md`'s tally now reconciles exactly. No claim, row, number or reviewer-facing text touched.
+
+**Reconciled, row-derived and script-verified:** Unchanged 20 · Corrected 21 · Struck 9 · Replaced by results 5 · HOLD → resolved 3 · Newly added 22 · Bookkeeping 2 = **82**. "On HOLD (0)" and "UNVERIFIED (1, = U6)" now sit *outside* the total — the old 69 was adding a §7 liability to a §§1–6 row count, which is the arithmetic error underneath the discrepancy.
+
+**The scheme is precedence-ordered least-flattering-first** — Struck > Corrected > HOLD→resolved > Replaced by results > Newly added > Unchanged > Bookkeeping — so the tie-break rule and the against-us rule are the same rule, which is neat and hard to game later. Judgement calls taken against us: two "qualified"/"wording fixed" rows → Corrected; all four struck/corrected compounds → Struck. One call deliberately *not* least-flattering and flagged as such: rows 3.11 and 4.16 stay "Newly added" because "Corrected" means a **v4** claim changed, and neither row has a v4 claim.
+
+**F91 — Four row-level findings, reported not fixed, exactly as instructed.**
+1. **T33's count of 81 is itself wrong — it is 82.** Row **4.18a** was missed; it is a full row with its own status and evidence. So the escalation that prompted this task had an off-by-one of its own.
+2. **"Newly added 21" — the one bucket believed to reconcile — did not.** It is **22**; row 3.9 is newly added but lacks the `*(new)*` marker.
+3. **Row 1.17 still reads "struck (pending T6)".** T6 landed and row 4.4 was updated; 1.17 was not. Stale reviewer-adjacent bookkeeping.
+4. Rows 4.24, 5.10 and 1.24 audit **no v4 claim**, so any "we audited N claims" statement should say **80**, not 83.
+
+Items 2–4 are small row edits T34 was not authorised to make. Dispatching **T35** to close them, since #3 in particular is a live staleness pointing at a question that is now settled.
