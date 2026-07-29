@@ -14,11 +14,24 @@
 > not for "injected sentences are easier to reason about". (2) Single model (gpt-5.4-mini), single
 > analyzer, one replay turn per conversation, no repeats.
 
+## Headline
+
+| metric | AC3-Reset | notes |
+|---|---|---|
+| **Pollution removal rate** | **97.6%** (123/126) | 96.9% on the causally-validated subset |
+| **Preservation rate** | **4.0%** (5/126) | AC3-Reset discards correct injected content too |
+| **Edit precision** | **50.4%** (123/244) | chance is 50.0% by construction |
+| **Gate accuracy (sensitivity)** | **98.4%** (124/126) | clean-arm gate-open base rate 96.8% |
+| Pollutant named explicitly in `issues` | **78.6%** (99/126) | 89.7% on the causally-validated subset |
+
+AC3 **detects** the constructed pollutant (names it in `issues` in ~4 of 5 conversations, ~9 of 10
+on the subset that is causally harmful) and **removes** it (97.6%). It is **not surgical**: it
+removes correct injected content at essentially the same rate, so edit precision sits at chance.
+The mechanism this supports is *detect-and-rebuild-from-the-user-side*, not *selective excision*.
+
 Conversations in manifest: **145**; complete across all four run cells: **145**; of those, **126** pass the mechanical probe-admissibility check and form the primary analysis set.
 
 Excluded 19 conversation(s) whose anchor is not a reliable probe: {'harmful_anchor_not_unique': 1, 'useful_anchor_too_short_numeric': 16, 'harmful_anchor_too_short_numeric': 5, 'useful_anchor_not_unique': 2}. The check is mechanical and applied identically to the harmful and the useful side, so it cannot bias the 2x2 in either direction.
-
-> Missing run cells: [('rw', 'clean', 'code_v2', 'conv0'), ('rw', 'clean', 'code_v2', 'conv1'), ('rw', 'clean', 'database_v2', 'conv1')]
 
 `metrics.json` and `run_summary.json` agree on accuracy in every run cell (trap 5 check).
 
@@ -144,7 +157,7 @@ Excluded 19 conversation(s) whose anchor is not a reliable probe: {'harmful_anch
 - **Pollution removal rate** = 27.0% (34/126)  [95% CI 20.0–35.3%]
 - **Preservation rate** = 38.9% (49/126)  [95% CI 30.8–47.6%]
 - **Edit precision** = 30.6% (34/111)  (chance = 50.0% by construction: exactly one harmful and one useful span per conversation, so an indiscriminate editor scores 50%)
-- clean-arm spontaneous base rate: harmful anchor 0.0%, useful anchor 0.0%
+- clean-arm spontaneous base rate: harmful anchor 2.4%, useful anchor 0.0%
 - base-rate-attributable preservation = 38.9%
 - harmful span named explicitly in the analyzer's `issues` section: 77.8% (98/126); useful span named there (a false alarm): 42.9% (54/126)
 

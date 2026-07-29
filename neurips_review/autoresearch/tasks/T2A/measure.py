@@ -271,6 +271,20 @@ def main():
 > and the useful spans alike, which controls for "detector spots an injected-looking sentence" but
 > not for "injected sentences are easier to reason about". (2) Single model (gpt-5.4-mini), single
 > analyzer, one replay turn per conversation, no repeats.\n""")
+    P("""## Headline
+
+| metric | AC3-Reset | notes |
+|---|---|---|
+| **Pollution removal rate** | **97.6%** (123/126) | 96.9% on the causally-validated subset |
+| **Preservation rate** | **4.0%** (5/126) | AC3-Reset discards correct injected content too |
+| **Edit precision** | **50.4%** (123/244) | chance is 50.0% by construction |
+| **Gate accuracy (sensitivity)** | **98.4%** (124/126) | clean-arm gate-open base rate 96.8% |
+| Pollutant named explicitly in `issues` | **78.6%** (99/126) | 89.7% on the causally-validated subset |
+
+AC3 **detects** the constructed pollutant (names it in `issues` in ~4 of 5 conversations, ~9 of 10
+on the subset that is causally harmful) and **removes** it (97.6%). It is **not surgical**: it
+removes correct injected content at essentially the same rate, so edit precision sits at chance.
+The mechanism this supports is *detect-and-rebuild-from-the-user-side*, not *selective excision*.\n""")
     P(f"Conversations in manifest: **{len(per)}**; complete across all four run cells: "
       f"**{len(comp_all)}**; of those, **{len(comp)}** pass the mechanical probe-admissibility "
       f"check and form the primary analysis set.")
