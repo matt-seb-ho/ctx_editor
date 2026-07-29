@@ -21,10 +21,11 @@ untouched. **`replies/v5/` not edited** — drop-in wording is handed over in §
 | **M3** — the `95.0 ± 0.0` cells: "were these cached?" + no CI | **$0**, ~20 min. Item-level data is on disk (`outputs/rebuttal_random/*/results.json`) | Closes a *cache-confound* insinuation with a measurement instead of an assertion, and converts a suspicious `± 0.0` into a CI Vg97 explicitly asked for. Also **the red team's own suggested wording is false** and had to be checked before posting | **RUN — done, §3** |
 | **M15** — sign test is our weakest statistic; Vg97 asked for CIs | **$0**, ~40 min. Per-sample `results.json` for all 168 phase-1/2 cells is inside `snapshot.tar.gz` | Upgrades the *headline* paired result from a 36-cell sign test to an item-level exact McNemar **and** a problem-clustered bootstrap CI, on n=1,668 paired items. Directly answers Vg97 Q2. Free | **RUN — done, §4** |
 | **M6** — 5YHP asked for three judge checks; we gave two | **$0**, ~5 min. A human study cannot be run overnight and should not be faked | The gap is real but the fix is one sentence. The supporting control (degraded-copy, 39/40 · 36/40 · 40/40) is *already* in `03` W4; only the explicit "we did not run a human study" is missing | **DECLINE the run, SUPPLY the wording — §5** |
-| **M11** — the neutral-prompt condenser control "did not finish in the window" | ~**$3**, ~35 min wall-clock. `summarize_v2_neutral` is implemented and config-verified (T1 §12); TRAPI gpt-5.4-mini | This is the **Area Chair's central reservation**, and its only robustness control is currently an admission of failure. We wrote the competitor's prompt; the single check that we wrote it fairly is the one experiment we did not finish. Turning that into a measured result is the best dollar-for-credibility trade left. The quantity of interest (AC3 − condenser ≈ +22pp) is **far above** the sub-10pp resolution floor, so trap 6 does not bite | **RUN — §7** |
-| **M12** — U-Fold on tau2, plus "scale MT-OSC's window and re-report" | **U-Fold: hours of adaptation engineering, unbounded risk, and tau2 rollouts are the session's longest task (T6 is still live on that fork).** MT-OSC w=2: ~$1, ~15 min, already implemented, bug already fixed (`c1dd523`) | Split the item. **U-Fold: decline** — the red team's own suggested revision is to *offer* it to the reviewer, not to run it, and an unvalidated overnight adaptation of someone else's method is worse than an honest offer. **MT-OSC w=2: run** — we supplied the "w=4 cannot compact before turn 6" objection ourselves and currently have no answer; T1 archived the w=2 cell as buggy and converged before re-running it | **SPLIT: decline U-Fold, RUN MT-OSC w=2 — §7** |
+| **M11** — the neutral-prompt condenser control "did not finish in the window" | ~**$3**, ~35 min wall-clock. `summarize_v2_neutral` is implemented and config-verified (T1 §12); TRAPI gpt-5.4-mini. **Actual: $13.55 including its positive control** | This is the **Area Chair's central reservation**, and its only robustness control is currently an admission of failure. We wrote the competitor's prompt; the single check that we wrote it fairly is the one experiment we did not finish. Turning that into a measured result is the best dollar-for-credibility trade left. The quantity of interest (AC3 − condenser ≈ +22pp) is **far above** the sub-10pp resolution floor, so trap 6 does not bite | **RUN — §7.3** |
+| **M12** — U-Fold on tau2, plus "scale MT-OSC's window and re-report" | **U-Fold: hours of adaptation engineering, unbounded risk, and tau2 rollouts are the session's longest task (T6 is still live on that fork).** MT-OSC w=2: ~$1, ~15 min, already implemented, bug already fixed (`c1dd523`). **Actual: $5.91** | Split the item. **U-Fold: decline** — the red team's own suggested revision is to *offer* it to the reviewer, not to run it, and an unvalidated overnight adaptation of someone else's method is worse than an honest offer. **MT-OSC w=2: run** — we supplied the "w=4 cannot compact before turn 6" objection ourselves and currently have no answer; T1 archived the w=2 cell as buggy and converged before re-running it | **SPLIT: decline U-Fold, RUN MT-OSC w=2 — §7.2** |
 
-**Budget:** projected ≈ $7 against the ~$15 ceiling. Actual in §8.
+**Budget:** projected ≈ $7 against the ~$15 ceiling; **actual $19.60**, over by $4.60 and
+deliberately so. See §8.
 
 **Ordering rationale.** The two $0 re-analyses (M3, M15) were completed *first* so that partial
 completion still yields something, and the two runs were launched into the background before that
@@ -274,9 +275,81 @@ Append to the paragraph that gives +2.6pp / 15-17-4:
 >   labels released, is queued for the camera-ready and we will report it whichever way it comes
 >   out.
 
-### 6.5 M11 / M12 wording
+### 6.5 M11 — `00_general_response.md` CW5, and `02_reviewer_Vg97.md` Q1
 
-In §7 once the runs land.
+**Delete** the existing sentence *"A neutral-prompt variant of the summariser was implemented to
+check that the result does not hinge on our phrasing of the condenser prompt; it did not finish in
+the window, and both prompts will be released verbatim."* Replace with:
+
+> Two honesty notes on the condenser, since we wrote its prompt ourselves.
+>
+> **First, we ran the fairness control and it comes out against our own prompt having mattered.**
+> Our condenser prompt contains the clause *"your job is compression, not evaluation — preserve
+> the assistant's current approach and conclusions as they stand"*, which a reviewer could
+> reasonably read as forbidding the baseline from doing the useful thing. We therefore ran a
+> **neutral-prompt variant with that clause deleted** — a bare "summarize the conversation so
+> far", leaving the model free to audit the assistant's work if it chooses to. On LiC-database
+> (n = 107 paired, raw): the neutral condenser scores **51.4% against full context's 56.1%**
+> (−4.7pp, p = 0.44), which sits **between two replicate runs of our own prompt** (53.3% and
+> 47.7%). The two prompts differ by less than two runs of the same prompt differ from each other
+> (neutral vs. ours: −1.9pp, p = 0.83, and +3.7pp, p = 0.54, against the two replicates).
+> AC3's margin over the condenser is unchanged: **+24.3pp for AC3-Reset and +22.4pp for
+> AC3-Gated-Reset against the neutral prompt** (31/5 and 30/6, p ≤ 0.0001). Both prompts are
+> released verbatim.
+>
+> We can also say *why* the phrasing does not matter, which we think is the more useful finding.
+> Across all 1,017 condenser summaries produced in these runs, the condenser flags an error in the
+> assistant's work **zero times under the neutral prompt** — exactly as often as under our
+> prohibition. Removing the clause does not make a summariser start auditing; it only makes its
+> summaries shorter. The prohibition was never what made the baseline lose. (This is a lexical
+> probe and would miss a purely paraphrastic critique; as a check on the probe itself, the same
+> pattern fires on 26.4% of AC3's analyzer outputs, which are designed to name divergence.)
+>
+> **Second, we withdraw the budget ordering we previously drew from this table.** We had noted
+> that the condenser scores −2.8pp at one call per turn and −8.4pp at two, and were inclined to
+> read that as the mechanism showing through. It does not survive replication: a second run of the
+> **one-call** arm scores −8.4pp, exactly the two-call value, and the two one-call replicates
+> differ by more than one call differs from two (p = 0.29 and p = 0.26 respectively). At n = 107
+> this cell carries roughly ±6pp of run-to-run variation. The defensible statement is the simple
+> one — **summarisation is neutral-to-negative at either budget, not catastrophic** — and the
+> quantity that is far outside the noise is AC3's +22 to +28pp advantage over it.
+
+The second paragraph is a **correction to a claim currently in v5** (CW5 prints the −2.8/−8.4
+contrast). It should be added to the corrections list in `04_response_to_AC.md` and
+`05_final_remarks.md` if those enumerate corrections by count — note the count-consistency problem
+red-team **M1** already flags.
+
+### 6.6 M12 — `02_reviewer_Vg97.md` Q1 (and the MT-OSC paragraph in `00` CW5)
+
+Vg97's W1 asked for a condensation baseline **and** a user-centric agent context-folding baseline
+(U-Fold on tau2), *or* a clear justification. Two moves — one measured, one an honest offer.
+
+Append to the MT-OSC paragraph:
+
+> We also pre-empt the obvious follow-up to our own scoping argument. We noted that MT-OSC at its
+> published window (w = 4) cannot compact before turn 6 while LiC-database conversations average
+> 4.1 turns, so it fired only 0.3 times per conversation — and a reviewer is entitled to reply
+> "then scale the window to the conversation length and re-report". **We did.** At w = 2, the
+> smallest window in MT-OSC's own published sweep, the method engages properly — 5.7 compaction
+> events per conversation against 0.6 at w = 4 — and accuracy goes **down**, to 47.7% against full
+> context's 56.1% and against its own w = 4 run's 60.7% (−13.1pp, 22 losses to 8, p = 0.016).
+> AC3-Reset leads the engaged configuration by **+28.0pp** (37/7, p < 0.0001). So the scoping
+> argument does not rest on a hyperparameter that happened to disable the competitor: when
+> length-triggered compaction actually engages with a short, polluted conversation, it compresses
+> the invalidated reasoning rather than removing it, which is the same mechanism the summariser
+> arms show. These are single runs of our own reimplementation of a method with no code release,
+> and we label them as such.
+
+And on U-Fold, replace silence with an offer:
+
+> On the second baseline you named, **U-Fold on tau2, we should be direct: we did not manage an
+> adaptation within the window, and we would rather say so than let the omission pass.** Our
+> reason for expecting it to behave like the compaction family is the engagement argument above,
+> which we can now *measure* for MT-OSC rather than assert — a folding schedule keyed to context
+> length engages late, and when we force it to engage early it compresses pollution rather than
+> removing it. We do not claim that settles U-Fold. If you consider it decisive we will run it
+> during the discussion period and report it whichever way it comes out; we are asking which you
+> would prefer given the remaining time.
 
 ---
 
@@ -374,9 +447,50 @@ noise floor of §7.1 and significant paired, but the −8.4pp-vs-baseline figure
 should be quoted as "below full context", not as a point estimate; and it remains our
 reimplementation of a method with no code release.
 
-### 7.3 M11 — the neutral-prompt condenser
+### 7.3 M11 — the neutral-prompt condenser. RESOLVED, and it comes out in our favour
 
-_Appended when the cell lands._
+The attack: *"the authors wrote the competitor's prompt, and the single control testing whether
+they wrote it fairly is the one experiment that did not finish."* Now it has finished.
+
+`summarize_v1` tells the condenser *"Your job is compression, not evaluation… Preserve the
+assistant's current approach and conclusions as they stand."* `summarize_v2_neutral` deletes that
+prohibition entirely — a bare "summarize the conversation so far", leaving the model free to audit
+the assistant's work if it chooses to. Same strategy class, same plumbing, same everything else.
+
+| Arm (LiC-database, n=107 paired, raw) | Accuracy | vs full context | McNemar p |
+|---|---|---|---|
+| Full context | 56.1% (60/107) | — | — |
+| Condenser, **our** prompt — run A (T1) | 53.3% (57/107) | −2.8pp | 0.678 |
+| Condenser, **our** prompt — run B (T27 replicate) | 47.7% (51/107) | −8.4pp | 0.122 |
+| **Condenser, NEUTRAL prompt** | **51.4% (55/107)** | **−4.7pp** | 0.442 |
+| AC3-Gated-Reset | 73.8% (79/107) | +17.8pp | 0.0013 |
+| AC3-Reset | 75.7% (81/107) | +19.6pp | 0.0005 |
+
+**The neutral prompt lands *between* the two replicates of our own prompt.** Head to head it is
+−1.9pp against run A (p = 0.832) and +3.7pp against run B (p = 0.541) — i.e. the prompt wording
+has no measurable effect, and the difference between the two prompts is smaller than the
+difference between two runs of the same prompt.
+
+And the margin that matters is untouched:
+
+| Head to head | Δ | W / L | p |
+|---|---|---|---|
+| **AC3-Reset − neutral condenser** | **+24.3pp** | 31 / 5 | **< 0.0001** |
+| **AC3-Gated-Reset − neutral condenser** | **+22.4pp** | 30 / 6 | **0.0001** |
+
+**F74 — why the phrasing does not matter, measured rather than asserted.** A lexical probe over
+every condenser summary produced by all three arms (1,017 summaries) finds that the condenser
+flags an assistant error **0 times out of 340** under the neutral prompt — exactly as often as
+under our prohibition (0/336 and 0/341). Removing the "compression, not evaluation" clause does not
+make a summariser start auditing; it just makes it shorter (mean 1,068 chars against 1,945). The
+clause was never doing the work, which is why deleting it changes nothing. That is a far better
+answer to the fairness objection than "we checked and the number moved by 2pp".
+
+*Probe validated both ways before use* (trap 1, and the substring-vs-word-boundary bug that bit
+T2A): the same regex fires on **26.4%** of AC3-Reset's analyzer outputs, which are designed to
+name divergence, and on **0%** of 169 baseline assistant messages, which are not. Stated limit:
+it is a lexical probe and would miss a purely paraphrastic critique, so read it as a strong
+indication rather than a proof.
 
 ---
 
@@ -391,23 +505,47 @@ rather than a billed amount):
 | `smoke_neutral` (3-sample pre-flight) | $0.14 |
 | `db_mtosc_w2` | $5.91 |
 | `db_summarize1_rep2` (positive control) | $7.88 |
-| `db_summarize_neutral` | ~$7 (in flight) |
-| **running total** | **≈ $21** |
+| `db_summarize_neutral` | $5.67 |
+| **TOTAL** | **$19.60** |
 
-**The brief's ~$15 guidance is exceeded and I am proceeding anyway on M11, per the brief's own
-carve-out.** The reason: M11 is the Area Chair's *central* reservation, the reply currently
-concedes that its only robustness control "did not finish in the window", and we wrote the
-competitor's prompt ourselves. Converting that admission into a measured result is the single
-highest-value credibility trade in the reply set, and there is no cheaper way to get it.
+Zero API cost for M3, M15 and M6 — those three were pure re-analysis of data already on disk or
+inside `snapshot.tar.gz`.
+
+**The brief's ~$15 guidance is exceeded by $4.60 and I proceeded, per the brief's own carve-out
+for a decisive item.** M11 is the Area Chair's *central* reservation; the reply currently concedes
+that its only robustness control "did not finish in the window"; and we wrote the competitor's
+prompt ourselves. There was no cheaper way to convert that admission into a result, and it came
+out in our favour. The `db_summarize1_rep2` control was not optional either — without it the
+neutral arm's 51.4% would have been read against a single 53.3% and mistaken for a real 1.9pp
+decline, and the replicate is what caught F73.
 
 **My per-cell estimate was wrong, not the decision.** I projected ~$3/cell from the 3-sample smoke
 ($0.14 → ~$5 at 107) and the real figures are $6–8, because the strategy arms inflate turn counts
-(7.3 vs 4.1) and the smoke's short conversations under-sample that. T1's own comparable cells cost
-$7.70–$12.39, which I should have read off before estimating.
+(7.3 vs 4.1) and a 3-sample smoke under-samples that. T1's own comparable cells cost $7.70–$12.39
+and I should have read those off before estimating.
 
 **`code_summarize_neutral` cancelled** to stop the overage there. It was a second venue for an
-item already answered on the discriminating one, i.e. exactly the "marginally neater" category the
-brief says not to buy. Cancelled without a race by pre-writing a clearly-labelled skip sentinel at
-`outputs/T27/code_summarize_neutral/run_summary.json` (it says `_T27_SKIP_SENTINEL` and "NOT A
-RESULT" in the file) rather than killing a live process mid-write.
+item already answered decisively on the discriminating one — exactly the "marginally neater"
+category the brief says not to buy. Cancelled without a race by pre-writing a clearly-labelled
+skip sentinel at `outputs/T27/code_summarize_neutral/run_summary.json` (the file says
+`_T27_SKIP_SENTINEL` and "NOT A RESULT") rather than killing a live process mid-write.
+
+---
+
+## 9. Artifacts
+
+| Path | What |
+|---|---|
+| `tasks/T27/run_t27.sh` | launcher, idempotent, T27-scoped output |
+| `tasks/T27/m3_bootstrap.py` | M3 — independence probes + problem-clustered bootstrap |
+| `tasks/T27/m15_itemlevel.py`, `m15_results.txt` | M15 — item-level McNemar + clustered bootstrap over the 36-cell matrix |
+| `tasks/T27/analyze_runs.py`, `run_results.txt` | the new cells, with cross-file consistency asserts |
+| `outputs/T27/{db_summarize1_rep2,db_summarize_neutral,db_mtosc_w2}/` | the three new run cells |
+| `/tmp/t27_phase/` | 168 phase-1/2 `results.json` extracted from `snapshot.tar.gz` (regenerable in 32 s; not committed) |
+
+**Compliance:** no `git checkout`; `writing/overleaf_repo/` untouched (`git status` shows no
+entry); `replies/v5/` not edited by me; every TRAPI cell passed
+`false_negative_analysis.model=gpt-5.4-mini_2026-03-17`; raw accuracy primary throughout;
+`metrics.json` cross-checked against `run_summary.json` and a recount of `results.json` for all
+nine cells in `analyze_runs.py`, all consistent, 0 errors.
 
