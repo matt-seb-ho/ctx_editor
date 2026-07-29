@@ -874,3 +874,172 @@ best evidence we have contradicts.
 **Effort:** 30 min for #1–#4; 1–3 h for #5–#6 depending on option. **Blocking:** no, but the paper
 will contradict `03_reviewer_5YHP.md:132` until it is done.
 
+
+---
+
+## PAPER-11 — the tau2 withdrawal ⚖ **SCOPED INVENTORY — do not attempt the rewrite from this document**
+
+**Summary.** T6 re-ran the full published tau2 matrix at N=3 (3 models × 5 arms × 3 replicates ×
+19 tasks = **855 scored rollouts**, 899 run, 15/15 cells, same hyperparameters and model
+identities as the committed sweep scripts). **Two of three published baselines do not replicate:
+DSV4F 31.6 → 70.2 ± 11.0, Kimi 26.3 → 78.9 ± 0.0.** On **all three models the re-measured
+Baseline is at or above every AC3 arm.** The tau2 improvement claim is **withdrawn**.
+**What survives: AO → 0.0% on every model, every replicate, 9 cells / 171 rollouts, structural
+and exact.**
+
+**Blocking:** no. v5 posts the withdrawal in its own words (`00` CW1+CW4, `01` W3, `02` W2/Q2,
+`04` correction 6, `05` correction 8, `README`, `CHANGES` §12.3), and a reviewer reading "we
+withdraw this claim" needs no paper edit to verify it. **But it must land before any revision or
+arXiv push, and it is the highest-stakes item on the list.**
+
+**Rule, codified in `replies/v5/README.md` Blocker 2 and worth restating here:** the positive
+control **reproduced** (gpt-5.4 Baseline 68.4 vs published 68.4; AO 0.0 across 9 cells vs
+published 0/0/0), `gpt-5-mini` *was* reachable, invocation strings were byte-identical and no
+model was substituted anywhere. **Do not soften the withdrawal into "mixed results" or "not
+comparable across model eras."** (F79.)
+
+### The re-measured matrix (the numbers any replacement must use)
+
+| tau2-bench (reward %) | gpt-5.4 | DeepSeek-V4-Flash | Kimi-K2.6 |
+|---|---|---|---|
+| Full context — **as published** (N=1) | 68.4 | **31.6** | **26.3** |
+| **Full context — re-measured, N=3** | **68.4 ± 13.9** | **70.2 ± 11.0** | **78.9 ± 0.0** |
+| Assistant omission, N=3 | **0.0 ± 0.0** | **0.0 ± 0.0** | **0.0 ± 0.0** |
+| \method-Augment, N=3 | 47.4 ± 5.3 | 50.9 ± 8.0 | 57.9 ± 9.1 |
+| \method-Gated-Reset, N=3 | 57.9 ± 21.1 | 57.9 ± 10.5 | 71.9 ± 11.0 |
+| \method-Rewrite, N=3 | 47.4 ± 5.3 | 57.9 ± 13.9 | 66.7 ± 8.0 |
+
+Paired against the re-measured baseline: **Augment is significantly worse on all three**
+(−21.1 p = 0.008 / −19.3 p = 0.043 / −21.1 p = 0.012); Gated-Reset and Rewrite are negative
+everywhere without reaching significance. AO is −68.4 / −69.6 / −78.9, **p < 0.0001**.
+
+**Evidence:** **F78–F81, D21**. `tasks/T6/worklog.md` (Tables 1–2, §"the finding the rebuttal has
+to deal with", §"Did the positive control reproduce?", §"Bug found in the fork"); per-rollout
+traces at `~/ac3/tau2_ctxe/ctx_edit/outputs/T6_reps/<model>_<arm>/traces/*.json`; aggregators
+`t6_aggregate.py` / `t6_paired.py`; diagnostic at `outputs/T6_diag/`. Same table printed in
+`replies/v5/00_general_response.md` CW4.
+
+### ⚠ Two consequences nobody has recorded, both found while building this inventory
+
+**(1) Figure 1 is an image, and the image itself is now wrong — not just its caption.**
+`assets/ctxe_story.drawio.png` draws the "Ours" curve **strictly above** the flat "Vanilla" line
+across the whole x-axis, *including the tau2-bench band*, with an inset reading *"Fine-grained
+context management remains robust in more complex, more referential interactions!"*. Under the
+withdrawal, at the tau2 end AC3 is at or below vanilla on all three respondents. **The teal curve
+must cross or meet the orange line inside the tau2 band, and the inset text must change.** This is
+a redraw, not a caption edit. **And the draw.io source is not in the repo** — `find` over the
+whole tree returns no `.drawio` file, only exported PNGs (`ctxe_story.drawio.png`,
+`ctxe_story.drawio(1).png`, `fig1_v6.drawio.png`, `task_comparison.drawio.png`). Whoever holds the
+draw.io document must redraw it; budget this separately from the text edits.
+
+**(2) The "appropriate intensity" narrative loses its tau2 leg, and the ordering inverts.**
+L358 and L372 both claim *"the strongest respondent (gpt-5.4) benefits most from the lightest
+operator (Augment, +15.8pp), while the weakest (Kimi-K2.6) benefits most from the heaviest
+(Rewrite)"*. On the re-measured matrix, reading down the AC3 rows: gpt-5.4 → **Gated-Reset 57.9**
+(Augment 47.4, Rewrite 47.4); DSV4F → **Gated-Reset 57.9 = Rewrite 57.9** (Augment 50.9);
+Kimi → **Gated-Reset 71.9** (Rewrite 66.7, Augment 57.9). **Gated-Reset is best or tied-best on
+all three**, so the light-for-strong / heavy-for-weak pattern does not merely lose its magnitudes
+— **it is not there any more.** The WildChat half of the same argument (Rewrite wins on Kimi-K2.6,
+Reset on gpt-5.4) is untouched and survives. **L372 therefore needs an authorial decision, not a
+number swap** — see the judgement calls below.
+
+### Full location inventory
+
+Ordered by position in the file. "Must become" is the constraint, not the wording.
+
+| # | Line | Section | Current text (substring) | What it must become | Kind |
+|---|---|---|---|---|---|
+| 1 | **110** | abstract | `\method is the only approach that improves over full context across the entire spectrum` | the pre-drafted fallback, applied verbatim in v5: **"the only method tested that improves over full context on every self-contained and referential benchmark, and the only method that remains viable in the stateful agentic setting"** | mechanical (wording fixed by v5) |
+| 2 | **110** | abstract | `and substantially outperforms full context in agentic tool use --- by double-digit margins per respondent --- where blanket omission instead collapses to 0\% on every model tested` | **delete the improvement half.** Keep only: blanket omission collapses to 0% on every model tested | mechanical |
+| 3 | **110** | abstract | `selective curation, not blanket removal, is what scales to multi-turn human--AI interaction` | survives on LiC + WildChat, but see **PAPER-5** — the same sentence is load-bearing there | ⚖ interacts with PAPER-5 |
+| 4 | **122** | Fig. 1 caption | `\emph{\methodfull{} (\method, ours)} substantially outperforms vanilla across the spectrum --- including on tau2-bench, where AO collapses entirely (to 0\%) while \method still beats full context` | **false as written.** Must become: AC3 outperforms vanilla on the self-contained and referential benchmarks; on tau2-bench AC3 remains viable while AO collapses to 0%, but does not beat full context | mechanical text, **plus the image redraw above** |
+| 5 | **122** | Fig. 1 caption | `\emph{Full context} (vanilla) plateaus throughout.` | **false at the tau2 end** — vanilla is the top arm there (68.4 / 70.2 / 78.9). The schematic's whole shape is at issue | ⚖ depends on the redraw |
+| 6 | **139** | intro | `\method is the only method that improves over full context across the entire spectrum` | same replacement as #1 | mechanical |
+| 7 | **139** | intro | `And on stateful agentic tool use in tau2-bench~\citep{barres2025tau2}, the best \method operator beats full context by double-digit margins on every respondent, while AO catastrophically collapses to 0\%...` | **delete the improvement clause; keep the AO collapse.** Suggested: "And on stateful agentic tool use in tau2-bench, AO catastrophically collapses to 0\% on every respondent by destroying tool-call results that live only in assistant turns, while \method{} remains viable" | mechanical |
+| 8 | **242** | Experiments, tau2 para | (benchmark description, no result claim) | **no change needed** | — |
+| 9 | **280** | `tab:megatable` caption | `\mkimi~tau2-bench Baseline/AO cells are rate-limit-clipped floors at Foundry workers=4 (true Baseline likely 40--50\%; AC3 cells ran clean).` | **the concession becomes the finding.** Both the Kimi *and* the DSV4F baselines were clipped; re-measured they are 78.9 and 70.2. This sentence must be replaced by a statement that the published Baseline row was withdrawn and re-measured at N=3 | mechanical (given the new table) |
+| 10 | **280** | `tab:megatable` caption | `or task reward (tau2-bench, \texttt{telecom\_small}, $n{=}19$ per cell)` | add: mean ± std over N=3 replicate runs (seeds 42/43/44), 19 tasks per replicate | mechanical |
+| 11 | **289–293** | `tab:megatable` **tau2 block** | the six values per row (`68.4 / 31.6 / 26.3`; `0.0 / 0.0 / 0.0`; `84.2 / 57.9 / 57.9`; `52.6$^{*}$ / 47.4$^{*}$ / 68.4$^{*}$`; `73.7 / 57.9 / 73.7`) | **replace wholesale with the re-measured matrix above**, as mean ± std. Note the `$^{*}$` marker (Gated-Reset) still applies — always-on Reset was never run on tau2 | mechanical, but the `\scored` colour bins all change |
+| 12 | **328** | §multi-model | `the best \method operator per cell beats Baseline (full context) in every (model, benchmark) block, while AO collapses entirely on tau2-bench across all three` | **false.** Must become: beats Baseline in every LiC and CollabLLM block; on tau2 no AC3 arm beats the re-measured Baseline, while AO collapses to 0% | mechanical |
+| 13 | **328** | §multi-model | `on tau2-bench the spread widens and the winning operator changes by respondent` | **false** — Gated-Reset is best or tied-best on all three. Delete or restate | mechanical |
+| 14 | **356** | §tau2-results ¶1 | AO collapses to 0% … infinite re-lookup loops … blanket omission incompatible with stateful tool use | **KEEP — this is the paragraph the section exists for.** Strengthen with the N=3 evidence: 9 cells / 171 rollouts, not one non-zero reward, via the confirmed `max_steps` termination path, paired −68.4 / −69.6 / −78.9 pp, p < 0.0001 | mechanical strengthening |
+| 15 | **358** | §tau2-results ¶2 | the entire *"winning operator changes with respondent strength"* paragraph — `+15.8pp`, `+26.3pp`, `+47.4pp`, the "appropriate intensity" reading | **DELETE or REWRITE FROM SCRATCH.** Every magnitude in it is withdrawn and the ordering it asserts is not present in the re-measured matrix | ⚖ **authorial** |
+| 16 | **360** | §tau2-results ¶3 | `only 1 of 11 baseline failures is attributable to context pollution (Table~\ref{tab:tau2-failure-modes})` | **soften — see sub-item U4 below** | ⚖ |
+| 17 | **360** | §tau2-results ¶3 | `Across all four respondents the load-bearing finding is the same: selective editing is the only context-management approach that remains viable when tool-call results live only in assistant turns.` | **survives verbatim** — "viable", not "better". This sentence is already the honest claim | none |
+| 18 | **369** | Discussion ¶1 | `on tau2-bench, AO collapses to 0\% on every respondent we tried while editing beats full context by +15.8 to +47.4pp over Baseline (the upper end against a rate-limit-clipped Kimi baseline...)` | **delete the magnitude clause entirely.** Keep the AO collapse | mechanical |
+| 19 | **372** | Discussion ¶2 | `On tau2-bench, the strongest respondent (gpt-5.4) benefits most from the lightest operator (Augment, $+$15.8pp), while the weakest (Kimi-K2.6) benefits most from the heaviest (Rewrite, the largest gain in the sweep).` | **DELETE.** The pattern is not in the re-measured data (see consequence (2) above). The paragraph's WildChat half survives and can carry it alone, but the paragraph's thesis then rests on one benchmark | ⚖ **authorial** |
+| 20 | **405** | conclusion | `and on tau2-bench, where AO collapses to 0\% on every respondent, the best \method operator beats full context by double-digit margins` | **delete the improvement clause.** Keep the AO collapse; add "remains viable" | mechanical |
+| 21 | **405** | conclusion | `Second, a single shared analyzer supports the full operator menu, and intensity should match the respondent: lighter editing (Augment) for stronger agents, heavier editing (Rewrite) for weaker ones (Table~\ref{tab:megatable}).` | **same problem as #19** — this is the conclusion's statement of the withdrawn pattern | ⚖ **authorial** |
+| 22 | **558** | `app:tau2-diagnostic` | the whole per-trial gpt-5-mini paragraph: `Per-trial success rates across seeds 42--44`, `The table reports the best-of-3 trial` | **best-of-3 must go** — v5 commits to mean ± std. Note this cell (gpt-5-mini) was **not** re-run by T6, which targeted the three-model matrix, so its numbers stand but its reporting convention must change | mechanical |
+| 23 | **562–577** | `tab:tau2-failure-modes` | the 11-failure breakdown, "Context pollution 1" | **soften — U4, see below** | ⚖ |
+| 24 | **808** | `app:limitations` | `\emph{Tau2-bench scope.}` … `the load-bearing finding is the \emph{collapse} of AO … not the absolute success rate of \method` | **already the right posture.** Extend with the withdrawal, the unexplained gpt-5.4 collapse and the fork parser bug — draft below | mechanical addition |
+| 25 | **checklist.tex L98** | NeurIPS checklist, error bars | `For tau2-bench (Table~\ref{tab:main}d) we ran 3 trials for both Baseline and Gated-Reset (the table cell shows the best of 3...)` | **two defects**: (a) `Table~\ref{tab:main}d` is a **stale cross-reference** — `tab:main` has been LiC-only since inner-repo commit `d211637`, so this renders as a panel that does not exist; (b) best-of-3 must become mean ± std over N=3. Nobody has flagged (a) | mechanical |
+
+### Sub-item U4 — the failure-mode table (`tab:tau2-failure-modes`)
+
+**Status: unverified, and it characterises a tau2 baseline that has since moved.** The "1 of 11"
+figure is traceable to `~/ac3/tau2_ctxe/ctx_edit/EXPERIMENT_LOG.md` commit `169b044` (2026-03-24)
+with the table verbatim identical to the paper's — but **the 20 traces are gone**, never tracked
+in git, absent from both tarballs and from disk, and **no labels file or rubric ever existed**.
+Two further defects: it is the **45.0% trial, the worst of three {45, 55, 60}**, while the table
+reports best-of-3, so 11 failures does not reconcile with the reported cell; and n is ambiguous
+(20 vs 19). **F56.** Standing recommendation, unchanged: **soften now, defer re-derivation to
+camera-ready.** v5 already says this to the reviewers in its own words
+(`00_general_response.md` CW4, final paragraph: *"we do not have a defensible failure taxonomy for
+it … one author's reading of a single trial's traces, without a rubric and without a second
+annotator … For the camera-ready we will annotate all trials against a published rubric with a
+second annotator"*). **The paper must not keep asserting the taxonomy while the reply disowns it.**
+
+### Draft limitations addition (L808) — paste-ready, and the one part of PAPER-11 that is not a judgement call
+
+Append to the `\emph{Tau2-bench scope.}` sentence:
+
+```latex
+\emph{Tau2-bench scope, and a withdrawn comparison.} Tau2-bench results use only the \texttt{telecom\_small} subset and are framed as a preliminary exploration of the agentic regime. Re-running the full three-respondent matrix at $N{=}3$ (855 scored rollouts) established that two of the three full-context baselines we originally reported were degraded --- rate-limit-clipped floors rather than honest performance --- and that against re-measured baselines no \method{} operator improves over full context on this benchmark. We therefore withdraw the tau2-bench improvement comparison. The load-bearing finding is unaffected and reproduces exactly: assistant omission returns \textbf{0\%} on every respondent, every replicate, 9 cells and 171 rollouts, because blanket omission destroys the tool-call results that exist only in assistant turns and the agent re-calls tools until it exhausts its step budget. Two things we cannot yet explain and prefer to state. First, on gpt-5.4 the \emph{baseline} reproduced exactly (68.4 vs 68.4) while every \method{} arm fell by 10 to 37 points against the published values; we ruled out model substitution, gating failure, degenerate termination and rate limits, and we report the collapse as unexplained rather than attribute it. Second, we found a real defect in our tau2 harness --- the analyzer's tag extractor misses when the model answers in JSON, so 53\% of analyzer calls fell back to splicing a raw completion into the agent's briefing --- which can only degrade \method{} arms and cannot touch full context or omission; patching it moved accuracy by $+2.3$pp, so it is worth fixing but is not the explanation.
+```
+
+### ⚖ The authorial decisions — options presented, not chosen
+
+**J1 — What is the paper's headline contribution without the tau2 improvement?** The abstract's
+spine is a *spectrum* argument: AC3 wins everywhere along a referentiality axis with tau2 at the
+far end. Removing tau2's improvement leaves the far end supported only by "AC3 remains viable
+while AO collapses". Three framings:
+
+* **(a) Keep the spectrum, weaken the far end.** Use v5's exact fallback wording (#1 above).
+  *Pro:* zero divergence from what reviewers will have read; the fallback is already drafted and
+  posted. *Con:* the spectrum's punchline becomes "we do not break" rather than "we win", and
+  Figure 1's shape has to change to match.
+* **(b) Re-centre on LiC + WildChat and demote tau2 to a stress test.** The headline becomes
+  "closes most of the multi-turn gap on self-contained tasks and wins every real-conversation
+  cell; tau2 shows that the *alternative* fix fails structurally". *Pro:* every claim is measured
+  and none is at risk. *Con:* a larger rewrite of abstract, intro, Fig. 1 and conclusion, and it
+  gives up the four-benchmark sweep as the organising idea.
+* **(c) Re-centre on the AO-refutation.** Make the paper's thesis "blanket omission is not a
+  general fix", with tau2 as the decisive counterexample and AC3 as the constructive answer.
+  *Pro:* AO = 0% on 9/9 cells is the single strongest, most reproducible result in the whole
+  submission, and it is *unaffected* by the withdrawal. *Con:* it reframes the contribution from
+  "our method wins" to "the field's current fix is wrong", which changes who the paper is arguing
+  with.
+
+**J2 — Does the "appropriate intensity" thesis survive on WildChat alone?** #19 and #21 assert
+it from tau2 + WildChat; the tau2 half is gone and the surviving tau2 ordering (Gated-Reset best
+or tied-best on all three) points the *other* way. Options: **(i)** keep the thesis on WildChat
+only and say so; **(ii)** retire the thesis and present the three operators as a design knob
+without a directional rule; **(iii)** replace it with the *measured* tau2 ordering — Gated-Reset
+dominates in the agentic setting, which is a defensible and useful statement about gating in
+state-carrying environments, though at N=3 on 19 tasks it is not resolvable. **I recommend
+against (iii) as written**: it would replace a withdrawn pattern with a new underpowered one,
+which is exactly the failure mode D20 records.
+
+**J3 — Does Figure 1 stay a schematic?** It is labelled "Schematic of qualitative trends", which
+gives licence to redraw the tau2 band with the teal and orange curves meeting. Alternatively it
+could be replaced by a real bar chart from the measured data. **Redraw needs the draw.io source,
+which is not in the repo.**
+
+### Effort
+
+3–5 h of text, **plus a figure redraw of unknown cost** because the source file is missing, plus
+whatever J1 costs. **Do PAPER-5 and PAPER-11 in one sitting**: J1 option (b) or (c) and PAPER-5
+option C converge on the same rewrite, and doing them separately means rewriting the abstract
+twice.
+
