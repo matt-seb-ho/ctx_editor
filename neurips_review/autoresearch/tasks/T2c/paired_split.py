@@ -82,13 +82,18 @@ def report(name, keys, ac3, base):
     # win/(win+loss) rescaled by disc/n.
     lo, hi = wilson(win, disc) if disc else (float("nan"), float("nan"))
     dlo, dhi = (2 * lo - 1) * disc / n, (2 * hi - 1) * disc / n
+    base_wrong = n - b
+    base_right = b
+    recov = win / base_wrong if base_wrong else float("nan")
+    broke = loss / base_right if base_right else float("nan")
     print(
         f"{name:34s} n={n:4d}  base={b/n:6.1%}  AC3={a/n:6.1%}  "
         f"delta={100*(a-b)/n:+6.1f}pp  [{100*dlo:+6.1f},{100*dhi:+6.1f}]  "
-        f"W/L={win}/{loss}  p={p:.4f}"
+        f"W/L={win}/{loss}  p={p:.4f}  recov={recov:5.1%}  broke={broke:5.1%}"
     )
     return dict(name=name, n=n, base=b / n, ac3=a / n, delta=(a - b) / n,
-                ci=(dlo, dhi), win=win, loss=loss, p=p)
+                ci=(dlo, dhi), win=win, loss=loss, p=p,
+                recovery=recov, breakage=broke)
 
 
 def main(label_file, label_key="label", arm="context_edit_v2_no_gate",
@@ -100,7 +105,11 @@ def main(label_file, label_key="label", arm="context_edit_v2_no_gate",
             continue
         if tasks and r["task"] not in tasks:
             continue
-        labels[(r["task"], r["conv"], r["sample_id"])] = r[label_key]
+        lab = r[label_key]
+        # nothing was inserted into the context -> nothing could leak
+        if r.get("injected") is False:
+            lab = "NO_LEAK"
+        labels[(r["task"], r["conv"], r["sample_id"])] = lab
 
     ac3 = load_arm(arm)
     base = load_arm("baseline")

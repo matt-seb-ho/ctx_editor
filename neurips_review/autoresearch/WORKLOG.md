@@ -98,3 +98,4 @@ Consequences, in order of severity:
 
 - **09:50** Heartbeat tick. 3 agents in flight (T8, T2c, T12-T13) = concurrency cap; all <5 min old, no worklogs written yet, none stalled. No dispatch, no pivot. Queue behind them: T9, T2A, T1, T11, T6, T2B.
 - **10:01** Heartbeat tick. All 3 agents healthy — worklogs for T8, T2c and T12-T13 all written and touched within the last 6 min, and live processes confirm real compute (`run_collabllm` on `collabllm_ac3_reset_v8` + `collabllm_baseline`, plus a `ctx-editor append_analysis` run). Still at cap; no dispatch, no pivot.
+- **10:24** Heartbeat tick. Still 3 agents at cap, all live. Worklog ages T2c 11m / T12-T13 25m / T8 28m, all inside the 45-min stall threshold. Useful liveness signal beyond mtimes: the `run_collabllm` PIDs rotated since the 10:01 tick, so T8 is finishing replicates and relaunching rather than hanging on one. No dispatch, no pivot.

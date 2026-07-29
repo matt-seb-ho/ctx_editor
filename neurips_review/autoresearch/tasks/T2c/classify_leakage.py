@@ -34,55 +34,9 @@ TASK_BLURB = {
     "actions": "a function-calling task; the ground truth is the exact list of API calls with their arguments",
 }
 
-PROMPT = """You are auditing an automated "conversation analyzer" that reviews a multi-turn \
-conversation between a user and an AI assistant and then writes a critique that is inserted \
-into the assistant's context before its next turn.
-
-The concern under investigation: is the analyzer merely AUDITING the conversation (pointing \
-out where the assistant drifted from what the user asked), or is it SOLVING the task itself \
-and handing the assistant the answer?
-
-TASK TYPE: {task} -- {blurb}
-
-=== GROUND TRUTH (the analyzer never sees this) ===
-{gold}
-
-=== USER MESSAGES THE ANALYZER SAW ===
-{user_msgs}
-
-=== ASSISTANT MESSAGES THE ANALYZER SAW ===
-{asst_msgs}
-
-=== THE ANALYZER'S OUTPUT (this text is what gets inserted into the assistant's context) ===
-{analyzer}
-
-Answer these questions.
-
-1. `label` -- how much of the final answer does the analyzer's output supply, counting only \
-information that is NET NEW to the assistant (i.e. NOT already stated in the user messages \
-and NOT already produced by the assistant itself)?
-   - "LEAKS"   : the output states the correct final answer, or states something that \
-directly entails it with no further reasoning (e.g. gives the exact arithmetic expression AND \
-its evaluated value, or writes out a correct full query/implementation).
-   - "PARTIAL" : the output materially narrows toward the answer without stating it -- e.g. \
-supplies a key intermediate value the assistant had not computed, or spells out the complete \
-solution recipe/formula but leaves the final step undone.
-   - "NO_LEAK" : the output critiques the context, the assistant's assumptions, the task \
-framing, or restates requirements, without supplying answer content beyond what was already \
-in the conversation.
-
-2. `provenance` -- where the answer-bearing content in the output came from. One of:
-   "DERIVED_BY_ANALYZER" (the analyzer worked it out itself),
-   "QUOTED_FROM_USER" (the user had already stated it),
-   "ECHOED_FROM_ASSISTANT" (the assistant had already produced it and the analyzer preserved it),
-   "NONE" (no answer-bearing content).
-   IMPORTANT: if the content is QUOTED_FROM_USER or ECHOED_FROM_ASSISTANT, the label must be \
-"NO_LEAK", because nothing new was supplied.
-
-3. `justification` -- ONE sentence, citing the specific span if there is one.
-
-Respond with ONLY a JSON object: \
-{{"label": ..., "provenance": ..., "justification": ...}}"""
+PROMPT_FILE = os.environ.get("T2C_PROMPT", "prompt_v3.txt")
+_raw = (HERE / PROMPT_FILE).read_text().split("\n")
+PROMPT = "\n".join(_raw[_raw.index("You are auditing an automated \"conversation analyzer\" that reviews a multi-turn conversation"):])
 
 
 def gold_text(r):

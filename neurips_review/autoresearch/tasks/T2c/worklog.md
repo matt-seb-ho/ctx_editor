@@ -98,6 +98,109 @@ philosophy (same triples on both arms), finer granularity.
 
 ---
 
-## 4. Leakage classification
+## 4. Leakage measurement
 
-(Filled in below as the work proceeds.)
+Two independent measurements, deliberately: one deterministic (auditable, no model trust
+required) and one LLM-judged (covers all four tasks and the nuanced 3-way label).
+
+### 4a. Deterministic numeric probe — LiC-math only (`numeric_probe.py`)
+
+For each math analyzer output: does the GSM8K gold final answer appear as a standalone number
+(thousands separators and trailing `.0` normalised, word-boundary matched) in the analyzer's
+output? And is that same number already present in (i) the user messages the analyzer saw,
+(ii) the assistant messages the analyzer saw?
+
+Three-way provenance falls out with no model in the loop:
+
+| | `context_edit_v2_no_gate` | `context_edit_v2_gated` |
+|---|---|---|
+| gold number appears in analyzer output | 73 / 144 (50.7%) | 73 / 142 (51.4%) |
+| ...already stated by the **user** | 9 | 9 |
+| ...already produced by the **assistant** | 7 | 7 |
+| **derived by the analyzer itself** | **57 (39.6%)** | **57 (40.1%)** |
+| derived *and* injected into the context | 57 (39.6%) | 57 (40.1%) |
+
+Hand-read of the derived cases confirms they are real, not string coincidences, e.g.
+`sharded-GSM8K/1113`: *"The correct morning temperature would be 2 - 8 + 3 = -3°C"* (gold -3);
+`sharded-GSM8K/1131`: *"80 planks × $1.20 = $96.00"* (gold 96);
+`sharded-GSM8K/1166`: *"Total = 50 + 150 + 350 + 800 + 0 + 1,000 = **2,350**"* (gold 2350).
+
+**Decision D3 — the assistant-message check is not optional.** Without it the "derived" rate
+reads 44.4%; 7/144 of those are the analyzer *preserving a correct result the assistant had
+already produced*, which is the paper's stated mechanism, not the analyzer solving anything.
+The task brief flagged the user-quotation case; the assistant-echo case is the same problem one
+step over and matters just as much.
+
+### 4b. LLM classifier (`classify_leakage.py`)
+
+Judge `gpt-5.4-mini_2026-03-17` on TRAPI `redmond/interactive`, concurrency 5, one call per
+analyzer invocation. Inputs: task type, ground truth, the user messages the analyzer saw, the
+assistant messages the analyzer saw, and the analyzer's output (the injected `edited_context`
+where one exists, otherwise the reconstructed `task_spec`/`aligned`/`issues` block).
+
+**Decision D4 — the unit of "leakage" is NET NEW answer content.** Anything the user had
+already stated, or the assistant had already produced, is excluded by construction. This is the
+only operationalisation that answers 5YHP's actual question ("is the analyzer solving the
+task?") rather than a proxy for "does the answer string appear anywhere".
+
+**Prompt v1 failed hand-validation** — see §5. Prompt **v2** (`prompt_v2.txt`, verbatim, and the
+one used for every reported number) forces a provenance-first decision procedure and carries
+three worked examples covering the failure mode found in v1. v1 labels are kept at
+`leak_labels_v1.jsonl` for comparison.
+
+*Contamination note:* two of v2's worked examples were written from records in the v1
+hand-validation sample (`sharded-BFCL/parallel_199` conv1, `sharded-GSM8K/856` conv1). Those two
+records are excluded from the round-2 hand-validation draw. 2/1079 is immaterial to aggregates.
+
+*Non-injected analyses:* 16/1079 records have `needs_edit=false`, so nothing was inserted into
+the context and no leak was possible. They are labelled `NO_LEAK` by construction in the paired
+analysis.
+
+---
+
+## 5. Hand validation
+
+### Round 1 — prompt v1: **14/23 binary agreement (61%). Rejected.**
+
+24 records drawn stratified (2 per task × label cell, seed 2026); 1 unadjudicable because the
+dump printed `edited_context`, which was empty for a non-injected record. I read the ground
+truth, the user shards, the last assistant message and the full injected text for each, and
+adjudicated before looking at the judge's justification.
+
+| task | exact 3-way | binary (NO_LEAK vs PARTIAL∪LEAKS) |
+|---|---|---|
+| math | 5/6 | 5/6 |
+| database | 2/5 | 2/5 |
+| code | 4/6 | 5/6 |
+| actions | 2/6 | 2/6 |
+| **total** | **13/23 (57%)** | **14/23 (61%)** |
+
+**9 of the 10 disagreements were the same error in the same direction: the judge scored a
+faithful restatement of user-supplied requirements as leakage.** Canonical case,
+`sharded-BFCL/parallel_199`: the user names four cities and asks for humidity; the analyzer
+lists the four `get_current_weather(...)` calls with those cities; the judge called that
+`LEAKS / DERIVED_BY_ANALYZER`. Nothing was derived. Same pattern on
+`sharded-spider-val-617` (user literally asks for "min share" and "max share"),
+`sharded-spider-val-257`, `sharded-BFCL/parallel_139`, `sharded-BFCL/parallel_175`.
+One case was the mirror error on the assistant side (`sharded-livecodebench/2977`: the analyzer
+endorses the assistant's own correct implementation → judged `LEAKS / ECHOED_FROM_ASSISTANT`,
+violating the prompt's own rule).
+
+The single disagreement in the other direction was `sharded-GSM8K/961`, where the analyzer
+writes "recalculate using the complete data: 70 + 70 + 85 = 225" (gold 225) and the judge said
+`NO_LEAK`.
+
+Because the bias is one-directional, v1's numbers are **conservative for the paper's defence**
+(over-calling leakage shrinks the `NO_LEAK` subset and dilutes the `LEAKS` subset with
+non-leaky samples) — but 61% agreement is not good enough to report, hence v2.
+
+### Round 2 — prompt v2
+
+(filled in below)
+
+---
+
+## 6. Results
+
+(filled in below)
+

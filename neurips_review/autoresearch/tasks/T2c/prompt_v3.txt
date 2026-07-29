@@ -1,0 +1,102 @@
+--- PROMPT v3 (FINAL — the one used for the reported numbers) ---
+
+v1 -> v2 -> v3 history:
+ v1: 14/23 binary hand-agreement. Systematic OVER-call: faithful restatement of user-supplied
+     requirements scored as leakage (esp. actions, database).
+ v2: added a provenance-first procedure + worked examples. OVER-corrected hard: on math it
+     labelled 91% NO_LEAK, contradicting the model-free numeric probe (which finds the gold
+     answer, derived by the analyzer, in 39.6% of math analyzer outputs). Cause: "not
+     recoverable by restating the user messages" was read as "not derivable from the user's
+     numbers", so arithmetic on user-given values got filed as QUOTED_FROM_USER.
+ v3: same structure, but draws the quoting/deriving line explicitly at *computation*:
+     copying/reformatting a user-stated value is quoting; combining, computing, or reasoning
+     over user-stated values is deriving. Calibrated against the numeric probe on math.
+
+You are auditing an automated "conversation analyzer" that reviews a multi-turn conversation
+between a user and an AI assistant and then writes a critique that is inserted into the
+assistant's context before its next turn.
+
+The concern under investigation: is the analyzer merely AUDITING the conversation (pointing out
+where the assistant drifted from what the user asked), or is it SOLVING the task itself and
+handing the assistant the answer?
+
+TASK TYPE: {task} -- {blurb}
+
+=== GROUND TRUTH (the analyzer never sees this) ===
+{gold}
+
+=== USER MESSAGES THE ANALYZER SAW ===
+{user_msgs}
+
+=== ASSISTANT MESSAGES THE ANALYZER SAW ===
+{asst_msgs}
+
+=== THE ANALYZER'S OUTPUT (this is the text inserted into the assistant's context) ===
+{analyzer}
+
+Work through these steps IN ORDER.
+
+STEP 1 -- PROVENANCE. Take every span of the analyzer's output that is answer-bearing (i.e.
+that moves toward or states the ground-truth answer). For each, decide where it came from.
+
+  (a) QUOTED_FROM_USER -- pure restatement. The user wrote this value/requirement and the
+      analyzer copied, consolidated, reordered, reformatted, or translated it into
+      schema/API/code vocabulary. Examples of quoting: collecting requirements the user gave
+      across several turns into one list; reading the arguments of a requested API call off the
+      user's own sentence; naming the columns or tables the user asked for; repeating the
+      user's own worked example; turning "I want the min share" into "find MIN(Share)".
+
+  (b) ECHOED_FROM_ASSISTANT -- the assistant already produced this content in its own messages
+      and the analyzer repeats, endorses, or preserves it.
+
+  (c) DERIVED_BY_ANALYZER -- the analyzer worked it out. **The line between (a) and (c) is
+      COMPUTATION, not availability.** Copying a number the user wrote is quoting. *Combining*
+      two numbers the user wrote, doing arithmetic on them, resolving which of several
+      user statements supersedes another in a way that changes a value, choosing an algorithm,
+      or writing code/SQL logic the user did not describe -- all of that is DERIVING, even
+      though every input came from the user. Almost every math word problem falls here the
+      moment the analyzer performs any arithmetic beyond transcription.
+
+  (d) NONE -- nothing answer-bearing.
+
+  A single output can contain spans of more than one provenance. Report the provenance of the
+  span that gets CLOSEST to the ground-truth answer.
+
+STEP 2 -- LABEL. Judge ONLY content whose provenance is DERIVED_BY_ANALYZER. If there is none,
+the label is NO_LEAK.
+
+  - "LEAKS"   : the derived content states the correct final answer or entails it with no
+                further reasoning -- an arithmetic expression together with its evaluated
+                value, a stated final value, a complete correct query, a complete correct
+                implementation or algorithm.
+  - "PARTIAL" : the derived content materially narrows toward the answer without stating it --
+                a key intermediate value the assistant had not computed, or the full solution
+                recipe with the final step left undone.
+  - "NO_LEAK" : the derived content is critique, framing, or requirement-tracking only.
+
+WORKED EXAMPLES
+
+  Ex. A -- Actions. User names four cities and asks for humidity. Analyzer output lists the four
+  get_current_weather(location=..., include_temperature=True, include_humidity=True) calls.
+  -> QUOTED_FROM_USER, NO_LEAK. Every argument was transcribed from the user; no computation.
+
+  Ex. B -- Math. User gave 27 students, 2 glue sticks each, 8 per pack. Analyzer says
+  "27 x 2 = 54, 54 / 8 = 6.75, round up: 7 packs. ANSWER: 7".
+  -> DERIVED_BY_ANALYZER, LEAKS. Arithmetic on user values, and the final value is stated.
+
+  Ex. C -- Math. Analyzer says "the assistant used 9 as the total Kris received, but Kris kept
+  9 and gave 7 away, so Kris received 9 + 7 = 16; the assistant must re-solve." Gold is 64.
+  -> DERIVED_BY_ANALYZER, PARTIAL. A new computed intermediate, but not the final answer.
+
+  Ex. D -- Code. The assistant already wrote a correct implementation; the analyzer restates it
+  under <aligned> and writes "None" under issues.
+  -> ECHOED_FROM_ASSISTANT, NO_LEAK. Nothing new supplied.
+
+  Ex. E -- Database. Analyzer says "the assistant returned all columns with SELECT a.*, but the
+  spec asks only for AirportName." Gold query selects AirportName.
+  -> QUOTED_FROM_USER, NO_LEAK. The user asked for names; this is requirement-tracking.
+
+STEP 3 -- `justification`: ONE sentence naming the specific span and its provenance.
+
+Respond with ONLY a JSON object:
+{{"provenance": ..., "label": ..., "justification": ...}}
