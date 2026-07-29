@@ -230,3 +230,59 @@ injected}), (b) an **AC3-Rewrite (S3)** arm, which compacts instead of resetting
 the natural control for "is the removal rate just an artifact of deleting everything?".
 `experiment.strategy.analysis_cache_dir=null` is forced on the Rewrite runs — the shipped config
 points at `outputs/analysis_cache`, built with a different model/prompt (RECON unknown #9).
+
+---
+
+## 4. Full 16-cell matrix complete (13:05). Headline numbers, and one surprise.
+
+**Primary set: 126 conversations = 126 harmful + 126 useful spans.** All four positive controls
+pass on exactly this set.
+
+| | harmful (false by construction) | useful (true by construction) |
+|---|---|---|
+| **AC3 removed** | 123 | 121 |
+| **AC3 kept** | 3 | 5 |
+
+- **Pollution removal rate 97.6%** (123/126), 95% CI [93.2, 99.2]
+- **Preservation rate 4.0%** (5/126), 95% CI [1.7, 9.0]
+- **Edit precision 50.4%** (123/244)
+- **Gate sensitivity 98.4%** (124/126 injected conversations opened the gate); clean-arm gate-open
+  base rate 96.8%
+- Harmful span **named explicitly in the analyzer's `issues`** in 78.6% (99/126); useful span
+  named there (a false alarm) in 42.1% (53/126)
+- Clean-arm spontaneous base rate for *both* anchor classes: **0.0%** — the probes never fire by
+  accident, so removal is not inflated and preservation is not deflated by chance hits.
+
+Per task: database removal 96.2% / preservation 2.5%; code removal 100% / preservation 6.5%.
+Removal by injected type: `H_PHANTOM_COL` 95.5%, `H_PHANTOM_PARAM` 100%, `H_WRONG_EXEC_FACT` 100%,
+`H_WRONG_TEST` 100%. Preservation by type: `U_EXEC_FACT` 2.5%, `U_TRUE_TEST` 4.2%,
+`U_TRUE_SIG` 9.1%.
+
+### The surprise: injecting the *pair* made the Baseline **better**, not worse
+
+| arm | Baseline (full context) | AC3-Reset |
+|---|---|---|
+| clean | 27.8% (35/126) | 65.1% (82/126) |
+| injected | 36.5% (46/126) | 65.1% (82/126) |
+
+Baseline **+8.7pp**, AC3 **+0.0pp**. Reading that as "AC3 fails to protect" would be wrong: each
+conversation got *both* a false span and a true one, and the true one carries real information
+(a verified result value, a real public test case, the graded signature). On an unedited context
+the true span's benefit outweighs the false span's damage. AC3, which drops both, is simply
+**invariant** to injected assistant-side content.
+
+AC3-clean and AC3-injected are not the same run in disguise: 7 conversations flip each way
+(112/126 identical), i.e. ordinary sampling noise, and the injected anchor appears in the
+analyzer's `issues` in 78.6% of injected conversations, so the analyzer demonstrably saw the
+injection.
+
+**Cache trap checked (RECON unknown #9).** `context_edit_v2_no_gate.yaml` sets
+`analysis_cache_dir: outputs/analysis_cache` (1023 entries, shared with other agents running right
+now). I read `strategies/analysis_cache.py`: the key is
+`sha256(trace_message_hash + analyzer_model + prompt_version + spec_only + memory flags)` — it is
+**content-addressed and model-scoped**, so (a) injected and clean conversations can never share an
+entry, and (b) another agent's DeepSeek analyses cannot be served to my gpt-5.4-mini runs. Safe as
+configured; I forced `analysis_cache_dir=null` on the AC3-Rewrite arm anyway because that config's
+default cache predates this model.
+
+This is precisely why the single-span factorial arms were queued. Running now.

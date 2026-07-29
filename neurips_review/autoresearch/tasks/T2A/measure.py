@@ -338,7 +338,7 @@ def main():
     for k in sorted({r["u_kind"] for r in comp}):
         rows = [r for r in comp if r["u_kind"] == k]
         n = len(rows)
-        kp = sum(1 for r in rows if r[f"{tag}_injected_u_kept"])
+        kp = sum(1 for r in rows if r["ac3_injected_u_kept"])
         P(f"- preservation by useful type `{k}`: {pct(kp, n)}")
 
     rw = [r for r in comp if "rw_injected_h_kept" in r]

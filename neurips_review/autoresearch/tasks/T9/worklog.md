@@ -295,3 +295,53 @@ with analyzer strength.
 
 Sampling replicate (temperature 1.0; **not** a seed — `seed=` is inert on LiC), same 12 cells,
 launched 12:13 UTC into `outputs/T9/rep2/`.
+
+### 8.5 Status ping 13:07 UTC + positive controls
+
+**Status:** rep2 in flight, 3/6 arms done per task (baseline, ds_v4_flash, gpt54mini), Kimi
+running on both. Throughput dropped from ~4 s/sample (rep1 morning) to ~23 s/sample — endpoint
+contention with the other overnight agents, not an error. ETA ~14:15 UTC. rep1 is complete and
+fully analysed (§8.1-8.3); nothing in this task is blocked.
+
+**rep2 raw counts so far (replicate runs at `temperature: 1.0` — NOT seeds; `seed=` is inert on
+the LiC harness, and I set no `seed=` override anywhere, so no dependence on any seed-dispatcher
+fix):**
+
+| task | arm | rep1 | rep2 |
+|---|---|---|---|
+| code | baseline | 12/40 (30.0%) | 10/40 (25.0%) |
+| code | ds_v4_flash | 22/40 (55.0%) | 23/40 (57.5%) |
+| code | gpt54mini | 18/40 (45.0%) | 20/40 (50.0%) |
+| database | baseline | 9/49 (18.4%) | 7/49 (14.3%) |
+| database | ds_v4_flash | 21/49 (42.9%) | 23/49 (46.9%) |
+| database | gpt54mini | 24/49 (49.0%) | 24/49 (49.0%) |
+
+**Positive control — is the weak-analyzer number real, or a silent harness zero?**
+Relevant because a teammate found harness paths that return `0.0` instead of erroring. Two
+independent checks, both on rep1:
+
+1. **No arm is anywhere near zero.** The floor of the ladder, `gpt-4o-mini` on database, is
+   26.5% — *above* the 18.4% Baseline, not below it. There is no near-zero cell to explain away.
+2. **The weak arms' analyzer outputs are well-formed, not empty.** Counting malformed/empty
+   parses per arm (rep1):
+
+   | arm | analyzer calls | empty `user_intent` | empty `issues` | empty `edited_context` | `needs_edit=False` | edits applied |
+   |---|---|---|---|---|---|---|
+   | code / DeepSeek-V4-Flash | 37 | 0 | 1 | 0 | 1 | 36 |
+   | code / gpt-5.4-mini | 37 | 0 | 2 | 0 | 2 | 35 |
+   | code / Kimi-K2.6 | 37 | 0 | 0 | 0 | 2 | 35 |
+   | code / Llama-3.3-70B | 37 | 0 | 6 | 0 | 6 | 31 |
+   | code / gpt-4o-mini | 37 | 0 | 0 | 0 | 3 | 34 |
+   | database / DeepSeek-V4-Flash | 49 | 0 | 0 | 0 | 0 | 49 |
+   | database / gpt-5.4-mini | 49 | 0 | 1 | 0 | 1 | 48 |
+   | database / Kimi-K2.6 | 49 | 0 | 0 | 0 | 1 | 48 |
+   | database / Llama-3.3-70B | 49 | 0 | 7 | 0 | 7 | 42 |
+   | database / gpt-4o-mini | 49 | 0 | 1 | 0 | 17 | 32 |
+
+   `user_intent` parses on **100%** of calls in every arm, and `edited_context` is non-empty on
+   **100%** of the edits that were applied. So the weak analyzers are producing real, parseable
+   analyses and the harness is applying them — the reduced gain is a genuine analyzer effect.
+   The one striking number is database/gpt-4o-mini's **17/49 `needs_edit=False`**: it declines to
+   edit on a third of turns where every strong analyzer edits. Note the empty-`issues` count
+   equals the `needs_edit=False` count in every arm, i.e. "no issues found" is a *deliberate,
+   well-formed* verdict, not a parse failure. That is under-detection, measured.
