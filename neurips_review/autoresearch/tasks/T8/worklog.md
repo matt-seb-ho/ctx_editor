@@ -360,11 +360,27 @@ run — it distinguishes "the model failed" from "the sandbox is missing a libra
    21.7 ± 5.8 vs Baseline 6.7 ± 5.8, **+15pp in every replicate, 3/3 wins**, and it solves 9
    problem-instances Baseline never solves while losing none. This claim is safe to lead with.
 
-
-
 ---
 
-## 7. Paste-ready table
+## 9. Bonus — a genuinely different problem draw (enabled by the seed fix)
 
-_(pending bigcodebench)_
+Using branch `T8_collabllm_true_seed` with `seed=1234`, which draws a **fully disjoint** set of 20
+bigcodebench problems (0/20 overlap with the seed=42 set). Run log confirms the fix is live:
+`Loaded 20 samples from bigcodebench (None split, data_seed=1234)`.
+
+| Arm | seed=1234 draw (n=1) | seed=42 draw (mean of 3) |
+|---|---|---|
+| **AC3-Reset** | **3/20 = 15.0** | 21.7 |
+| **Baseline** | **1/20 = 5.0** | 6.7 |
+| delta | **+10.0 pp** | +15.0 pp |
+
+The Reset-over-Baseline effect **reproduces in the same direction on 20 problems the method has
+never been evaluated on**, at a smaller magnitude (+10pp vs +15pp). This is the one result here
+that is not confounded by the fixed-draw bug, and it is the best available evidence that the
+bigcodebench finding is a property of the method rather than of the particular 20 problems.
+(n=1 per arm — a bonus data point, not a replicated result. Canonical-solution pre-flight for this
+draw: 18/20, i.e. `201` and `35` are unscoreable for both arms alike.)
+
+Artifacts: `outputs/T8/seed1234_reset_bigcodebench`, `outputs/T8/seed1234_baseline_bigcodebench`.
+
 
