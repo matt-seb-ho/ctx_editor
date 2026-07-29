@@ -381,3 +381,25 @@ This is the most dangerous single item found tonight. An error that inflates our
 - **16:01** Heartbeat tick. All 3 fresh and healthy — T6 worklog 2m with three `run_parallel.py` workers, T17 worklog 3m (it logged within three minutes of dispatch), T2B worklog 8m with a baseline arm running. No dispatch, no pivot; the queue is empty.
 
   The two open severe items are both in flight: **F37** (do the published tau2 baselines replicate — T6) and **F42** (ERGO scored on unfiltered denominators — T17). Everything else this session has either landed or been retired.
+
+- **16:20** `T17` returned **DONE** (zero API calls). Artifacts: `tasks/T17/{RESULTS.md,worklog.md,build_corrected.py,corrected_tabmain.json}`, commit `6ebc59b`.
+
+**F43 — Confirmed, and there are two defects, not one.**
+- **D1 — ERGO alone is scored on the unfiltered pools**: 16/23, 11/25, 3/25, 12/25 against everyone else's 20/19/25/23. Confirmed not by inference but by the author's own Overleaf commit `d856247`, which states those exact fractions and names the (now-lost) run dirs. The filter is `replay.py:21-56` + `run_experiment.py:441-470`, and ERGO's denominators equal filtered-n plus pruned stubs exactly on all four tasks (20+3, 19+6, 25+0, 23+2).
+- **D2 — four cells sit one sample *below* the pool denominator** (AO/code 14/18, Concat/math 16/19, Augment/code 10/18, Reset/code 11/18) and Gated-Reset's actions row sits two *above* it (n=25).
+- Also: **the actions column's n=23 has no artifact behind it at all** — no `actions_false_negatives.json` has ever existed. It is the ad-hoc "common 23-sample" normalisation the paper itself confesses at `tex:508`.
+
+**F44 — ⚠️⚠️ An AC3 claim genuinely weakens, and we must say so plainly.** Corrected ERGO (k=0 point estimate): math **69.6 → 80.0**, code **44.0 → 57.9**, database 12.0 unchanged, actions **48.0 → 52.2**.
+
+- **ERGO beats AC3-Reset on math (80.0 vs 75.0)**, ties it on code (57.9) and actions (52.2), and **ties AC3-Gated-Reset — our recommended default — on math (80.0 vs 80.0)**.
+- Across the twelve no-memory ERGO-vs-AC3 comparisons, ERGO moves from losing 11/12 to **winning-or-tying 7/12**.
+
+**What holds, and it is not nothing:** database is untouched and decisive (ERGO 12.0 vs AC3 48.0); **Gated-Reset is still ≥ ERGO on all four tasks**; every operator still clears Baseline; and **no printed *sentence* becomes false** — the LiC prose compares against AO and Baseline, and the single explicit ERGO claim survives. Two body numbers even move in our favour (code gap-closure 78% → 82%; "closes 55–80%" → "67–82%").
+
+This is the correct outcome to have found ourselves. The fix strengthens a competitor and narrows our margin, which is exactly why a reviewer finding it first would have been severe.
+
+**F45 — The bound cannot be closed from disk.** The per-sample results are gone: `outputs/2026-05-01/23-*` (ERGO), `2026-03-21/*` (AO, Concat, Reset) and the whole v8 batch are absent from the 69,738-entry snapshot index, from `supplementary.tar.gz`, from `runs.yaml` (875 entries) and from every recovered tree. Numerators are attested; the pruned-item split is not. **ERGO code is therefore only bounded to [26.3, 57.9]** — far too wide to publish.
+
+Closing it needs **87 last-turn ERGO replays at roughly $0.20**, using `replay_source=data/baseline_traces_v2/{task}` so the filter fires automatically. T17 correctly stopped rather than estimating, and flagged it as step 1 of PAPER-7. **Dispatched as T18** — twenty cents to convert an unpublishable interval into an exact number is the best remaining trade in the session.
+
+**Controls (exemplary):** the denominator rule reproduces on all 28 archived pool-replay runs with 0 exceptions; the 20+3=23 stub arithmetic was verified against actual files (a run reporting n=20 holds 23 traces, 3 empty, matching the sidecar IDs); a **blind rational reconstruction of ERGO's fractions matched the Overleaf commit message on all four cells**; three independent source docs reproduce three published rows to the digit; all 30 unchanged cells are bit-identical.

@@ -60,3 +60,157 @@ Replay prefixes: `data/valid_prefixes_htn50_52/deepseek_v4_flash_foundry/{databa
 Baseline replay cells of 40–80 samples took 1.5–2.5 min at `max_concurrent=5`, i.e. ≈ 2–3.5 s of
 wall clock per sample. A T2B condition-run of ~25 conversations is therefore ≈ 1–1.5 min. This is
 what makes N replicates per condition affordable.
+
+### 0.1a Trap 3 result — the `seed=` fix is **not** in this tree
+
+```
+grep -rn "seed" src/ctx_editor/run_experiment.py      -> 0 hits
+grep -rn "seed" src/ctx_editor/execution/*.py         -> 0 hits
+git log --oneline -3 -> 1030d0d chore(rebuttal): dispatch T2B natural-span causal ablation
+```
+
+Same finding T2A recorded. I am told not to `git checkout` (trap 4), so **D0 stands: no `seed=`.**
+Replicates are described throughout as **"replicate runs at temperature 1.0"**. Confirmed from the
+run log that temperature really is 1.0 and not 0: `ctx_editor - WARNING - gpt-5 models require
+temperature=1.0, overriding 0.0 -> 1.0`. Good — the replicates are genuine independent draws, which
+is a precondition for this whole design.
+
+### 0.5 A stale-clock note
+
+`uptime` and my first `date` reading disagreed with the run log by ~50 min. All times in this
+worklog are taken from `date` / the run logs, which agree with each other. (T2A hit the same thing.)
+
+---
+
+## 1. Design
+
+### 1.1 What a "span" is
+
+A **span** is a naturally occurring block inside an assistant message of the replay prefix:
+a fenced code block, or a blank-line-separated paragraph. Nothing is authored, nothing is injected.
+`build_corpus.py::split_blocks` partitions each assistant message exhaustively into such blocks.
+
+Choices, with reasons:
+
+* **Block, not whole message.** Ablating a whole assistant message leaves the following user turn
+  answering a question that is no longer there, which confounds "this span was harmful" with "the
+  conversation stopped making sense". Block-level ablation keeps the clarifying question in place
+  and removes one unit of content. It is also finer, and it is what "span" means in the TODO.
+* **Only assistant messages, only in the prefix.** The final assistant message is stripped by
+  `truncate_final_assistant`, so it is not part of the context under test.
+* **Both arms are canonicalised.** The present corpus rebuilds every prefix assistant message as
+  `"\n\n".join(blocks)`. The ablated corpus is the same rebuild minus one block. Without this the
+  ablated arm would differ from the present arm in incidental whitespace as well as in the span.
+* **A span may not be the only block in its message** (removal would leave an empty assistant
+  message, which is an API artifact rather than an ablation).
+* **Minimum 40 characters.**
+
+### 1.2 Span selection, K = 4 per conversation
+
+All admissible blocks are enumerated (~9 per conversation); 4 are kept, **stratified by block kind**
+— up to 2 code blocks and the rest prose, each spread over conversation position by a deterministic
+rule (`spread()`). Selection uses **position and block kind only**: never correctness, never content,
+never any effect estimate. The stratification exists so the sample is not swamped by boilerplate
+prose ("This query joins the tables ...") and actually contains the SQL/code that is the plausible
+anchoring content.
+
+### 1.3 The run matrix
+
+Per task, conditions are `present`, `abl1..abl4`, and three controls. Loop order is **rep-major**,
+so a truncated session yields fewer replicates of everything rather than zero replicates of some
+conditions. Every cell is skipped if `run_summary.json` already exists, so replicates can be topped
+up later by re-running with a larger `R_*`.
+
+### 1.4 Controls (trap 1 — mandatory, and stated before the results)
+
+Three injected spans of **known causal sign**, all placed identically (appended as a new final block
+of the last prefix assistant message). Their "span removed" arm is the plain `present` corpus, so
+each costs one condition, not two.
+
+| control | span | expectation |
+|---|---|---|
+| `ctl_filler` | contentless, in T2A's surface frame | ablation effect ≈ **0** (negative control) |
+| `ctl_harm` | the T2A `H_PHANTOM_COL` / `H_PHANTOM_PARAM` span for this exact conversation — the two injection types T2A §4 causally validated as harmful | ablation effect **> 0** |
+| `ctl_answer` | the fully specified question (+ the gold `reference_sql` for database) | ablation effect **≪ 0** — this is the brief's "ablate the span containing the answer" |
+
+`ctl_harm` reuses T2A's `manifest.jsonl` verbatim, so the two studies are on one scale.
+
+### 1.5 Statistics — and the honest bit about power
+
+* Per span: `delta = p_ablated - p_present`, sign convention **positive = removing the span helped =
+  the span was harmful**. CI by Newcombe hybrid score; test by two-sided Fisher exact; multiplicity
+  by Benjamini–Hochberg at q = 0.10.
+* Fisher implementation validated against textbook values before use
+  (`fisher.test(matrix(c(3,1,1,3),2))` = 0.4857 ✓; lady-tasting-tea 4/4 vs 0/4 = 0.02857 ✓).
+  **My first implementation was wrong** — the hypergeometric support bounds were
+  `max(0, c1 - b)` instead of `max(0, r1 + c1 - n)`, which made `mde()` return 0.000 and reported
+  p = 0.023 for 5/8 vs 5/10. Caught precisely because I sanity-checked against known values before
+  trusting the number, which is trap 1 in its purest form.
+* **Minimum detectable effect**, exact, at `n_present = 12`, `n_ablated = 10`:
+  * smallest *observed* difference that can reach p < 0.05: **0.400**
+  * smallest *true* difference detectable with 80% power: **+0.61** at base rate 0.20,
+    **+0.55** at base rate 0.40.
+  * Downward (a span being *useful*): **bounded by the base rate itself** — at `p0 = 0.20` no
+    downward effect above 0.20 is even expressible, so useful spans are undetectable at floor.
+    This is the single most important power fact in the study and it is why §2 selects
+    conversations with headroom.
+* Consequently, **per-span labels resolve only large effects**, and the load-bearing analyses are
+  aggregate: the distribution of `delta` over all spans, and a label-free test of whether AC3's
+  remove/keep decision predicts `delta`.
+
+---
+
+## 2. Pilot and conversation selection (16:57–16:24 by the run log)
+
+`run_pilot.sh` — 6 replicate runs of the **unablated** prefix over the full conv0 pools
+(49 database, 35 code), `experiment=baseline`, i.e. the reference arm only.
+
+**Finding that changed the design: the present-arm accuracy distribution is strongly bimodal.**
+After 3 replicates, database was 41/49 never-solved, 5/49 always-solved, 3 mixed; code was
+15/35 never-solved, 17/35 always-solved, 3 mixed. Mean raw accuracy on database ≈ 10%.
+
+This matters because it bounds what an ablation can reveal:
+
+* a **floor** conversation has only upward headroom → it can reveal a **harmful** span (removing it
+  rescues the turn) and can never reveal a useful one;
+* a **ceiling** conversation has only downward headroom → it can reveal a **useful** span only;
+* mid-range conversations can reveal either, but there are very few of them.
+
+My first selection rule ("keep conversations with pilot rate strictly between 0 and 1") would have
+found 3 per task. **Rejected.** Replacement rule, declared before looking at which conversations it
+picks: **sort by pilot accuracy, take an evenly spaced sample across the sorted order**, so the
+selected set spans floor, middle and ceiling in proportion. Ties break toward conversations that
+have a T2A manifest entry, so the `ctl_harm` control covers as much of the set as possible.
+
+Selection uses the *pilot* copy of the present arm only. The analysis then uses **fresh present
+replicates**, so selection cannot manufacture an effect through regression to the mean.
+
+**Selected: 17 database + 15 code = 32 conversations → 128 spans (4 per conversation).**
+
+### 2.1 Alignment-probe feasibility, checked before committing compute
+
+Ran the probe offline against T2A's *existing* `ac3_clean_database_v2_conv0` traces, which replay
+the same conv0 prefixes, so this cost nothing:
+
+* 185 candidate spans over 49 conversations; **93 (50.3%) have ≥ 2 unique content tokens** and are
+  therefore probe-admissible. The other half are boilerplate whose vocabulary is fully shared with
+  the rest of the conversation and cannot be probed without a judge — they still receive causal
+  labels, they just cannot be scored for AC3 alignment. This is a stated coverage limit.
+* On those, AC3-Reset's keep rate is **9.7%**, consistent with T2A's 4.0% preservation rate on
+  injected spans. The probe is clearly not saturated at 1.
+
+## 3. Run plan committed (t ≈ 16:25)
+
+| | value |
+|---|---|
+| conversations | 17 database + 15 code |
+| spans | 128 (4 per conversation, ≤2 code + rest prose) |
+| replicates, present | 14 |
+| replicates, ablation | 12 |
+| replicates, controls | 8 |
+| MDE (observed difference reaching p<0.05) at (14, 12) | 0.333 |
+| runs | 86 per task |
+| estimated wall clock | ≈ 3.9 h (database ≈ 66 s/run, code ≈ 96 s/run) |
+
+Rep-major loop + skip-if-complete, so replicates can be topped up later and a truncated session
+still yields a balanced matrix.
