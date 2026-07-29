@@ -97,7 +97,16 @@ def load_meter(d):
     return json.load(open(p)) if p.exists() else None
 
 
+def load_rejudge():
+    """Arm-symmetric FN re-judge results (see fn_rejudge.py)."""
+    f = HERE / "fn_rejudge.json"
+    if not f.exists():
+        return {}
+    return {r["cell"]: r for r in json.load(open(f))}
+
+
 def main():
+    rejudge = load_rejudge()
     data = {}
     for task, _ in TASKS:
         for tag, _ in ARMS:
@@ -121,8 +130,8 @@ def main():
     # --- main table
     P("## Accuracy")
     P("")
-    P("| Task | Arm | Acc (raw) | n correct | Δ vs baseline | 95% CI | W/L | McNemar p | Adj. acc | Artifact |")
-    P("|---|---|---|---|---|---|---|---|---|---|")
+    P("| Task | Arm | Acc (raw) | n correct | Δ vs baseline | 95% CI | W/L | McNemar p | Adj. acc (repo, biased) | Adj. acc (arm-symmetric) | Artifact |")
+    P("|---|---|---|---|---|---|---|---|---|---|---|")
     for task, tname in TASKS:
         base = data.get((task, "baseline"))
         for tag, aname in ARMS:
@@ -134,14 +143,16 @@ def main():
             # lands in run_summary.json — not metrics.json.
             adj = cell["summary"]["metrics"].get("adjusted_accuracy")
             adj_s = f"{adj:.1%}" if adj is not None else "—"
+            rj = rejudge.get(cell["dir"].name)
+            sym_s = f"{rj['adjusted_accuracy_symmetric']:.1%}" if rj else "—"
             if tag == "baseline" or base is None:
                 P(f"| {tname} | {aname} | {m['accuracy']:.1%} | {m['correct']}/{m['total_samples']} "
-                  f"| — | — | — | — | {adj_s} | `{cell['dir'].relative_to(ROOT)}` |")
+                  f"| — | — | — | — | {adj_s} | {sym_s} | `{cell['dir'].relative_to(ROOT)}` |")
             else:
                 s = paired(cell["correct"], base["correct"])
                 P(f"| {tname} | {aname} | {m['accuracy']:.1%} | {m['correct']}/{m['total_samples']} "
                   f"| {100*s['delta']:+.1f}pp | [{100*s['ci'][0]:+.1f}, {100*s['ci'][1]:+.1f}] "
-                  f"| {s['win']}/{s['loss']} | {s['p']:.4f} | {adj_s} "
+                  f"| {s['win']}/{s['loss']} | {s['p']:.4f} | {adj_s} | {sym_s} "
                   f"| `{cell['dir'].relative_to(ROOT)}` |")
     P("")
 

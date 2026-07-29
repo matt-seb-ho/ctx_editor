@@ -42,10 +42,13 @@ CONCURRENCY = 4
 
 
 def load_trace(cell: Path, sample_id: str):
-    hits = list(cell.glob(f"traces/*/*/{sample_id}.json"))
-    if not hits:
-        return None
-    return json.load(open(hits[0]))
+    # Trace filenames sanitise "/" to "_" (code sample ids look like
+    # "sharded-HumanEval/105"). Try both forms.
+    for name in (sample_id, sample_id.replace("/", "_")):
+        hits = list(cell.glob(f"traces/*/*/{name}.json"))
+        if hits:
+            return json.load(open(hits[0]))
+    return None
 
 
 def all_visible(trace: dict) -> dict:

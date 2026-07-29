@@ -446,12 +446,140 @@ final context. The buggy run is preserved at `outputs/T1/main/BUGGY_db_mtosc_w2/
 
 ---
 
-## 10. Still outstanding
+## 10. FINAL RESULTS — both tasks
 
-- `db_mtosc_w2` re-run post-fix (the buggy run is archived, not deleted).
-- All 7 code arms (n=100) — `code_baseline` started 13:46.
-- Both `summarize_v2_neutral` robustness cells.
-- Arm-symmetric FN re-judge (§8.3) using the full user-message history.
+Converged on orchestrator directive: driver stopped after `code_summarize2`, no further arms
+started. Full machine-generated table in [`RESULTS.md`](RESULTS.md)
+(`.venv/bin/python neurips_review/autoresearch/tasks/T1/analyze.py`).
+
+**Primary metric = raw accuracy.** It is the paired, arm-symmetric, model-free quantity. The
+repo's `adjusted_accuracy` is reported alongside but is *invalid* for cross-arm comparison
+(§8.3); the arm-symmetric re-judge (§11) is the corrected version and agrees with raw.
+
+### LiC-database — n=107, paired, 1 run per cell
+
+| Arm | raw acc | correct/n | Δ vs baseline | 95% CI | W/L | McNemar p | adj (repo, biased) | adj (symmetric) |
+|---|---|---|---|---|---|---|---|---|
+| Baseline (full context) | 56.1% | 60/107 | — | — | — | — | 58.3% | 57.7% |
+| Summarisation, 1 call/turn | 53.3% | 57/107 | −2.8pp | [−10.5, +5.7] | 10/13 | 0.678 | 83.8% | 55.9% |
+| Summarisation, 2 calls/turn (budget-matched) | 47.7% | 51/107 | −8.4pp | [−14.2, −0.0] | 6/15 | 0.078 | 79.7% | 50.0% |
+| MT-OSC (reimpl.) w=4, as published | 60.7% | 65/107 | +4.7pp | [−3.6, +11.5] | 13/8 | 0.383 | 62.5% | 62.5% |
+| **AC3-Reset** | **75.7%** | 81/107 | **+19.6pp** | [+9.2, +26.1] | 28/7 | **0.0005** | 89.0% | 77.1% |
+| **AC3-Gated-Reset** | **73.8%** | 79/107 | **+17.8pp** | [+7.6, +24.3] | 26/7 | **0.0013** | 84.9% | 76.0% |
+
+### LiC-code — n=100, paired, 1 run per cell
+
+| Arm | raw acc | correct/n | Δ vs baseline | 95% CI | W/L | McNemar p | adj (repo, biased) | adj (symmetric) |
+|---|---|---|---|---|---|---|---|---|
+| Baseline (full context) | 83.0% | 83/100 | — | — | — | — | 83.0% | 83.0% |
+| Summarisation, 1 call/turn | 79.0% | 79/100 | −4.0pp | [−10.7, +4.1] | 7/11 | 0.481 | 100.0% | 80.6% |
+| Summarisation, 2 calls/turn (budget-matched) | 80.0% | 80/100 | −3.0pp | [−8.4, +3.8] | 5/8 | 0.581 | 98.8% | 80.8% |
+| **AC3-Reset** | **92.0%** | 92/100 | **+9.0pp** | [+2.0, +11.9] | 11/2 | **0.023** | 100.0% | 92.0% |
+
+### Head-to-head, paired: AC3-Reset minus the compaction baselines
+
+| Task | Comparison | Δ | W/L | McNemar p |
+|---|---|---|---|---|
+| database | AC3-Reset − Summarisation-1call | **+22.4pp** | 31/7 | 0.0001 |
+| database | AC3-Reset − Summarisation-2call | **+28.0pp** | 36/6 | <0.0001 |
+| database | AC3-Reset − MT-OSC w=4 | +15.0pp | 21/5 | 0.0025 |
+| code | AC3-Reset − Summarisation-1call | **+13.0pp** | 16/3 | 0.0044 |
+| code | AC3-Reset − Summarisation-2call | **+12.0pp** | 15/3 | 0.0075 |
+
+### Pooled, n=207 paired samples
+
+Baseline 69.1% · Summarisation-1call 65.7% (**−3.4pp**, 17W/24L, p=0.35) · Summarisation-2call
+63.3% (**−5.8pp**, 11/23, p=0.058) · **AC3-Reset 83.6% (+14.5pp, 39/9, p<0.0001)**.
+(The pooled rows for AC3-Gated-Reset and MT-OSC are **database-only** — their code cells were
+not run; see §12.)
+
+### Answer to the question T1 was set
+
+**No — generic condensation does not close the multi-turn gap.** On both tasks a faithful,
+good-faith summariser is flat-to-negative versus full context (−2.8pp and −4.0pp, both
+non-significant), while the *same plumbing* driven by an analyzer gains +19.6pp and +9.0pp. The
+prediction registered before running holds, and the sign of the summarisation effect is
+negative, not merely small. **Doubling the summariser's budget made it worse on database
+(−8.4pp), not better** — the gap is not a compute problem.
+
+### Measured budget — parity as a measurement, ratios not rounded
+
+From `<run_dir>/call_meter.json`, snapshotted before FN analysis.
+
+| Task | Arm | total calls | strategy calls | strategy calls/conv | strategy tokens | total tokens | avg turns |
+|---|---|---|---|---|---|---|---|
+| database | Baseline | 1222 | 0 | 0.0 | 0 | 874,226 | 4.1 |
+| database | Summarisation 1-call | 1558 | 336 | 3.1 | 559,644 | 1,596,358 | 7.3 |
+| database | **Summarisation 2-call** | 1909 | **678** | 6.3 | **1,268,902** | 2,294,569 | 7.3 |
+| database | MT-OSC w=4 | 1258 | **30** | 0.3 | 51,711 | 940,225 | 4.3 |
+| database | **AC3-Reset** | 1879 | **666** | 6.2 | **781,968** | 1,682,405 | 6.9 |
+| database | AC3-Gated-Reset | 1483 | 276 | 2.6 | 330,333 | 1,204,787 | 5.3 |
+| code | Baseline | 1088 | 0 | 0.0 | 0 | 1,274,962 | 4.0 |
+| code | Summarisation 1-call | 1416 | 304 | 3.0 | 583,343 | 1,984,327 | 7.1 |
+| code | **Summarisation 2-call** | 1815 | **646** | 6.5 | **1,420,048** | 2,892,747 | 7.5 |
+| code | **AC3-Reset** | 1555 | **542** | 5.4 | **663,270** | 1,783,127 | 5.9 |
+
+**Ratios, budget-matched summariser ÷ AC3-Reset:**
+
+| | strategy calls | strategy tokens | total calls | total tokens |
+|---|---|---|---|---|
+| database | **1.02×** | **1.62×** | 1.02× | 1.36× |
+| code | **1.19×** | **2.14×** | 1.17× | 1.62× |
+
+So the budget-matched arm did not merely match AC3-Reset — it **over-consumed** it, by 1.02–1.19×
+on calls and 1.62–2.14× on tokens, and still lost by 12–28pp. That is a stronger claim than
+equal budget: the baseline was *over*-budgeted and still lost. The 1-call summariser sits at
+0.50–0.56× AC3-Reset's calls, which is exactly why the 2-call arm exists.
+
+AC3-Gated-Reset reaches +17.8pp on **0.41×** AC3-Reset's strategy calls and **0.26×** the
+budget-matched summariser's strategy tokens — i.e. the best accuracy-per-token arm in the table
+is also an AC3 arm.
+
+---
+
+## 11. Arm-symmetric FN re-judge — the §8.3 correction, executed
+
+`fn_rejudge.py` re-runs the *identical* sufficiency judge and prompt on the complete user-message
+history recovered from `trace.messages` (hidden messages are retained there), de-duplicated in
+order. Only message *visibility* changes. Output: `fn_rejudge.json`.
+
+| arm (database) | excluded, repo (visible-only) | excluded, arm-symmetric |
+|---|---|---|
+| Baseline | 4 / 47 (9%) | 5 / 47 |
+| MT-OSC w=4 | 3 / 42 (7%) | 3 / 42 |
+| AC3-Gated-Reset | 14 / 28 (50%) | 3 / 28 |
+| AC3-Reset | 16 / 26 (62%) | 2 / 26 |
+| Summarisation 1-call | **39 / 50 (78%)** | **5 / 50** |
+| Summarisation 2-call | **43 / 56 (77%)** | **6 / 56** |
+
+The 9×-by-treatment spread collapses to a flat 2–6 once the judge sees the same user history in
+every arm — confirming the exclusions were an artefact of context editing, not of the user
+simulator. Under the corrected metric the ordering and magnitudes match raw accuracy
+(database: 57.7 / 55.9 / 50.0 / 62.5 / **77.1** / 76.0).
+
+**This is a bug in the shipped pipeline, not just in T1**, and it inflates `adjusted_accuracy`
+for every context-editing arm in the paper (AC3-Reset database reads 89.0% under the shipped
+metric versus 77.1% corrected). Worth escalating beyond T1.
+
+---
+
+## 12. Not run — explicit gaps
+
+| cell | status |
+|---|---|
+| `db_mtosc_w2` | **archived as `BUGGY_db_mtosc_w2`** (pre-fix, 26.2% — invalid, see §9). Not re-run post-fix; converged before it could be. **Do not quote the 26.2% figure.** |
+| `code_mtosc_w2`, `code_mtosc_w4` | not run |
+| `code_gated` | not run |
+| `db_summarize_neutral`, `code_summarize_neutral` | **implemented and config-verified, not run.** Prompt in §A.3. |
+
+**Is MT-OSC reportable?** Only partially, and it should be labelled *"MT-OSC (our
+reimplementation from the paper; no code release), w=4 as published"*. The w=4 number
+(60.7%, +4.7pp, p=0.38) is valid but near-vacuous *by the method's own schedule*: it fired 30
+times across 107 conversations (0.3 calls/conversation) because at w=4 it cannot touch the
+context before turn 6, and LiC-database averages 4.1 turns. **That structural point is the
+reportable finding** — MT-OSC's earliest possible intervention is later than the turn at which
+LiC pollution begins — and it does not depend on our reimplementation being perfect. The w=2
+configuration, which would test the condenser rather than the schedule, has no valid run.
 
 ---
 
