@@ -114,5 +114,5 @@ Addresses the meta-review directly, which no previous version did.
 
 * Verify numbers against `../../experiments/*.txt` and `../../experiment_todos.md`.
 * Push the paper edit (inner repo `b1a629a`) so the PDF matches the rebuttal. See `../../paper_edits_needed.md`.
-* Fill in the two in-flight results (condensation baseline, detector metric) if they land in time; both have placeholders in the current text.
+* The two in-flight items (condensation baseline, detector metric) are written as in-progress commitments, not as results. No text needs filling before posting. If they land during the discussion period, post the numbers as a follow-up comment (v5).
 * Coordinate with co-authors before posting.
