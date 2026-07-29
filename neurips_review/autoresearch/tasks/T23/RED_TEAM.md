@@ -1,5 +1,13 @@
 # T23 — Red team of `replies/v5/`
 
+> **⚠ READ THIS FIRST — the *attacks* in this document are verified; the *suggested wordings* are
+> not.** Every "Suggested revision" below was written under time pressure without running
+> anything, and is a **hypothesis requiring verification before it is posted**, not a patch to
+> apply. T27 measured two of them and both turned out to be **false** — see the inline
+> `⚠ SUPERSEDED — DO NOT APPLY` notes at **M3** and **M11**. This is decision **D20** in
+> `../../WORKLOG.md`: *adversarial-reader output is a hypothesis list, not a patch set.* Check any
+> proposed wording against the artifacts before it reaches a reviewer.
+
 *2026-07-29. Adversarial read, not an accuracy audit.* The accuracy audit (T15/T19/T20/T21)
 asked "is what we wrote true?" This asks "what does a reviewer who wants to reject do with
 it?" Everything below is written from the chair of a reviewer who has the submitted PDF
@@ -426,7 +434,7 @@ authors built and could not verify."
 
 **Severity: MEDIUM** (HIGH if the AC engages on it, which is likely — it is their reservation).
 
-**Suggested revision.** Two sentences of pre-emption in CW5:
+**Revision.** Two sentences of pre-emption in CW5:
 
 > Two honesty notes on the condenser. First, it degrades with *more* budget (−2.8 → −8.4pp),
 > which is itself the mechanism prediction — a second condensation pass compresses the
@@ -439,6 +447,27 @@ authors built and could not verify."
 
 Reframing to "neutral, not catastrophic" costs us nothing (AC3 still beats it by 22–28pp
 paired) and removes the appearance of stacking the deck.
+
+> ### ⚠ SUPERSEDED — DO NOT APPLY (T27, 2026-07-29). The attack was right; **half of the
+> suggested revision above is false and the other half is obsolete.**
+>
+> **(a) "It degrades with more budget (−2.8 → −8.4pp), which is itself the mechanism prediction"
+> — FALSE.** That ordering is 1-call 53.3% against 2-call 47.7%, exact McNemar **p = 0.263**.
+> T27 replicated the **1-call** arm at identical config and it landed on **47.7% — exactly the
+> 2-call value** — and the two 1-call replicates differ by *more* (p = 0.286) than 1-call
+> differs from 2-call. There is no budget effect to explain; the cell carries ≈**±6pp** of
+> run-to-run variation at n=107. Printing a *mechanism* on top of that ordering would have been
+> worse than printing the ordering, because the mechanism is the part a reviewer quotes back.
+> **Only the second half of the sentence — "summarisation is neutral-to-negative, not
+> catastrophic" — is supportable, and that is what `replies/v5/` now says.** (T27 §7.1, F73.)
+>
+> **(b) "It did not finish in the discussion window" — OBSOLETE.** T27 ran it. The
+> **neutral-prompt condenser scores 51.4%** against full context's 56.1%, landing *between* the
+> two replicates of our own prompt (53.3 and 47.7), and AC3 leads it by **+24.3 / +22.4pp**
+> (31/5 and 30/6). The decisive detail, which is stronger than the number: with the "compression,
+> not evaluation" clause deleted the condenser flags an assistant error **0 times out of 340** —
+> exactly as often as with it. A summariser does not audit whatever you instruct it to do.
+> (T27 §7.3, F74/F75.) Applied to `00` CW5, `02` Q1, `04`, `05` by **T28**.
 
 ## M12 — Vg97 asked for U-Fold on tau2. We neither ran it nor mentioned that we did not
 
@@ -459,6 +488,23 @@ you consider it decisive — we are asking which you would prefer given the time
 reviewer to choose converts an omission into an offer. And pre-empt the window objection:
 "we also ran MT-OSC at a shortened window to check that the engagement argument, not the
 hyperparameter, is doing the work" — if we have that run; if not, promise it.
+
+> ### ✅ RESOLVED (T27; applied by T28). **Split: U-Fold declined with a reason, MT-OSC w=2 run.**
+> The suggested U-Fold wording is sound and was adopted — an unvalidated overnight adaptation of
+> someone else's method is worse than an honest offer, and T6 was live on that fork.
+>
+> **We did have the run, or rather we made it.** T1 had archived its w=2 cell as buggy
+> (`raw_pairs_carried` silently dropped) and converged before re-running it; T27 re-ran it
+> post-`c1dd523`. At **w=2** MT-OSC engages **5.7 times per conversation against 0.6 at w=4**
+> (~9x), `raw_pairs_carried` 133 against the buggy run's 0 — and scores **47.7%**, i.e.
+> **−13.1pp against its own w=4 run** (8 W / 22 L, p = 0.016) and −8.4pp against full context.
+> AC3-Reset leads it by **+28.0pp** (37/7, p < 0.0001).
+>
+> **This retires our own "MT-OSC barely fires" defence, and we no longer need it.** The answer
+> to "then scale the window" is *we did, and it hurts* — which rules out the reading that MT-OSC
+> would have won if tuned, and is a stronger version of the scoping argument than "the schedule
+> cannot fire". Any text still resting on the low-engagement argument alone should be updated.
+> (T27 §7.2, F76.)
 
 ## M13 — "The comparison you describe was a user-simulator artifact"
 
@@ -501,11 +547,38 @@ have an analyzer-cache confound in our own history (F20); (b) `00` CW2 L89 conce
 these intervals "estimate decoder variance, not sampling variance over problems, and are
 correspondingly **narrower** than a full re-draw would give" — so we tell the reviewer every
 ± in the rebuttal understates uncertainty and then present a ±0.0. **Severity: MEDIUM.**
-**Revision:** add "(38/40 in each of the three runs; the analyzer cache was disabled for
+**Revision.** add "(38/40 in each of the three runs; the analyzer cache was disabled for
 these runs, so the replicates are independent draws)" — assuming that is true; if it is not
 true, we need to know before posting. And give a bootstrap CI over problems for this table:
 we have item-level data, Vg97 asked for CIs, and it converts a suspicious ±0.0 into a
 defensible [x, y].
+
+> ### ⚠ SUPERSEDED — DO NOT APPLY (T27, 2026-07-29). The attack was right; **the suggested
+> clause is false.** The caveat in it — "assuming that is true; if it is not true, we need to
+> know before posting" — is the reason this was checked, and it is the reason it must not be
+> pasted by anyone who skips the check.
+>
+> **"The analyzer cache was disabled for these runs" — FALSE.**
+> `src/ctx_editor/config/experiment/context_edit_v2_gated.yaml:18` sets
+> `analysis_cache_dir: outputs/analysis_cache`, and `experiments/run_exp1_reps.sh` does **not**
+> override it — contrast `tasks/T1/run_t1_main.sh`, which passes
+> `experiment.strategy.analysis_cache_dir=null` explicitly. The runs' own
+> `outputs/rebuttal_random/{full,rep2,rep3}_gated/config.yaml` confirm the cache path at line 14.
+> Posting this sentence would have handed a reviewer a checkable false statement inside the
+> paragraph whose entire purpose is to rebut a suspicion of caching.
+>
+> **The true answer is stronger and is measured** (T27 §3.2). Across the three replicates:
+> analyzer outputs differ on **39 of 39** comparable conversations; the two failing problems are
+> a **different pair each run** (`{288,427}` / `{1066,435}` / `{427,916}` — union 5,
+> **intersection 0**); turn counts differ on **7 of 40** and extracted answers on **5 of 40**.
+> On AC3-Reset, **40 of 40** differ. Three genuinely different runs landing on the same *count*.
+>
+> **The bootstrap half of the suggestion was correct and has been run** (T27 §3.3): full context
+> **87.5 [79.2, 95.0]**, AC3-Reset **93.3 [87.5, 98.3]**, AC3-Gated-Reset **95.0 [90.0, 99.2]**;
+> paired, Gated-Reset **+7.5pp [+1.7, +15.0]** (p = 0.023), Reset **+5.8pp [+0.0, +12.5]**
+> (p = 0.119). Applied to `00` CW3 and `01` Q1 by **T28**. Note also that "38/40 in each of the
+> three runs" was itself a guess: the cell is **38/40**, but state it from the data, not from
+> arithmetic on a percentage.
 
 ## M4 — iNYK's actual argument was regression to the mean, and we never answer it — although the condensation baseline answers it perfectly
 
@@ -556,6 +629,14 @@ human study in the discussion window. The closest evidence we have is the degrad
 positive control, where three judges prefer the intact response 39/40, 36/40 and 40/40; a
 human-agreement study on a sampled subset is queued for the camera-ready." Naming the gap
 costs a line; being caught omitting a third of a numbered request costs the reviewer's trust.
+
+> ### ✅ RESOLVED (T27 declined the run and supplied wording; applied by T28 to `03` W4).
+> A human study cannot be recruited and defended overnight and a synthetic stand-in would be
+> worse than the gap, so the gap is named rather than filled. The degraded-copy control cited
+> above is **real and was already in the reply** (`03` W4, third bullet; source
+> `tasks/T11/worklog.md:221-227` — gpt-5-mini 39/40 with 1 tie and 0 degraded wins, DeepSeek
+> 36/40, Kimi 40/40). The posted wording adds that the control establishes the judges
+> *discriminate*, not that they agree with people. (T27 §5.)
 
 ## M7 — A bombshell about the WildChat pools is buried in a revision line
 
@@ -635,6 +716,28 @@ the result almost certainly survives). **Revision:** add a clustered bootstrap C
 problems, e.g. "+15.9pp, 95% CI [x, y] by a task-clustered bootstrap; item-level exact
 McNemar pooled across the matrix gives p = z", and keep the sign test as the assumption-light
 version. We have the item-level data (it is how T1, T2c and T9 were computed).
+
+> ### ✅ RESOLVED (T27, applied by T28) — with one correction to the note above.
+> **"We have the item-level data (it is how T1, T2c and T9 were computed)" is not right.**
+> T1/T2c/T9 are different experiments; the 36-cell matrix is parsed from the *report tables* in
+> `docs/reports/post_neurips_ac3_phase{1,2}.md`, and `outputs/post_neurips_ac3_phase{1,2}/`
+> contain only `winners.json`. The per-sample data **is** recoverable — all 168 `results.json`
+> are inside `blob_staging/snapshot.tar.gz` — which is how T27 ran it, but anyone following this
+> line to `outputs/` would have concluded the analysis was impossible.
+>
+> **Result:** AC3-Reset **+15.4pp, 95% CI [+11.5, +19.4]**, **350 W / 93 L** of 1,668 paired
+> items over 191 problem clusters. Both positive controls exact (168/168 cells reproduce;
+> `paired_analysis_results.txt`'s five rows reproduce to the digit). A trap inside the data,
+> caught by the control: harness errors are stored as `num_turns == 0` rows with
+> `is_correct: false` and **no `error` field**, so a failed conversation is indistinguishable
+> from a wrong answer unless you check the turn count — scoring them would have penalised
+> whichever arm errored more.
+>
+> **Guardrail that must travel with this item: do NOT quote the matrix-wide AC3-vs-AO McNemar
+> (p = 0.010) as a win.** It treats 1,668 items as independent when they are 191 problems x up
+> to 9 correlated replicates. The clustered CI is **[−0.3, +5.9]** and includes zero; database is
+> **[+10.7, +26.6]**. Using the anti-conservative test to upgrade the wash into a win is exactly
+> the statistic-shopping this document flags in **M8**. (T27 §4, F77.)
 
 ---
 
