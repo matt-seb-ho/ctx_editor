@@ -339,3 +339,9 @@ worth −34.4 pp. The natural-span effects in §3 are measured against that yard
 
 Note the empirical null threshold is still loose (95th pct of |filler effect| = 0.500) purely
 because the filler arm has only ~3 replicates so far; it will tighten as the matrix fills.
+
+### 5.1 Status 17:44
+
+Main matrix **85/172** runs (≈ 49%), steady at 1.06 runs/min; projected finish ≈ 19:05.
+**2062 samples run, 0 errors** across every T2B run directory. AC3 alignment arms complete at
+5 replicates × 2 arms × 2 tasks (20 runs).
