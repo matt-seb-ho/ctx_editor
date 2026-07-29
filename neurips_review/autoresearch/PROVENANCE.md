@@ -43,7 +43,8 @@ graph TD
     T16["T16 verify gate stats<br/>claim exact; wording wrong<br/>firing rate != detection rate<br/>[done]"]
     T14["⚠ T14 FN-adjustment audit<br/>2 flips on Rewrite (unpublished cells)<br/>Reset/Gated survive all 8<br/>found ERGO denominator defect<br/>[done]"]
     T17["⚠⚠ T17 ERGO denominator fix<br/>ERGO 69.6->80.0 math, beats Reset<br/>ties Gated-Reset; bound too wide<br/>[done]"]
-    T18["T18 close ERGO bound<br/>[run] — 87 replays, ~$0.20"]
+    T18["T18 close ERGO bound<br/>math 80.0 CLOSED (ships)<br/>code ~43.9 — T17 was +14pp wrong<br/>no diff significant at n≈20<br/>[done]"]
+    T19["T19 fold settled findings into v5<br/>[run]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
   S1 --> S2
@@ -64,6 +65,9 @@ graph TD
   T14 -.->|"LiC figures provisional"| T15
   T14 --> T17
   T17 --> T18
+  T18 --> T19
+  T14 --> T19
+  T16 --> T19
   T6 -.->|"⚠ baselines may not replicate"| T15
   T15 --> T16
   T14 -.->|"corrects magnitudes in"| P0
@@ -101,7 +105,8 @@ graph TD
 | T2B | Counterfactual span ablation | 2026-07-29 | `tasks/T2B/worklog.md` | Upgrades T2A's synthetic injections to **natural** spans |
 | T14 | FN-adjustment audit | 2026-07-29 | `tasks/T14/{RESULTS.md,corrected_matrix.*}` (`30089f3`) | **`tab:main` pool filter is sound; per-run `adjusted_accuracy` must go; ERGO denominators wrong** |
 | T17 | ERGO denominator fix | 2026-07-29 | `tasks/T17/{RESULTS.md,build_corrected.py,corrected_tabmain.json}` (`6ebc59b`) | **PAPER-7 — ERGO ties/beats AC3 on 3 of 4 tasks once corrected** |
-| T18 | Close the ERGO bound | 2026-07-29 | `tasks/T18/worklog.md` | 87 ERGO replays to resolve code ∈ [26.3, 57.9] |
+| T18 | Close the ERGO bound | 2026-07-29 | `tasks/T18/worklog.md` | **math 80.0 confirmed; code ~43.9 (T17 overstated by 14 pp); nothing significant at n≈20** |
+| T19 | Fold settled findings into `replies/v5/` | 2026-07-29 | `tasks/T19/worklog.md`; `replies/v5/CHANGES.md` | Lands T14/T16/T17/T18 in the reply text |
 
 ---
 
@@ -110,7 +115,9 @@ graph TD
 | Direction | Verdict | Reason |
 |---|---|---|
 | "BigCodeBench cannot be evaluated with executable tests" | `[dead]` | Factually wrong — T8 §5 shows that path runs real `untrusted_check` execution. We conceded a limitation that does not exist; struck along with the dependent judge-discrimination figures. |
-| "AC3 beats ERGO across LiC" (as an unqualified claim) | `[dead]` | T17: on corrected denominators ERGO beats AC3-Reset on math (80.0 vs 75.0), ties on code and actions, ties Gated-Reset on math — 7/12 comparisons won-or-tied, up from 1/12. What holds: database decisive (12.0 vs 48.0), Gated-Reset ≥ ERGO on all four tasks. |
+| "AC3 beats ERGO across LiC" (as an unqualified claim) | `[dead]` | Corrected denominators: ERGO/math 80.0 beats AC3-Reset (75.0) and ties Gated-Reset. **Superseded in part by T18** — see next row. |
+| T17's corrected ERGO/code = 57.9 | `[dead]` | T18 measured the free parameter k directly (2.67/6, not 0/6): corrected ERGO/code is ~43.9 ≈ the published 44.0. Shipping 57.9 would have overstated a competitor by 14 pp. Measured scorecard 3/12, not 7/12. |
+| Framing the ERGO comparison as an ordering at all | `[dead]` | T18: paired exact sign tests show **no** ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction (code p=0.375, math p=1.00). Report "n≈20 cannot resolve this" rather than any ordering. |
 | Per-run `adjusted_accuracy` as a reported metric | `[dead]` | T14: inflates reset arms +13.9 to +55.9 pp vs +0.2 to +6.5 for no-reset arms, because the FN judge sees 1.00 user turns/sample on Rewrite vs 5.35 on baseline. Report **raw**; keep only the arm-symmetric pool filter. |
 | Rebuttal end-to-end "AC3-Reset 100.0 ± 0.0" | `[dead]` | FN-adjusted with asymmetric exclusions (Reset 1/2/5 items, baseline 0). Raw: 87.5 ± 2.0 / 93.3 ± 4.2 / 95.0 ± 0.0. Claim survives; the perfect score does not. |
 | MT-OSC as a fair pollution baseline | `[dead]` | T1: at published w=4 it fired 0.3×/conversation — it cannot touch context before turn 6 and LiC conversations average 4.1 turns. Report as *structurally inapplicable*, which supports our scoping argument, rather than as a beaten baseline. |

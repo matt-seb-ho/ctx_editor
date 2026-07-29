@@ -408,3 +408,27 @@ Closing it needs **87 last-turn ERGO replays at roughly $0.20**, using `replay_s
   **F37 (do the published tau2 baselines replicate?) is the last severe item outstanding.** Everything else has landed: the ERGO denominator defect is quantified (F43/F44) with its bound being closed by T18, and the FN-adjustment question is resolved in the paper's favour on `tab:main` (F42).
 - **16:46** Heartbeat tick. All 3 healthy, no intervention. T6 worklog 19m (three `run_parallel.py` workers). T18 worklog 21m with a baseline arm running. T2B worklog 17m and now running **both** `ac3_rewrite_v8_lic` and `context_edit_v2_gated` — i.e. it is doing the Rewrite-arm alignment check its brief specifically required, rather than only the easy Reset comparison whose answer T2A showed is largely predetermined by design. No dispatch, no pivot.
 - **17:01** Heartbeat tick. All 3 healthy, no intervention. T2B worklog 14m. T6 (34m) and T18 (36m) are both approaching the 45-min threshold but each has live processes — three `run_parallel.py` workers for T6, baseline arms for T18 — so under D5/D6 the process check clears them. Flagged as the watch item for next tick; per tonight's record (six nudges, six responses, zero restarts) the correct response if they breach is a nudge, not a restart.
+
+- **17:10** `T18` returned **DONE**. Log: `tasks/T18/worklog.md`.
+
+**F46 — The positive control did NOT reproduce, and that is the most important line in the report.** ERGO/database measured **44.0 vs published 12.0**. `gpt-5-mini` (the published-era model) is unreachable — `dl-openai-3` returns 401, there is no `.env`, and TRAPI serves only `gpt-5.4-mini`/`gpt-4o`. **Therefore no re-run's absolute levels are substitutable into `tab:main` tonight, by anyone.** The control did exactly its job: it prevented a plausible-looking set of numbers from being written into the paper.
+
+**F47 — The bound was closed anyway, by a design that does not depend on comparable levels.** T17's interval has exactly one free parameter — **k**, how many pruned items ERGO solved. T18 measured k directly by replaying ERGO against a *pruned-items-only* pool (sidecar removed so the filter cannot fire):
+
+| task | published | T17 pt est | T17 interval | **k measured** | **T18 result** |
+|---|---|---|---|---|---|
+| math | 69.6 (16/23) | 80.0 | [65.0, 80.0] | **0/3**, 3 reps | **80.0 = 16/20 — CLOSED** |
+| code | 44.0 (11/25) | 57.9 | [26.3, 57.9] | **2.67/6** (3,2,3) | **43.9 = 8.3/19, [42.1, 47.4]** |
+| database | 12.0 (3/25) | 12.0 | exact | n/a | 12.0 |
+| actions | 48.0 (12/25) | 52.2 | [43.5, 52.2] | **unmeasurable** — no sidecar exists | unchanged |
+
+k transfers across the model gap because **full-context Baseline solves 0/6 pruned code items at the newer model too** — the three solvable ones are unlocked by *context cleaning* (ERGO 3/6, Concat 3/6, AC3-Reset 2/6), not by the newer model. That is the argument that makes the transfer legitimate rather than assumed.
+
+**F48 — T17's code estimate was too generous; the math finding survives.**
+- **math holds: ERGO 80.0 beats AC3-Reset (75.0) and ties AC3-Gated-Reset (80.0).** This is the reviewer-visible defect and **it must ship**.
+- **code does not: T17's k=0 was wrong.** Corrected ERGO/code is ~43.9 — essentially the published 44.0, a correction of ≈ **−0.1 pp, not +13.9**. AC3-Reset leads by ~14 pp, Gated-Reset by ~19. **Shipping T17's 57.9 would have overstated a competitor by 14 pp** — an error in the opposite direction, and equally unacceptable.
+- Scorecard: published 1/12 ERGO wins-or-ties → T17 estimated 7/12 → **measured 3/12** (5/12 only if the unclosable actions cell sits at its ceiling).
+
+**F49 — The whole ordering dispute is inside the noise.** Paired exact sign tests on the same items show **no ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction** (code p=0.375, math p=1.00). This deserves its own line in the paper: it reframes the ERGO comparison from "who wins" to "n≈20 cannot resolve this", which is both true and far more defensible than either ordering.
+
+**Cost note:** ≈$6 across 40 runs against a $0.20 brief. The overage is the comparator arms and the pruned-items probe, logged as deliberate deviations — and it bought the k-measurement that closed the bound, so the deviation was correct. Worth recording that the brief's estimate was wrong, not the agent's judgement.
