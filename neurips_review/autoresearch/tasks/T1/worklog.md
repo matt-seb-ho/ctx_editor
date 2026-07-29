@@ -305,17 +305,153 @@ instead of erroring, so a real 5/20 read as 0/20. Controls in place here:
 4. No arm has produced a suspiciously low score so far. If one does, it will be re-run with
    `logging.verbose=true` on 3 samples and the traces read before any number is reported.
 
-### 8.1 Live results (raw accuracy; full table in [`RESULTS.md`](RESULTS.md))
+### 8.1 Database results — COMPLETE (n=107, paired, 1 run per cell)
 
-| task | arm | acc | n |
-|---|---|---|---|
-| database | Baseline (FC) | 56.07% | 60/107 |
-| database | Summarisation, 1 call/turn | **53.27%** | 57/107 |
-| database | AC3-Reset | **75.70%** | 81/107 |
+`data/sharded_instructions_600.json`, filter=database, gpt-5.4-mini TRAPI, sharded user sim.
+**Raw accuracy is the primary metric** — see §8.3 for why the repo's `adjusted_accuracy` is
+*not* comparable across these arms.
 
-The pilot's apparent +6.7pp for summarisation on n=30 did not survive n=107: faithful
-condensation is flat-to-slightly-negative versus full context, while AC3-Reset is ~+20pp.
-Regenerable with `.venv/bin/python neurips_review/autoresearch/tasks/T1/analyze.py`.
+| Arm | Acc (raw) | correct/n | Δ vs baseline | 95% CI | W/L | McNemar p |
+|---|---|---|---|---|---|---|
+| Baseline (full context) | 56.1% | 60/107 | — | — | — | — |
+| Summarisation, 1 call/turn | 53.3% | 57/107 | **−2.8pp** | [−10.5, +5.7] | 10/13 | 0.678 |
+| Summarisation, 2 calls/turn (budget-matched) | 47.7% | 51/107 | **−8.4pp** | [−14.2, −0.0] | 6/15 | 0.078 |
+| MT-OSC (reimpl.), w=4 as published | 60.7% | 65/107 | +4.7pp | [−3.6, +11.5] | 13/8 | 0.383 |
+| **AC3-Reset** | **75.7%** | 81/107 | **+19.6pp** | [+9.2, +26.1] | 28/7 | **0.0005** |
+| **AC3-Gated-Reset** | **73.8%** | 79/107 | **+17.8pp** | [+7.6, +24.3] | 26/7 | **0.0013** |
+
+Head-to-head, paired: AC3-Reset − Summarisation-1call = **+22.4pp** (31 W / 7 L, p=0.0001);
+AC3-Reset − Summarisation-2call = **+28.0pp** (36/6, p<0.0001); AC3-Reset − MT-OSC-w4 =
+**+15.0pp** (21/5, p=0.0025).
+
+**The registered prediction holds, and more strongly than expected.** Faithful condensation does
+not close the gap — it does not move accuracy at all (−2.8pp, p=0.68), and *doubling* its budget
+makes it worse (−8.4pp). Meanwhile the identical plumbing driven by an analyzer gains +19.6pp.
+
+### 8.2 Measured budget — parity is a measurement, not an assertion
+
+From `<run_dir>/call_meter.json`, snapshotted before FN analysis. 107 conversations per cell.
+
+| Arm | total calls | strategy calls | strategy calls/conv | strategy tokens | total tokens | avg turns |
+|---|---|---|---|---|---|---|
+| Baseline | 1222 | 0 | 0.0 | 0 | 874,226 | 4.1 |
+| Summarisation, 1 call/turn | 1558 | 336 | 3.1 | 559,644 | 1,596,358 | 7.3 |
+| **Summarisation, 2 calls/turn** | 1909 | **678** | 6.3 | **1,268,902** | 2,294,569 | 7.3 |
+| MT-OSC w=4 | 1258 | **30** | 0.3 | 51,711 | 940,225 | 4.3 |
+| **AC3-Reset** | 1879 | **666** | 6.2 | **781,968** | 1,682,405 | 6.9 |
+| AC3-Gated-Reset | 1483 | 276 | 2.6 | 330,333 | 1,204,787 | 5.3 |
+
+**Ratios, stated rather than rounded to "comparable":**
+
+- Summarisation-2call vs AC3-Reset: **1.02× the strategy calls (678 vs 666)** and **1.62× the
+  strategy tokens (1.269M vs 0.782M)**. The budget-matched summariser therefore consumed
+  *more* compute than AC3-Reset and still lost by 28.0pp. This is a stronger statement than
+  equal-budget: the baseline was over-budgeted and still lost.
+- Summarisation-1call vs AC3-Reset: 0.50× calls, 0.72× tokens. Under budget — which is exactly
+  why the 2-call arm exists.
+- AC3-Gated-Reset reaches +17.8pp on **0.41× AC3-Reset's strategy calls** and 0.22× the
+  summarisation-2call arm's strategy tokens.
+- **MT-OSC w=4 fired only 30 times across 107 conversations (0.3 calls/conv).** At w=4 it cannot
+  touch the context before turn 6; LiC-database conversations average 4.1 turns under baseline.
+  Its +4.7pp (p=0.38) is a near-no-op, and that is a structural fact about its schedule, not a
+  quality judgement on its condenser.
+
+### 8.3 Incidental finding — `adjusted_accuracy` is invalid for cross-arm comparison
+
+**This affects the paper's own headline numbers, not just T1.** Worth escalating.
+
+`identify_false_negatives.analyze_sample` builds the user-sufficiency judge's prompt from
+`get_active_messages(trace)`, which returns **visible** messages only
+(`identify_false_negatives.py:191-193, 228-229`). After any context reset the visible user
+messages are the condensed text plus the latest shard — so the judge is shown a *truncated* user
+history and concludes "the user never specified X", marks the sample user-sim-induced, and
+`compute_adjusted_accuracy` drops it from the denominator.
+
+The exclusion rate is therefore a function of the treatment — textbook post-treatment
+conditioning — and scales with how aggressively an arm discards user text:
+
+| arm | incorrect analysed | excluded as user-sim-induced | raw | adjusted |
+|---|---|---|---|---|
+| Baseline | 47 | **4** (9%) | 56.1% | 58.3% |
+| MT-OSC w=4 (near-no-op) | 42 | **3** (7%) | 60.7% | 62.5% |
+| AC3-Gated-Reset | 28 | 14 (50%) | 73.8% | 84.9% |
+| AC3-Reset | 26 | 16 (62%) | 75.7% | 89.0% |
+| Summarisation 1-call | 50 | **39 (78%)** | 53.3% | 83.8% |
+| Summarisation 2-call | 56 | **43 (77%)** | 47.7% | 79.7% |
+
+The two arms that leave the context alone exclude 7–9%; every context-editing arm excludes
+50–78%. The user shards are *identical* across arms and revealed by the same user agent, so a
+genuine user-sim failure rate cannot differ 9× by treatment.
+
+**Consequence to state plainly, because it cuts against us:** under the repo's canonical
+`adjusted_accuracy` the summarisation arm reads 83.8% against AC3-Reset's 89.0% — a 5pp gap
+instead of 22pp. That metric is wrong for this comparison, but a reviewer running our own
+pipeline would see it, so T1 reports raw as primary, prints adjusted alongside, and explains
+the confound rather than quietly dropping the column.
+
+**Planned correction (§10):** re-run the sufficiency judge with the *complete* user-message
+history read from `trace.messages` (which retains hidden messages), which is the arm-symmetric
+input the check was always meant to have.
+
+### 8.4 Zero/low-score controls — one fired, and it caught a real bug
+
+Control 1 (baseline as positive control through the identical evaluator), control 2
+(`analyze.py` asserts `results.json` ↔ `metrics.json` ↔ `run_summary.json` agreement on every
+cell before any number is used) and control 3 (errors separated from wrong answers) are as
+described above. They fired twice:
+
+1. **First MT-OSC smoke** reported `0.00% (0/0) (4 errors excluded)` — surfaced as *errors*, not
+   as a silent zero. Cause: `str.format` on the condenser template, which embeds literal JSON
+   braces from the Figure-2 exemplars. Fixed with `str.replace`.
+2. **`db_mtosc_w2` returned 26.2% against a 56.1% baseline** — a 30pp drop, well outside
+   anything the method could plausibly cause. Per the standing instruction this was treated as a
+   fault until proven otherwise, and it *was* a fault — see §9.
+
+Every other cell is within a plausible band and the consistency asserts pass on all of them.
+
+---
+
+## 9. Bug found by the low-score control — commit `c1dd523`
+
+**What it was.** MT-OSC's Combined Operation is
+`H_{w+2} = {(C_ju, C_ja)} ∪ {(u_k, a_k)}_{k=t}^{w+1}`, and the paper's own w=4 walkthrough gives
+`H_6 = {C_1, (u_5, a_5)}`: pair 5 is *not* covered by `C_1` (which covers pairs 1–4) and stays
+raw. My reset rebuilt the context as `[system] + C_j + [latest user message]`, dropping every
+pair completed between the condensation trigger and its application. At w=2 that silently
+deleted **a whole user shard per condensation**.
+
+Concrete instance (`sharded-spider-val-1008-medium`): the user says "only filter singers born in
+1948", then "or you could include singers born in 1949 too". Both shards were discarded; the
+final answer was `SELECT Name FROM singer WHERE Birth_Year = <birth_year>` — a placeholder,
+because the assistant no longer had a year. Cost: **26.2% vs a 56.1% baseline**.
+
+**Why it mattered beyond MT-OSC.** A misrepresented baseline is worse than an absent one, and
+this one would have been misrepresented by 30pp in *our favour*. Had it shipped, MT-OSC would
+have appeared catastrophically bad and the whole "we tested the closest published compaction
+method" claim would have been indefensible on inspection of the traces.
+
+**Scope check — does it affect the summarisation arms? No.** `SummarizationStrategy` re-reads
+the *entire* conversation every turn and replaces the context with a summary covering everything
+up to the latest user message; nothing can fall between a window and its application because
+there is no window. Same for AC3-Reset, whose analyzer sees the full conversation and which
+additionally rebuilds its task spec from `get_user_messages_string(all_unique=True)`. The bug
+was specific to MT-OSC's windowed, lagged schedule.
+
+**Fix.** Carry the raw pairs completed after the condensation window:
+`carry = self._window_pairs(trace)[pending["n_pairs_condensed"]:]`, spliced in between the
+condensed pair and the latest user message. Verified on a fresh 4-sample smoke run:
+`mtosc_applied {'j': 1, 'turn': 4, 'raw_pairs_carried': 1}` and the raw pair is visible in the
+final context. The buggy run is preserved at `outputs/T1/main/BUGGY_db_mtosc_w2/` and
+`db_mtosc_w2` is being re-run post-fix. `db_mtosc_w4` ran **after** the fix and is clean.
+
+---
+
+## 10. Still outstanding
+
+- `db_mtosc_w2` re-run post-fix (the buggy run is archived, not deleted).
+- All 7 code arms (n=100) — `code_baseline` started 13:46.
+- Both `summarize_v2_neutral` robustness cells.
+- Arm-symmetric FN re-judge (§8.3) using the full user-message history.
 
 ---
 
