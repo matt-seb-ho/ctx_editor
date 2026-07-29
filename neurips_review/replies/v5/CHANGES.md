@@ -9,16 +9,18 @@ Every assertion in `replies/v4/` audited against the 2026-07-29 autoresearch ses
 | Status | Count |
 |---|---|
 | **Unchanged** (re-verified, wording untouched) | 24 |
-| **Corrected** (number or wording changed) | 14 |
+| **Corrected** (number or wording changed) | 15 |
 | **Struck** (removed from v5) | 6 |
 | **Newly added** (result that did not exist in v4) | 16 |
 | **On HOLD** (blocked on an in-flight task) | 3 |
-| **UNVERIFIED** (no artifact found tonight — see §7) | 4 |
+| **UNVERIFIED** (no artifact found — see §7) | 1 |
 | **Total claims audited** | 67 |
 
-Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted accuracy / end-to-end table, preservation attribution, WildChat headline, memory gains, auditing-on-math), **3 move in our favour** (BigCodeBench, database leak-free replication, budget accounting), and 5 are wording-only. Of the 5 claims T19 newly added, **all 5 are the ERGO denominator disclosure**, which moves against us by raising a competitor.
+Of the 15 corrections, **7 move against us** (CollabLLM MATH-Hard, the CollabLLM assistant-omission column, FN-adjusted accuracy / end-to-end table, preservation attribution, WildChat headline, memory gains, auditing-on-math), **3 move in our favour** (BigCodeBench, database leak-free replication, budget accounting), and 5 are wording-only. Of the 5 claims T19 newly added, **all 5 are the ERGO denominator disclosure**, which moves against us by raising a competitor.
 
 **Changes made by T19 to T15's tally.** Newly-added 11 → 16 (five ERGO disclosure rows). On-HOLD 4 → 3 (1.13, 2.4, 3.2, 4.4 were the four; the T14-gated provisional flag on all LiC figures is lifted, and 4.4's hold is now T6-only — the three remaining holds are all tau2). UNVERIFIED 5 → 4 (**U1 retired**: the gate-statistic artifacts do exist, at `scripts/analysis_rewrite_v_reset/data/gated_reset_reconstructed_{lic,collabllm}.md`, and T16 re-derived both independently from raw traces). Total 64 → 67.
+
+**Changes made by T21 (from T20's verification pass).** UNVERIFIED 4 → **1**: U2, U3, U4 and U5 are all resolved, leaving only U6, which is unclosable by construction. Corrections 14 → 15, the new one being the CollabLLM assistant-omission column taken from N=1 to N=3 (§10). On-HOLD stays at 3 — all three are tau2, and every INTERNAL/HOLD block in the reply files is byte-identical to what T15 wrote (verified mechanically; see §10).
 
 ## Path legend
 
@@ -50,7 +52,7 @@ Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted a
 | 1.13 | CW4 tau2 table (FC 68.4/31.6/26.3; AO 0/0/0; best AC3 84.2/57.9/73.7) | **HOLD** | **T6 in flight.** Interim N=3 Baselines: gpt-5.4 68.4±13.9, DSV4F **70.2±11.0** (published 31.6), Kimi **80.4±2.5** (published 26.3) — `AR/tasks/T6/worklog.md` 15:10 entry | Table moved inside a `⚠ INTERNAL — HOLD` block with fallback wording drafted |
 | 1.14 | "Assistant omission collapses to 0% on every model" | **unchanged, and strengthened** | T6 positive control #2: AO rollouts terminate on `max_steps`, never `user_stop`, while the other four arms return reward 1.0 in the same process — `AR/tasks/T6/worklog.md` 13:58 | Promoted to carry CW4 on its own, with the mechanism stated |
 | 1.15 | Kimi footnote: "rate-limit-clipped, so we quote a conservative **+24 to +34pp**" | **struck** | **T6 interim**: the whole Kimi baseline cell is a clipped floor; re-measured 80.4 is above every published Kimi AC3 number. A "conservative" range off a broken control is not conservative | removed |
-| 1.16 | "only **1 of 11** baseline failures on gpt-5-mini attributable to context pollution" | **unchanged** — but see §7 (U4) | paper tex L360/L558 via `neurips_review/worklog.md:158`; not re-verified tonight | verbatim |
+| 1.16 | "only **1 of 11** baseline failures on gpt-5-mini attributable to context pollution" | **CORRECTED — softened** (T21, from T20/§7 U4) | **F56**. Number traced to `~/ac3/tau2_ctxe/ctx_edit/EXPERIMENT_LOG.md` commit `169b044`, but the 20 traces and any labels file are **unrecoverable**, the labelling had no rubric and no second annotator, and it is the 45.0% trial while the table reports best-of-3 | "1 of 11" dropped. Now: the baseline failures were **dominated by missing domain knowledge and step-budget exhaustion**, with a single repetitive-loop case; stated explicitly as a qualitative reading of one trial rather than a rubric-based annotation, with a proper taxonomy promised for the camera-ready |
 | 1.17 | tau2 "confirms the rule: lightest operator wins on the strongest model, heaviest on the weakest" | **struck (pending T6)** | derived from the same N=1 cells T6 is re-measuring | removed; replaced by the analyzer-sweep evidence (F21/F22) as the CW1 generality argument |
 | 1.18 | CW5: "**We are adding** a condensation baseline at matched compute … our prediction is …" | **replaced by results** | **F27**, `AR/tasks/T1/RESULTS.md`, `AR/tasks/T1/analyze.py`, `OUT/T1/main/*` | Full 10-row accuracy table, head-to-head paired deltas, measured budgets, MT-OSC engagement rate |
 | 1.19 | CW5 baseline-justification prose (pollution vs. length pressure) | **unchanged** | — | verbatim, now followed by the measurement |
@@ -111,7 +113,7 @@ Of the 14 corrections, **6 move against us** (CollabLLM MATH-Hard, FN-adjusted a
 | 4.7 | W3 replay-is-causal defence | **unchanged** | — | verbatim |
 | 4.8 | W4 CollabLLM table: MATH-Hard 95 / 90 / **100 (Augment)** | **CORRECTED — claim struck** | **F16**, `AR/tasks/T8/worklog.md` §6, §8; `OUT/T8/*` | N=3: Full context **91.7 ± 5.8**, AC3-Augment **91.7 ± 7.6** — **exactly tied**, identical 55/60 per-problem totals, per-replicate delta 0.0 ± 8.7. v5 says AC3-Augment **matches** Baseline: refutes the regression, claims no improvement |
 | 4.9 | W4 CollabLLM BigCodeBench 5 / 15 / **20 (Reset)** | **corrected — strengthened** | **F17/F18**, `AR/tasks/T8/worklog.md` §6, §9; `OUT/T8/seed1234_{reset,baseline}_bigcodebench` | N=3: Reset **21.7 ± 5.8** vs Baseline **6.7 ± 5.8**, +15pp in 3/3 replicates, 9 problems solved that Baseline never solves, and it reproduces on a **fully disjoint** draw (3/20 vs 1/20). Quoted as "≈1 in 5, ±1 problem" |
-| 4.10 | W4 AO cells (90 MATH-Hard, 15 BigCodeBench) | **unchanged**, now flagged | not re-replicated tonight (T8 ran 4 cells = 2 arms x 2 datasets) | dagger footnote: "assistant-omission cells are single runs and were not re-replicated" |
+| 4.10 | W4 AO cells (90 MATH-Hard, 15 BigCodeBench) | **CORRECTED — now N=3** (T21) | **F54**; `AR/tasks/T21/worklog.md`, `OUT/T21/*`; rep1 recovered, reps 2–3 fresh under T8's exact config | MATH-Hard **88.3 ± 2.9** (18/17/18) and BigCodeBench **18.3 ± 5.8** (3/3/5, re-scored). Dagger footnote **removed** — the column is no longer single-run. The BigCodeBench move narrows AC3-Reset's margin over AO from +6.7pp to **+3.3pp**, which the reply now reports as a second self-reported correction and declines to claim as an ordering. See §10 |
 | 4.11 | W4 "executable tests are unavailable because the simulator does not transmit the required function signatures, which is a property of the benchmark harness" | **STRUCK — factually wrong** | **F18** / `AR/tasks/T8/worklog.md` §5: the CollabLLM BigCodeBench path is `eval_method: pass_rate` → `judge_pass_rate` → `bigcodebench.eval.untrusted_check`, i.e. **real test execution**. (This also corrects RECON Unknown #7) | Replaced with a correction *in the reviewer's favour*: the numbers **are** execution-based pass rates, but they are library-version sensitive; every cell re-scored offline in one unified environment with a canonical-solution pre-flight (19/20) |
 | 4.12 | W4 "the judge discriminates sharply … v8-Rewrite 17.6% vs Reset 0% on gpt-5.4; 16.7% vs 0% on Kimi-K2.6" | **struck** | moot once scoring is execution-based (4.11); also not re-verified tonight (see §7 U1) | removed |
 | 4.13 | W4 "**We will add** judge-agreement and position-bias checks for WildChat" | **replaced by results** | **F30/F31/F32/F33**, `AR/tasks/T11/worklog.md` §(a)–(d), `AR/tasks/T11/out/*.jsonl` | Position bias (+5.5pp toward slot 2, p=1.8e-4, opposite-signed on the other two judges); corrected headline; PABAK 0.79–0.83 / AC1 0.84–0.87; self-consistency 96.9%; punitive 2-of-3 rule 82.5%; positive controls 39/40, 36/40, 40/40 |
@@ -205,3 +207,85 @@ Mirrors the above. All ten revision bullets updated to the corrected numbers; fo
 This matters because the reviewer-facing text must not claim more than was done. The corrected cells are **the published numerator over the corrected denominator**, with the one free parameter — *k*, how many of the pruned items ERGO was solving — **measured** by replaying ERGO against a pruned-items-only pool. math: k = 0 over three replicate runs, so 16/23 → 16/20 = **80.0**. code: k ≈ 2.67 of 6 (3, 2, 3), so 11/25 → ≈8.3/19 = **43.9** [42.1, 47.4].
 
 **T18's own positive control did not reproduce**, and this is a real limit on what may be quoted. ERGO/database came back at 44.0 against a published 12.0 because `gpt-5-mini` (the published-era model) is unreachable — `dl-openai-3` returns 401, there is no `.env`, and TRAPI serves only `gpt-5.4-mini`/`gpt-4o`. So **no absolute accuracy level from T18's re-runs is substitutable into `tab:main` by anyone**, and none is quoted anywhere in this reply set. What survives the control failure is *k*, because *k* does not use the replication's accuracy levels: it is defended against the model gap by the observation that **full-context Baseline solves 0/6 of the pruned code items at the newer model too**, so the three solvable ones are unlocked by context cleaning rather than by the model era. That argument is strong but is not proof; the reply text says "roughly half" on code rather than quoting 43.9, which is the right level of precision to commit to in front of reviewers. Source: `AR/tasks/T18/worklog.md` §"Honest accounting".
+
+---
+
+## 10. T21 integration record — §7 cleared, and the CollabLLM assistant-omission column taken to N=3
+
+T21 did two things: applied T20's drop-in wordings for U2–U5 to the reply files (§7 above
+now records the outcome of each), and **ran the one experiment T20 identified as the
+cheapest open item in the reply set** — the assistant-omission (AO) column of the
+`03_reviewer_5YHP.md` W4 table, which was the last N=1 column in any reviewer-facing table.
+
+### The AO column at N=3
+
+Four fresh cells (AO x {math-hard, bigcodebench} x replicates {2, 3}), run under T8's exact
+configuration so the column is comparable with the arms beside it: `model=deepseek_v4_flash_user_deepseek`,
+`load_balancer=multi_endpoint_foundry`, `task.limit=20`, `execution.max_concurrent=5`. AO
+runs no analyzer, so `analysis_cache_dir` is omitted for the same reason it is omitted for
+Baseline. Replicate 1 is the recovered snapshot cell. **These are replicate runs at
+temperature 1.0 on a fixed 20-problem draw, not seeds.** Cost ≈ $0.17, 25 min wall-clock on
+two parallel streams. Artifacts: `outputs/T21/`; log `AR/tasks/T21/worklog.md`.
+
+| Dataset | rep1 (recovered) | rep2 | rep3 | **mean ± sd** | N=1 value the reply previously quoted |
+|---|---|---|---|---|---|
+| MATH-Hard | 18/20 (90.0) | 17/20 (85.0) | 18/20 (90.0) | **88.3 ± 2.9** | 90.0 |
+| BigCodeBench (re-scored) | 3/20 (15.0) | 3/20 (15.0) | 5/20 (25.0) | **18.3 ± 5.8** | 15.0 |
+
+**Did the numbers move materially?** Not in absolute terms — MATH-Hard moves −1.7pp and
+BigCodeBench +3.3pp, both **less than one problem** on a 20-problem draw that quantises in
+5pp steps. But the BigCodeBench move **does** change a comparison the reply was making:
+AC3-Reset's margin over assistant omission drops from **+6.7pp to +3.3pp**, i.e. from about
+1.3 problems to 0.67, which is inside the replicate-to-replicate noise. The W4 text now
+states this as a **second self-reported correction** and explicitly declines to claim that
+AC3 beats assistant omission on BigCodeBench. The load-bearing claim — AC3-Reset over
+**full context**, +15pp in 3 of 3 replicates — is untouched.
+
+**Per-problem, all three bigcodebench arms over 3 replicates (60 instances each):**
+AO **11/60**, AC3-Reset **13/60**, full context **4/60**. The two treatment arms succeed on
+partly different problems (AO solves `228` 3/3 where Reset solves it 1/3; Reset solves `285`
+and `563` 2/3 each where AO never does), which is the substantive reason not to read a
+3.3pp gap as an ordering.
+
+### Controls, because two harness bugs in this pipeline silently return 0.0
+
+All verified **before** launching, not after:
+
+* **Judge live.** `fxdata-shared` 401s for this identity and `multi_endpoint_foundry.yaml`
+  routes `gpt-4o-mini` — the judge/extractor role — through it; T8's `gpt-4o-mini: 150`
+  entry on `dl-openai-3` is still present. A 2-sample AO smoke run returned real verdicts
+  (`2/2`, cost $0.0038), not the `0/0` signature of a dead judge.
+* **Sandbox live.** Canonical-solution pre-flight on the seed-42 draw: **19/20 reference
+  solutions pass**, the one failure being `BigCodeBench/501`, exactly reproducing T8.
+  `matplotlib` present (its absence kills every test subprocess in-sandbox and is swallowed
+  as 0.0 — this is how T8's first Reset rep2 read 0/20 when it was really 5/20).
+* **Re-scorer reproduces known cells.** Before any new cell existed, T21 re-scored the three
+  recovered rep1 bigcodebench cells offline and got **AC3-Reset 5/20, full context 2/20,
+  AO 3/20** — T8's and T20's published re-scores to the item, with `BigCodeBench/451` the
+  only mover in each. The final per-problem pass also reproduced T8's full N=3 grids for
+  AC3-Reset (5/5/3) and full context (2/2/0) and T8's math-hard grids (20/17/18 and
+  19/19/17) unchanged.
+* **Every cell cross-checked** across `metrics.json`, `run_summary.json` and `results.json`;
+  all agree, `total_attempted: 20` and `errors: 0` everywhere.
+
+**One new finding, reported rather than smoothed over.** `BigCodeBench/859` trains an SVM
+and asserts a minimum accuracy with no seed fixed in the test, so it is **intrinsically
+stochastic**: over eight full-suite re-scoring passes of the identical stored code it passed
+seven times and failed once, and 7/7 in isolation. AO rep3 is therefore reported at its
+modal **5/20**, and the reply now discloses the flakiness. This is a different failure mode
+from the `BigCodeBench/451` dependency-version difference T8 found — that one is
+deterministic — and it is worth knowing for anyone reporting BigCodeBench at n=20, where a
+single flaky problem is a full 5pp.
+
+### Effect on the tally
+
+**UNVERIFIED 4 → 1.** U2, U3, U4 and U5 are all resolved (U3 retired and restored to the
+reviewer text, U2 verified but deliberately kept struck, U4 softened, U5 verified and now
+replicated). **U6 alone remains**, and it is unclosable by construction. **Corrections
+14 → 15**, the new one being the AO column, which moves *against* us in the sense that it
+narrows a gap we had shown — so 7 of 15 corrections now move against us. **One paper action
+added, PAPER-8** (Table 3 caption). Every INTERNAL/HOLD tau2 block in the reply files is
+**unchanged and byte-identical**; T6's outcome is still unknown and nothing here touches it.
+Verified two ways against the pre-T21 commit `1382e61`: `git diff 1382e61 -U0 -- replies/v5/ |
+grep -E '^[-+]>'` returns **nothing** (no blockquote line anywhere in v5 was added or
+removed), and the extracted HOLD blocks of `00`, `01`, `04` and `05` hash identically.

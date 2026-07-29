@@ -1,6 +1,6 @@
 # T21 — Apply T20's verified wordings to `replies/v5/`; take the CollabLLM AO column to N=3
 
-**Started:** 2026-07-29 ~17:38 UTC.
+**Started:** 2026-07-29 ~17:38 UTC. **Status: COMPLETE** (~18:30 UTC). **API spend: $0.178.**
 **Scope:** (1) apply T20's drop-in wordings for §7 U2–U5 to `neurips_review/replies/v5/`;
 (2) run the assistant-omission (AO) column at N=3 on CollabLLM.
 Nothing else. `writing/overleaf_repo/` untouched; no `git checkout` in this tree.
@@ -162,3 +162,142 @@ the kind that produced T8's first `0/0 correct (20 errors excluded)`.
 moved**, including `BigCodeBench/451` (which is the item that moved on Reset rep1 and
 Baseline rep1). So the AO cells are insensitive to the dependency-version difference that
 shifted the other two arms — consistent with T20's finding on AO rep1.
+
+**18:07 UTC** — `bigcodebench rep3` done: in-run **5/20**. **code stream COMPLETE.**
+All four cells landed in 25 min wall-clock. Total spend across the four cells: **$0.174**
+(math $0.0384 + $0.0428, bcb $0.0450 + $0.0480), plus $0.0038 for the smoke — under the
+$0.20 T20 estimated.
+
+---
+
+## Part 2 — results
+
+### Assistant-omission column, N=3 (per-replicate raw counts)
+
+| Dataset | rep1 (recovered) | rep2 | rep3 | **mean ± sd** | N=1 value the reply quoted |
+|---|---|---|---|---|---|
+| MATH-Hard | 18/20 (90.0) | 17/20 (85.0) | 18/20 (90.0) | **88.33 ± 2.89** | 90.0 |
+| BigCodeBench (re-scored) | 3/20 (15.0) | 3/20 (15.0) | 5/20 (25.0) | **18.33 ± 5.77** | 15.0 |
+
+In-run vs re-scored, bigcodebench (which cells the environment touched):
+
+| cell | in-run | re-scored (authoritative) |
+|---|---|---|
+| AO rep1 (recovered, 2026-06 env) | 3/20 | 3/20 |
+| AO rep2 | 3/20 | 3/20 — no item moved, incl. `451` |
+| AO rep3 | 5/20 | 5/20 (modal; see the `859` note) |
+
+### Did the numbers move materially?
+
+**In absolute terms, no.** MATH-Hard −1.7pp and BigCodeBench +3.3pp; on a 20-problem draw
+that quantises in 5pp steps, those are 0.33 and 0.67 problems. Both N=1 values sit inside
+the observed replicate range.
+
+**In comparative terms, yes, and it is reported prominently.** The reply's BigCodeBench row
+previously read full context 6.7 / AO 15.0 / AC3-Reset 21.7, implying a **+6.7pp** AC3
+advantage over assistant omission. At N=3 that margin is **+3.3pp** — 13/60 vs 11/60
+problem-instances — which is inside the replicate noise. **v5 now declines to claim an
+ordering between AC3-Reset and assistant omission on BigCodeBench** and rests the result on
+the comparison against full context (+15pp, 3/3 replicates), which is untouched.
+
+### Per-problem, all three bigcodebench arms x 3 replicates (fully paired, same 20 problems)
+
+`AR/tasks/T21/perprob_ao.py`; full grid at `logs/perprob_ao.txt`.
+
+```
+total across 3 reps:  AO 11/60   AC3-Reset 13/60   Baseline 4/60
+AO   per-rep [3, 3, 5]/20  -> [15.0, 15.0, 25.0]  mean 18.33  sd 5.77
+RST  per-rep [5, 5, 3]/20  -> [25.0, 25.0, 15.0]  mean 21.67  sd 5.77
+BAS  per-rep [2, 2, 0]/20  -> [10.0, 10.0,  0.0]  mean  6.67  sd 5.77
+```
+
+The two treatment arms succeed on **partly different problems**: AO solves `228` in 3/3
+replicates where Reset solves it 1/3; Reset solves `285` and `563` 2/3 each where AO never
+does; AO uniquely solves `178` once. So the 3.3pp is not a weak version of the same ordering
+— the arms are differently distributed over a 6-problem signal set against a 14-problem
+floor. That is the substantive reason not to read the gap as an ordering.
+
+**Embedded positive control:** the same script re-derived T8's AC3-Reset grid (5/5/3) and
+Baseline grid (2/2/0) and the math-hard grids for AC3-Augment (20/17/18) and full context
+(19/19/17) — **all four reproduce T8 exactly**, in the same pass that produced the new AO
+numbers. So the AO column and the columns beside it are scored by one scorer in one run.
+
+### math-hard, for completeness
+
+```
+AO   [18, 17, 18]/20 -> mean 88.33  sd 2.89   total 53/60
+AUG  [20, 17, 18]/20 -> mean 91.67  sd 7.64   total 55/60   (reproduces T8)
+BAS  [19, 19, 17]/20 -> mean 91.67  sd 5.77   total 55/60   (reproduces T8)
+```
+
+AO is now the *lowest* of the three math-hard arms, but by 3.3pp on a benchmark where 14 of
+20 problems are solved by every arm in every replicate. Not a claim in either direction.
+
+### New finding — `BigCodeBench/859` is intrinsically stochastic
+
+The first full-suite re-score of AO rep3 returned **4/20**, disagreeing with the in-run 5/20
+on `BigCodeBench/859`. That looked like the T8 environment trap, so I characterised it
+instead of picking a number:
+
+* the item **in isolation**: 7/7 repeats score 1.0;
+* **full-suite** re-scoring passes of the identical stored code: **7 of 8 pass, 1 fails**.
+
+Its test is the cause, not the environment — it trains an SVM and asserts
+`accuracy >= 0.8` with **no seed fixed in the test**, so it is a genuine coin-weighted flake.
+This is a *different* failure mode from T8's `BigCodeBench/451`, which is deterministic
+(5/5 repeats) and is a library-version difference. AO rep3 is therefore reported at its
+**modal 5/20**, and the reply now discloses the flakiness rather than quoting a single
+scoring pass. At n=20 one flaky problem is a full 5pp, so this is worth stating.
+
+---
+
+## What changed in `replies/v5/` for Part 2
+
+| File | Change |
+|---|---|
+| `03_reviewer_5YHP.md` W4 | AO column now **88.3 ± 2.9** and **18.3 ± 5.8**; single-run dagger footnote **deleted**; per-replicate raw counts added for all six cells; a new "second correction" paragraph reporting the narrowed AO margin and declining the ordering; `859` flakiness disclosed in the scoring-environment paragraph |
+| `04_response_to_AC.md` | Correction item 1 extended with the AO replication and the narrowed margin. **The numbered list was deliberately NOT renumbered** — the T6 HOLD block below it reserves "a fifth correction" for the pending tau2 withdrawal, and renumbering would have silently invalidated a block that must stay byte-identical |
+| `05_final_remarks.md` | Same treatment, same reason |
+| `CHANGES.md` | Tally updated (UNVERIFIED 4 → 1, corrections 14 → 15); claim rows **1.16** and **4.10** rewritten; new **§10** T21 integration record with the full N=3 table, the control evidence and the `859` finding |
+| `README.md` | CollabLLM guardrail rewritten: AO column is N=3, do **not** claim AC3 beats AO on BigCodeBench; §7 pre-posting blocker struck as done, U6 named as the only survivor |
+
+## Final HOLD-block verification (against `1382e61`, the commit immediately pre-T21)
+
+```
+$ git diff 1382e61 -- neurips_review/replies/v5/ | grep '^[-+].*⚠ INTERNAL'
+(no output)
+$ git diff 1382e61 -U0 -- neurips_review/replies/v5/ | grep -E '^[-+]>'
+(no output)
+```
+
+Extracted HOLD blocks, `HEAD@1382e61` vs working tree:
+
+| File | md5 | verdict |
+|---|---|---|
+| `00_general_response.md` | `6a0ccfb1…` | IDENTICAL |
+| `01_reviewer_iNYK.md` | `4a71c6d0…` | IDENTICAL |
+| `04_response_to_AC.md` | `3f13100e…` | IDENTICAL |
+| `05_final_remarks.md` | `345021643…` | IDENTICAL |
+| `README.md` | `db34efe3…` | IDENTICAL |
+
+**Not one blockquote line in the entire v5 tree was added or removed.** All five tau2 HOLD
+blocks, the orientation preamble and both T19 renumbering notes are byte-identical.
+
+## Ambiguities resolved without asking (per the brief)
+
+1. **T20's U5 footnote wording was written for the case where the cells are NOT run.** They
+   were run, so I did not paste it; the footnote is deleted outright and the comparability
+   point (BigCodeBench AO re-scored in the unified environment) is folded into the
+   scoring-environment paragraph, which is where it now belongs.
+2. **`04` and `05` were not renumbered.** Adding the AO correction as a new numbered item
+   would have made the pending tau2 withdrawal item "six"/"eight" while the adjacent
+   byte-identical HOLD block still calls it "a fifth"/"a seventh". Folding it into the
+   existing CollabLLM item preserves both the disclosure and the block.
+3. **Reporting AO rep3 as 5/20, not 4/20.** 4/20 came from one of eight scoring passes of an
+   item with a seedless stochastic test; 5/20 is the mode (7/8), the isolated value (7/7)
+   and the in-run value. Documented rather than silently chosen. **No replicate was dropped.**
+4. **The baseline for the HOLD diff is `1382e61`, not the `d989c50` in my session snapshot** —
+   `replies/v5/` was committed by other agents after that snapshot was taken, so `d989c50`
+   predates the tree and would have made the check vacuous.
+5. Nothing under `writing/overleaf_repo/` was touched; no `git checkout` was performed;
+   outputs are confined to `outputs/T21/`.
