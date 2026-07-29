@@ -279,8 +279,43 @@ AC3-Reset, AC3-Gated-Reset. Database first (the discriminating venue).
 
 ## 8. Results
 
-*(filled in as cells complete — see [`RESULTS.md`](RESULTS.md), regenerable with
-`.venv/bin/python neurips_review/autoresearch/tasks/T1/analyze.py`)*
+**Status line (2026-07-29 12:50, live):** main sweep running, 3/16 cells done. Not wedged —
+the pilot processes were deliberately killed at 12:04 when the venue changed (D10) and
+everything since runs under `outputs/T1/main/` via `run_t1_main.sh` (PID-tracked, log
+`run_log_main.txt`). Remaining: 4 more database arms, then 7 code arms, then 2 robustness
+arms. ETA ~15:30. Next action after that: `analyze.py` → `RESULTS.md`.
+
+### 8.0 Zero/low-score sanity controls
+
+A standing warning from a sibling task: two harness bugs elsewhere **silently returned 0.0**
+instead of erroring, so a real 5/20 read as 0/20. Controls in place here:
+
+1. **Positive control by construction.** The Baseline arm on each task is run through the
+   *identical* harness, task evaluator and FN pipeline as every treatment arm. Baseline scoring
+   56.07% on database and 93.3% on the code pilot proves the evaluator, the Spider execution
+   path and the extraction path all work. Any treatment arm reading 0.0 while baseline reads
+   non-zero would therefore be a strategy-side fault, not an evaluator fault.
+2. **Cross-file consistency assert.** `analyze.py` asserts `results.json` correct-count ==
+   `metrics.json.correct` and `metrics.json.accuracy` == `run_summary.json.metrics.accuracy`
+   for every cell before using any number, and refuses to build the table otherwise. This is
+   the check that caught the earlier double-write corruption incident.
+3. **Error accounting.** `metrics.json` separates `errors` (excluded conversations) from wrong
+   answers; the first MT-OSC smoke run surfaced exactly this way — `0.00% (0/0) (4 errors
+   excluded)` from a `str.format` crash on the condenser template, not a silent zero.
+4. No arm has produced a suspiciously low score so far. If one does, it will be re-run with
+   `logging.verbose=true` on 3 samples and the traces read before any number is reported.
+
+### 8.1 Live results (raw accuracy; full table in [`RESULTS.md`](RESULTS.md))
+
+| task | arm | acc | n |
+|---|---|---|---|
+| database | Baseline (FC) | 56.07% | 60/107 |
+| database | Summarisation, 1 call/turn | **53.27%** | 57/107 |
+| database | AC3-Reset | **75.70%** | 81/107 |
+
+The pilot's apparent +6.7pp for summarisation on n=30 did not survive n=107: faithful
+condensation is flat-to-slightly-negative versus full context, while AC3-Reset is ~+20pp.
+Regenerable with `.venv/bin/python neurips_review/autoresearch/tasks/T1/analyze.py`.
 
 ---
 
@@ -358,3 +393,33 @@ pollution is not a generic condenser. The sentence is also standard in real comp
 (faithfulness instructions are the norm). If the result is null, the honest framing is: *the
 gain comes from the audit, not from the compression* — which is exactly the paper's claim, and
 the prompt makes that separation legible rather than hiding it.
+
+### A.3 `summarize_v2_neutral.txt` (robustness arm — no "compression, not evaluation" clause)
+
+Added so the result does not hinge on one prompt's wording. `summarize_v1` explicitly tells the
+condenser not to evaluate; a reviewer could argue that clause forbids the baseline from doing
+the useful thing. This prompt is deliberately minimal and takes no position either way, leaving
+the model free to audit the assistant's work if it spontaneously chooses to.
+
+```
+Summarize the conversation so far so that it can replace the conversation history.
+
+The assistant will continue this conversation and will see only your summary, the system prompt, and the most recent user message.
+
+Preserve the important details: what the user has asked for, what has been done so far, and the current state of the work.
+
+## System Prompt (for context; already visible to the assistant, do not repeat it)
+{system_message}
+
+## Conversation So Far
+{conversation}
+
+Wrap your summary in <summary>...</summary> tags. Only the content inside those tags will be shown to the assistant.
+```
+
+### A.4 MT-OSC condenser prompt
+
+Not reproduced here because it is not ours: it is Appendix B.1 of arXiv:2604.08782 verbatim,
+plus the three Figure-2 exemplars transcribed. The exact file we send is
+`src/ctx_editor/strategies/prompts/mtosc_condenser.txt` and it should be diffed against the
+paper rather than against anything we wrote.
