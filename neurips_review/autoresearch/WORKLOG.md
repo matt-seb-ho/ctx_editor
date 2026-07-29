@@ -264,3 +264,34 @@ This matters beyond the rebuttal — the "unlike prior work that discards all as
 
   Worth recording as a general lesson: a stall detector that only watches liveness will misclassify an over-eager agent as a dead one. The signal that distinguished them was *commits and new processes without worklog updates* — progress in the artifact stream but not in the record.
 - **15:01** Heartbeat tick. T6 (worklog 23m, three `run_parallel.py`) and T11 (worklog 11m) healthy. **T1 held, not re-escalated.** Its worklog is now 70 min stale and `summarize_v1_2pass` is still live, but the scope directive went out only 15 min ago and messages are delivered at the agent's next tool round — if T1 is blocked on a long subprocess poll it has not seen it yet. Repeating the same directive 15 minutes later would be noise rather than escalation, so: hold one tick, then act. T1 remains the session's single watch item.
+
+- **15:10** `T1` returned **DONE**. Logs: `tasks/T1/worklog.md` (decisions, all prompts verbatim, gaps) and `tasks/T1/RESULTS.md` (regenerable via `analyze.py`).
+
+**F27 — Summarisation does NOT close the gap. The AC's "limited baselines" is answered empirically.**
+
+| Task | Arm | Acc | n | Δ vs base | McNemar p |
+|---|---|---|---|---|---|
+| database | Baseline (FC) | 56.1% | 60/107 | — | — |
+| database | Summarisation, 1 call/turn | 53.3% | 57/107 | −2.8 | 0.678 |
+| database | Summarisation, 2 calls/turn (budget-matched) | 47.7% | 51/107 | −8.4 | 0.078 |
+| database | MT-OSC (reimpl., w=4 as published) | 60.7% | 65/107 | +4.7 | 0.383 |
+| database | **AC3-Reset** | **75.7%** | 81/107 | **+19.6** | **0.0005** |
+| database | **AC3-Gated-Reset** | **73.8%** | 79/107 | **+17.8** | **0.0013** |
+| code | Baseline (FC) | 83.0% | 83/100 | — | — |
+| code | Summarisation, 1 call/turn | 79.0% | 79/100 | −4.0 | 0.481 |
+| code | Summarisation, 2 calls/turn | 80.0% | 80/100 | −3.0 | 0.581 |
+| code | **AC3-Reset** | **92.0%** | 92/100 | **+9.0** | **0.023** |
+
+Head-to-head paired: AC3-Reset − summarisation = **+22.4/+28.0 pp** (database), **+13.0/+12.0 pp** (code), all p < 0.01. The prediction held: a good-faith condenser carries invalidated reasoning forward in compressed form.
+
+**The budget result is stronger than parity.** Measured per-component via a new `utils/call_meter.py`: the budget-matched summariser did not merely match AC3-Reset, it **over-consumed** it — **1.02–1.19× strategy calls, 1.62–2.14× strategy tokens** — and still lost by 12–28 pp. Gated-Reset gets +17.8 pp on **0.41×** Reset's calls. "We spent more compute on the baseline and it still lost" is a far better sentence than "budgets were comparable."
+
+**MT-OSC is reportable but structurally inapplicable, and that is the interesting part.** At published w=4 it fired **30 times across 107 conversations (0.3/conv)** because it cannot touch context before turn 6, while LiC conversations average 4.1 turns. So its +4.7 pp (p=0.383) is not a fair test of MT-OSC's idea — it is evidence that length-triggered compaction schedules *cannot engage* with pollution that appears early. That is exactly our scoping argument, now with a number behind it.
+
+**F28 — ⚠️ `adjusted_accuracy` is invalid across context-editing arms, and it inflates our own published numbers.** The false-negative judge reads *visible* messages only, so editing arms get **50–78% of failures excluded** versus **9%** for baseline. An arm-symmetric re-judge collapses exclusions to 2–6% uniformly and **reproduces the raw ordering**. Magnitude on a shipped number: **AC3-Reset database 89.0% as published vs 77.1% corrected.**
+
+This is the most serious methodological finding of the session. The bias runs *in our favour*, it affects the paper's headline LiC table, and a reviewer who reconstructs the FN-adjustment would find it. The direction of our claims survives — the raw ordering is unchanged and AC3 still wins — but the magnitudes do not. **Queued as PAPER-6, and see D11 below.**
+
+**F29 — A 30 pp low score was a harness fault, and was caught.** MT-OSC w=2 scored 26.2% because the agent's schedule dropped raw pairs completed after the condensation window (fixed in `c1dd523`). The buggy run is archived; **do not quote its 26.2%**. Fourth time tonight that treating an anomalous number as a suspected fault rather than a result was correct.
+
+**Confidence:** high on direction and significance (n=207 paired, consistent across two tasks, two summariser budgets, and both accuracy metrics); moderate on exact magnitudes (N=1 per cell — `seed=` is inert on LiC). **Not run**, having converged on the scope directive: MT-OSC w=2 post-fix, all code MT-OSC/Gated cells, both neutral-prompt robustness cells (implemented; prompt in the worklog appendix).

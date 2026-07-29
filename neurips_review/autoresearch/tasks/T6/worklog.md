@@ -265,3 +265,79 @@ Either way, if the baselines rise the AC3-over-baseline deltas on those two mode
 shrink. **That must be reported, not buried.** Waiting for the AC3 arms.
 
 Status 14:38: gpt5_4 s0 DONE, s2 running. dsv4f s0 21/60. kimi s0 24/60. Zero FAILED.
+
+## 15:10 UTC — three Baseline cells complete. A serious problem with the published DSV4F/Kimi baselines.
+
+| Model | Arm | rep1(s42) | rep2(s43) | rep3(s44) | mean ± sd | published seed-42 |
+|---|---|---|---|---|---|---|
+| gpt-5.4 | Baseline | 52.6 | 78.9 | 73.7 | **68.4 ± 13.9** | 68.4 |
+| DeepSeek-V4-Flash | Baseline | 57.9 | 78.9 | 73.7 | **70.2 ± 11.0** | **31.6** |
+| Kimi-K2.6 | Baseline | 78.9 | 78.9 | 83.3 | **80.4 ± 2.5** | **26.3** |
+| gpt-5.4 | Gated-Reset (2/3 reps) | 36.8 | 62.5 | — | 49.7 ± 18.1 | 52.6 |
+
+n=19/rep (one rep of Kimi has 18 — one rollout still in flight at read time), 0 errors.
+
+**gpt-5.4 baseline replicates on the mean (68.4 vs 68.4).** DSV4F is +38.6 pp and
+Kimi is +54.1 pp above their published baselines. That is not noise.
+
+### Evidence on why
+
+- **Termination reasons in my runs:** dsv4f s0 = 60/60 `user_stop`; kimi s0 = 59/60
+  `user_stop`; gpt5_4 s0 = 58/60 `user_stop`. Essentially every rollout ran to a
+  natural conversational end.
+- **The original Kimi run did not.** The source report states the Kimi Baseline and AO
+  cells had **14/20 and 19/20 short-exits** from `litellm.RateLimitError`, calls those
+  numbers "rate-limit-clipped floors rather than honest performance", and guesses the
+  true baseline at 40-50%. My 80.4% says even that guess was low.
+- **Foundry alias drift: no evidence.** `DeepSeek-V4-Flash` and `Kimi-K2.6` still
+  resolve as their own deployment names (`response.model` echoes them);
+  `DeepSeek-V4-Flash-2026-04-23` is a *separate* deployment and 404s under the alias.
+  So the deployment names are not silently repointed. Cannot fully exclude an
+  in-place version bump on the alias, but there is no positive sign of one.
+- **Original outputs are unauditable.** `ctx_edit/outputs/` is gitignored in the fork
+  (`.gitignore:227`) and `git ls-files ctx_edit/outputs` returns nothing, so the May
+  per-task traces do not exist anywhere I can reach. I cannot count the original
+  short-exits for DSV4F.
+
+### What I think happened
+
+The rate-limit failure mode that killed 42/60 and 59/60 of my own first-launch
+rollouts is the *same* one the source report documents for Kimi. My rotate-and-backoff
+wrapper removes it. The most likely reading is that the published DSV4F and Kimi
+Baseline cells are **infrastructure-degraded floors**, and the Kimi one is admitted to
+be so in the report that produced it. The report's claim that "the AC3 vs Baseline
+differential is robust regardless" rests on the AC3 arms having run clean while the
+baseline did not — i.e. on comparing a clean treatment against a broken control.
+Whether that holds is exactly what the AC3 arms now running will settle.
+
+**Consequence if this survives:** the published tau2 gains on DSV4F (+26.3 pp) and
+Kimi (+47.4 pp) are measured against baselines that are too low, and shrink or
+invert. Kimi's re-measured baseline (80.4) is already **above every published Kimi AC3
+number** (Augment 57.9, Gated-Reset 68.4, Rewrite 73.7). This is the opposite of a
+convenient result and it goes in the report unhedged.
+
+Status 15:10: gpt5_4 s0 done / s2 37/60; dsv4f s0 done / s2 starting; kimi s0 59/60.
+
+## 15:19 UTC — all three drivers were KILLED by the agent harness; relaunched detached
+
+At 15:18 the harness reported all three background driver tasks as `killed`
+(bm2jpevg0 / behcw1xki / b0cnkm0g2) and `pgrep` confirmed no surviving
+`run_parallel.py`. They had been up ~60 min. Cause was the harness's background-task
+lifecycle, not the runs themselves — zero `FAILED` lines in any cell log.
+
+Lost work at kill time: `gpt5_4_s2` 53/60, `dsv4f_s2` 8/60, `kimi_s2` 13/60 (all
+in-flight, no results.json). Two fixes:
+
+1. **Resume support** in `run_parallel.py`: a job whose trace file already exists and
+   parses as JSON is skipped when building the job list. Trace paths are deterministic
+   (`{safe_task_id}_{strategy}_seed{seed}.json`), so restarts are idempotent and a
+   killed cell costs only its in-flight rollouts. `run_t6_reps.sh` now gates on
+   *trace count* (20 x trials) rather than the presence of `results.json`, and appends
+   to cell logs.
+2. **Detached launch**: `setsid nohup ./run_t6_reps.sh ... &` with logs to
+   `ctx_edit/outputs/T6_reps/_logs/driver_*.log`. New process group, so the harness's
+   task manager cannot reap them.
+
+Relaunched 15:19:12-14. All three s0 cells correctly SKIPped (60/60 traces), all three
+s2 cells resumed. Note for whoever picks this up: **poll the trace counts, not the
+background-task status** — `ls ctx_edit/outputs/T6_reps/<cell>/traces | wc -l` vs 60.

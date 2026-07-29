@@ -34,11 +34,12 @@ graph TD
     T9["T9 analyzer-model sensitivity<br/>graceful degradation, all 5 positive<br/>non-gpt takes top rung<br/>[done]"]
     T2A["T2A Tier-A constructed pollution<br/>removal 97.6%, precision 50.4% (=chance)<br/>Reset not surgical<br/>[done]"]
     T2C["T2c auditing vs re-solving<br/>+20.7pp on NO_LEAK subset<br/>math conceded<br/>[done]"]
-    T1["T1 condensation baseline<br/>[run] — database+code, not math"]
+    T1["T1 condensation baseline<br/>summarisation does NOT close gap<br/>over-budget and still loses<br/>[done]"]
     T11["T11 WildChat judge checks<br/>[run]"]
     T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
     T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
-    T2B["T2B counterfactual span ablation<br/>[todo, gold standard]"]
+    T2B["T2B counterfactual span ablation<br/>[deferred] — superseded in priority"]
+    T14["⚠ T14 FN-adjustment audit<br/>adjusted_accuracy inflates our own<br/>numbers 89.0 -> 77.1<br/>[run]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
   S1 --> S2
@@ -55,6 +56,8 @@ graph TD
   T5 -.->|"non-discriminating on math;<br/>re-run on high-pollution task"| T1
   T2A --> T2B
   T2C --> T2B
+  T1 --> T14
+  T14 -.->|"corrects magnitudes in"| P0
 
   P3 -->|"N=1 claim we already<br/>assert in replies/v4"| T8
   P1 -->|"N=1 claim"| T6
@@ -81,6 +84,8 @@ graph TD
 | T6 | Multi-replicate tau2 | 2026-07-29 | `tasks/T6/worklog.md`; fork at `~/ac3/tau2_ctxe` | iNYK — largest remaining statistical hole |
 | T2A | Tier-A constructed pollution | 2026-07-29 | `tasks/T2A/{RESULTS.md,inject.py,measure.py}` (`88cacb3`); `outputs/T2A/` | 5YHP W5 — **detection 97.6% / naming 78.6%; selectivity at chance for Reset** |
 | T11 | WildChat judge checks | 2026-07-29 | `tasks/T11/worklog.md` | 5YHP W4 (promised in replies/v4) |
+| T1 | Condensation baseline | 2026-07-29 | `tasks/T1/{worklog.md,RESULTS.md,analyze.py}`; `outputs/T1/` | Vg97 W1/Q1 + AC — **summarisation −2.8 to −8.4 pp vs AC3-Reset +19.6 pp** |
+| T14 | FN-adjustment audit | 2026-07-29 | `tasks/T14/worklog.md` | **Corrects the paper's headline LiC magnitudes** |
 
 ---
 
@@ -88,6 +93,7 @@ graph TD
 
 | Direction | Verdict | Reason |
 |---|---|---|
+| MT-OSC as a fair pollution baseline | `[dead]` | T1: at published w=4 it fired 0.3×/conversation — it cannot touch context before turn 6 and LiC conversations average 4.1 turns. Report as *structurally inapplicable*, which supports our scoping argument, rather than as a beaten baseline. |
 | End-to-end tau2 replay | `[dead]` | ~2 dev-days; out of window. Defend replay as causal-attribution design instead; T4 supplies fresh end-to-end evidence on LiC. |
 | Full human eval on WildChat | `[dead]` | Out of window. Defend with N=3 seeds + tight intervals; T11 supplies judge-side checks. |
 | T5 on math | `[dead]` as a discriminating control | Near-ceiling accuracy compressed all arms to ~97.5%. Needs a high-pollution venue → folded into T1. |
