@@ -113,3 +113,117 @@ Out dir `ctx_edit/outputs/T6_smoke_s0`.
 **Throughput is far better than feared: ~28 s/task.** A 20-task cell at workers=8 should
 be a few minutes, so the FULL 3-model x 5-arm x 3-rep matrix (900 rollouts) looks
 affordable. Revising plan upward from "depth on one cell" to the full matrix.
+
+## 13:58 UTC — POSITIVE CONTROL #2 (all five arms) PASSED
+
+2 tasks x {s0 already done, s1, s2, s3, ao}, gpt-5.4:
+
+| arm | rewards | termination |
+|---|---|---|
+| s1 | 1.0, 1.0 | user_stop |
+| s2 | 1.0, 0.0 | user_stop |
+| s3 | 1.0, 1.0 | user_stop |
+| **ao** | **0.0, 0.0** | **max_steps (both)** |
+
+**The AO zero is behavioural, not a scoring fault.** AO rollouts never reach
+`user_stop`; they burn all 50 steps. That is the documented failure mode (blanket
+assistant-message omission destroys tool-call state, so the agent re-calls tools
+forever). This is the sanity check the brief asked for: a 0% AO cell here is
+corroborated by a mechanism, and the same harness returns 1.0 on the other four arms
+in the same process.
+
+## 14:00 UTC — seed-42 reference table locked
+
+From `docs/reports/post_may18_progress_update_v4_bandaid_tau2.html:435-470` (n=19,
+`[service_issue]break_apn_settings[PERSONA:None]` dropped):
+
+| Arm | gpt-5.4 | DSV4F | Kimi-K2.6 |
+|---|---|---|---|
+| Baseline (s0) | 68.4 | 31.6 | 26.3 ‡ |
+| AO | 0.0 | 0.0 | 0.0 ‡ |
+| AC3-Augment (s1) | 84.2 | 57.9 | 57.9 |
+| AC3-Gated-Reset (s2) | **52.6** | 47.4 | 68.4 |
+| AC3-Rewrite v11 (s3) | 73.7 | 57.9 | 73.7 |
+
+‡ Kimi s0/AO cells were rate-limit-clipped in the original run (14/20 and 19/20
+short-exits at workers=4); the report itself calls them "floors, not honest
+performance". My re-run uses workers=4 as well, so watch for the same artefact.
+The gpt-5.4 Gated-Reset regression to check: **52.6 < 68.4 baseline**.
+
+## 14:02–14:03 UTC — full matrix launched
+
+Driver `ctx_edit/run_t6_reps.sh` (new; same hyperparameters as the committed
+`run_post_may18_tau2_foundry.sh`: max-steps 50, min-turns 2, max-resets 3,
+rewrite-prompt-version v11, user+analyzer `openai/gpt-5-mini`), except
+`--num-trials 3` => seeds 42, 43, 44. Arms ordered s0, s2, s1, s3, ao so the
+regression-relevant cells land first. Output `ctx_edit/outputs/T6_reps/<model>_<arm>/`.
+
+| block | agent-llm | workers | started |
+|---|---|---|---|
+| gpt5_4 | `openai/gpt-5.4` (-> dl-openai-3) | 6 | 14:02:11 |
+| dsv4f_foundry | `foundry/DeepSeek-V4-Flash` | 6 | 14:02:31 |
+| kimi_k2_6_foundry | `foundry/Kimi-K2.6` | 4 | 14:04 |
+
+Throughput observed: gpt-5.4 s0 hit 6/60 rollouts in ~60 s => ~10 min/cell.
+15 cells total; AO cells will be slower (they always run to max_steps).
+Aggregator: `ctx_edit/t6_aggregate.py` — reads **per-task traces**, not results.json,
+so a runner crash cannot lose completed rollouts; it drops records carrying an
+`error` key and excludes `break_apn_settings` for the n=19 denominator.
+
+## 14:13 UTC — FIRST LAUNCH ABORTED: gpt-5-mini rate limits (this is a real trap)
+
+First matrix launch died on HTTP 429. `gpt5_4_s0` finished with rc=0 and printed a
+summary, but **42 of its 60 rollouts had errored**:
+
+```
+litellm.RateLimitError: OpenAIException - Your requests to gpt-5-mini for gpt-5-mini
+in swedencentral have exceeded rate limit.
+```
+`kimi_k2_6_foundry_s0`: 59/60 errored (52 gpt-5-mini 429s, 7 Kimi-K2.6 429s).
+
+**The bottleneck is not the agent model — it is `gpt-5-mini`, which is the user
+simulator AND the analyzer for every arm of every model block simultaneously.**
+
+Note the shape of this failure, because it is exactly the silent-degradation class the
+brief warned about: `run_parallel.py` writes `reward: 0.0` for an errored rollout into
+`results.json`, and the printed per-strategy summary silently shrinks the denominator
+(it filters `"error" not in r`). So a cell that lost 70% of its rollouts still prints a
+clean-looking percentage over the survivors, and `results.json` still contains 60 rows
+of which 42 read `reward: 0.0`. **Any naive mean over `results.json` would have
+produced a badly wrong, confidently-reported number.** My aggregator drops `error`
+records and prints per-rep n.
+
+### Fix — endpoint pooling + real backoff
+
+Probe of every Azure OpenAI resource named in ctx_editor's load-balancer configs:
+
+| resource | gpt-5-mini | gpt-5.4 |
+|---|---|---|
+| `dl-openai-1` | **OK** | **OK** |
+| `dl-openai-3` | 429 (saturated) | OK |
+| `fxdata-eastus2` | 401 PermissionDenied | 401 |
+| `fxdata-shared` | 401 PermissionDenied | 401 |
+
+(So `fxdata-shared` being dead is confirmed, and `fxdata-eastus2` is dead the same way.
+Neither is on any route I use.)
+
+New module `ctx_edit/_t6_llm_patch.py` wraps `litellm.completion` **and**
+`tau2.utils.llm_utils.completion` (llm_utils does `from litellm import completion`,
+i.e. by value, so patching `litellm.completion` alone is not enough — worth knowing):
+- round-robin `api_base` across the pool of resources verified to serve that
+  deployment (`gpt-5-mini` -> [dl-openai-1, dl-openai-3], `gpt-5.4` -> [dl-openai-3,
+  dl-openai-1], plus `gpt-4.1-2025-04-14`, tau2's NL-assertions judge);
+- on a retryable error, **rotate endpoint and back off** — 14 attempts, exponential
+  from 4 s to 90 s with jitter (tau2's own `num_retries=3` litellm backoff is far too
+  short); `num_retries` forced to 0 so retries are not double-counted;
+- calls that already carry an explicit `api_base` (the `foundry/` path for
+  DeepSeek-V4-Flash / Kimi-K2.6) keep their endpoint and get only the retry behaviour.
+
+Transport-only change. Model identities, prompts and sweep hyperparameters untouched.
+
+Smoke after patch: gpt-5.4 s0, 4 tasks, workers 4 -> `S0 : 3/4 (75.0%)`, 80 s, 0 errors.
+
+## 14:18–14:20 UTC — matrix relaunched (workers 5 / 5 / 4)
+
+`T6_reps` wiped and restarted from scratch so no rate-limit-poisoned cell survives.
+gpt5_4 @5 (14:18), dsv4f_foundry @5 (14:19), kimi_k2_6_foundry @4 (14:20).
