@@ -38,7 +38,8 @@ graph TD
     T11["T11 WildChat judge checks<br/>position bias real but pre-randomised<br/>headline survives, -2.0/-0.9pp<br/>[done]"]
     T12["T12-13 memory order / split<br/>order NOT distinguished; learner noise ~6pp<br/>contamination = zero<br/>[done]"]
     T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
-    T2B["T2B counterfactual span ablation<br/>[run] — natural spans, causal labels"]
+    T2B["T2B counterfactual span ablation<br/>pollution real + concentrated (~6%)<br/>BOTH operators non-selective<br/>[done] $62.80"]
+    T25["T25 retract Rewrite claim<br/>+ assemble the case<br/>[run]"]
     T15["T15 claims audit -> replies/v5<br/>64 claims: 24 unchanged, 14 corrected,<br/>6 struck, 11 added, 5 unverified<br/>[done]"]
     T16["T16 verify gate stats<br/>claim exact; wording wrong<br/>firing rate != detection rate<br/>[done]"]
     T14["⚠ T14 FN-adjustment audit<br/>2 flips on Rewrite (unpublished cells)<br/>Reset/Gated survive all 8<br/>found ERGO denominator defect<br/>[done]"]
@@ -76,6 +77,8 @@ graph TD
   T21 --> T22
   T22 --> T23
   T23 --> T24
+  T2B -->|"supersedes Rewrite attribution"| T25
+  T23 --> T25
   T1 -.->|"56.1% vs paper 4.0%"| T24
   T8 --> T21
   T11 --> T20
@@ -125,6 +128,8 @@ graph TD
 | T22 | Operator handoff | 2026-07-29 | `autoresearch/HANDOFF.md` (`11d8e40`) | 14 must-change claims; PAPER-1..8 with effort estimates |
 | T23 | Red-team `replies/v5/` | 2026-07-29 | `tasks/T23/RED_TEAM.md` | 30 items; **found the 52 pp baseline spread the accuracy audits missed** |
 | T24 | Reconcile the three baselines | 2026-07-29 | `tasks/T24/worklog.md` | H1 — whether T1 still answers the AC |
+| T2B | Counterfactual span ablation | 2026-07-29 | `tasks/T2B/{RESULTS.md,per_span.json}` (`289de75`) | **Causal gold standard: pollution concentrated (~6%); both operators non-selective** |
+| T25 | Retract Rewrite claim + assemble case | 2026-07-29 | `tasks/T25/worklog.md` | Supersedes PAPER-5; executes RED_TEAM's four-move plan |
 
 ---
 
@@ -146,7 +151,7 @@ graph TD
 | Full human eval on WildChat | `[dead]` | Out of window. Defend with N=3 seeds + tight intervals; T11 supplies judge-side checks. |
 | T5 on math | `[dead]` as a discriminating control | Near-ceiling accuracy compressed all arms to ~97.5%. Needs a high-pollution venue → folded into T1. |
 | Quoting single-trial memory gains (+10/+12 pp) | `[dead]` | T12: below the learner's own ~6 pp noise floor; N=4 remeasure gives −5.0/−8.0 pp. Lead with T13's zero-contamination result instead (D7). |
-| "We preserve what's correct and remove what's harmful" (as a claim about **Reset**) | `[dead]` | T2A: edit precision 50.4% vs 50% chance, preservation 4.0%. Reset discards the assistant side wholesale and re-derives from the user side. The selectivity claim belongs to **Rewrite** (27.0 / 38.9). Attribute, don't retract. |
+| "We preserve what's correct and remove what's harmful" (as a claim about **either** operator) | `[dead]` | T2A found Reset non-selective and Rewrite apparently selective (27.0 / 38.9). **T2B overturns the Rewrite half on natural spans**: Rewrite keeps 0/66, Reset 5/66, edit precision at base rate for both. Rewrite only looked selective because a compactor can copy a short *injected* sentence verbatim; it paraphrases the model's own prose. Mechanism for both = rebuild-from-the-user-side. |
 | `analysis_cache` as a T9 confound | `[dead]` | Resolved, not worked around: `make_key()` includes analyzer model identity (`analysis_cache.py:92`); call site passes live model (`analyzer.py:587`). Cache disabled anyway + per-trace audit. |
 | CollabLLM math-hard "100%" claim | `[dead]` | T8 N=3: 91.7 ± 7.6 vs Baseline 91.7 ± 5.8, identical 55/60 totals. Near-ceiling decoding noise. Say "matches Baseline" — still refutes the regression. |
 | "Memory is order-robust" framing | `[dead]` | T12 variance controls: across-ordering std (6.5) does not exceed same-ordering std (6.1). Ordering is not a distinguished factor; the learner is just noisy. |

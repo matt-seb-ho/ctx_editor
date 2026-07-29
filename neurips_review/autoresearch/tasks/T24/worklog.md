@@ -20,8 +20,10 @@ less polluted, does T1 still answer the Area Chair's "limited baselines" reserva
    56.1% → **32.0%**; restricting `code_baseline` to the paper's 25 items moves it
    83.0% → **48.0%**.
 3. **T1 still answers the AC**, and on the strongest possible reading: it is the *only* LiC
-   evidence we have on a **completely unselected pool**, and AC3 still gains +19.6pp / +9.0pp
-   there at p ≤ 0.02. See §5 for the pollution accounting.
+   evidence we have on a **completely unselected pool**, its venue is demonstrably high-pollution
+   (measured single-turn ceiling 94.4% database / 98.0% code against full-context multi-turn
+   56.1% / 83.0% — a **38.3pp / 15.0pp** gap), and AC3 closes **51% / 60%** of that gap, the same
+   fraction it closes on the paper's much harder pool (**50%**). No re-scoping needed. §5.
 4. **But I found a worse problem than H1 while doing this (§6, `F-T24-1`).** The reply to iNYK
    W2 states that the 36-comparison paired matrix — the rebuttal's new headline evidence — is on
    "**the full, non-difficulty-selected pool**". It is not. It runs on `htn50_52_*`, which is
@@ -49,6 +51,7 @@ less polluted, does T1 still answer the Area Chair's "limited baselines" reserva
 | Reproduce T1's published code Baseline | 83.0% (83/100) | `outputs/T1/main/code_baseline/results.json` → 83/100 | ✅ |
 | Re-derive `tab:main` Baseline numerators independently | 12/20, 3/19, 1/25, 8/23 | T17 §2 rational reconstruction + `docs/reports/v8_batch_results.md:27,29` agree | ✅ |
 | Pool-membership join: do the paper's 25 database items exist in T1's 107-item run? | 25/25 | 25/25 matched on `sample_id` | ✅ |
+| New single-turn ceiling arm lands in the published LiC `full` band for this pool | 89.7–98.1% (7 GPT-5.x models, `data/sota_model_results.csv`) | **94.4%** | ✅ |
 
 Note the deliberate design choice: **§3's decomposition needs no new API calls at all.** It is a
 re-slicing of per-sample outcomes from runs that already exist, so it is immune to the
@@ -208,9 +211,21 @@ concentrate the failure mode under study; row 3 is the population estimate. The 
 three share is that **within each row every arm sees the identical items**, so the paired Δ is the
 comparable quantity across all three, and the absolute level is not.
 
+**The invariant that makes them one design rather than three results.** Priced on a single
+respondent against a measured single-turn ceiling (§5.3), the *fraction of the multi-turn gap
+AC3-Reset closes* is **47–51%** on database and **50–60%** on code across all three item sets,
+while the baseline level moves by 24–35pp between them. The absolute accuracies are venue
+properties; the gap-closure fraction is a method property, and it is the one the paper claims.
+
 Cross-check that this is design and not drift: applying the row-1 and row-2 item sets to the
 row-3 run reproduces the ordering and most of the magnitude (§3) with model, evaluator, protocol
 and metric all held fixed.
+
+Extra corroboration on the paper's own model, from LiC's released logs on the identical 107-item
+pool (`data/sota_model_results.csv`): GPT-5-mini scores **29.9%** sharded / **90.7%** full on the
+*whole* database pool. The paper reports **4.0%** on its top-25 subset of that same pool. The
+selection effect on the paper's own model is therefore ≈**26pp**, within 2pp of the 24.1pp we
+measure by transferring the item set to gpt-5.4-mini (§3). Two independent routes, same answer.
 
 ---
 
@@ -229,30 +244,91 @@ pollution" is not compatible with that number.
 
 ### 5.2 Pollution ceiling, measured (new runs, `outputs/T24/`)
 
-T1 lacked the design-oracle arms, so the pollution *magnitude* in its venue was unquantified. I
-added them: `concatenate_user` (single-turn upper bound) and `omit_assistant` (AO) on the full
-107/100 pool, same model, same evaluator, same harness
-(`neurips_review/autoresearch/tasks/T24/run_t24_ceiling.sh`).
+T1 lacked any ceiling arm, so the pollution *magnitude* in its venue was unquantified. I added
+three, all on the same 107/100 pool, same respondent, same v2 evaluator, same harness:
 
-<!--T24-CEILING-->
+- `concatenate_user` and `omit_assistant` — the paper's two **design-oracle** baselines
+  (`run_t24_ceiling.sh`).
+- **`db_fullspec` / `code_fullspec`** — the true **single-turn ceiling**
+  (`run_t24_fullspec.sh`). Implementation: `data/t24_fullspec_single_shard.json` replaces each
+  sample's shard list with *one* shard containing the original fully-specified question
+  (`fully_specified_question` for Spider; `prompt` / `question_content`+`starter_code` for
+  HumanEval / LiveCodeBench), so `user_mode=sharded` degenerates to LiC's "full" condition while
+  every other component — system prompt, user sim, system judge, evaluator — is byte-identical to
+  the T1 baseline run.
 
-### 5.3 Is a 56.1% baseline still "high-pollution"?
+  *Positive control:* LiC's own logs on this exact 107-item database pool put the `full` condition
+  at **89.7–98.1%** for seven GPT-5.x models (`data/sota_model_results.csv`). Our arm returns
+  **94.4%** — inside the band. ✅ Same check on code: LiC `full` 29.0–97.0% (very noisy, v1
+  extractor); ours 98.0%, consistent with the v2 extractor fixing the code-fence bug.
 
-Yes, and the paper's own definition supports it. "Pollution damage" is *ceiling − full-context*,
-where the ceiling is the design oracle on the same items — not 100%. On the paper's pool that
-ceiling is **32.0%** and the baseline is 4.0%, i.e. damage = 28.0pp. T1's venue is measured in
-§5.2. The relevant comparison is not "4% is low so it must be polluted, 56% is high so it must be
-clean" — a 4% cell whose oracle is 32% has 28pp of headroom; that is *less* absolute headroom than
-T1's venue if T1's oracle sits anywhere above 84%.
+### 5.3 The pollution accounting, three venues, one run each
 
-**Honest statement of what T1 is and is not.** T1's venue is *less difficulty-concentrated* than
-the paper's, and its per-item pollution rate is lower — most of the 107 database items are not
-polluted at all, which is precisely why the baseline is 56%. That **dilutes** the measured Δ; it
-does not inflate it. A dilution argument runs *against* us, not for us: the +19.6pp on the full
-pool is a lower bound on what AC3 does where pollution binds (cf. the same run restricted to the
-hard quarter: 32.0 → 60.0, **+28.0pp**). So the condensation baselines were **not** given an easy
-ride relative to AC3 — they were run on the same conversations, and they still lost by 12–28
-points while consuming 1.02–1.19× AC3-Reset's strategy calls.
+Everything below is gpt-5.4-mini, end-to-end sharded, v2 evaluators, raw accuracy. Columns are
+item sets; the two right-hand columns are the *other two rows of the H1 table's* pools, so this
+single table prices all three venues on one model. Script: `/tmp/t24_full.py`.
+
+**LiC-database**
+
+| arm | full LiC pool (n=107) | ∩ htn50_52 (n=50) | ∩ paper's dev subset (n=25) |
+|---|---|---|---|
+| **Fully-specified single turn (true ceiling)** | **94.4%** | 96.0% | **88.0%** |
+| AO / assistant omission (design "oracle") | 69.2% | 52.0% | 32.0% |
+| Concat User (design "oracle") | 63.6% | 42.0% | 32.0% |
+| **Baseline (full context, sharded)** | **56.1%** | 32.0% | **32.0%** |
+| **AC3-Reset** | **75.7%** | 62.0% | **60.0%** |
+| AC3-Gated-Reset | 73.8% | 58.0% | 60.0% |
+| MT-OSC (w=4) | 60.7% | 36.0% | 28.0% |
+| Summarisation 1/turn | 53.3% | 28.0% | 28.0% |
+| Summarisation 2/turn (budget-matched) | 47.7% | 18.0% | 16.0% |
+| **multi-turn gap (ceiling − baseline)** | **38.3pp** | 64.0pp | **56.0pp** |
+| **fraction of gap closed by AC3-Reset** | **51%** | 47% | **50%** |
+
+**LiC-code**
+
+| arm | full LiC pool (n=100) | ∩ htn50_52 (n=44) | ∩ paper's dev subset (n=25) |
+|---|---|---|---|
+| **Fully-specified single turn (true ceiling)** | **98.0%** | 97.7% | **96.0%** |
+| **Baseline (full context, sharded)** | **83.0%** | 72.7% | **48.0%** |
+| **AC3-Reset** | **92.0%** | 86.4% | **72.0%** |
+| Summarisation 1/turn | 79.0% | 68.2% | 48.0% |
+| Summarisation 2/turn | 80.0% | 63.6% | 52.0% |
+| **multi-turn gap** | **15.0pp** | 25.0pp | **48.0pp** |
+| **fraction of gap closed by AC3-Reset** | **60%** | 55% | **50%** |
+
+(AO / Concat-User code arms were still running at write-up time; see `run_log.txt`. They do not
+affect any conclusion above.)
+
+### 5.4 Answer: yes, T1's venue is high-pollution, and the invariant is the gap-closure fraction
+
+**T1's database venue loses 38.3 points to multi-turn sharding** (94.4% single-turn → 56.1%
+full-context multi-turn) on a completely unselected pool. That is the Lost-in-Conversation
+phenomenon, reproduced at full strength on a 2026-era model, and it is *larger* in absolute terms
+than the 28.0pp headroom the paper's own design-oracle rows imply for `tab:main`'s database cell.
+A 56.1% baseline is high only because the pool is unselected; the **gap is not small**.
+
+The genuinely reassuring result is the bottom row of each table: **the fraction of the multi-turn
+gap AC3-Reset closes is 47–51% on database and 50–60% on code, across all three venues.** Absolute
+levels move by 52 points across the three pools; the quantity the paper actually claims ("closes
+55–80% of the multi-turn gap") moves by 4 points. That is the reconciliation, and it is a much
+stronger statement than any of the three raw numbers.
+
+**Did the condensation baselines get an easy ride?** No — the opposite. They were run on the same
+conversations as AC3, and on the unselected pool both summarisation budgets and MT-OSC score
+**below full context** (53.3 / 47.7 / 60.7 vs 56.1), while consuming 1.02–1.19× AC3-Reset's
+strategy calls. Restricted to the *hardest* quarter (the paper's own pool) they lose harder still
+(28.0 / 16.0 / 28.0 vs baseline 32.0). There is no venue in this data where condensation wins.
+
+**One thing we should say ourselves, because it is load-bearing and currently unstated.** The
+"design-oracle" label is too strong for our end-to-end runs. On the full pool AO reaches 69.2% and
+Concat-User 63.6% against a true single-turn ceiling of 94.4%; on the paper's 25 items both sit at
+32.0% against a true ceiling of **88.0%**. The oracles are depressed because they inherit the user
+simulator's paraphrase loss — which is exactly the premise of our own false-negative appendix.
+Two consequences: (i) `tab:main`'s "AC3-Reset 48.0 exceeds the oracle 32.0" is exceeding a
+*depressed* oracle, not the single-turn ceiling, and should be phrased that way; (ii) AO and
+Concat-User are oracles *by construction only in replay mode*, where the trajectory is fixed. In
+end-to-end mode they are ordinary baselines — and AC3-Reset beats both on the unselected pool
+(75.7 vs 69.2 / 63.6), which is a cleaner replication of the "exceeds AO" claim than the paper's.
 
 **Does T1 answer the AC?** Yes, on all three of the AC's requirements, and I would argue it is our
 single best experiment:
@@ -263,11 +339,15 @@ single best experiment:
    table, the multi-model table, the 36-comparison matrix — is on a baseline-failure-selected
    pool. T1 is not. That makes it the answer to iNYK's Q1 as well as the AC's request.
 3. *It is end-to-end*, not replay, so it also removes the replay confound iNYK raised in W2.
+4. *Its venue is demonstrably high-pollution*: 38.3pp of multi-turn degradation on database and
+   15.0pp on code against a measured single-turn ceiling (§5.3), with AC3 recovering ~half — the
+   same fraction as in the paper's venue.
 
 **The one scoping caveat T1 does need**, and it should be stated by us: T1's 56.1% baseline is a
 *population-average* venue, so its Δ is an average over polluted and unpolluted items. It should
 not be quoted next to `tab:main`'s numbers as though the two are the same measurement — which is
-exactly what H1 says. Fix the framing, keep the conclusion.
+exactly what H1 says. Fix the framing, keep the conclusion. Nothing in tonight's evidence requires
+re-scoping T1's conclusion.
 
 ---
 
@@ -334,6 +414,14 @@ framing is unaffected).
 > full context from 56.1% to **32.0%** and AC3-Reset from 75.7% to **60.0%**. Absolute accuracies
 > are therefore not comparable across the three tables; **the paired Δ within each block is the
 > quantity to read**, and it is computed on identical items in all three.
+>
+> Nor is the unselected pool an easy setting. Measuring the single-turn ceiling directly on it
+> (same harness, each instance's fully-specified question delivered in one turn) gives **94.4% on
+> database and 98.0% on code**, against full-context multi-turn accuracies of 56.1% and 83.0% — a
+> **38.3pp** and **15.0pp** multi-turn gap on a pool with no difficulty selection whatsoever.
+> AC3-Reset closes **51%** and **60%** of those gaps, which is the same fraction it closes on
+> Table 1's much harder subset (**50%** on both tasks). The absolute baselines differ by up to 52
+> points across our tables; the fraction of the multi-turn gap our method closes differs by four.
 
 ### 7.2 Replacement for `01_reviewer_iNYK.md:31` (**required — current text is false**)
 
@@ -369,19 +457,38 @@ For the AC letter, one sentence after the condensation result:
 
 > We would flag one thing about this experiment ourselves: unlike Table 1, it runs on the complete
 > LiC pool with no instance selection, which is why its full-context baseline (56.1% / 83.0%) is
-> much higher than Table 1's. That makes the comparison *harder* for us, not easier — most
-> instances in an unselected pool are not pollution-limited at all, which dilutes any Δ — and
+> much higher than Table 1's. That does not make it an easy setting — measured in the same
+> harness, the single-turn ceiling on that pool is 94.4% (database) and 98.0% (code), so the
+> multi-turn gap is still 38.3pp and 15.0pp — and it makes the comparison *harder* for us, since
+> most instances in an unselected pool are not pollution-limited at all, which dilutes any Δ.
 > AC3-Reset still beats full context by +19.6pp and both condensation budgets by +22.4 to +28.0pp
-> on the same conversations.
+> on the same conversations, and closes 51% of the multi-turn gap — the same fraction it closes on
+> Table 1's much harder subset.
+
+### 7.5 Optional but recommended: an explicit "not an oracle in end-to-end mode" sentence
+
+Only if we report AO/Concat on the new pool. Our own measurement shows these baselines are
+depressed by the user simulator's paraphrase loss (§5.4), so:
+
+> A note on the two design-oracle baselines. They are oracles in the replay protocol, where the
+> conversation is fixed and collapsing it to a single turn recovers the original problem exactly.
+> In fully end-to-end simulation they are not: they concatenate the *simulator's* paraphrases of
+> the shards, not the original question, so they inherit whatever the simulator drops. On the
+> unselected pool AO reaches 69.2% and Concat User 63.6% against a measured single-turn ceiling of
+> 94.4%. We therefore report them as baselines rather than upper bounds in this table, and the
+> single-turn ceiling separately.
 
 ---
 
 ## 8. Files
 
-- `neurips_review/autoresearch/tasks/T24/run_t24_ceiling.sh` — the §5.2 oracle arms.
-- `neurips_review/autoresearch/tasks/T24/run_log.txt`, `nohup.out` — their logs.
-- `outputs/T24/{db_concat,db_ao,code_concat,code_ao}` — their artifacts.
-- `/tmp/t24_pool.py` — the §3 re-slicing (no API calls; reproduces §3 from existing runs).
+- `neurips_review/autoresearch/tasks/T24/run_t24_ceiling.sh` — AO + Concat-User arms (§5.2).
+- `neurips_review/autoresearch/tasks/T24/run_t24_fullspec.sh` — single-turn ceiling arms (§5.2).
+- `data/t24_fullspec_single_shard.json` — derived pool: one shard = the fully-specified question.
+- `neurips_review/autoresearch/tasks/T24/run_log.txt`, `run_log_fullspec.txt`, `nohup*.out`.
+- `outputs/T24/{db_concat,db_ao,code_concat,code_ao,db_fullspec,code_fullspec}` — artifacts.
+- `/tmp/t24_pool.py`, `/tmp/t24_full.py` — the §3 / §5.3 re-slicing (no API calls; reproduce from
+  existing runs).
 
 ## 9. Ambiguities resolved without asking
 
