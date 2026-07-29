@@ -45,7 +45,8 @@ graph TD
     T17["⚠⚠ T17 ERGO denominator fix<br/>ERGO 69.6->80.0 math, beats Reset<br/>ties Gated-Reset; bound too wide<br/>[done]"]
     T18["T18 close ERGO bound<br/>math 80.0 CLOSED (ships)<br/>code ~43.9 — T17 was +14pp wrong<br/>no diff significant at n≈20<br/>[done]"]
     T19["T19 fold settled findings into v5<br/>ERGO disclosed in 5 places<br/>tau2 HOLDs byte-identical<br/>[done]"]
-    T20["T20 verify remaining claims<br/>[run] — U2/U3/U4/U5"]
+    T20["T20 verify remaining claims<br/>U3/U5 verified, U2 restruck,<br/>U4 softened; found unre-scored AO cell<br/>[done]"]
+    T21["T21 apply wordings + AO N=3<br/>[run]"]
     SEED["⚠ inert-seed finding<br/>LiC + CollabLLM reps are<br/>temperature-only, not seeded"]
   end
   S1 --> S2
@@ -68,6 +69,8 @@ graph TD
   T17 --> T18
   T18 --> T19
   T19 --> T20
+  T20 --> T21
+  T8 --> T21
   T11 --> T20
   T14 --> T19
   T16 --> T19
@@ -110,7 +113,8 @@ graph TD
 | T17 | ERGO denominator fix | 2026-07-29 | `tasks/T17/{RESULTS.md,build_corrected.py,corrected_tabmain.json}` (`6ebc59b`) | **PAPER-7 — ERGO ties/beats AC3 on 3 of 4 tasks once corrected** |
 | T18 | Close the ERGO bound | 2026-07-29 | `tasks/T18/worklog.md` | **math 80.0 confirmed; code ~43.9 (T17 overstated by 14 pp); nothing significant at n≈20** |
 | T19 | Fold settled findings into `replies/v5/` | 2026-07-29 | `tasks/T19/worklog.md`; `replies/v5/` (`0154041`) | Lands T14/T16/T17/T18; ERGO disclosed in 5 places; T17's 57.9 grep-verified absent |
-| T20 | Verify remaining unverified claims | 2026-07-29 | `tasks/T20/worklog.md` | `CHANGES.md` §7 U2/U3/U4/U5 |
+| T20 | Verify remaining unverified claims | 2026-07-29 | `tasks/T20/worklog.md` | §7: **U3 + U5 verified, U2 re-justified, U4 softened**; found AO cell never re-scored |
+| T21 | Apply wordings + AO N=3 | 2026-07-29 | `tasks/T21/worklog.md` | Closes the cheapest open item (≈\$0.20) |
 
 ---
 
@@ -121,6 +125,8 @@ graph TD
 | "BigCodeBench cannot be evaluated with executable tests" | `[dead]` | Factually wrong — T8 §5 shows that path runs real `untrusted_check` execution. We conceded a limitation that does not exist; struck along with the dependent judge-discrimination figures. |
 | "AC3 beats ERGO across LiC" (as an unqualified claim) | `[dead]` | Corrected denominators: ERGO/math 80.0 beats AC3-Reset (75.0) and ties Gated-Reset. **Superseded in part by T18** — see next row. |
 | T17's corrected ERGO/code = 57.9 | `[dead]` | T18 measured the free parameter k directly (2.67/6, not 0/6): corrected ERGO/code is ~43.9 ≈ the published 44.0. Shipping 57.9 would have overstated a competitor by 14 pp. Measured scorecard 3/12, not 7/12. |
+| Striking the "72–92%" WildChat range as unverifiable | `[dead]` | T20 re-derived all 22 `tab:wildchat` cells from per-turn judge verdicts — 22/22 reproduce to the digit; the range is their exact rounded envelope. T11's corrections touch no Table 3 cell. v5 was giving away a defensible number. |
+| U2 struck "because not order-balanced" | `[dead]` | Wrong reason — it invites "so re-judge it". Real reason is non-significance: matched-35-turn gap rests on 7 discordant turns, 6 vs 1, exact McNemar p = 0.125. |
 | Framing the ERGO comparison as an ordering at all | `[dead]` | T18: paired exact sign tests show **no** ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction (code p=0.375, math p=1.00). Report "n≈20 cannot resolve this" rather than any ordering. |
 | Per-run `adjusted_accuracy` as a reported metric | `[dead]` | T14: inflates reset arms +13.9 to +55.9 pp vs +0.2 to +6.5 for no-reset arms, because the FN judge sees 1.00 user turns/sample on Rewrite vs 5.35 on baseline. Report **raw**; keep only the arm-symmetric pool filter. |
 | Rebuttal end-to-end "AC3-Reset 100.0 ± 0.0" | `[dead]` | FN-adjusted with asymmetric exclusions (Reset 1/2/5 items, baseline 0). Raw: 87.5 ± 2.0 / 93.3 ± 4.2 / 95.0 ± 0.0. Claim survives; the perfect score does not. |

@@ -486,3 +486,65 @@ that as the finding, but that is where it is heading and I am not going to softe
 
 Status 17:16: gpt5_4 {s0,s1,s2,s3} done, ao 3/60. dsv4f s1 53/60, then {s3, ao}.
 kimi {s0,s1,s2} done, s3 52/60, then ao. Still exactly 1 errored rollout in the sweep.
+
+## 17:35 UTC — FOUND A REAL BUG: 53% of analyzer Q1 calls fail tag extraction and inject escaped JSON into the context
+
+While auditing why gpt-5.4's AC3 arms all collapsed, I dumped the text actually spliced
+into an Augment rollout's context. It looks like this:
+
+```
+<analysis>
+### Task Specification (reviewer's consolidated interpretation)
+\nConsolidated user task specification:\n\n1) Customer identity and contact\n- Name: ...
+```
+
+Literal backslash-n. The analyzer's Q1 asks for `<task_spec>...</task_spec>`;
+**gpt-5-mini often answers with a JSON object** `{"task_spec": "...\n..."}` instead.
+`_extract_tag` (`ctx_edit/analyzer.py:89-95`) only regexes for the XML tags, returns
+`""`, and `analyze_conversation` (`:519-521`) then falls back to **the raw completion**
+— so the JSON wrapper, quoting and all escape sequences, is handed to the agent as its
+briefing.
+
+### Rate, measured over every AC3 trace in the sweep (862 analyzer calls)
+
+| cell | analyses | JSON-fallback | rate |
+|---|---|---|---|
+| gpt5_4 s1 | 163 | 107 | **66%** |
+| gpt5_4 s2 | 131 | 72 | 55% |
+| gpt5_4 s3 | 137 | 61 | 45% |
+| dsv4f s1 | 85 | 49 | 58% |
+| dsv4f s2 | 80 | 28 | 35% |
+| kimi s1 | 90 | 62 | **69%** |
+| kimi s2 | 80 | 32 | 40% |
+| kimi s3 | 96 | 48 | 50% |
+| **TOTAL** | **862** | **459** | **53%** |
+
+**This degrades every AC3 arm and cannot touch Baseline or AO** (neither calls the
+analyzer). It is the exact shape of the gpt-5.4 result: baseline reproduces at 68.4,
+all three AC3 arms drop 20-26 pp. And the worst-affected arm (s1, 66%) is the one with
+the largest published-vs-remeasured gap (-37 pp).
+
+Whether this is pre-existing or environment-induced is **unresolved**: it depends on
+whether OpenAI-hosted gpt-5-mini emitted the tags more reliably than the Azure
+deployment does. The original traces are gone, so I cannot check directly.
+
+### Diagnostic launched (17:36)
+
+Patched `_extract_tag` to also accept a JSON object keyed by the tag name (and to strip
+markdown fences), **gated behind `T6_FIX_TAG_PARSE=1`, default OFF** so the in-flight
+replicate sweep is untouched — the remaining cells launch fresh processes that read the
+edited file, and with the flag unset they behave exactly as before. Verified: flag off
+-> `''` (old behaviour), flag on -> the unescaped string, XML path unchanged.
+
+Running gpt-5.4 Augment, seed 42, 20 tasks, `T6_FIX_TAG_PARSE=1` ->
+`ctx_edit/outputs/T6_diag/gpt5_4_s1_fixparse`. Comparator is the matching sweep rep:
+**42.1%**. If it jumps toward the published 84.2 the parser explains the AC3 collapse;
+if it stays near 42 the collapse is real.
+
+### Two other errored rollouts (total sweep errors now 3 / ~1700)
+
+- `s3 unseat_sim_card`: Azure content-management policy filtered the prompt.
+- `s3 break_app_storage_permission`: `AuthenticationError ... token expired` — the
+  `foundry/` path binds its bearer token into `llm_args` at agent-build time, so a
+  single rollout that outlives the remaining TTL can fail. 1 occurrence; my pooled path
+  re-stamps the token per call and never hit this.
