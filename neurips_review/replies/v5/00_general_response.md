@@ -102,7 +102,7 @@ The bootstrap resamples whole **problems** (191 of them, each contributing up to
 
 ### Where AC3 separates from assistant omission, and where it does not
 
-Several corrections in this rebuttal narrow individual AC3-vs-assistant-omission comparisons, so we would rather assemble the whole picture here than leave a reader to do it from six documents. Assistant omission is a strong baseline — on LiC it is a design-oracle by construction — and across the full 36-triple matrix the head-to-head is close to a wash: AC3-Reset's mean advantage over it is **+2.6pp**, on **15 wins, 17 losses and 4 ties**. We state that plainly, because it is computable from the two rows above. What the aggregate hides is that the difference is not evenly spread. It is concentrated exactly where our analysis says it should be:
+Several corrections in this rebuttal narrow individual AC3-vs-assistant-omission comparisons, so we would rather assemble the whole picture here than leave a reader to piece it together from our separate replies. Assistant omission is a strong baseline — on LiC it is a design-oracle by construction — and across the full 36-triple matrix the head-to-head is close to a wash: AC3-Reset's mean advantage over it is **+2.6pp**, on **15 wins, 17 losses and 4 ties**. We state that plainly, because it is computable from the two rows above. What the aggregate hides is that the difference is not evenly spread. It is concentrated exactly where our analysis says it should be:
 
 | Setting | AC3-Reset vs. assistant omission | Why the framework predicts it |
 |---|---|---|

@@ -28,7 +28,7 @@ Rates over every analyzer invocation in the AC3-Reset arm (one per conversation;
 | **all** | **547** | **182 (33%)** | **58 (11%)** | — |
 
 
-### Table 2 — AC3 vs full-context Baseline, paired per sample, split by leakage (strict: analyzer output verified to contain the correct answer)
+### Table 2 — AC3 vs full-context Baseline, paired per sample, split by leakage (primary — union: analyzer output verified to contain the correct answer OR the math-only model-free numeric probe fires)
 
 | subset | n | Baseline | AC3 | Δ (pp) | 95% CI | W/L | McNemar p |
 |---|---|---|---|---|---|---|---|

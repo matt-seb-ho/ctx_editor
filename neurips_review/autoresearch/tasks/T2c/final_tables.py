@@ -113,5 +113,6 @@ def table_paired(key, label):
 
 
 table_rates()
-table_paired("leak_final", "strict: analyzer output verified to contain the correct answer")
+table_paired("leak_final", "primary — union: analyzer output verified to contain the correct "
+                           "answer OR the math-only model-free numeric probe fires")
 table_paired("leak_judge", "conservative: LLM judge's 3-way label, LEAKS+PARTIAL vs NO_LEAK")
