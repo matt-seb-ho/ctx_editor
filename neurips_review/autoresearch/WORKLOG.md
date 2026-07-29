@@ -782,3 +782,17 @@ The distinguishing signal existed and I did not use it: every previous nudge-and
 - **22:01** Heartbeat tick. **The D29 mitigation is working**: T31b wrote `PAPER_EDITS.md` to disk within ~8 minutes of dispatch and committed it (`2772f8b`) as a skeleton covering all eleven items, before specifying any of them. Contrast with T31, which held the whole document in memory for 51 minutes and lost every bit of it to one transport error. The instruction converts a total-loss failure mode into a bounded one, and cost the agent perhaps a minute to comply with.
 
   Nothing else outstanding; every experiment and edit pass is complete. No dispatch, no pivot.
+
+- **22:15** `T31b` returned **DONE**. `neurips_review/autoresearch/PAPER_EDITS.md` (1,091 lines) + `tasks/T31/worklog.md`, written and committed across **seven incremental commits** — D29 validated end to end. `writing/overleaf_repo/` untouched.
+
+**Nine items fully specified and paste-ready:** PAPER-7a (the blocker), 9, 1, 8, 4, 2, 3, 10, 6. **Two left as judgement calls with options presented, not made:** PAPER-5 (4 of 6 sites mechanical; the ERGO-differentiation and conclusion edits are authorial) and PAPER-11 (25-location inventory, limitations text paste-ready, three framing decisions stated and left open). PAPER-7b flagged optional — its endpoints are unmeasurable because the per-sample results are gone.
+
+**PAPER-7 confirmed as the only posting blocker, and it is a ~20-minute paste:** ERGO row → math 80.0, code 43.9, database 12.0, actions as the interval 43.5–52.2, plus a caption. T17's 57.9 marked do-not-use. Items 1–7 in the recommended order total ~1 h 30 m.
+
+**F94 — ⚠️ The drafted PAPER-9 caption is wrong twice, and both this log and `HANDOFF.md` endorsed it.** T24's §7.4 draft says math is a top-25 selection; it is **23-of-23 eligible**. It says code used five baseline runs; it used **four**. I recorded T24's reconciliation as settled and T29 carried the endorsement into the handoff — so a drafted replacement propagated through two consolidation passes without anyone re-deriving it. Same failure mode as the red team's two false fixes (F74) and my own "+21 pp" and "83 claims": **proposed wording gets inherited, not verified.**
+
+**F95 — Figure 1's *image* is now false, not just its caption.** "Ours" is drawn above "Vanilla" through the tau2 band, which the withdrawal contradicts — and **no `.drawio` source exists anywhere in the tree**, so the figure cannot be regenerated from source. That is a camera-ready blocker nobody had identified.
+
+**F96 — The "appropriate intensity" ordering inverts.** On the re-measured tau2 matrix, Gated-Reset is best or tied-best on **all three** respondents, so the light-for-strong / heavy-for-weak pattern is **absent, not merely weakened**. It appears in three places. This is a claim change, not a number change.
+
+**F97 — Four PAPER items have no target in the paper as `HANDOFF.md` describes them** (PAPER-1, 4, 2, 10), and three smaller issues surfaced: PAPER-8 has a **second occurrence at L347**; `checklist.tex:98` carries a stale `tab:main` reference; and the LiC **`+Memory` rows are transductive and undisclosed** — the cheatsheet is built from the eval set itself, and T13 measured that protocol's effect at **0.0 pp**. The last is a disclosure gap, not just bookkeeping.
