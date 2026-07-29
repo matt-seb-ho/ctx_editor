@@ -425,3 +425,25 @@ it is bad news for the tau2 row as currently written.
 
 Status 16:02: gpt5_4 s1 42/60; dsv4f s2 40/60; kimi s1 11/60. 0 FAILED anywhere.
 Remaining: gpt5_4 {s1,s3,ao}, dsv4f {s2,s1,s3,ao}, kimi {s1,s3,ao}. ETA ~19:00 UTC.
+
+## 16:28 UTC — status
+
+Complete cells (N=3, n=19/rep): gpt-5.4 {s0, s1, s2}; DSV4F {s0, s2}; Kimi {s0, s1, s2}.
+Running: gpt-5.4 s3, DSV4F s1, Kimi s1(57/60). Remaining after that: 3x s3/ao tails.
+
+New complete cells since last entry:
+- gpt-5.4 Augment finished at **47.4 ± 5.3** (42.1 / 52.6 / 47.4) vs published 84.2.
+  Tight across reps; the -36 pp gap is not replicate noise.
+- DSV4F Gated-Reset **57.3 ± 9.7** (57.9 / 66.7 / 47.4) vs published 47.4.
+- Kimi Augment **59.8 ± 11.1** (63.2 / 47.4 / 68.8) vs published 57.9 — this one
+  replicates well.
+- Kimi Baseline is 78.9 in **all three** reps (identical). Same 15/19 tasks solved each
+  time; telecom_small has a hard core Kimi never gets and an easy core it always gets.
+  Not a bug — 0.0 sd is legitimate here and is itself evidence the benchmark has very
+  few discriminating tasks.
+
+**Total errored rollouts across the entire sweep so far: 1.**
+`FAILED s2 [mobile_data_issue]data_mode_off[PERSONA:None]: Extra data: line 1 column 3`
+— a malformed tool-call `arguments` payload from DeepSeek that the JSON parser
+rejects. That rep is scored over n=18 and the aggregator reports it. No rate-limit
+failures at all since the pooling patch went in.

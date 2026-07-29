@@ -67,7 +67,15 @@ def main() -> int:
             if r["conv"] == "conv0" and r["harmful"]["kind"] in ("H_PHANTOM_COL", "H_PHANTOM_PARAM"):
                 t2a.add((r["task_dir"], r["sample_id"]))
         order = sorted(rr, key=lambda k: (rr[k], (task, k) not in t2a, k))
-        chosen = spread(order, N_SEL[task])
+        # Mid-range conversations (0 < rate < 1) can express an effect in EITHER
+        # direction and are scarce, so take all of them first; then fill the
+        # remainder by even spacing over the sorted rest, which keeps floor and
+        # ceiling conversations represented in proportion.
+        mid = [k for k in order if 0 < rr[k] < 1]
+        rest = [k for k in order if k not in set(mid)]
+        chosen = mid[: N_SEL[task]]
+        if len(chosen) < N_SEL[task]:
+            chosen = chosen + spread(rest, N_SEL[task] - len(chosen))
         sel[task] = sorted(chosen)
         report[task] = {
             "n_pilot_runs": len(runs),

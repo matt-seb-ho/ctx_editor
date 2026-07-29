@@ -132,6 +132,7 @@ def main() -> int:
     np_, na_ = n_pres_reps, n_abl_reps
     if np_ and na_:
         m_obs = mde(np_, na_)
+        m_obs = m_obs if m_obs is not None else float("nan")
         m_up = mde_power(np_, na_, round(p0, 2), direction=+1)
         m_dn = mde_power(np_, na_, round(p0, 2), direction=-1)
         P(f"n_present = {np_}, n_ablated = {na_}, mean present accuracy p0 = {p0:.3f}.")
@@ -159,7 +160,7 @@ def main() -> int:
         key = (s["task"], s["sample_id"])
         pv = present.get(key, [])
         av = abl[j][0].get(key, [])
-        if len(pv) < 2 or len(av) < 2:
+        if len(pv) < int(os.environ.get("MINREP","2")) or len(av) < int(os.environ.get("MINREP","2")):
             continue
         kp, npv = sum(pv), len(pv)
         ka, nav = sum(av), len(av)
@@ -209,7 +210,11 @@ def main() -> int:
             [sum(present[k]) / len(present[k]) for k in keys],
             [sum(acc[k]) / len(acc[k]) for k in keys],
         )
-        ok = (abs(eff) < 0.05 if c == "ctl_filler" else (eff > 0 if c == "ctl_harm" else eff < -0.10))
+        ok = (
+            (lo <= 0 <= hi) if c == "ctl_filler"
+            else (eff > 0 and lo > -0.02) if c == "ctl_harm"
+            else (eff < -0.10)
+        )
         ctl_ok[c] = ok
         P(f"| `{c}` | {ctl_expect[c]} | {len(keys)} | {pp:.3f} | {pa:.3f} | "
           f"**{eff:+.3f}** | [{lo:+.3f}, {hi:+.3f}] | {pval:.4f} |")
@@ -239,7 +244,7 @@ def main() -> int:
       f"({sum(1 for r in rows if r['bh_sig'] and r['delta'] > 0)} harmful, "
       f"{sum(1 for r in rows if r['bh_sig'] and r['delta'] < 0)} useful)")
     P()
-    ds = [r["delta"] for r in rows]
+    ds = [r["delta"] for r in rows] or [0.0]
     lo, hi = boot_mean_ci(ds)
     P(f"Mean ablation effect over **all** spans: **{sum(ds)/len(ds):+.4f}** "
       f"[95% CI {lo:+.4f}, {hi:+.4f}] — i.e. the average natural span is close to causally inert, "

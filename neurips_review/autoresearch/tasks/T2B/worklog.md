@@ -214,3 +214,44 @@ the same conv0 prefixes, so this cost nothing:
 
 Rep-major loop + skip-if-complete, so replicates can be topped up later and a truncated session
 still yields a balanced matrix.
+
+### 3.1 Selection rule revised once more, before any ablation compute
+
+The even-spacing rule alone put database at mean pilot rate 0.137 — almost all floor, i.e. almost
+no ability to detect a *useful* span on that task. Revised (still present-arm-only, still declared
+in advance): **take all mid-range conversations first** (they are scarce and can express an effect
+in either direction), **then fill by even spacing over the sorted rest**. Result:
+
+| task | selected | pilot rates of the selected set | mean |
+|---|---|---|---|
+| database | 17 | ten at 0.00, then 0.17, 0.33, 0.50, 0.67, 0.83, 0.83, 1.00 | 0.255 |
+| code | 15 | 0.00, three at 0.17, 0.50, five at 0.67, three at 0.83, two at 1.00 | 0.589 |
+
+`ctl_harm` (the T2A injected-pollutant control) covers 24 of the 32; `ctl_answer` covers all 32.
+
+### 3.2 Corpus integrity check (offline, before spending compute)
+
+For all **111 spans**: the ablated trace differs from the present trace **in exactly one message**,
+that message contains the span in the present arm, does not contain it in the ablated arm, and the
+length delta equals the span length (± the 2-char block join). **111/111 pass, 0 failures.** This is
+the check that would have caught a silent no-op ablation, which is the T2B analogue of the two
+silent `0.0` returns the brief warns about.
+
+Corpus sizes on disk (database / code): present 17/15, abl1 17/13, abl2 17/13, abl3 17/11,
+abl4 12/11, ctl_filler 17/15, ctl_harm 13/11, ctl_answer 17/15. 111 spans total
+(43 code blocks, 68 prose).
+
+**Matrix launched 16:25.**
+
+### 3.3 AC3-arm smoke test (16:28)
+
+3 database conversations through both editors before committing the full alignment runs:
+
+* `context_edit_v2_no_gate` (**AC3-Reset**) — logs `conversation_analysis` + `edit_decision` +
+  `context_edit_output`; `carried_context()` returns 766–1172 chars, gate open in 3/3.
+* `ac3_rewrite_v8_lic` with `analysis_cache_dir=null` (**AC3-Rewrite**) — logs
+  `compaction_analysis` + `context_compaction`; `carried_context()` returns 627–892 chars.
+
+Both branches of T2A's `carried_context()` therefore fire correctly on T2B traces, so the alignment
+probe will not be silently reading an empty string (which is exactly how a "0.0 removal rate"
+harness fault would look).

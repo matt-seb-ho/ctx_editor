@@ -28,7 +28,7 @@ for (( R=1; R<=R_AC3; R++ )); do
         model=gpt5_4_mini_trapi load_balancer=trapi \
         task=$TASK task.data_file=${DATAFILE[$TASK]} \
         execution.replay_source=data/t2b_present/$TASK execution.replay_turns=1 \
-        execution.max_concurrent=5 \
+        execution.max_concurrent=${CONC:-3} \
         false_negative_analysis.model=gpt-5.4-mini_2026-03-17 \
         experiment_name=T2B_ac3${ARM}_${TASK}_r${R} \
         logging.output_dir=$OUT >>"$LOG" 2>&1
