@@ -31,6 +31,7 @@ from .legacy import (
     ReflectionStrategy,
 )
 from .prior_work_baselines import ConcatenateUserStrategy, OmitAssistantStrategy
+from .summarization import SummarizationStrategy
 
 __all__ = [
     # Protocol
@@ -45,6 +46,7 @@ __all__ = [
     "ERGORestartStrategy",
     "ConcatenateUserStrategy",
     "OmitAssistantStrategy",
+    "SummarizationStrategy",
     # Shared analyzer
     "ConversationAnalyzer",
     # Backwards-compatible aliases (predate AC3 naming)

@@ -121,12 +121,15 @@ class SystemAgent:
             answer_description=self.answer_description,
         )
 
-        response = await model_client.generate_json(
-            messages=[{"role": "user", "content": prompt}],
-            model=self.system_model,
-            temperature=0.0,
-            reasoning_effort=reasoning_effort,
-        )
+        from ..utils.call_meter import call_tag
+
+        with call_tag("system"):
+            response = await model_client.generate_json(
+                messages=[{"role": "user", "content": prompt}],
+                model=self.system_model,
+                temperature=0.0,
+                reasoning_effort=reasoning_effort,
+            )
 
         result = response.content
         return VerificationResult(
@@ -181,12 +184,15 @@ class SystemAgent:
                 answer_description=self.answer_description,
             )
 
-            response = await model_client.generate_json(
-                messages=[{"role": "user", "content": prompt}],
-                model=self.system_model,
-                temperature=0.0,
-                reasoning_effort=reasoning_effort,
-            )
+            from ..utils.call_meter import call_tag
+
+            with call_tag("system"):
+                response = await model_client.generate_json(
+                    messages=[{"role": "user", "content": prompt}],
+                    model=self.system_model,
+                    temperature=0.0,
+                    reasoning_effort=reasoning_effort,
+                )
             total_cost += response.total_usd
             model_responses.append(response)
 

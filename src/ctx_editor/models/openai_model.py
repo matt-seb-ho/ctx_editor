@@ -272,6 +272,22 @@ class OpenAIModelClient(BaseModelClient):
             prompt_tokens_cached=prompt_tokens_cached,
         )
 
+        # Process-global call/token accounting (see utils/call_meter.py).
+        # Used to report *measured* per-arm budgets rather than asserted ones.
+        try:
+            from ..utils.call_meter import METER
+
+            METER.record(
+                model=model,
+                prompt_tokens=prompt_tokens,
+                completion_tokens=completion_tokens,
+                total_tokens=total_tokens,
+                cached_prompt_tokens=prompt_tokens_cached,
+                cost_usd=total_usd,
+            )
+        except Exception:
+            pass
+
         return ModelResponse(
             content=response_dict["choices"][0]["message"]["content"],
             total_tokens=total_tokens,

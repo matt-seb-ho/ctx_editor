@@ -190,7 +190,10 @@ class ConversationAnalyzer:
         if self.reasoning_effort:
             generate_kwargs["reasoning_effort"] = self.reasoning_effort
 
-        response = await model_client.generate(**generate_kwargs)
+        from ..utils.call_meter import call_tag
+
+        with call_tag("strategy"):
+            response = await model_client.generate(**generate_kwargs)
         return response.content
 
     # --- v6: two-query flow ---

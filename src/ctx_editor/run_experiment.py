@@ -642,6 +642,18 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     )
     save_metrics(metrics, str(output_dir))
 
+    # Measured LLM call / token budget for this run, broken down by component
+    # (assistant / user sim / system judge / strategy). Snapshotted here, i.e.
+    # BEFORE false-negative analysis, so the numbers describe the experiment
+    # itself and not the post-hoc adjustment pass. See utils/call_meter.py.
+    try:
+        from ctx_editor.utils.call_meter import METER
+
+        with open(output_dir / "call_meter.json", "w") as f:
+            json.dump(METER.snapshot(), f, indent=2)
+    except Exception as e:  # pragma: no cover
+        logger.warning(f"Failed to write call_meter.json: {e}")
+
     # Clean up partial results file now that final results are saved
     if partial_results_path.exists():
         partial_results_path.unlink()
@@ -726,6 +738,15 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
     }
     with open(output_dir / "run_summary.json", "w") as f:
         json.dump(run_summary, f, indent=2)
+
+    # End-of-process meter snapshot (includes false-negative analysis calls).
+    try:
+        from ctx_editor.utils.call_meter import METER
+
+        with open(output_dir / "call_meter_final.json", "w") as f:
+            json.dump(METER.snapshot(), f, indent=2)
+    except Exception:  # pragma: no cover
+        pass
 
     logger.info(f"Results saved to {output_dir}")
 

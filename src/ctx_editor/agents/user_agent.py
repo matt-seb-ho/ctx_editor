@@ -117,12 +117,15 @@ class UserAgent:
         )
 
         # Generate response
-        response = await model_client.generate_json(
-            messages=[{"role": "user", "content": prompt}],
-            model=self.model,
-            temperature=temperature,
-            reasoning_effort=reasoning_effort,
-        )
+        from ..utils.call_meter import call_tag
+
+        with call_tag("user"):
+            response = await model_client.generate_json(
+                messages=[{"role": "user", "content": prompt}],
+                model=self.model,
+                temperature=temperature,
+                reasoning_effort=reasoning_effort,
+            )
 
         result = response.content
         return UserResponse(
