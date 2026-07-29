@@ -40,7 +40,9 @@ graph TD
     T6["T6 multi-replicate tau2<br/>[run] — fork cloned outside tree"]
     T2B["T2B counterfactual span ablation<br/>pollution real + concentrated (~6%)<br/>BOTH operators non-selective<br/>[done] $62.80"]
     T25["T25 retract Rewrite claim<br/>+ assemble AO counter-case<br/>H2-H8,H10 applied<br/>[done]"]
-    T26["T26 refresh HANDOFF<br/>[run] — stale at 58 of 72 findings"]
+    T26["T26 refresh HANDOFF<br/>[done]"]
+    T27["T27 triage MEDIUM items<br/>M3/M11/M12/M15 run, M6/U-Fold declined<br/>caught 2 FALSE red-team fixes<br/>[done] $19.60"]
+    T28["T28 apply T27 wordings<br/>+ inoculate RED_TEAM<br/>[run]"]
     T15["T15 claims audit -> replies/v5<br/>64 claims: 24 unchanged, 14 corrected,<br/>6 struck, 11 added, 5 unverified<br/>[done]"]
     T16["T16 verify gate stats<br/>claim exact; wording wrong<br/>firing rate != detection rate<br/>[done]"]
     T14["⚠ T14 FN-adjustment audit<br/>2 flips on Rewrite (unpublished cells)<br/>Reset/Gated survive all 8<br/>found ERGO denominator defect<br/>[done]"]
@@ -82,6 +84,9 @@ graph TD
   T23 --> T25
   T24 -->|"F70 false claim + reconciliation"| T25
   T25 --> T26
+  T23 --> T27
+  T27 --> T28
+  T27 -.->|"2 suggested fixes false"| T23
   T22 -.->|"superseded"| T26
   T1 -.->|"56.1% vs paper 4.0%"| T24
   T8 --> T21
@@ -134,7 +139,9 @@ graph TD
 | T24 | Reconcile the three baselines | 2026-07-29 | `tasks/T24/worklog.md` (`78226bd`) | **H1 explained by pool selection (~25 pp, two routes); T1 still answers the AC; found F70** |
 | T2B | Counterfactual span ablation | 2026-07-29 | `tasks/T2B/{RESULTS.md,per_span.json}` (`289de75`) | **Causal gold standard: pollution concentrated (~6%); both operators non-selective** |
 | T25 | Retract Rewrite claim + assemble case | 2026-07-29 | `tasks/T25/worklog.md` (`edbda19`) | PAPER-5 rewritten; AO case assembled (+2.6 pp wash, database +18.7 pp); H2–H8, H10 applied |
-| T26 | Refresh `HANDOFF.md` | 2026-07-29 | `autoresearch/HANDOFF.md` | Supersedes the T22 version (written at 58 of 72 findings) |
+| T26 | Refresh `HANDOFF.md` | 2026-07-29 | `autoresearch/HANDOFF.md` (`701f6b6`) | Supersedes the T22 version; corrected my brief in 3 places |
+| T27 | Triage MEDIUM red-team items | 2026-07-29 | `tasks/T27/worklog.md` (`6396b31`) | **M11 closes the AC's reservation; caught 2 false red-team fixes**; M15 CI [+11.5, +19.4] |
+| T28 | Apply T27 wordings + inoculate RED_TEAM | 2026-07-29 | `tasks/T28/worklog.md` | Prevents the two false fixes being posted |
 
 ---
 
@@ -152,7 +159,8 @@ graph TD
 | Framing the ERGO comparison as an ordering at all | `[dead]` | T18: paired exact sign tests show **no** ERGO-vs-AC3 `tab:main` difference is significant at n≈20 in either direction (code p=0.375, math p=1.00). Report "n≈20 cannot resolve this" rather than any ordering. |
 | Per-run `adjusted_accuracy` as a reported metric | `[dead]` | T14: inflates reset arms +13.9 to +55.9 pp vs +0.2 to +6.5 for no-reset arms, because the FN judge sees 1.00 user turns/sample on Rewrite vs 5.35 on baseline. Report **raw**; keep only the arm-symmetric pool filter. |
 | Rebuttal end-to-end "AC3-Reset 100.0 ± 0.0" | `[dead]` | FN-adjusted with asymmetric exclusions (Reset 1/2/5 items, baseline 0). Raw: 87.5 ± 2.0 / 93.3 ± 4.2 / 95.0 ± 0.0. Claim survives; the perfect score does not. |
-| MT-OSC as a fair pollution baseline | `[dead]` | T1: at published w=4 it fired 0.3×/conversation — it cannot touch context before turn 6 and LiC conversations average 4.1 turns. Report as *structurally inapplicable*, which supports our scoping argument, rather than as a beaten baseline. |
+| "MT-OSC barely fires, so it cannot address pollution" (as our defence) | `[dead]` | Superseded by T27/M12: at w=2 it engages **9× more** and scores **47.7%, −13.1 pp vs w=4** (p=0.016). We no longer need the low-engagement argument — making it fire more makes it worse. |
+| "Summarisation degrades with more budget, which is the mechanism prediction" | `[dead]` | T27: the 1-call arm replicates at **47.7%**, exactly the 2-call value; the two 1-call runs differ by more than 1-call differs from 2-call. Fifth margin to dissolve under replication. Print "neutral-to-negative". |
 | End-to-end tau2 replay | `[dead]` | ~2 dev-days; out of window. Defend replay as causal-attribution design instead; T4 supplies fresh end-to-end evidence on LiC. |
 | Full human eval on WildChat | `[dead]` | Out of window. Defend with N=3 seeds + tight intervals; T11 supplies judge-side checks. |
 | T5 on math | `[dead]` as a discriminating control | Near-ceiling accuracy compressed all arms to ~97.5%. Needs a high-pollution venue → folded into T1. |
