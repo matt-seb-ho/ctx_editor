@@ -77,3 +77,7 @@ Note for the write-up: kappa is depressed here by extreme marginal imbalance (th
 ~90% of pairs), the classic kappa paradox. Adding PABAK and Gwet's AC1 alongside raw+kappa,
 and reporting each judge's *own* win-rate on the shared subset, which is the quantity the
 paper's claim actually rests on.
+
+### 01:35 — DeepSeek order run complete (320/320, 0 failures)
+gpt-5-mini at 769/904, Kimi at 181/320. Launched the DeepSeek n=20 positive control.
+Added PABAK + Gwet's AC1 to `analyze.py` alongside raw agreement and Cohen's kappa.

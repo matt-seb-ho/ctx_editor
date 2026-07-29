@@ -227,3 +227,41 @@ Smoke after patch: gpt-5.4 s0, 4 tasks, workers 4 -> `S0 : 3/4 (75.0%)`, 80 s, 0
 
 `T6_reps` wiped and restarted from scratch so no rate-limit-poisoned cell survives.
 gpt5_4 @5 (14:18), dsv4f_foundry @5 (14:19), kimi_k2_6_foundry @4 (14:20).
+
+## 14:38 UTC — FIRST FULL CELL LANDED: gpt-5.4 Baseline, N=3
+
+```
+| Model   | Arm          | rep1(s42) | rep2(s43) | rep3(s44) | mean ± sd  | seed-42 ref |
+| gpt-5.4 | Baseline(FC) |   52.6    |   78.9    |   73.7    | 68.4 ± 13.9 |    68.4     |
+```
+n=19 per rep, 0 errored rollouts, 1184 s wall for the 60 rollouts.
+
+**Two things worth stopping on.**
+
+1. **The mean lands exactly on the published seed-42 point estimate (68.4).** But the
+   seed-42 replicate itself came back **52.6**, not 68.4. So `--seed 42` does *not*
+   reproduce the original number bit-for-bit — expected, given the seed is the
+   best-effort provider parameter and the transport now differs (dl-openai-1/3 instead
+   of api.openai.com). The published number is a good estimate of the mean; it is not
+   a reproducible point.
+2. **Rep-to-rep spread is ±13.9 pp on a single cell.** For n=19 at p≈0.68 the binomial
+   sd is sqrt(.68*.32/19) = 10.7 pp, so this is simply the noise floor of a 19-task
+   benchmark — not an artefact. **This is the quantitative form of the reviewer's
+   complaint.** Any tau2 gap smaller than roughly 15 pp measured at N=1 is inside the
+   noise. Several published tau2 cell-to-cell differences are smaller than that.
+
+Early partials on the other two models (incomplete, do not quote yet):
+DSV4F Baseline rep1 = 57.9 (published 31.6); Kimi Baseline rep1 = 78.9 (published 26.3).
+If those hold up they are far above the published baselines. Candidate explanations,
+in order of my current suspicion:
+  (a) the published DSV4F/Kimi baselines were **infrastructure-degraded** — the source
+      report already concedes this for Kimi ("rate-limit-clipped floors, not honest
+      performance", 14/20 short-exits; "true Baseline is probably 40-50%"), and my
+      rotate-and-backoff wrapper removes exactly that failure mode;
+  (b) Foundry deployment drift — `DeepSeek-V4-Flash` and `Kimi-K2.6` are alias
+      deployment names and `/models` on mgalley-foundry2 now also lists
+      `DeepSeek-V4-Flash-2026-04-23`; the alias may point somewhere newer than in May.
+Either way, if the baselines rise the AC3-over-baseline deltas on those two models
+shrink. **That must be reported, not buried.** Waiting for the AC3 arms.
+
+Status 14:38: gpt5_4 s0 DONE, s2 running. dsv4f s0 21/60. kimi s0 24/60. Zero FAILED.
