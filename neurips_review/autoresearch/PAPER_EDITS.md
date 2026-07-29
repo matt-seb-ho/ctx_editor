@@ -31,12 +31,12 @@ Numbers that could not be confirmed are flagged in-line and recorded in
 | **PAPER-1** | "seeds" appears only twice in the paper, both tau2, both correct — reduces to one limitations sentence | No | ✅ paste-ready |
 | **PAPER-8** | "on the same prefixes" is false; **two** locations (L300 + L347), 35 shared, McNemar p=0.125 | No | ✅ paste-ready (one ⚖ hedge) |
 | **PAPER-4** | CollabLLM MATH-Hard "100" — **no occurrence of `100` in the paper**; not applicable | No | ✅ closed, no edit |
-| **PAPER-3** | `+ Memory` rows are single-trial below a ~6 pp noise floor — soften or re-run | No | ⏳ |
+| **PAPER-3** | `+ Memory` rows are single-trial below a ~6 pp noise floor — soften (5 locations) | No | ✅ paste-ready |
 | **PAPER-2** | The dangling citation is in `docs/`, **not** in any `.tex` — an outer-repo docs fix | No | ✅ closed, no paper edit |
-| **PAPER-10** | AO / Concat-User in end-to-end mode are baselines, not upper bounds | No | ⏳ |
-| **PAPER-6** | Drop per-run `adjusted_accuracy`; report raw; fix the "all user simulator messages" sentence | No (do before arXiv) | ⏳ |
-| **PAPER-5** | Retract "preserve what's correct and remove what's harmful"; rewrite the ERGO differentiation | No | ⏳ **JUDGEMENT CALL** |
-| **PAPER-11** | Withdraw the tau2 improvement claim across abstract, Fig. 1, intro, `tab:megatable`, §tau2-results, discussion, conclusion | No | ⏳ **INVENTORY + JUDGEMENT CALL** |
+| **PAPER-10** | No table is mislabelled today; optional caption line that *strengthens* the LiC claim | No | ✅ paste-ready |
+| **PAPER-6** | Rewrite `app:false-neg` (L478/L480); no metric to delete — the paper never names it | No (do before arXiv) | ✅ paste-ready |
+| **PAPER-5** | Retract "preserve what's correct…" — 4 mechanical sites paste-ready, 2 authorial | No | ⚖ 4 ✅ + 2 options |
+| **PAPER-11** | Withdraw the tau2 improvement claim — **25-location inventory**, limitations text paste-ready, 3 judgement calls | No | ⚖ inventory complete |
 
 ⏳ = not yet written · ✅ = fully specified, paste-ready · ⚖ = options presented, needs Matthew
 
@@ -1043,3 +1043,49 @@ whatever J1 costs. **Do PAPER-5 and PAPER-11 in one sitting**: J1 option (b) or 
 option C converge on the same rewrite, and doing them separately means rewriting the abstract
 twice.
 
+
+---
+
+## Recommended order
+
+| # | Item | Time | Why here |
+|---|---|---|---|
+| 1 | **PAPER-7a** | 20 min | **The only posting blocker.** Nothing else can go out first |
+| 2 | **PAPER-9** | 15 min | Highest value per minute; merged caption with 7a is one paste |
+| 3 | **PAPER-4, PAPER-2** | 0 + 20 min | Both close without touching the paper; PAPER-2 is an outer-repo docs fix |
+| 4 | **PAPER-1** | 10 min | One limitations sentence; integrity item |
+| 5 | **PAPER-8** | 10 min | Two locations, one hedge decision |
+| 6 | **PAPER-10** | 10 min | Strengthens the LiC claim rather than weakening it |
+| 7 | **PAPER-3** | 25 min | Five locations, plus the transductive-protocol disclosure |
+| 8 | **PAPER-6** | 45 min | Appendix rewrite; do before arXiv |
+| 9 | **PAPER-5 + PAPER-11** | one sitting, 4–8 h + figure redraw | They share an abstract; doing them apart means rewriting it twice |
+
+Items 1–7 total roughly **1 h 30 m** and cover the blocker plus every mechanical item on the list.
+
+## Cross-checks performed against `replies/v5/`
+
+| Item | Would the edit contradict anything posted? |
+|---|---|
+| PAPER-7a | No — it *is* what v5 commits to, in five places |
+| PAPER-7b | No, but goes beyond v5 (no reply mentions 73.7 / 66.7 / 63.2 / 52.6) |
+| PAPER-9 | No — v5 already describes the pool correctly (`00` CW5, `01` W2) |
+| PAPER-1 | No — tau2 keeps "seeds" in both the paper and v5 (F81) |
+| PAPER-8 | No — the claim is struck from v5 entirely |
+| PAPER-3 | No — memory is dropped from v5 |
+| PAPER-6 | No — the wording defends the denominators and concedes only the per-run metric, matching F50's rule |
+| PAPER-5 | **The paper currently contradicts `03_reviewer_5YHP.md:132`** until this lands |
+| PAPER-11 | **The paper currently contradicts `00` CW1/CW4, `01` W3, `02` W2/Q2, `04` correction 6, `05` correction 8** until this lands |
+| PAPER-10 | No |
+
+## Guardrails carried forward into any of these edits
+
+* **Never ship T17's 57.9 for ERGO/code.** Superseded by T18's measured 43.9 (F48).
+* **Never soften the tau2 withdrawal into "mixed results" or "not comparable across model eras."**
+  The positive control reproduced; the published baselines were wrong (F79).
+* **Never re-attribute "we preserve what's correct" to AC3-Rewrite.** Rewrite is the *less*
+  preserving operator, 0/66 vs Reset's 5/66 (F66 supersedes F25).
+* **Never quote the matrix-wide item-level McNemar p = 0.010 for AC3-vs-AO as a win** — it treats
+  1,668 items as independent when they are 191 problems × up to 9 correlated replicates (F82).
+* **Defend `tab:main`'s 20/19/25/23 denominators; concede only the per-run metric** (F42, D13,
+  F50).
+* **Never strike a claim for unverifiability without a documented deep search** (D15).
