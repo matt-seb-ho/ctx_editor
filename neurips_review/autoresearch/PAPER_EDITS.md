@@ -329,3 +329,187 @@ the mitigation is strong and is measured (gap-closure moves 50% → 51%/60% acro
 baseline spread, F68/F69). The only trap is pasting the drafted sentence with its two factual
 errors.
 
+
+---
+
+## PAPER-8 — "on the same prefixes" is false ✅ (two locations, not one)
+
+**Summary.** The gpt-5.4 WildChat Gated-vs-Reset comparison was **not** run on the same prefixes:
+Reset was scored on 44 turns, Gated-Reset on 58, with **35 shared**. On the matched 35 the gap
+survives (88.6 vs 74.3, **−14.3pp**) but rests on **seven discordant turns, 6 vs 1, exact McNemar
+p = 0.125**.
+
+**Blocking:** no. The claim is struck from v5 entirely, so nothing posted depends on it.
+
+**HANDOFF points at `tex:299`; the string is at L300 and there is a *second* occurrence at L347
+that HANDOFF does not mention.** Both must be fixed or the caption and the body disagree.
+
+### Location 1 — `tab:wildchat` caption, **L300** (final clause)
+
+Current (exact substring):
+
+```latex
+The \mgpt~Gated-Reset cell ($-$14.5pp vs.\ always-on Reset on the same prefixes) is discussed in Section~\ref{sec:wildchat-results}; corresponding cells on the Foundry respondents were not run.
+```
+
+Replacement (paste-ready):
+
+```latex
+The \mgpt~Gated-Reset cell ($-$14.5pp vs.\ always-on Reset; the two arms were scored on partly different turn pools, $n{=}44$ and $n{=}58$ with 35 in common, and on those 35 shared prefixes the gap is $-$14.3pp at exact McNemar $p{=}0.125$) is discussed in Section~\ref{sec:wildchat-results}; corresponding cells on the Foundry respondents were not run.
+```
+
+### Location 2 — §`sec:wildchat-results`, **L347** (second sentence)
+
+Current (exact substring):
+
+```latex
+always-on Reset wins 88.6\% vs.\ AO (Table~\ref{tab:wildchat}), while Gated Reset on the same prefix set scores 74.1\%, a $-$14.5pp gap driven by false-negative \texttt{needs\_edit=False} decisions when the analyzer judges a turn ``on track'' but a clean reset would still have helped.
+```
+
+Replacement (paste-ready):
+
+```latex
+always-on Reset wins 88.6\% vs.\ AO (Table~\ref{tab:wildchat}), while Gated Reset scores 74.1\%. The two arms were evaluated on partly different turn pools --- 44 and 58 turns, 35 shared --- so we also report the matched comparison: on the 35 prefixes both arms were scored on, the gap is $-$14.3pp, but it rests on seven discordant turns (6 vs.\ 1, exact McNemar $p{=}0.125$), so we read it as a direction rather than a resolved effect. It is consistent with false-negative \texttt{needs\_edit=False} decisions when the analyzer judges a turn ``on track'' but a clean reset would still have helped.
+```
+
+### Evidence
+
+| Number | Value | Source |
+|---|---|---|
+| Reset 88.6% | 39/44, reproduces to the digit | **F55**, `tasks/T20/worklog.md` §U2 positive control |
+| Gated-Reset 74.1% | 43/58, reproduces to the digit | same |
+| Pool overlap | \|s15\|=44, \|s2\|=58, **shared 35**, s15-only 9, s2-only 23 | `tasks/T20/worklog.md` §U2.1 |
+| Matched gap | Reset 31/35 = 88.6%, Gated 26/35 = 74.3% → **−14.3pp** | §U2.2 |
+| Significance | 7 discordant (6 vs 1), exact McNemar **p = 0.125** | §U2.3 |
+| Raw traces | `~/ac3/recovered/ctx_editor/outputs/post_may26_wildchat_gpt54/{s15,s2}_gpt5_4_seed42_*/turn_results.jsonl`; script `tasks/T20/recompute_u2.py` | §U2 |
+
+### ⚖ One judgement call attached
+
+The paragraph then says *"We recommend always-on Reset when intervention cost is not a constraint
+and the respondent is near-ceiling."* After the edit, that recommendation rests on a p = 0.125
+result from seven discordant turns. **Options:** (a) leave it — it is a recommendation, not a
+claim, and the direction is consistent; (b) hedge to "we tentatively recommend"; (c) drop the
+sentence. **Recommend (b)** — cheapest, and it matches v5's posture of keeping underpowered
+negatives without upgrading them. Matthew's call.
+
+**Effort:** 10 min (5 if only L300). **Risk:** none — the substance survives matching.
+
+---
+
+## PAPER-1 — "N=3 seeds" ✅ **and it turns out the paper does not have the defect**
+
+**Summary as written in HANDOFF:** reword LiC/CollabLLM "seeds" → "replicate runs (temperature
+1.0)"; WildChat and tau2 keep "seeds".
+
+**What is actually in the file.** I grepped `seed` across
+`neurips_2026_conference.tex` (815 lines) and `checklist.tex` (223 lines). **The word appears
+exactly twice, and both are tau2**:
+
+* **L360** — "Gated Reset stays within trial noise of the full-context Baseline across 3 seeds"
+* **L558** — "Per-trial success rates across seeds 42--44 are: …" and "reward is invariant to seed"
+
+Per **F81**, tau2 **keeps** the word: `--seed` genuinely threads on that fork
+(`run_parallel:131` → `orchestrator:526-528` → `llm_config.py:41-48` → litellm), best-effort at
+the provider. So **both surviving occurrences are correct and require no edit.**
+
+The LiC and CollabLLM passages already use the honest wording — L254 "$N{=}3$ replay-mode reruns",
+L318 "mean over $N{=}3$ replay-mode reruns", L485 "We re-ran … two additional times, giving
+$N{=}3$ per cell", L458 "All LLM calls … use `temperature` $=$ $1.0$". **Nothing to reword.** The
+F4 defect lived in the launcher scripts and in the rebuttal drafts, not in the paper.
+
+### The one edit that remains: the limitations caveat
+
+**Location.** `app:limitations`, **L808**, immediately after the sentence beginning
+*"\emph{Sample size and statistical reporting.}"*.
+
+Current text (exact substring):
+
+```latex
+\emph{Sample size and statistical reporting.} Per-cell sample sizes are modest and we do not report paired significance tests on the main tables; the headline gaps should therefore be read as suggestive of the qualitative trends Figure~\ref{fig:story} summarizes rather than as point-calibrated effect sizes.
+```
+
+Replacement (paste-ready):
+
+```latex
+\emph{Sample size and statistical reporting.} Per-cell sample sizes are modest and we do not report paired significance tests on the main tables; the headline gaps should therefore be read as suggestive of the qualitative trends Figure~\ref{fig:story} summarizes rather than as point-calibrated effect sizes. \emph{What the replicates vary.} The $N{=}3$ LiC and CollabLLM replicates differ only through temperature-1.0 sampling: no decoder seed is varied, and under replay the user-simulator trajectory is held fixed. They therefore bound sampling variance for a fixed history, not seed variance and not end-to-end variance including the user simulator. The tau2-bench replicates do vary a decoder seed (42--44), best-effort at the provider.
+```
+
+### Evidence
+
+| Claim | Finding | Artifact |
+|---|---|---|
+| `cfg.seed` read only by `huang_eval/`; every `seed=$((42+rep))` inert on LiC/CollabLLM | **F4** | `tasks/RECON/worklog.md` |
+| CollabLLM loaders hardcode `random.Random(42)`, so replicates draw the same 20 problems | **F4** | `tasks/T8/worklog.md` |
+| tau2's `--seed` genuinely threads → keep "seeds" there | **F81** | `tasks/T6/worklog.md` §13:56 |
+| True seeding fixed going forward; prior runs reproduce bit-for-bit | F19 | `tasks/RECON/worklog.md` |
+
+**Effort:** 10 min. **Risk:** none. **Blocking:** no — but it is an integrity item and it is now a
+one-paragraph edit rather than a sweep, so do it early.
+
+---
+
+## PAPER-4 — CollabLLM MATH-Hard "100%" ✅ **no target exists in the paper**
+
+**Summary as written in HANDOFF:** any CollabLLM MATH-Hard "100" → "matches Baseline" (91.7 vs
+91.7).
+
+**Verified against the current file: the string `100` does not occur anywhere in
+`neurips_2026_conference.tex`.** The paper's only CollabLLM MATH-Hard numbers are:
+
+* **L541** (`app:collabllm`) — "Baseline 40.0\% / 62.5\%, Rewrite 45.0\% / 82.5\% on MATH-Hard /
+  BigCodeBench" (GPT-5-mini);
+* **L280–L293** (`tab:megatable`, CollabLLM block) — benchmark-averaged, 44.9–57.5.
+
+The 100% was a **v4 rebuttal claim about AC3-Augment on MATH-Hard**, not a paper claim. It is
+already corrected in v5 (F16: N=3 gives AC3-Augment **91.7 ± 7.6** vs Baseline **91.7 ± 5.8** —
+identical means *and* identical 55/60 per-problem totals; per-replicate delta [+5, −10, +5] =
+**0.0 ± 8.7**).
+
+**Action: none in the paper. Close PAPER-4 as not-applicable** — but keep the finding, because it
+is the number to use if a MATH-Hard figure is ever added: say *"matches Baseline"*, which still
+refutes 5YHP's regression claim. Evidence: **F16**, `tasks/T8/worklog.md`.
+
+**Effort:** 0. **Blocking:** no.
+
+---
+
+## PAPER-2 — the missing provenance doc ✅ **not a paper edit either**
+
+**Summary as written in HANDOFF:** "The appendix variance table cites
+`docs/multi_run_variance_2026-05-07.md`, which does not exist."
+
+**Verified: no `.tex` file in `writing/overleaf_repo/` cites it.** `grep -rn
+"multi_run_variance\|paper_experiments_provenance" writing/overleaf_repo/` returns **nothing**.
+The dangling references are all in the **outer** repo's docs:
+
+| File | Line | Text |
+|---|---|---|
+| `docs/paper_experiments_provenance.md` | 41 | `See [multi_run_variance_2026-05-07.md](...)` |
+| `docs/paper_experiments_provenance.md` | 45 | "The Gated-Reset row's N=3 spread is captured in …" |
+| `docs/paper_experiments_provenance.md` | 138 | "Appendix variance table … Captured in …" |
+| `docs/index.md` | 140 | topical entry for the missing file |
+| `docs/index.md` | 250 | chronological-log row, dated 2026-05-07 |
+
+So **PAPER-2 is a 5-minute outer-repo docs fix, not an Overleaf edit**, and it does not need to
+travel through the shared-repo pull/push dance. `docs/index.md` currently violates the CLAUDE.md
+rule that index entries must resolve.
+
+**What the paper's variance table actually rests on, and it is fine.** T17's positive control PC5
+verified the per-run values printed at **L496–L499** (75.0/80.0/85.0; 72.2/63.2/57.9;
+44.0/32.0/40.0; 68.0/56.0/60.0) reproduce the printed means 80.0 / 64.4 / 38.7 / 61.3 to 0.1pp,
+and the only denominators consistent with those per-run values are 20 / {18,19,19} / 25 / 25. So
+the numbers are internally attested even though the doc that was supposed to hold their raw form
+was never committed.
+
+**Recommended fix (outer repo, no paper change):** in `docs/paper_experiments_provenance.md`
+replace the three links with a pointer to the surviving evidence — the per-run table at
+`neurips_2026_conference.tex:492-502` plus `tasks/T17/RESULTS.md` PC5 — and note that the raw
+run directories (`outputs/2026-03-16/19-*` onward) are absent from `snapshot.tar.gz`,
+`supplementary.tar.gz`, `runs.yaml` and every recovered tree (**F45**, T17 §7). Then remove or
+retarget the two `docs/index.md` entries. Same pass should fix the second half of F8: the
+provenance doc names configs `assistant_omit` and `concat_baseline` that do not exist.
+
+**Effort:** 20 min. **Blocking:** no. **Risk:** none.
+**I did not apply this** — it is a docs edit outside T31b's scope, and the operator may prefer to
+attempt recovery of the runs first.
+
