@@ -160,9 +160,127 @@ Launched 2026-07-29 ~11:52. Progress log: `neurips_review/autoresearch/tasks/T1/
 
 ---
 
-## 5. Results
+## 5. Pilot (n=30, `data/lic_eval_subset.json`) — and why the venue changed
 
-*(filled in as cells complete — see §6)*
+Ran 12:05–12:20. Artifacts kept at `outputs/T1/pilot_n30/`.
+
+| task | arm | acc |
+|---|---|---|
+| database | Baseline | 53.3% (16/30) |
+| database | Summarisation, 1 call/turn | 60.0% (18/30) |
+| database | AC3-Reset | 66.7% (20/30) |
+| code | Baseline | **93.3% (28/30)** |
+
+**Decision D10 — abandon `lic_eval_subset.json`, move to the full LiC pool
+`data/sharded_instructions_600.json`.** LiC-code baseline at 93.3% is *at ceiling*: two
+errors of headroom cannot discriminate between four treatment arms. This is precisely the
+failure mode that wasted session 1's T5 (near-ceiling math, all arms ~97.5%, non-discriminating),
+and the brief was explicit that repeating it would be a waste. The full pool gives **n=107
+database and n=100 code**, with no baseline-failure selection bias (unlike
+`htn50_52_*`, which is selected on baseline failure and would regress to the mean), and its
+code half is 55% LiveCodeBench vs 43% in the 30-sample subset — i.e. genuinely harder.
+
+Larger n was preferred over N=3 replicates at n=30: 107 independent samples beat 90
+observations over 30 reused ones, and `seed=` is inert on LiC anyway (D9).
+
+All 19 `db_id`s required by the 107-sample database pool are present in
+`data/spider/databases/` (checked before launching). The pilot's database ordering is a prefix
+of the full pool, so nothing is lost.
+
+**Operational near-miss, recorded as a warning for other agents.** Stopping the pilot with
+`pkill -f "ctx_editor.run_experiment\|ctx-editor"` would have killed **two other agents'
+T9 runs** sharing this box. It happened not to, only because `pkill` uses ERE and `\|` was
+matched literally. **Kill T1 processes by PID, never by `pkill -f ctx-editor`.**
+
+---
+
+## 6. MT-OSC (arXiv:2604.08782) — reimplemented
+
+The brief listed MT-OSC as optional-if-time and warned against a half-faithful reimplementation.
+Assessment: **it is specified concretely enough**, so it was implemented — it is the closest
+published analogue to what the AC meant by "compaction baseline", and it evaluates on the *same
+sharded LiC datasets we use* (GSM8K, Spider, BFCL, HumanEval).
+
+*MT-OSC: Path for LLMs that Get Lost in Multi-Turn Conversation* — Singh, Tu, Ballesteros, Sun,
+Ghoshal, Yuan, Benajiba, Ravi, Roth (Oracle AI), arXiv:2604.08782v3, 2026-06-01. **No code
+release** (no availability statement, no repo link anywhere in the paper).
+
+What it does: a **Condenser** (one few-shot LLM call producing a single synthetic
+user/assistant pair from a window of `w` pairs), a rule-based **Decider** (no LLM) that can
+withhold condensation on information-dense dialogues, and a schedule that runs the condenser
+**as a background process**, so the condensation computed at turn `T_j` is only used from turn
+`T_j + 1`.
+
+Faithful: Appendix B.1 condenser prompt **verbatim**; the three few-shot exemplars transcribed
+from Figure 2 (they exist only as a rasterised figure, and the authors call the exemplar set
+"central to maintaining nuanced context"); the JSON `HumanInput`/`Assistant`/`Reasoning`
+contract with `Reasoning` discarded; the Appendix B.3 schedule including the one-turn lag and
+the recursion `C_j = Condense({C_{j-1}} ∪ new pairs)`; γ=0.2, τ=1000; decoding settings from B.1.
+The schedule was generalised to arbitrary `w` as trigger at `T_j = (w-1)j + 2`, usable from
+`T_j + 1`, `C_j` covering raw pairs `1 … (w-1)j+1`; substituting w=4 reproduces the paper's
+turn-by-turn walkthrough exactly (trigger 5/8/11, used from 6/9/12, `H_6 = {C_1,(u_5,a_5)}`,
+`H_9 = {C_2,(u_8,a_8)}`).
+
+Not determined by the paper, and recorded rather than hidden:
+
+1. **The Decider's polarity is self-contradictory in the paper.** §3 prose: the rule fires on
+   high redundancy and "condensation is *withheld* to avoid potential loss". The
+   Combined-Operation equation says the opposite (raw history *if D_w is False*). We implement
+   the prose. **This is inert on LiC and measured, not assumed**: τ=1000 user tokens over `w`
+   turns is never approached — LiC sharded user messages give `user_tokens` of 10–12 per window
+   in the smoke run — so the Decider never fires under either reading. Every decision is logged
+   (`mtosc_decider`) so the trigger rate is reportable.
+2. Stopword list / lemmatiser / tokeniser behind "normalized content words" are unnamed. Inert,
+   per (1).
+3. The exemplar concatenation format is unstated; the B.1 skeleton is followed literally.
+4. The paper's condenser is Llama-3.3-70B-Instruct. We run the condenser on gpt-5.4-mini, the
+   same model every other arm's context operator uses, because matched-model is the point of the
+   comparison. The paper's §5.3 reports MT-OSC is insensitive to the condenser model. Also,
+   gpt-5 deployments force `temperature=1.0`, so the paper's `temperature=0.01` cannot be
+   honoured; and we pass `reasoning_effort=medium` to match the other arms (generous to the
+   baseline).
+
+**Structural point worth putting in the rebuttal regardless of the numbers.** At the paper's
+headline **w=4, MT-OSC does not touch the context before turn 6.** The authors say as much —
+their Spider ≥6-turn subset is n=6. LiC conversations here average ~4–5 turns, so w=4 is a
+near-no-op. **w=2** (the smallest window in the paper's own sweep, w ∈ {2,3,4}) intervenes from
+turn 4 and is the informative configuration; both are run. Pollution in LiC starts at turn 2–3,
+which is *earlier than MT-OSC's earliest possible intervention* — a scheduling fact, independent
+of how good the condenser is.
+
+Also relevant, from the paper's own results: aggregated over its 10 datasets the accuracy change
+is **not significant** (Wilcoxon signed-rank, p=0.118); the authors' own framing is "efficiency
+without compromising on performance". Its abstract frames the problem as context-window
+exhaustion, latency and cost — i.e. context *length*. Pollution appears only as a secondary
+claimed side effect (§5.1, Appendix E), and their own Appendix E example shows the condenser
+carrying a fabricated value forward.
+
+Smoke run (`outputs/T1/smoke_mtosc`, 4 database samples, w=2) behaves exactly to spec:
+condensation at turn 3, applied at turn 4, recursion at turn 4 over `{C_1} ∪ pair 3`, Decider
+never withholding. The condenser output compresses the assistant's SQL to prose ("Provided an
+SQL query joining Treatments and Professionals, selecting …") — carrying the approach forward
+without auditing it, which is the behaviour under test.
+
+Bug found and fixed during the smoke: `str.format` cannot be used on the condenser template
+because the Figure-2 exemplars embed literal JSON braces; use `str.replace`.
+
+---
+
+## 7. Main sweep (full pool)
+
+Launcher `neurips_review/autoresearch/tasks/T1/run_t1_main.sh`, output `outputs/T1/main/`,
+log `run_log_main.txt`. Launched 2026-07-29 12:05. Idempotent (skips completed cells).
+
+7 arms × 2 tasks, sequential at `execution.max_concurrent=5`:
+Baseline, Summarisation-1call, Summarisation-2call (budget-matched), MT-OSC w=2, MT-OSC w=4,
+AC3-Reset, AC3-Gated-Reset. Database first (the discriminating venue).
+
+---
+
+## 8. Results
+
+*(filled in as cells complete — see [`RESULTS.md`](RESULTS.md), regenerable with
+`.venv/bin/python neurips_review/autoresearch/tasks/T1/analyze.py`)*
 
 ---
 

@@ -154,3 +154,37 @@ The agent then ran two variance controls, and they invert the headline: fixing c
 **F15 (preliminary, from T8's §6 — not yet final).** Two claims, pulling opposite ways:
 - **The bigcodebench result replicates and is *stronger* than we claimed.** Reset **21.7 ± 5.8** vs Baseline **6.7 ± 5.8** — +15 pp in every replicate, **3/3 wins**, solving 9 problem-instances Baseline never solves while losing none. Safe to lead with.
 - **The math-hard side reads as *not* supporting a claimed improvement.** `replies/v4/` currently asserts **100%** off a single run. If this holds, that number must be struck from the rebuttal before submission. Awaiting explicit per-replicate counts — this is the specific thing nudge #2 asks for.
+
+- **12:20** `T8` returned **DONE** — all 12 cells (4 arms × 3 replicates) plus a bonus disjoint-draw pair. Log: `tasks/T8/worklog.md`. This is the most consequential result of the session: it corrects a claim we currently assert in the rebuttal.
+
+**F16 — ⚠️ The math-hard 100% claim does NOT replicate. Strike it from `replies/v4/`.**
+
+| Arm | rep1 | rep2 | rep3 | mean ± sd |
+|---|---|---|---|---|
+| AC3-Augment | 20/20 (100) | **17/20 (85)** | **18/20 (90)** | **91.7 ± 7.6** |
+| Baseline | 19/20 (95) | 19/20 (95) | 17/20 (85) | **91.7 ± 5.8** |
+
+The arms are **exactly tied** — identical means *and* identical per-problem totals (55/60 each). Per-replicate delta `[+5, −10, +5]` = **0.0 ± 8.7**. The quoted 100% is the top of the range, not the centre; the apparent +5 pp was decoding noise on a near-ceiling benchmark (15/20 problems solved by both arms in every replicate).
+
+**What we can still say, and it is not nothing:** AC3-Augment **matches** Baseline. That refutes the *regression* 5YHP raised — no arm degrades — but it does **not** support a claimed improvement. The honest sentence is "matches", and we must stop writing "100%".
+
+**F17 — The bigcodebench claim survives and is stronger than we claimed.**
+
+| Arm | rep1 | rep2 | rep3 | mean ± sd |
+|---|---|---|---|---|
+| AC3-Reset | 5/20 (25) | 5/20 (25) | 3/20 (15) | **21.7 ± 5.8** |
+| Baseline | 2/20 (10) | 2/20 (10) | 0/20 (0) | **6.7 ± 5.8** |
+
+**+15 pp in every replicate — 3/3 wins, sd of the delta 0.0.** Reset solves 9 problem-instances Baseline never solves once, and loses none. It also reproduces on a **fully disjoint** 20-problem draw (0/20 overlap): Reset 3/20 vs Baseline 1/20. A same-direction result on non-overlapping problems is much better evidence than three replicates of one draw, and is worth stating explicitly in the rebuttal.
+
+Quantisation caveat to state ourselves: at n=20 every cell moves in 5 pp steps, and rep1 re-scores to 5/20 = 25% under the unified scorer (problem `451` flips deterministically on a library version). Quote as "≈1 in 5, ±1 problem" rather than a bare percentage.
+
+**F18 — Two harness bugs that silently produce zeros.** Both would have manufactured fake negative results:
+1. `bigcodebench` package absent → cells report `0/0 (20 errors excluded)`.
+2. Package present but **matplotlib** missing → BigCodeBench's `reliability_guard` dies in-sandbox and `judge_pass_rate` swallows the failure as `0.0`. **T8's first Reset rep2 read 0/20 this way; it is really 5/20.** Caught by re-scoring a known-4/20 cell and getting 0/20 — i.e. by a deliberate positive control, not by noticing something looked wrong.
+
+All bigcodebench cells are consequently re-scored offline under one unified environment from stored `extracted_answer`, with a canonical-solution pre-flight (seed=42 draw passes 19/20; the single failure is never solved by either arm). **Any future bigcodebench number in this project must carry a positive-control check.**
+
+**F19 — True seeding is fixed (2 lines).** The loaders already accepted `seed`; only the dispatcher dropped it. Default remains 42, so **all prior runs reproduce bit-for-bit (verified)**; `seed=1234` yields a 0/20-overlap draw. This partially retires F4 going forward, though it does not retroactively make past "seeds" real.
+
+**Process caveat:** the fix ended up on `main` because other agents' commits landed on T8's branch while it was checked out in the shared tree, fast-forwarding main (refs-only; no working files touched). Verified sane at 12:20 — on `main`, clean tree. **Rule for the rest of the session: no `git checkout` in this shared tree; use a worktree.**
