@@ -155,3 +155,52 @@ Legend: [ ] todo · [~] in progress · [x] done · [DROP] dropped w/ reason
   purpose-built construction (deixis into assistant-enumerated content / explicit artifact edits),"
   which is itself the design contribution to bring back to Philippe.
 
+- **2026-07-30 (why the retrofit can't work — mechanism):** Inspected the actual generated L3
+  math turns (`val_baseline/lvl3`). The generator, told to be elliptical, *drops the shard's
+  quantitative content* and replaces it with a pointer to nothing concrete: shard-2 gold "50 fruits
+  at age 5" surfaced as "start earlier, that normal level" — the number 50 appears in **neither**
+  the user history nor the assistant history (the assistant turn only holds a derived
+  `**ANSWER: 2000**`). So the information is **destroyed, not relocated to the assistant turn** →
+  both informed and blinded fall. Mechanism, stated crisply: **LiC shards specify relations among
+  the problem's OWN quantities/requirements (age-6 = 3× age-5-baseline), which are independent of
+  the assistant's DERIVED running answer. You cannot faithfully re-express such a shard as an
+  operation on the assistant's output, because the assistant's output doesn't encode the shard's
+  content.** A recoverability gap (blinded < informed) requires the intent's *content* to live in
+  the assistant turn — which only happens for **selections among assistant-proposed options,
+  callbacks to assistant-named entities, and corrections of assistant-produced artifacts.** That is
+  a property of TASK STRUCTURE, not of phrasing. `[DECISION]` Reframe the deliverable: (a) the
+  negative retrofit result (math+code) + (b) a positive *existence proof* that faithful entanglement
+  IS constructible when intent routes through assistant-introduced referents, measured by the same
+  recoverability instrument. Built `src/referent_demo.py` (12 templated referent seeds ×
+  levels 0-3; templated on purpose so no generator is in the loop — removes the
+  generator/recoverer self-validation threat and isolates the *construction*).
+
+- **2026-07-30 (code validation):** baseline × entanglement {0,1,2,3}, N=5, dev_code.
+  Accuracy **e0=20% · e1=60% · e2=60% · e3=20%** (`artifacts/val_baseline_dev_code/`; noisy at N=5,
+  no clean trend — code standard-LiC e0 is already hard). Running recoverability on the code L1-3
+  traces to check whether code's richer assistant artifacts (actual code) yield any informed-flat/
+  blinded-falling gap vs math's terse numeric answers. Results pending (`recoverability/code_lvl*`).
+
+- **2026-07-30 (RESULTS — the three-way story):** Both measurements landed.
+  **Code recoverability** (`recoverability/code_lvl*`): L1 0.83/0.88/−0.05 · L2 0.66/0.71/−0.05 ·
+  L3 0.60/0.63/−0.03. Informed and blinded fall together, gap ≈ 0 — **same difficulty-confound as
+  math, in a different domain.** So the failure is about *independent-shard task structure*, not the
+  math domain. **Referent existence proof** (`referent_demo/result.json`): L0 1.00/1.00/0.00 ·
+  L1 1.00/0.96/+0.04 · L2 0.79/0.63/+0.17 · L3 0.83/0.42/**+0.42**. Informed stays high & ~flat,
+  blinded **falls monotonically**, gap **grows** — **the desired signature.** Faithful entanglement
+  IS constructible; it just requires the user turn's *content* to live in the assistant turn
+  (selections / callbacks / corrections on assistant-introduced referents). Built the comparison
+  figure (`recoverability/recoverability_figure.png`, 3 panels: math / code / referent) via
+  `src/recoverability_figure.py`. `[DECISION]` Deliverable is complete as a research note:
+  wrote `docs/entanglement_knob_findings.md` (proposal → instrument → negative retrofit result →
+  positive referent result → reframed eval plan for Philippe), updated `docs/index.md`.
+
+- **2026-07-30 (bottom line for Matthew/Philippe):** **Entanglement is a knob on task STRUCTURE,
+  not phrasing.** You cannot retrofit it onto LiC's independent shards — the recoverability
+  instrument (built here) proves the retrofit produces a difficulty confound, not dependence. The
+  faithful knob requires a task where later user turns operate on assistant-contributed content
+  (artifact-refinement / propose-then-select). Next concrete step: build that benchmark (deterministic
+  gold) and run the method sweep (`omit_assistant` should collapse as the gap grows; `context_edit_v2`
+  = decontextualize-then-edit should hold, since decontextualization is the inverse of the referent
+  construction). `run_sweep.sh` + `aggregate.py` are ready for that sweep once the task exists.
+

@@ -35,7 +35,6 @@ from azure.identity import (
     AzureCliCredential,
     ChainedTokenCredential,
     ManagedIdentityCredential,
-    get_bearer_token_provider,
 )
 from openai import AsyncOpenAI
 
@@ -43,10 +42,15 @@ SCOPE = "api://trapi/.default"
 ENDPOINT = "https://trapi.research.microsoft.com/redmond/interactive/openai/v1/"
 JUDGE_MODEL = "gpt-5.4-mini_2026-03-17"  # different family from the gpt-4o entangling generator
 
-_token_provider = get_bearer_token_provider(
-    ChainedTokenCredential(AzureCliCredential(), ManagedIdentityCredential()), SCOPE
-)
-_client = AsyncOpenAI(base_url=ENDPOINT, api_key=_token_provider)
+_credential = ChainedTokenCredential(AzureCliCredential(), ManagedIdentityCredential())
+
+
+def _fresh_client() -> AsyncOpenAI:
+    token = _credential.get_token(SCOPE).token
+    return AsyncOpenAI(base_url=ENDPOINT, api_key=token)
+
+
+_client = _fresh_client()
 
 _sem = asyncio.Semaphore(12)
 
@@ -105,11 +109,11 @@ def _extract_score(text: str) -> float:
 
 
 def _load_gold_shards(data_path: Path) -> dict[str, dict[int, str]]:
-    """task_id -> {shard_id -> shard_text}."""
+    """normalized_task_id -> {shard_id -> shard_text}. Keys normalized (/,- -> _)."""
     data = json.loads(data_path.read_text())
     out: dict[str, dict[int, str]] = {}
     for s in data:
-        tid = str(s.get("task_id"))
+        tid = str(s.get("task_id")).replace("/", "_")
         out[tid] = {int(sh["shard_id"]): sh["shard"] for sh in s.get("shards", [])}
     return out
 
@@ -166,17 +170,11 @@ async def analyze(results_dir: Path, data_path: Path) -> dict:
     meta = []
     for f, trace in _iter_traces(results_dir):
         msgs = _messages_of(trace)
-        tid = str(trace.get("sample_id") or trace.get("task_id") or f.stem.split("-")[-1])
-        # try to resolve gold shards for this task
-        shard_lookup = None
-        for k in gold_map:
-            if k in f.stem or k == tid:
-                shard_lookup = gold_map[k]
-                break
+        stem = f.stem  # e.g. sharded-GSM8K_1166
+        shard_lookup = gold_map.get(stem)
         if shard_lookup is None:
-            # fallback: match by stem suffix number
             for k, v in gold_map.items():
-                if f.stem.endswith(k):
+                if stem.endswith(k) or k.endswith(stem) or k in stem:
                     shard_lookup = v
                     break
         if shard_lookup is None:
