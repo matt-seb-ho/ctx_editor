@@ -111,6 +111,11 @@ recoverable *with* the assistant turn); blinded **falls monotonically** (without
 "go with option B" is unrecoverable); the gap **grows to +0.42**. Deleting the assistant turn here
 is genuinely lossy — exactly Philippe's realistic regime.
 
+*Robustness:* re-running with an expanded, more varied seed set (28 seeds: selections, ordinal/
+pronoun references, corrections to specific artifact parts, callbacks to assistant-*computed*
+values) preserves the signature — gap 0.00 → 0.05 → 0.21 → 0.23, blinded falling 0.95 → 0.41 while
+informed stays higher (`artifacts/referent_demo_n28/`). Not an artifact of a dozen hand-picked cases.
+
 ![recoverability figure](../research/entanglement/artifacts/recoverability/recoverability_figure.png)
 
 ## 4.5 Philippe's method figure, measured on the referent construction
@@ -138,7 +143,8 @@ method per level (`research/entanglement/src/referent_methods.py`):
 assistant turn, dropping that turn destroys it — Philippe's prediction (1). **Decontextualize-then-
 edit holds** across all levels (→ 0.88): it relocates the referent content back into the user turn
 *before* the assistant is dropped, so the drop becomes lossless — prediction (3). This is the whole
-argument for our method over naive assistant-omission, made quantitative.
+argument for our method over naive assistant-omission, made quantitative. *(Robust at 28 seeds:
+decon-then-edit 0.96/0.96/0.95/0.80 vs drop-assistant 0.95/0.93/0.57/**0.39**; `referent_methods_n28/`.)*
 
 **Honest caveat about the axis.** Recoverability isolates the *drop-assistant* failure mode only. It
 does **not** measure accumulation's pollution cost — that is why accumulate's line looks fine here

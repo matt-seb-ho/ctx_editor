@@ -217,3 +217,12 @@ Legend: [ ] todo · [~] in progress · [x] done · [DROP] dropped w/ reason
   full method comparison still needs a task-accuracy sweep on a gradable artifact-refinement task.
   This figure is the left half (drop-assistant unsafe under entanglement; our method fixes it).
 
+- **2026-07-30 (robustness @ N=28 + wake-up summary):** Expanded referent seeds 12 → 28 (more
+  reference types: ordinal/pronoun chains, "the latter", corrections to specific artifact parts,
+  callbacks to assistant-*computed* values) and re-ran both. Existence proof holds: gap
+  0.00 → 0.05 → 0.21 → 0.23, blinded 0.95 → 0.41 while informed stays higher
+  (`artifacts/referent_demo_n28/`). Method comparison holds: decon-then-edit
+  0.96/0.96/0.95/0.80 vs accumulate 0.95/0.93/0.70/0.68 vs drop-assistant 0.95/0.93/0.57/**0.39**
+  (`artifacts/referent_methods_n28/`). Signature is not a hand-authoring artifact. Wrote
+  `SUMMARY.md` (2-minute wake-up memo for Matthew). **Deliverable is complete and self-contained.**
+

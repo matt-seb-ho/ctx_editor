@@ -177,6 +177,183 @@ SEEDS = [
             3: "Skip the second step and return what came before it.",
         },
     },
+    # --- extended seed set (robustness): more reference types ---
+    {
+        "base": "Compute a starting budget for me.",
+        "assistant": "Adding up your line items, the total starting budget is $4,200.",
+        "gold": "Set the budget cap to the computed starting total.",
+        "turns": {
+            0: "Set the budget cap to $4,200.",
+            1: "Set the cap to that $4,200 total you computed.",
+            2: "Set the cap to the total you just calculated.",
+            3: "Cap it at the number you got.",
+        },
+    },
+    {
+        "base": "Suggest names for my three microservices.",
+        "assistant": "How about: auth-service, billing-service, and notify-service.",
+        "gold": "Rename the billing microservice to payments-service.",
+        "turns": {
+            0: "Rename the billing microservice to 'payments-service'.",
+            1: "Rename that billing-service you suggested to 'payments-service'.",
+            2: "Rename the middle one to 'payments-service'.",
+            3: "Change the second name to 'payments-service'.",
+        },
+    },
+    {
+        "base": "List candidate features for the model.",
+        "assistant": "Candidate features:\n(A) user age\n(B) days since signup\n(C) number of past purchases\n(D) average session length",
+        "gold": "Drop the user-age feature.",
+        "turns": {
+            0: "Drop the user-age feature.",
+            1: "Remove that age feature you listed.",
+            2: "Drop the first candidate.",
+            3: "Cut option A.",
+        },
+    },
+    {
+        "base": "Give me two possible titles for the essay.",
+        "assistant": "Option 1: 'The Quiet Collapse'. Option 2: 'After the Noise'.",
+        "gold": "Use 'After the Noise' as the title.",
+        "turns": {
+            0: "Use 'After the Noise' as the title.",
+            1: "Go with 'After the Noise', your second option.",
+            2: "Use the second title you offered.",
+            3: "Let's go with the latter.",
+        },
+    },
+    {
+        "base": "You drafted a SQL query for me.",
+        "assistant": "SELECT name, email FROM users WHERE active = 1 ORDER BY name;",
+        "gold": "Change the ordering to sort by email instead of name.",
+        "turns": {
+            0: "Change the query to order by email instead of by name.",
+            1: "In your query, order by email instead of name.",
+            2: "Change that ORDER BY to use the other selected column.",
+            3: "Sort by the other column you selected instead.",
+        },
+    },
+    {
+        "base": "You listed the ingredients you'd use.",
+        "assistant": "I'd use: flour, sugar, butter, eggs, and vanilla.",
+        "gold": "Double the amount of butter.",
+        "turns": {
+            0: "Double the amount of butter.",
+            1: "Double that butter you listed.",
+            2: "Double the third ingredient.",
+            3: "Use twice as much of the third one.",
+        },
+    },
+    {
+        "base": "Propose a schedule for the three talks.",
+        "assistant": "Schedule:\n9:00 — Alice\n10:00 — Bob\n11:00 — Carol",
+        "gold": "Move Bob's talk to be the last one.",
+        "turns": {
+            0: "Move Bob's talk to be the last slot.",
+            1: "Move that 10:00 Bob talk to the end.",
+            2: "Move the second talk to the end.",
+            3: "Put the middle one last.",
+        },
+    },
+    {
+        "base": "You picked a color palette.",
+        "assistant": "Palette: primary #1f77b4 (blue), accent #ff7f0e (orange), background #f5f5f5 (light gray).",
+        "gold": "Make the accent color green instead of orange.",
+        "turns": {
+            0: "Change the accent color to green instead of orange.",
+            1: "Change that orange accent you chose to green.",
+            2: "Change the second color to green.",
+            3: "Make the accent one green instead.",
+        },
+    },
+    {
+        "base": "You proposed a function signature.",
+        "assistant": "def fetch(url, timeout=30, retries=3): ...",
+        "gold": "Increase the default number of retries to 5.",
+        "turns": {
+            0: "Increase the default retries to 5.",
+            1: "Bump that retries default in your signature to 5.",
+            2: "Raise the last default argument to 5.",
+            3: "Make the last one default to 5.",
+        },
+    },
+    {
+        "base": "You listed the steps of the algorithm.",
+        "assistant": "1. tokenize the text\n2. remove stopwords\n3. stem each token\n4. count frequencies",
+        "gold": "Skip the stopword-removal step.",
+        "turns": {
+            0: "Skip the stopword-removal step.",
+            1: "Drop that stopword-removal step you listed.",
+            2: "Skip the second step.",
+            3: "Leave out the second one.",
+        },
+    },
+    {
+        "base": "You suggested three test cases.",
+        "assistant": "Tests:\n(A) empty input\n(B) single element\n(C) already-sorted input",
+        "gold": "Add the already-sorted-input test case.",
+        "turns": {
+            0: "Add a test for already-sorted input.",
+            1: "Add that already-sorted test you suggested.",
+            2: "Add the third test case you listed.",
+            3: "Include the last one.",
+        },
+    },
+    {
+        "base": "You computed an intermediate value for me.",
+        "assistant": "The discount factor works out to 0.85.",
+        "gold": "Multiply the price by the computed discount factor.",
+        "turns": {
+            0: "Multiply the price by 0.85.",
+            1: "Multiply the price by that 0.85 discount factor you found.",
+            2: "Multiply the price by the discount factor you computed.",
+            3: "Scale the price by the factor you got.",
+        },
+    },
+    {
+        "base": "You proposed two database indexes.",
+        "assistant": "(A) index on users.email\n(B) composite index on orders(user_id, created_at)",
+        "gold": "Create the composite index on orders.",
+        "turns": {
+            0: "Create the composite index on orders(user_id, created_at).",
+            1: "Create that composite orders index you proposed.",
+            2: "Create the second index you suggested.",
+            3: "Add option B.",
+        },
+    },
+    {
+        "base": "You outlined four paragraphs for the intro.",
+        "assistant": "P1: motivation. P2: prior work. P3: our approach. P4: contributions.",
+        "gold": "Swap the order of the prior-work and approach paragraphs.",
+        "turns": {
+            0: "Swap the prior-work and our-approach paragraphs.",
+            1: "Swap those prior-work and approach paragraphs you outlined.",
+            2: "Swap the second and third paragraphs.",
+            3: "Flip the middle two.",
+        },
+    },
+    {
+        "base": "You gave me a regex and an example match.",
+        "assistant": "Regex: `[A-Z]{2,3}-\\d{4}`. It matches things like 'AB-1234' or 'XYZ-5678'.",
+        "gold": "Make the letter part require exactly two letters, not two-or-three.",
+        "turns": {
+            0: "Make the letter part require exactly two letters, not two or three.",
+            1: "In your regex, make that letter part exactly two letters.",
+            2: "Tighten the letter portion to exactly two.",
+            3: "Make the first part exactly two.",
+        },
+    },
+    {
+        "base": "You proposed default hyperparameters.",
+        "assistant": "Defaults: learning_rate=0.01, batch_size=32, epochs=10.",
+        "gold": "Lower the learning rate to 0.001.",
+        "turns": {
+            0: "Lower the learning rate to 0.001.",
+            1: "Lower that 0.01 learning rate you set to 0.001.",
+            2: "Drop the first hyperparameter by a factor of ten.",
+            3: "Make the first one ten times smaller.",
+        },
+    },
 ]
 
 
