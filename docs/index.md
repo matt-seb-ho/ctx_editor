@@ -159,6 +159,7 @@ Variance:
 
 ### Entanglement knob (Philippe follow-up, 2026-07)
 - [`entanglement_knob_findings.md`](entanglement_knob_findings.md) — Entanglement is a knob on task *structure*, not phrasing: retrofit onto LiC math/code gives a difficulty confound (recoverability gap ≈ 0); a referent construction yields the real signature (informed flat-high, blinded falling, gap → +0.42). Recoverability instrument + figure. Artifacts in `research/entanglement/`.
+- [`plans/entanglement_benchmark_spec.md`](plans/entanglement_benchmark_spec.md) — Implementation-ready spec for a gradable artifact-refinement benchmark (propose→select→resolve) so the full method sweep runs on task accuracy.
 
 ### Advisor & collaborator feedback
 - [`lianhui_feedback_analysis.md`](lianhui_feedback_analysis.md) — Analysis of Lianhui's abstract/intro feedback.
@@ -196,6 +197,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-07-30 | `plans/entanglement_benchmark_spec.md` | Spec for gradable artifact-refinement benchmark; full entanglement method sweep. |
 | 2026-07-30 | `entanglement_knob_findings.md` | Entanglement knob is task-structural: LiC retrofit = difficulty confound; referent construction = real gap. |
 | 2026-07-09 | `arxiv_push/worklog.md` | arXiv-push session log: paper recovery, adversarial debate, applied claim/polish edits, known issues. |
 | 2026-07-09 | `arxiv_push/debate/03_synthesis.md` | Adjudication of skeptic vs writing-editor vs jun1-optimism; honest-framing ruling. |
