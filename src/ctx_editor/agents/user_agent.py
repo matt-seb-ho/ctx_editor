@@ -26,6 +26,9 @@ class UserResponse:
     cost_usd: float = 0.0
     model_response: Optional[ModelResponse] = None  # For detailed usage tracking
     budget_exhausted: bool = False  # Set when user agent has no more info to share
+    # Entanglement-eval provenance (set only by EntanglementUserAgent):
+    entanglement_level: Optional[int] = None
+    decontextualized: Optional[str] = None  # self-contained paraphrase of this turn's intent
 
 
 class UserAgent:

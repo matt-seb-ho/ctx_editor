@@ -410,7 +410,24 @@ class ConversationSimulator:
 
         self.trace.add_user_message(
             content=user_response.content,
-            metadata={"cost_usd": user_response.cost_usd},
+            metadata={
+                "cost_usd": user_response.cost_usd,
+                **(
+                    {"entanglement_level": user_response.entanglement_level}
+                    if user_response.entanglement_level is not None
+                    else {}
+                ),
+                **(
+                    {"decontextualized": user_response.decontextualized}
+                    if user_response.decontextualized is not None
+                    else {}
+                ),
+                **(
+                    {"revealed_shard_id": user_response.shard_id}
+                    if user_response.shard_id is not None
+                    else {}
+                ),
+            },
         )
         # Track usage for user role
         if user_response.model_response:

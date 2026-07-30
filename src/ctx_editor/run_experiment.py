@@ -277,6 +277,14 @@ async def run_experiment(cfg: DictConfig) -> dict[str, Any]:
                 hard_cap_multiplier=cfg.user_mode.get("hard_cap_multiplier", 1.2),
                 include_shards=cfg.user_mode.get("include_shards", False),
             )
+        elif user_mode == "entangled":
+            from .agents.entanglement_user_agent import EntanglementUserAgent
+
+            user_agent = EntanglementUserAgent(
+                task=sample_task,
+                model=sim_config.user_model,
+                entanglement_level=cfg.user_mode.get("entanglement_level", 0),
+            )
         else:
             user_agent = UserAgent(sample_task, model=sim_config.user_model)
 
