@@ -47,6 +47,11 @@ Figures: `artifacts/recoverability/recoverability_figure.png` (3-panel: math/cod
 - The referent construction is a controlled set of templated seeds (12, then re-checked at 28 for
   robustness). It's an *existence proof* that the knob is real, not a full benchmark.
 - All accuracy numbers from the LiC validation pilots are N=5 — directional only.
+- **The gap (informed − blinded) is judge-sensitive; faithfulness (informed staying high) is the
+  judge-robust discriminator.** Re-scored with a second judge family (gpt-4o): math informed decays
+  0.81 → 0.35 while referent informed stays 0.91 → 0.82 — both judges agree on that contrast, even
+  though the raw gap numbers shift. Use *informed recoverability* as the certificate, not the gap.
+  Figure: `artifacts/recoverability/judge_invariance_figure.png`.
 
 ## The recommendation / next step
 

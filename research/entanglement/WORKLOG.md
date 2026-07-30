@@ -226,3 +226,14 @@ Legend: [ ] todo · [~] in progress · [x] done · [DROP] dropped w/ reason
   (`artifacts/referent_methods_n28/`). Signature is not a hand-authoring artifact. Wrote
   `SUMMARY.md` (2-minute wake-up memo for Matthew). **Deliverable is complete and self-contained.**
 
+- **2026-07-30 (judge-invariance — instrument hardening):** Re-scored both constructions with a
+  second, independent judge family (gpt-4o_2024-11-20, via `RECOV_JUDGE_MODEL` env override added to
+  `recoverability.py`). Finding refined: **the gap (informed − blinded) is judge-sensitive** — under
+  gpt-4o the math retrofit shows a *small positive* gap at L2/L3 (so a few retrofit turns do create
+  genuine dependence, mixed with info destruction). **The judge-robust discriminator is informed
+  recoverability (faithfulness):** math informed decays 0.90→0.41 (g5.4mini) / 0.81→0.35 (g4o) —
+  intent destroyed; referent informed stays 0.98→0.64 (g5.4mini) / 0.91→**0.82** (g4o) — intent
+  preserved. Both judges agree on the contrast. Built `src/judge_invariance_figure.py` →
+  `artifacts/recoverability/judge_invariance_figure.png`; added §4.6 to the doc. `[DECISION]` Report
+  *informed recoverability* as the faithfulness certificate, not the raw gap.
+

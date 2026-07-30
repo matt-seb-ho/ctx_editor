@@ -27,6 +27,7 @@ Usage:
 import argparse
 import asyncio
 import json
+import os
 import re
 from pathlib import Path
 from typing import Any, Optional
@@ -40,7 +41,8 @@ from openai import AsyncOpenAI
 
 SCOPE = "api://trapi/.default"
 ENDPOINT = "https://trapi.research.microsoft.com/redmond/interactive/openai/v1/"
-JUDGE_MODEL = "gpt-5.4-mini_2026-03-17"  # different family from the gpt-4o entangling generator
+# Judge (recoverer + matcher). Override with RECOV_JUDGE_MODEL to check judge-family invariance.
+JUDGE_MODEL = os.environ.get("RECOV_JUDGE_MODEL", "gpt-5.4-mini_2026-03-17")
 
 _credential = ChainedTokenCredential(AzureCliCredential(), ManagedIdentityCredential())
 

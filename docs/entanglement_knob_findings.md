@@ -154,6 +154,39 @@ recoverability. So this figure is the left half of the story (drop-assistant is 
 entanglement, our method fixes it); the full method comparison still needs the task-accuracy sweep
 on a gradable artifact-refinement benchmark (§6).
 
+## 4.6 Judge-invariance, and the *right* discriminator
+
+Everything above rests on one LLM judge (gpt-5.4-mini). Because the whole finding is instrument-
+mediated, we re-scored both the negative (math) and positive (referent) constructions with a second,
+independent judge family (**gpt-4o**, `RECOV_JUDGE_MODEL=gpt-4o_2024-11-20`). Two lessons:
+
+1. **The *gap* (informed − blinded) is judge-sensitive.** Under gpt-4o the math retrofit even shows a
+   small *positive* gap at levels 2–3 (a lenient judge scores the vague blinded reconstructions
+   lower). So "gap > 0" is not, by itself, a clean judge-robust test — some retrofit turns *do*
+   create a little genuine dependence ("triple *that*" pointing at the assistant's number), mixed in
+   with a lot of information destruction.
+2. **Faithfulness — informed recoverability staying HIGH — is the judge-robust discriminator.** It
+   separates the two constructions the same way under both judges:
+
+   | series | e1 | e2 | e3 |
+   |---|:--:|:--:|:--:|
+   | math informed, gpt-5.4-mini | 0.90 | 0.71 | 0.41 |
+   | math informed, gpt-4o | 0.81 | 0.65 | 0.35 |
+   | referent informed, gpt-5.4-mini | 0.98 | 0.79 | 0.64 |
+   | referent informed, gpt-4o | 0.91 | 0.86 | **0.82** |
+
+   The **retrofit destroys the intent** (informed decays to ~0.4 — unrecoverable even *with* the
+   assistant, because the information was never anywhere); the **referent construction preserves it**
+   (informed stays ~0.8 — always recoverable *with* the assistant, because the information was
+   relocated there, not destroyed). Both judges agree on this contrast.
+
+![judge-invariance figure](../research/entanglement/artifacts/recoverability/judge_invariance_figure.png)
+
+**Refined statement of the finding:** a *faithful* entanglement knob is one that keeps informed
+recoverability high while blinded recoverability falls. The primary, judge-robust certificate is
+**informed recoverability (faithfulness)**; the gap is corroborating but noisier. Retrofitting onto
+independent shards fails the faithfulness test (informed decays); the referent construction passes it.
+
 ## 5. Takeaway (the thing to bring back to Philippe)
 
 **Entanglement is not a free rephrasing knob you can turn on any benchmark. It is a knob on task
