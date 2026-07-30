@@ -113,6 +113,41 @@ is genuinely lossy — exactly Philippe's realistic regime.
 
 ![recoverability figure](../research/entanglement/artifacts/recoverability/recoverability_figure.png)
 
+## 4.5 Philippe's method figure, measured on the referent construction
+
+Once entanglement is *real* (the referent regime), context-management methods separate exactly as
+Philippe predicted. Using recoverability-vs-gold as an **intent-survival** proxy, we score each
+method per level (`research/entanglement/src/referent_methods.py`):
+
+- **accumulate (S0)** = informed recoverability (assistant kept, referent resolvable);
+- **drop-assistant (Huang/ERGO)** = blinded recoverability (assistant dropped, referent gone);
+- **decontextualize-then-edit (ours)** = first rewrite the user turn to be self-contained *using*
+  the assistant context (the inverse of entangling; Choi 2021), *then* drop the assistant and score
+  the rewritten turn blind.
+
+| level | accumulate | drop-assistant | decon-then-edit (ours) |
+|------:|:----------:|:--------------:|:----------------------:|
+| e0    | 1.00       | 1.00           | 1.00 |
+| e1    | 0.96       | 1.00           | 1.00 |
+| e2    | 0.75       | 0.63           | **1.00** |
+| e3    | 0.71       | **0.33**       | **0.88** |
+
+![method figure](../research/entanglement/artifacts/referent_methods/figure.png)
+
+**Drop-assistant collapses** as entanglement rises (1.00 → 0.33): once the intent lives in the
+assistant turn, dropping that turn destroys it — Philippe's prediction (1). **Decontextualize-then-
+edit holds** across all levels (→ 0.88): it relocates the referent content back into the user turn
+*before* the assistant is dropped, so the drop becomes lossless — prediction (3). This is the whole
+argument for our method over naive assistant-omission, made quantitative.
+
+**Honest caveat about the axis.** Recoverability isolates the *drop-assistant* failure mode only. It
+does **not** measure accumulation's pollution cost — that is why accumulate's line looks fine here
+(its intent is trivially recoverable *because* it keeps everything). Accumulate's real weakness
+(over-committed assistant reasoning polluting later turns) shows up on *task accuracy*, not on
+recoverability. So this figure is the left half of the story (drop-assistant is unsafe under
+entanglement, our method fixes it); the full method comparison still needs the task-accuracy sweep
+on a gradable artifact-refinement benchmark (§6).
+
 ## 5. Takeaway (the thing to bring back to Philippe)
 
 **Entanglement is not a free rephrasing knob you can turn on any benchmark. It is a knob on task

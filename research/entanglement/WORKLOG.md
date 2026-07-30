@@ -204,3 +204,16 @@ Legend: [ ] todo · [~] in progress · [x] done · [DROP] dropped w/ reason
   = decontextualize-then-edit should hold, since decontextualization is the inverse of the referent
   construction). `run_sweep.sh` + `aggregate.py` are ready for that sweep once the task exists.
 
+- **2026-07-30 (Philippe's method figure — measured):** Rather than wait on a new gradable
+  benchmark, measured the method comparison directly on the referent construction, using
+  recoverability-vs-gold as an intent-survival proxy (`src/referent_methods.py`,
+  `artifacts/referent_methods/`). accumulate = informed; drop-assistant = blinded;
+  decontextualize-then-edit = rewrite-using-assistant then score blind. Result by level
+  (accumulate / drop-assistant / decon-then-edit): e0 1.00/1.00/1.00 · e1 0.96/1.00/1.00 ·
+  e2 0.75/0.63/**1.00** · e3 0.71/**0.33**/**0.88**. **Exactly Philippe's predicted matrix:**
+  drop-assistant collapses with entanglement; decon-then-edit holds across all levels. `[NOTE]`
+  Honest caveat recorded in the doc: recoverability isolates the drop-assistant failure ONLY; it does
+  not price accumulation's pollution (accumulate looks fine here because it keeps everything). The
+  full method comparison still needs a task-accuracy sweep on a gradable artifact-refinement task.
+  This figure is the left half (drop-assistant unsafe under entanglement; our method fixes it).
+
