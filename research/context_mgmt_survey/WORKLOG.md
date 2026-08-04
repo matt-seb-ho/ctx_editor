@@ -81,3 +81,27 @@ summarize (production-representative) · [optional retrieval] · decontextualize
 (strongest counter to pre-empt: "summarize with a state-preserving prompt already does both" — show it
 collapses into a weak form of ours or fails the faithfulness gate). Then M4 depth-reads (Huang, ACON,
 StructFlowBench), then M5 one-pager + related-work paragraph folded into the entanglement findings doc.
+
+---
+
+## 2026-08-04 — Orchestrator tick (iteration 2): M3 verify + strawman-refutation
+
+Report-alive. M2 done last tick; advancing to M3. This tick: (a) launched a citation-audit subagent
+(sonnet, background) to batch-verify all 38 `related_work.bib` URLs/arXiv ids exist and match
+title/authors, writing `findings/citation_audit.md`; (b) writing the adversarial strawman-refutation
+myself (opus) → `notes/strawman_refutation.md`. Direction is distinct from iters 0 (breadth) and 1
+(synthesis).
+
+`[DECISION]` **Strawman-refutation written** — 8 objections steelmanned + rebutted from survey evidence
+(O1 summarize-with-state-prompt ★★★; O2 niche-baseline; O3 contrived-entanglement; O4 retrieval-solves-it;
+O5 just-query-rewriting; O6 big-windows; O7 judge-artifact; O8 StructFlowBench-scoops). Verdict: **not a
+strawman** — 7/8 answerable by citation today. **O1 is the only paper-threatening one that needs an
+experiment, not an argument.** Defined **Experiment E1**: add a `summarize_guided` condition (summarizer
+told to preserve referents + state) to the method axis — it either underperforms ours or collapses into
+an un-instrumented version of our resolve-then-prune; both outcomes vindicate us. `[DECISION]` Folded
+`summarize_guided` into `docs/plans/entanglement_benchmark_spec.md` METHODS list + predictions so it's
+actionable when the gradable benchmark is built.
+
+Citation-audit subagent (a9cf…) still running; its `findings/citation_audit.md` + fixes will be applied
+next tick (flagged load-bearing cites: huang 2602.24287, laban/LiC 2505.06120, acon 2510.00615, memento
+2604.09852, structflowbench 2502.14494, tau2 2506.07982; and `others` author lists to fill).

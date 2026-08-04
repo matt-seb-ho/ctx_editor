@@ -61,13 +61,19 @@ then **B** if A shows the predicted method separation.
 
 ## What to measure
 
-Run `run_sweep.sh` with `METHODS="baseline omit_assistant summarize_v1 context_edit_v2"` × levels
-{0,1,2,3} on the new task. `aggregate.py` already emits the matrix + `figure.png`. Predictions
+Run `run_sweep.sh` with `METHODS="baseline omit_assistant summarize_v1 summarize_guided context_edit_v2"`
+× levels {0,1,2,3} on the new task. `aggregate.py` already emits the matrix + `figure.png`. Predictions
 (now with a real gradable y-axis, not just recoverability):
 
 - **omit_assistant**: fine at level 0, **collapses** as level rises (referents destroyed).
 - **baseline (accumulate)**: degrades from *pollution* as turns accumulate — the failure mode
   recoverability could not see. Should now be visible on accuracy.
+- **summarize_v1 / summarize_guided**: `summarize_guided` (summarizer explicitly told to preserve every
+  referent later turns may point to + all environment state) is the **steelman** of the "summarization
+  already does both" objection (see `research/context_mgmt_survey/notes/strawman_refutation.md`, O1/E1).
+  Predicted: it beats `summarize_v1` but still trails ours — generative summarization can't *guarantee*
+  verbatim referent/state preservation — and whatever gains it gets come from doing an un-instrumented
+  resolve-then-prune, which validates our mechanism. Including it is what defuses the strawman charge.
 - **context_edit_v2 (decontextualize-then-edit)**: holds across levels — it resolves references
   against the assistant turn *before* editing/dropping, so it neither loses referents (unlike
   omit) nor accumulates pollution (unlike baseline). This is the paper's headline.
