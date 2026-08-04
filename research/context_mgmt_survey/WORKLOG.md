@@ -105,3 +105,25 @@ actionable when the gradable benchmark is built.
 Citation-audit subagent (a9cf…) still running; its `findings/citation_audit.md` + fixes will be applied
 next tick (flagged load-bearing cites: huang 2602.24287, laban/LiC 2505.06120, acon 2510.00615, memento
 2604.09852, structflowbench 2502.14494, tau2 2506.07982; and `others` author lists to fill).
+
+---
+
+## 2026-08-04 — Orchestrator tick (iteration 3): M3 close — citation fixes applied
+
+Report-alive. Citation-audit subagent returned: **42 entries — 34 VERIFIED, 8 NEEDS-FIX, 0 UNRESOLVED,
+zero fabrications.** All six load-bearing cites (huang 2602.24287, laban/LiC 2505.06120, acon 2510.00615,
+memento 2604.09852, structflowbench 2502.14494, tau2 2506.07982) resolve with exact title+authors; only
+structflowbench needed an author-list fill (metadata, not existence). `[DECISION]` **Applied all 8 fixes**
+to `related_work.bib`: (1) ergo title `Multi-Turn Dialogue`→`Multi-turn Language Models`; (2) pyramidkv
+venue ICLR→**COLM 2025** (OpenReview ayi7qezU87); (3) recursively year 2023→**2025** +vol 639/p 130193
+(Neurocomputing publication date, arXiv was 2023); (4) mint 3rd author `Li, Jiate`→**`Liu, Jiateng`**
+(the former does not exist on the paper); (5) amem author order — `Liang, Zujie` is 2nd not 5th; (6-8)
+structflowbench / multichallenge / memos `and others`→full author lists (5, 10, 9+ authors resp.).
+
+`[DECISION]` No content/claim changed — all fixes are citation metadata; the survey's findings and
+positioning are unaffected. Deli §9.4 citation-verification substep of M3 is now **complete**: 42/42 clean.
+
+**Next (M4):** depth-read the three load-bearing incumbents — Huang (2602.24287), ACON (2510.00615),
+StructFlowBench (2502.14494) — pulling exact failure-mode wording, quantified gaps (e.g. Huang's ~33%
+"Follow-up without Feedback"), and any entanglement/statefulness language we can cite verbatim. Then M5:
+one-page recommendation + related-work paragraph into `docs/entanglement_knob_findings.md`.
