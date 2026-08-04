@@ -127,3 +127,37 @@ positioning are unaffected. Deli §9.4 citation-verification substep of M3 is no
 StructFlowBench (2502.14494) — pulling exact failure-mode wording, quantified gaps (e.g. Huang's ~33%
 "Follow-up without Feedback"), and any entanglement/statefulness language we can cite verbatim. Then M5:
 one-page recommendation + related-work paragraph into `docs/entanglement_knob_findings.md`.
+
+---
+
+## 2026-08-04 — Orchestrator tick (iteration 4): M4 depth-reads + M5 synthesis — SURVEY CLOSED
+
+Ran the three M4 depth-reads as parallel background subagents (sonnet), all returned with full-text
+reads and verbatim quotes → `findings/depth_{huang,acon,structflowbench}.md`. Key confirmations:
+
+- **Huang (`huang2026llmsbenefit`)** — full PDF read. Every one of our positioning hooks is a *verbatim*
+  quote from the paper: context-pollution definition (§2.5); "follow-up without feedback for 33.1%"
+  (§2.3); "requires storing only the relevant assistant turn" (§2.4); the finer-grained future-work
+  sentence = our exact method (§3); the stateful/agentic deferral = our statefulness axis (§4); the call
+  for "benchmarks that reflect true multi-turn dependence" (§4). Decisive for the strawman question.
+- **ACON (`kang2026acon`)** — confirmed *compress-then-hope*: summarizes raw history + per-observation,
+  relies on a learned contrastive guideline optimizer, never resolves references first. **Fair, strong
+  statefulness-axis comparator** (public code; AppWorld 56.5% vs 56.0%). Our wedge = structural
+  resolve-then-prune holds on novel entanglement + removes assistant's erroneous assumptions (ACON keeps
+  them). Distinguishing experiment: high-coreference held-out split.
+- **StructFlowBench (`li2025structflowbench`)** — 6-way *categorical* taxonomy; confirmed it lacks all
+  four of our differentiators (continuous knob / statefulness / faithfulness gate / strategy comparison)
+  and measures compliance in clean context, not accuracy under pollution. Scooping = CLEAR.
+
+`[DECISION]` **M5 synthesis written and effort CLOSED.** (a) Folded a paper-facing positioning section +
+a drop-in related-work paragraph into `docs/entanglement_knob_findings.md` **§7** (§7.4 is the ready
+paragraph, bibkeys resolve against `related_work.bib`). (b) Wrote `SUMMARY.md` — the wake-up memo for
+Matthew (verdict, positioning, method axis, E1, full artifact index). `[DECISION]` Per the deli stop rule
+(milestones M1–M5 complete + saturated, stale_count 0 but no remaining in-scope direction that changes
+the conclusion), **the survey is closed** and the orchestrator cron will be retired this tick. Reopen
+candidates recorded in `directions_tried.json` (cross-domain analogy; production grey-lit; retrieval-
+lineage depth-read for O5) if ever needed.
+
+**Net answer to Matthew's question:** Not a strawman. Re-center the incumbent on summarization/compaction
+(ACON as the strong stateful comparator), keep assistant-omit as the clean baseline, and lead with the
+entanglement × statefulness faithfulness-gated knob. Huang's own paper flags the two gaps we measure.

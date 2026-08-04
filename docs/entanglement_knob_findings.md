@@ -221,3 +221,96 @@ recoverability gap is the x-axis we actually control; task accuracy per method i
   (decontextualize-then-edit) should hold, *because* decontextualization is precisely the inverse of
   the referent construction (Choi et al., TACL 2021).
 - **Scale N** beyond the N=5 validation pilots; current accuracy numbers are directional only.
+
+## 7. Related-work positioning (from the context-management survey)
+
+**Status:** added 2026-08-04 from the autonomous literature survey in `research/context_mgmt_survey/`
+(42 papers, all citations verified; see that dir's `notes/` and `findings/`). This section answers the
+question Matthew raised — *are we beating a strawman by centering on Huang's assistant-omit?* — and
+supplies a drop-in related-work paragraph.
+
+### 7.1 Verdict: not a strawman, but re-center the incumbent
+
+Assistant-omit (Huang et al. 2026, `huang2026llmsbenefit`) is the clean *minimal* baseline, **not** the
+foil the paper leads with. The production incumbent is **summarization/compaction** (shipped in the
+Anthropic Compaction API, Cline auto-compact, Cursor `/summarize`), and the strongest *research*
+compressor for stateful agents is **ACON** (`kang2026acon`, ICML 2026). Our contribution is the
+**entanglement × statefulness two-axis knob** plus a **faithfulness gate**, and the unifying diagnosis
+that every incumbent commits a lossy op (drop / evict / summarize / retrieve-key / archive / reset)
+**before** resolving inter-turn references — *prune-then-hope* — whereas we *resolve-then-prune*
+(decontextualize-then-edit).
+
+Crucially, Huang's own paper motivates rather than opposes us. Verbatim from arXiv 2602.24287:
+
+- It coins the problem: *"earlier assistant turns introduce errors, hallucinations, or stylistic
+  artifacts that propagate into future turns. We call this phenomenon context pollution."* (§2.5)
+- It quantifies the entanglement failure: *"follow-up without feedback for 33.1%"* of real WildChat +
+  ShareLM turns (§2.3) — prompts that reference a prior assistant response without reproducing it, where
+  blind omit hurts most.
+- It concedes blanket omit is over-aggressive: *"Note that the third case requires storing only the
+  relevant assistant turn."* (§2.4)
+- It names our method as its own future work: *"A natural extension of this work is to develop a
+  finer-grained approach for context filtering that preserves only the specific past assistant responses
+  relevant to a given prompt."* (§3)
+- It defers our statefulness axis: for *"multi-turn agentic systems, conversation context extends beyond
+  user prompts and assistant responses to include intermediate artifacts, such as tool outputs, execution
+  traces, retrieved files, and planning scratchpads … These additional outputs make context garbage
+  collection an even more critical design problem."* (§4)
+- It calls for our benchmark: *"the need for more carefully-curated real-world conversation benchmarks
+  that reflect true multi-turn dependence."* (§4)
+
+We build the eval that measures the two gaps Huang's authors explicitly flagged.
+
+### 7.2 The two closest neighbors, and how we differ
+
+- **ACON (`kang2026acon`)** — strongest *stateful* compressor; **fair comparator on the statefulness
+  axis**, not a strawman (public code, AppWorld 56.5% vs 56.0% no-compression at ~26% fewer peak tokens).
+  But it is *compress-then-hope*: it summarizes raw accumulated history / per-observation and relies on a
+  **contrastive guideline optimizer** (a learned, distribution-dependent heuristic) to retain whatever
+  cross-turn signal mattered on the *training* tasks. It never resolves inter-turn references before
+  compressing. Our structural wedge: decontextualize-then-edit makes each retained segment self-contained
+  *by construction*, so it holds on **novel** entanglement patterns ACON's guideline never saw. Orthogonal
+  gap: ACON preserves whatever is in the history, including the assistant's *erroneous* committed
+  assumptions; our analyzer specifically removes them. → distinguishing experiment: a high-coreference-
+  density held-out split where ACON's learned guideline has no coverage.
+- **StructFlowBench (`li2025structflowbench`, Findings ACL 2025)** — closest *scooping* risk; a 6-way
+  **categorical** inter-turn taxonomy (Follow-up, Refinement, Recall, Expansion, Summary, Unrelatedness)
+  scored by a GPT-4o judge on static "Golden Context." It does **not** do four things we do: (1) no
+  *continuous/graded* entanglement dial (categories are nominal labels); (2) no *statefulness* axis (pure
+  text history, no tools/env state); (3) no *faithfulness gate* on context edits; (4) no *context-strategy
+  comparison* — it evaluates models' native ability under one fixed protocol and never ablates
+  accumulate/omit/summarize/edit, nor measures task accuracy under pollution. Cite-and-distinguish.
+
+### 7.3 Method axis for the accuracy sweep (updated)
+
+`accumulate (S0)` · `omit_assistant (Huang/ERGO)` · `summarize_v1` (naive, production-representative) ·
+**`summarize_guided`** (the O1 steelman: summarizer told to preserve every later-referenced referent +
+all env state) · `context_edit_v2` (ours) · *[optional]* **ACON** on the statefulness axis. The
+`summarize_guided` condition is the one objection (O1) that needs an experiment not an argument: it either
+underperforms ours (generative summary can't guarantee verbatim referent/state preservation) or it
+collapses into an un-instrumented resolve-then-prune (validating our mechanism). Already folded into
+`docs/plans/entanglement_benchmark_spec.md`.
+
+### 7.4 Drop-in related-work paragraph (draft)
+
+> **Context management under multi-turn pollution.** Managing the conversational context to combat
+> *context pollution* — the over-conditioning on earlier, often erroneous, model outputs
+> [huang2026llmsbenefit] — has produced a spectrum of methods that we group by the lossy operation each
+> commits: **dropping** assistant turns wholesale [huang2026llmsbenefit, khalid2025ergo]; **evicting** KV
+> entries [zhang2023h2o, xiao2024streamingllm, li2024snapkv, cai2025pyramidkv]; **summarizing / compacting**
+> the history [jiang2023llmlingua, pan2024llmlingua2, kang2026acon, kontonis2026memento]; **retrieving**
+> salient turns on demand [packer2023memgpt, xu2025amem, chhikara2025mem0]; and **resetting** on an
+> uncertainty signal [khalid2025ergo]. A recurring limitation unites them: each discards or compresses
+> content *before* resolving how later turns refer back to it, so any inter-turn dependency that is
+> elliptical ("reverse that"), stateful (an accumulated environment value), or otherwise not locally
+> recoverable is silently severed. The conversational query-rewriting line [choi2021decontextualization,
+> elgohary2019canard, anantha2021qrecc, wu2022conqrr] resolves such references, but only to build a
+> one-shot retrieval key over a static corpus, discarding the resolution afterward. Benchmarks that probe
+> multi-turn structure either treat inter-turn relationships as *categorical* labels for instruction-
+> following compliance [li2025structflowbench, kwan2024mteval] or hold the shards independent by
+> construction [laban2026lic], leaving the degree of dependence uncontrolled. We instead expose
+> **entanglement** and **statefulness** as independently dial-able, faithfulness-gated axes on a single
+> benchmark, and compare context-management strategies along them — resolving references *before* pruning
+> (decontextualize-then-edit) rather than after.
+
+*(Bibkeys resolve against `research/context_mgmt_survey/related_work.bib`, 42 verified entries.)*
