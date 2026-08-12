@@ -13,6 +13,7 @@ Files are auto-discoverable via `find docs -name "*.md"`, but new docs accumulat
 - [`benchmarks_index.md`](benchmarks_index.md) — One-stop reference for the four benchmarks (LiC, CollabLLM, WildChat/Huang, Tau2).
 - [`scaling_experiments.md`](scaling_experiments.md) — How to run new experiments + sweeps with the post-Phase-3 setup.
 - [`global_todos.md`](global_todos.md) — Long-running cross-batch TODOs (sys-prompt preprocessing, input-order ablation, negative-guidance).
+- [`backup_restore_guide.md`](backup_restore_guide.md) — Self-contained runbook for backing a GCR node up to Azure Blob and restoring it elsewhere.
 - [`index.md`](index.md) — This file.
 
 ### Core method & architecture
@@ -197,6 +198,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-08-12 | `backup_restore_guide.md` | Node→Azure-Blob backup/restore runbook; secrets, verification, failure modes. |
 | 2026-07-30 | `plans/entanglement_benchmark_spec.md` | Spec for gradable artifact-refinement benchmark; full entanglement method sweep. |
 | 2026-07-30 | `entanglement_knob_findings.md` | Entanglement knob is task-structural: LiC retrofit = difficulty confound; referent construction = real gap. |
 | 2026-07-09 | `arxiv_push/worklog.md` | arXiv-push session log: paper recovery, adversarial debate, applied claim/polish edits, known issues. |
