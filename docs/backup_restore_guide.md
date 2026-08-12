@@ -21,11 +21,52 @@ is required.
 export STORAGE_ACCOUNT=yingxinwustorage
 export CONTAINER_NAME=mshotest
 export STAMP=$(date +%Y-%m-%d)            # e.g. 2026-08-12
+export NODE=$(hostname)                   # e.g. GCRAZGDL1739
+export PROJECT=ac3                        # <-- CHANGE THIS per node/project
+export PREFIX=${PROJECT}_${NODE}_${STAMP} # every blob name starts with this
 export STAGE=$HOME/backup_stage_${STAMP//-/}
 ```
 
 Everything is written to `$STAGE` first, then uploaded. `$STAGE` is scratch — delete it after
 you've verified the upload.
+
+### ⚠ One container, many nodes — namespace your blobs
+
+`mshotest` is a **flat, shared** container: no folders, no per-node isolation, and
+`az storage blob upload --overwrite` will silently clobber a same-named blob. If you back up a
+second node using the generic names below, you destroy the first node's backup.
+
+**Every blob name must carry `$PREFIX`.** That single rule keeps node-A and node-B backups
+side by side. Concretely:
+
+| Node / project | Blob names |
+|---|---|
+| `GCRAZGDL1739` / `ac3` | `ac3_GCRAZGDL1739_2026-08-12_ctx_editor.tar.zst`, `..._home_config.tar.zst`, `..._MANIFEST.md` |
+| other node / other project | `<proj>_<node>_<stamp>_<bundle>.tar.zst` |
+
+Before uploading anything, list what's already there and confirm no name of yours is taken:
+
+```bash
+az storage blob list --container-name "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT" \
+  --auth-mode login --query "[].name" -o tsv | sort
+```
+
+If a name you intend to write already exists, **change your `$PROJECT`/`$STAMP`, do not
+`--overwrite`.** Reserve `--overwrite` for re-running *your own* upload after a failure.
+
+> **Backups already in this container (do not overwrite):**
+> `backup.tar`, `ctx_editor_full_snapshot_2026-06-12.tar.gz`,
+> `project_preservation_supplementary_2026-06-12.tar.gz`, and the
+> `*_2026-08-12.*` set from `GCRAZGDL1739`.
+
+If you'd rather have hard separation than a naming convention, make your own container —
+you keep the same commands, just a different `$CONTAINER_NAME`:
+
+```bash
+export CONTAINER_NAME=<yourname>-<project>
+az storage container create --name "$CONTAINER_NAME" \
+  --account-name "$STORAGE_ACCOUNT" --auth-mode login
+```
 
 ---
 
@@ -152,27 +193,32 @@ cd "$HOME"
 
 EX="--exclude=.venv --exclude=venv --exclude=__pycache__ --exclude=.mypy_cache \
 --exclude=.ruff_cache --exclude=.pytest_cache --exclude=node_modules --exclude=.ipynb_checkpoints"
+```
 
+**The bundle list below is `ac3`-specific — replace the paths with your own project's.** Only
+the last one (`home_config`) is universal; keep it on every node.
+
+```bash
 # one project repo (note the extra exclude for a big public dataset)
 tar -I 'zstd -T8 -3' $EX --exclude=ac3/ctx_editor/data/spider \
-    -cf "$STAGE/ac3_ctx_editor_$STAMP.tar.zst" ac3/ctx_editor
+    -cf "$STAGE/${PREFIX}_ctx_editor.tar.zst" ac3/ctx_editor
 
 # an outputs-only snapshot
-tar -I 'zstd -T8 -3' $EX -cf "$STAGE/ac3_t14_snapshot_$STAMP.tar.zst" ac3/t14_snapshot
+tar -I 'zstd -T8 -3' $EX -cf "$STAGE/${PREFIX}_t14_snapshot.tar.zst" ac3/t14_snapshot
 
 # another repo, plus odds and ends
-tar -I 'zstd -T4 -3' $EX -cf "$STAGE/ac3_tau2_ctxe_$STAMP.tar.zst" \
-    ac3/tau2_ctxe ac3/recovered ac3/recovered_t20 ac3/recovered_t2c ac3/save_blob.md
+tar -I 'zstd -T4 -3' $EX -cf "$STAGE/${PREFIX}_tau2_ctxe.tar.zst" \
+    ac3/tau2_ctxe ac3/recovered ac3/recovered_t20 ac3/recovered_t2c
 
-tar -I 'zstd -T4 -3' $EX -cf "$STAGE/msho_intern26_$STAMP.tar.zst" msho-intern-26
+tar -I 'zstd -T4 -3' $EX -cf "$STAGE/${PREFIX}_msho_intern26.tar.zst" msho-intern-26
 
-# home: Claude state + dotfiles + small side repos. NO secrets (see below).
+# UNIVERSAL — Claude state + dotfiles + small side repos. NO secrets (see below).
 tar -I 'zstd -T8 -3' $EX --exclude=harness_understanding/code_ref \
-    -cf "$STAGE/home_config_$STAMP.tar.zst" \
+    -cf "$STAGE/${PREFIX}_home_config.tar.zst" \
     .claude .bashrc .profile .zshrc .bash_history .bash_logout \
-    .tmux.conf .tmux .vim .viminfo .config .agents \
-    misc trapi-llm-queries.md writing-skills-repo code_ref copilot-api harness_understanding
+    .tmux.conf .tmux .vim .viminfo .config .agents
 ```
+
 
 `-T8` = 8 compression threads. Bump toward `nproc` if you're not running anything else;
 several `tar`s in parallel will saturate disk read anyway. `-3` is zstd's default level —
@@ -200,8 +246,8 @@ If you must carry them, encrypt first — never plain:
 
 ```bash
 tar -I 'zstd -T4 -3' -cf - .ssh .env .azure .claude.json \
-  | openssl enc -aes-256-cbc -pbkdf2 -salt -out "$STAGE/secrets_$STAMP.tar.zst.enc"
-# restore: openssl enc -d -aes-256-cbc -pbkdf2 -in secrets_*.enc | tar -I zstd -xf - -C $HOME
+  | openssl enc -aes-256-cbc -pbkdf2 -salt -out "$STAGE/${PREFIX}_secrets.tar.zst.enc"
+# restore: openssl enc -d -aes-256-cbc -pbkdf2 -in <file>.enc | tar -I zstd -xf - -C $HOME
 ```
 
 Sanity-scan before uploading either way:
@@ -219,38 +265,46 @@ Catching a bad archive now is far cheaper than discovering it after the node is 
 
 ```bash
 cd "$STAGE"
-for f in *.tar.zst; do printf "%-44s " "$f"; zstd -t "$f" 2>&1 | tail -1; done
+for f in *.tar.zst; do printf "%-52s " "$f"; zstd -t "$f" 2>&1 | tail -1; done
 
 # spot-check that excludes worked and the important paths are actually inside
-tar -tf ac3_ctx_editor_$STAMP.tar.zst | grep -c '\.venv/'                 # expect 0
-tar -tf ac3_ctx_editor_$STAMP.tar.zst | grep -c 'writing/overleaf_repo/'  # expect > 0
-tar -tf home_config_$STAMP.tar.zst    | grep -cE '^\.(ssh|env|azure)'     # expect 0
-tar -tf home_config_$STAMP.tar.zst    | grep -c '\.claude/projects/.*\.jsonl'
+tar -tf ${PREFIX}_ctx_editor.tar.zst | grep -c '\.venv/'                 # expect 0
+tar -tf ${PREFIX}_ctx_editor.tar.zst | grep -c 'writing/overleaf_repo/'  # expect > 0
+tar -tf ${PREFIX}_home_config.tar.zst | grep -cE '^\.(ssh|env|azure)'    # expect 0
+tar -tf ${PREFIX}_home_config.tar.zst | grep -c '\.claude/projects/.*\.jsonl'
 
-md5sum    *.tar.zst > MD5SUMS_$STAMP.txt
-sha256sum *.tar.zst > SHA256SUMS_$STAMP.txt
+md5sum    *.tar.zst > ${PREFIX}_MD5SUMS.txt
+sha256sum *.tar.zst > ${PREFIX}_SHA256SUMS.txt
 ```
 
-Write a `MANIFEST_$STAMP.md` next to them recording: node name, date, what each archive holds,
-**what you deliberately excluded and why**, and the git state (branch, SHA, ahead/behind,
-uncommitted files) of every repo. Six months later the exclusion list is the part you'll
-actually need.
+Write a `${PREFIX}_MANIFEST.md` next to them recording: node name, date, what each archive
+holds, **what you deliberately excluded and why**, and the git state (branch, SHA,
+ahead/behind, uncommitted files) of every repo. Six months later the exclusion list is the
+part you'll actually need.
 
 ---
 
 ## 6. Upload
 
-Date-stamped names never collide with previous backups, so `--overwrite` is safe here.
+Names carry `$PREFIX`, so they can't collide with another node's set. `--overwrite` is then
+only ever re-writing your own file after a failed attempt.
 
 ```bash
 cd "$STAGE"
-for f in *.tar.zst MD5SUMS_$STAMP.txt SHA256SUMS_$STAMP.txt MANIFEST_$STAMP.md; do
+for f in *.tar.zst ${PREFIX}_MD5SUMS.txt ${PREFIX}_SHA256SUMS.txt ${PREFIX}_MANIFEST.md; do
   echo "=== $f"
   az storage blob upload \
     --account-name "$STORAGE_ACCOUNT" --container-name "$CONTAINER_NAME" \
     --name "$f" --file "$f" \
     --auth-mode login --overwrite --no-progress -o none || echo "FAILED: $f"
 done
+```
+
+Also upload this guide itself, so a bare node can bootstrap from the container alone:
+
+```bash
+az storage blob upload --account-name "$STORAGE_ACCOUNT" --container-name "$CONTAINER_NAME" \
+  --name BACKUP_RESTORE_GUIDE.md --file BACKUP_RESTORE_GUIDE.md --auth-mode login --overwrite
 ```
 
 Multi-GB uploads take a while; run under `tmux` or `nohup` so a dropped SSH session doesn't
@@ -266,7 +320,7 @@ Azure stores an MD5 for blobs uploaded in one shot. Compare remote against local
 ```bash
 az storage blob list \
   --container-name "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT" --auth-mode login \
-  --query "[?contains(name,'$STAMP')].{name:name, bytes:properties.contentLength, md5:properties.contentSettings.contentMd5}" \
+  --query "[?starts_with(name,'$PREFIX')].{name:name, bytes:properties.contentLength, md5:properties.contentSettings.contentMd5}" \
   -o table
 ```
 
@@ -274,19 +328,25 @@ Sizes must match `ls -l` exactly. The `md5` column is **base64**, not hex — co
 hash to compare:
 
 ```bash
-openssl dgst -md5 -binary ac3_ctx_editor_$STAMP.tar.zst | base64
+openssl dgst -md5 -binary ${PREFIX}_ctx_editor.tar.zst | base64
 ```
 
-For blobs uploaded in chunks (roughly >256 MB) the `md5` field may be empty. That's normal —
-fall back to a size check plus a real round-trip on at least one archive:
+For blobs uploaded in chunks (roughly >256 MB) the `md5` field comes back **empty**. That's
+normal and expected — Azure only stores `Content-MD5` for single-shot puts. Verify those by
+downloading them back and hashing:
 
 ```bash
-az storage blob download --account-name "$STORAGE_ACCOUNT" --container-name "$CONTAINER_NAME" \
-  --name home_config_$STAMP.tar.zst --file /tmp/rt.tar.zst --auth-mode login --no-progress
-md5sum /tmp/rt.tar.zst; grep home_config MD5SUMS_$STAMP.txt
+mkdir -p /tmp/rt && cd /tmp/rt
+for f in <the big ones>; do
+  az storage blob download --account-name "$STORAGE_ACCOUNT" --container-name "$CONTAINER_NAME" \
+    --name "$f" --file "$f" --auth-mode login --no-progress -o none
+done
+md5sum *.tar.zst                       # compare against ${PREFIX}_MD5SUMS.txt
+cd - && rm -rf /tmp/rt
 ```
 
 Only after this passes should you delete `$STAGE`.
+
 
 ---
 
@@ -295,35 +355,36 @@ Only after this passes should you delete `$STAGE`.
 ```bash
 export STORAGE_ACCOUNT=yingxinwustorage
 export CONTAINER_NAME=mshotest
-export STAMP=2026-08-12
 az login --use-device-code
 
 mkdir -p ~/restore && cd ~/restore
 
-# see what's there
+# 1. see what's there, and pick the PREFIX belonging to the node you want back
 az storage blob list --container-name "$CONTAINER_NAME" --account-name "$STORAGE_ACCOUNT" \
-  --auth-mode login --query "[].name" -o tsv
+  --auth-mode login --query "[].name" -o tsv | sort
 
-# read the manifest first — it tells you what is and isn't in these archives
+export PREFIX=ac3_GCRAZGDL1739_2026-08-12      # <-- set to the set you're restoring
+
+# 2. read that set's manifest first — it says what is and isn't in these archives
 az storage blob download --account-name "$STORAGE_ACCOUNT" --container-name "$CONTAINER_NAME" \
-  --name MANIFEST_$STAMP.md --file MANIFEST_$STAMP.md --auth-mode login --no-progress
-cat MANIFEST_$STAMP.md
+  --name ${PREFIX}_MANIFEST.md --file ${PREFIX}_MANIFEST.md --auth-mode login --no-progress
+cat ${PREFIX}_MANIFEST.md
 
-# pull the archives
-for f in ac3_ctx_editor ac3_t14_snapshot ac3_tau2_ctxe msho_intern26 home_config; do
+# 3. pull every blob in that set (and only that set)
+for f in $(az storage blob list --container-name "$CONTAINER_NAME" \
+             --account-name "$STORAGE_ACCOUNT" --auth-mode login \
+             --query "[?starts_with(name,'$PREFIX')].name" -o tsv); do
   az storage blob download --account-name "$STORAGE_ACCOUNT" --container-name "$CONTAINER_NAME" \
-    --name ${f}_$STAMP.tar.zst --file ${f}_$STAMP.tar.zst --auth-mode login --no-progress
+    --name "$f" --file "$f" --auth-mode login --no-progress -o none && echo "got $f"
 done
-az storage blob download --account-name "$STORAGE_ACCOUNT" --container-name "$CONTAINER_NAME" \
-  --name MD5SUMS_$STAMP.txt --file MD5SUMS_$STAMP.txt --auth-mode login --no-progress
 
-md5sum -c MD5SUMS_$STAMP.txt      # every line must say OK
+md5sum -c ${PREFIX}_MD5SUMS.txt      # every line must say OK
 ```
 
 Extract (archives are `$HOME`-rooted, so extract *into* `$HOME`):
 
 ```bash
-for f in *_$STAMP.tar.zst; do tar -I zstd -xf "$f" -C "$HOME"; done
+for f in ${PREFIX}_*.tar.zst; do tar -I zstd -xf "$f" -C "$HOME"; done
 ```
 
 `tar` overwrites same-named files. On a node with existing work, extract to a scratch dir
@@ -373,6 +434,8 @@ ls ~/.claude/projects/*/memory/MEMORY.md 2>/dev/null
 
 ## Failure modes worth remembering
 
+- **A shared container has no folders.** `--overwrite` with a generic name destroys another
+  node's backup. Prefix every blob with `<project>_<node>_<date>`.
 - **Gitignored directories are invisible to your GitHub backup.** Nested clones (e.g. an
   Overleaf-connected repo inside a project) exist only on disk. Tar them explicitly.
 - **`~/.claude/` is not part of any project.** Project-rooted tarballs miss it entirely, and
@@ -380,5 +443,6 @@ ls ~/.claude/projects/*/memory/MEMORY.md 2>/dev/null
 - **Wrong SSH key reads as revoked access.** Test each key against `git@github.com` before
   assuming a repo is unreachable.
 - **`/mnt` is wiped by maintenance.** Never stage a backup there.
-- **An unverified upload is not a backup.** Check sizes and round-trip at least one archive
-  before deleting the staging directory.
+- **An unverified upload is not a backup.** Check sizes and round-trip the chunked (>256 MB)
+  archives before deleting the staging directory.
+
