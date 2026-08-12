@@ -196,7 +196,9 @@ EX="--exclude=.venv --exclude=venv --exclude=__pycache__ --exclude=.mypy_cache \
 ```
 
 **The bundle list below is `ac3`-specific — replace the paths with your own project's.** Only
-the last one (`home_config`) is universal; keep it on every node.
+the last one (`home_config`) is universal; keep it on every node. **Whatever bundles you
+choose, name every `-cf` target `"$STAGE/${PREFIX}_<something>.tar.zst"`** — the upload guard
+in §6 rejects anything else.
 
 ```bash
 # one project repo (note the extra exclude for a big public dataset)
@@ -291,7 +293,17 @@ only ever re-writing your own file after a failed attempt.
 
 ```bash
 cd "$STAGE"
-for f in *.tar.zst ${PREFIX}_MD5SUMS.txt ${PREFIX}_SHA256SUMS.txt ${PREFIX}_MANIFEST.md; do
+
+# Guard: refuse to upload anything not carrying $PREFIX. This is what keeps one node's
+# backup from ever landing on another node's blob name.
+for f in *; do
+  case "$f" in
+    "$PREFIX"_*|BACKUP_RESTORE_GUIDE.md) ;;
+    *) echo "REFUSING (not prefixed with $PREFIX): $f" ;;
+  esac
+done
+
+for f in "$PREFIX"_*; do
   echo "=== $f"
   az storage blob upload \
     --account-name "$STORAGE_ACCOUNT" --container-name "$CONTAINER_NAME" \
@@ -299,6 +311,10 @@ for f in *.tar.zst ${PREFIX}_MD5SUMS.txt ${PREFIX}_SHA256SUMS.txt ${PREFIX}_MANI
     --auth-mode login --overwrite --no-progress -o none || echo "FAILED: $f"
 done
 ```
+
+If the guard prints anything, **rename those files to start with `$PREFIX` before uploading** —
+don't upload them as-is. (You built the bundles in §4 with your own paths; make sure their
+`-cf` targets used `$PREFIX` too.)
 
 Also upload this guide itself, so a bare node can bootstrap from the container alone:
 
