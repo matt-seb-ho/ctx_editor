@@ -154,6 +154,7 @@ Variance:
 - [`arxiv_push/arxiv_revision_plan.md`](arxiv_push/arxiv_revision_plan.md) — Prioritized edit plan (tau2 reconciliation, jun1 items, polish) + debate reconciliation.
 - [`arxiv_push/worklog.md`](arxiv_push/worklog.md) — Session work log: recovery, debate, applied edits, known issues.
 - [`arxiv_push/followup_experiments.md`](arxiv_push/followup_experiments.md) — Experiments deferred to future paper versions.
+- [`arxiv_push/nice_to_have_experiments.md`](arxiv_push/nice_to_have_experiments.md) — arXiv v1 nice-to-haves + pre-publication checklist (author block, Fig 1 redraw, v2 experiments).
 - [`arxiv_push/debate/01_reviewer_skeptic.md`](arxiv_push/debate/01_reviewer_skeptic.md) — Adversarial claim-evidence review (rejection risks).
 - [`arxiv_push/debate/02_writing_editor.md`](arxiv_push/debate/02_writing_editor.md) — Writing/clarity review + before→after rewrites.
 - [`arxiv_push/debate/03_synthesis.md`](arxiv_push/debate/03_synthesis.md) — Adjudication reconciling both reviews vs the jun1 framing.
@@ -198,6 +199,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-08-12 | `arxiv_push/nice_to_have_experiments.md` | arXiv v1 nice-to-haves + pre-pub checklist; ranked v2 experiments. |
 | 2026-08-12 | `backup_restore_guide.md` | Node→Azure-Blob backup/restore runbook; secrets, verification, failure modes. |
 | 2026-07-30 | `plans/entanglement_benchmark_spec.md` | Spec for gradable artifact-refinement benchmark; full entanglement method sweep. |
 | 2026-07-30 | `entanglement_knob_findings.md` | Entanglement knob is task-structural: LiC retrofit = difficulty confound; referent construction = real gap. |
