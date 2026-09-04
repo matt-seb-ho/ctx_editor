@@ -150,6 +150,7 @@ Variance:
 - [`jun1_megatable_findings.md`](jun1_megatable_findings.md) — Cross-model mega-table findings: new claims to add, contradicted claims to fix, discussion-direction shifts.
 
 ### arXiv push (2026-07)
+- [`arxiv_push/REVIEW_FINDINGS_2026-09-04.md`](arxiv_push/REVIEW_FINDINGS_2026-09-04.md) — Fresh adversarial review: verified tau2 Table-2 integrity blocker (B1) + LiC headline reconciliation (S1–S3).
 - [`arxiv_push/STATE_REPORT_2026-09-03.md`](arxiv_push/STATE_REPORT_2026-09-03.md) — Get-back-up-to-speed report: arXiv draft readiness, blockers (author block, Fig 1), and a full tmux/Claude-session cleanup guide.
 - [`arxiv_push/state_of_project.md`](arxiv_push/state_of_project.md) — Get-back-up-to-speed overview: what AC3 is, paper status, mega-table adds, recovery status, what's left.
 - [`arxiv_push/arxiv_revision_plan.md`](arxiv_push/arxiv_revision_plan.md) — Prioritized edit plan (tau2 reconciliation, jun1 items, polish) + debate reconciliation.
@@ -200,6 +201,7 @@ Date is **first-commit date** (or file mtime for never-committed files). Newest 
 
 | Date | File | One-liner |
 |---|---|---|
+| 2026-09-04 | `arxiv_push/REVIEW_FINDINGS_2026-09-04.md` | Fresh review: verified tau2 Table-2 integrity blocker + LiC headline inconsistencies. |
 | 2026-09-03 | `arxiv_push/STATE_REPORT_2026-09-03.md` | arXiv readiness + blockers + tmux/Claude-session cleanup guide. |
 | 2026-08-12 | `arxiv_push/nice_to_have_experiments.md` | arXiv v1 nice-to-haves + pre-pub checklist; ranked v2 experiments. |
 | 2026-08-12 | `backup_restore_guide.md` | Node→Azure-Blob backup/restore runbook; secrets, verification, failure modes. |

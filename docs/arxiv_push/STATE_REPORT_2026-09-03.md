@@ -5,10 +5,15 @@ internship. Two parts: **(1) is the paper done/ready?** and **(2) a guide to the
 sessions on this machine** with close/keep recommendations.
 
 TL;DR:
-- **The arXiv draft is written, honest, internally consistent, and revised through multiple
-  passes (research-paper-writing skill + a formal adversarial debate + a later, even more
-  conservative evidence fold-in).** It is *not yet posted*, and there are **3 real blockers**,
-  only one of which is genuinely hard.
+- **The arXiv draft is written, revised through multiple passes (research-paper-writing skill +
+  a formal adversarial debate + a later evidence fold-in), and honest *in its prose*.** It is
+  *not yet posted*.
+- **⚠ CORRECTION (2026-09-04):** a fresh clean-eyes review found the draft is **not** internally
+  consistent — the tau2 *prose* withdrawal was never propagated into **Table 2**, which still
+  prints the withdrawn improvement numbers, and the LiC headline "67–82%" doesn't reconcile with
+  the variance appendix's own N=3 means. This adds a **content-integrity blocker (B1)** on top of
+  the 3 below. Full detail: `docs/arxiv_push/REVIEW_FINDINGS_2026-09-04.md`. The "internally
+  consistent" language in this report predates that review and is superseded by it.
 - **The machine is running 4 Claude sessions across 3 tmux sessions.** Only one (the `arxiv`
   window in tmux session `1`) did the paper work, and its output is fully committed to git — so
   the others can be closed safely. Recommendation: consolidate to a single driver session.
@@ -111,13 +116,19 @@ Already in place — no `_v1/_v2` file sprawl needed:
   and stale** (a May-9 table-mockup-era artifact, *not* a newer version despite the name). Recommend
   deleting or renaming it so it isn't mistaken for the current draft.
 
-### 1.6 Honest caveat about *this* report
+### 1.6 Honest caveat about *this* report — now resolved by a fresh pass
 
 I (the Sep-3 session) **verified the blockers and framing directly** in the `.tex` and confirmed
 the debate artifacts exist, but I did **not** re-run a fresh independent adversarial pass or
 re-verify every number in this sitting. The multi-pass revision above was done by the prior
-`arxiv` session. If you want, I can run one more clean-eyes review pass (skeptic + copyedit) as the
-first task of the consolidated session before we push — recommended, since it's cheap insurance.
+`arxiv` session.
+
+**Update (2026-09-04):** that clean-eyes pass has now been run (skeptic + copyedit subagents +
+manual verification). It **found real internal inconsistencies this report missed** — see
+`REVIEW_FINDINGS_2026-09-04.md`. Net effect on §1.1/§1.4: there are now **four** blockers, not
+three — add **B1 (tau2 Table 2 still shows the withdrawn numbers)** ahead of the author block and
+Figure 1, and treat the LiC headline reconciliation (S1–S3) as a should-fix-before-post. The
+"cheap insurance" turned out to catch a genuine posting blocker.
 
 ---
 
