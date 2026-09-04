@@ -15,6 +15,16 @@ posting-blocking, because a reviewer inspecting the tables sees claims the text 
 Status legend: ✅ verified by me against the file · 🟡 reviewer-reported, plausible, not yet
 hand-verified.
 
+> **RESOLVED 2026-09-04 (inner-repo commit `9e9d2ae`).** B1 and S1–S3 are now **fixed**.
+> B1: Table 2's tau2 block was rebuilt from the verified re-measured N=3 matrix (source:
+> `neurips_review/autoresearch/tasks/T6/worklog.md` Table 1, cross-checked against
+> `neurips_review/autoresearch/PAPER_EDITS.md` — my three known rows matched exactly, and the
+> worklog's "seed-42 N=1 ref" column reproduced Table 2's old cells, confirming they were the
+> withdrawn single-run numbers). S1–S3: Table 1 Gated-Reset row set to the appendix N=3 means
+> (code→64.4, actions→61.3); headline 67–82% → 55–84%; code closure 82%/78% → 84%. No numbers
+> were invented. Remaining open items below: S4 (MT-OSC cite), S5 (l.577 cross-ref), S6 (abstract
+> scope), M1–M3, plus the non-review blockers (author block, Figure 1, push).
+
 ---
 
 ## Applied already (committed `f73371a`, revertible)
